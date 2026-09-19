@@ -1,6 +1,6 @@
 # M2 local generation-provider interfaces
 
-This interface covers the bounded local generation provider. It does not yet contain the Click requirement contract, scenarios, checker implementation, or reward. Import the public boundary from `feature_rl.generation`; M0 retains ownership of shared artifact schemas and storage.
+This interface covers the bounded local generation provider and grounded requirement/scenario authoring. Import the public boundaries from `feature_rl.generation`, `feature_rl.requirements`, and `feature_rl.scenarios`; M0 retains ownership of shared artifact schemas and storage. Checker implementation and reward remain later modules.
 
 ## Provider construction and call
 
@@ -72,6 +72,22 @@ The `tiny_smoke_2048x128` measurement profile is qualified only through 2,048 ac
 | process physical footprint | external `proc_pid_rusage` sampling every 20 ms; process group killed above 4 GiB; any missing/exceptional observation fails the call immediately |
 | declared memory ceiling | 5 GiB, leaving a 1 GiB guard band above the sampled kill threshold |
 | process cleanup | from successful spawn onward, a `finally` path kills/reaps the fresh process group after normal exit, boundary failure, monitor exception, or interruption and checks absence |
+
+## Requirement authoring
+
+`ClickDiscoveryService.discover(prepared)` runs the fixed public Click probe through M3's installed-wheel path. Its author-visible `ClickDiscoveryObservation` binds the exact baseline, environment recipe, and private build/execution receipt hashes. `BaselineRetriever` reads only declared inert archive paths and inclusive line ranges; safe directory metadata is ignored while links and other non-regular members reject. `AuthoringEvidenceResolver` reconstructs every supplied request, baseline span, public check, and discovery context from the controller store before inference and rejects altered text, locators, roles, or references.
+
+`RequirementContractProposal` is derived from the actual M0 `RequirementContract` field metadata for the semantic fields. `build_contract_request(...)` accepts a bounded requirement-ID namespace without requiring the model to use every ID. `ContractAuthoringService.generate(...)` resolves the evidence, checks the request contexts, makes at most one initial attempt plus two diagnosed repairs, grounds every quote and locator, validates entry points and observations against discovery, binds the final visible request and provenance label to the resolved request, constructs the real M0 artifact, and stores it immutably.
+
+Every attempt creates a journal with an exact request hash and a semantic request hash that excludes only request/response/prompt identities. A repair must change that semantic hash. `AuthoringExhausted` returns all verified rejected-journal refs. `AuthoringJournalPublicationPending.replay(store)` publishes a failed rejection journal before any later generation. A provider error with `generation_succeeded=true` is propagated with its `GenerationPublicationRecovery`; `GenerationProviderError.replay_result(archive)` completes provider publication and returns the original validated result. Passing that result back as `recovered_result=` completes grounding, journaling, and artifact publication without another model call. `AuthoringPublicationPending.replay(store)` handles a later accepted-journal or final-artifact publication fault.
+
+## Scenario planning
+
+`build_scenario_request(...)` creates the explicit `scenario_planning` stage from one exact authoring `RequirementContract`, the admitted request/B/discovery contexts, and the contract's actual requirement IDs. `ScenarioAuthoringService.generate(...)` dereferences the contract and requires its canonical context text, locator, ref, ordered ID sequence, exact admitted request/B/discovery reference set, request text/provenance, and requirement observation set. It applies the same three-attempt journaling, semantic-change, provider-recovery, and storage-replay rules as contract authoring.
+
+`ScenarioFinalizer` derives the mandatory set from every mandatory feature requirement plus every compatibility obligation, rejects unknown IDs or unsupported observations, grounds each oracle in the admitted evidence, requires meaningful coverage of the mandatory set, preserves `same_cases_within_group=true`, constructs the real M0 `ScenarioPlan`, and stores it with an exact contract join.
+
+The production Click run retained one successful M3 discovery and three provider calls. Two calls reached the fixed 120-second deadline. The final concise four-ID call completed in 84.458 seconds but returned a duplicate-key response that strict JSON rejected. No contract or scenario was frozen; this is an explicit construction failure rather than an API fallback or handwritten artifact.
 
 The physical-footprint boundary is sampled and can overshoot between polls. It is not a zero-transient allocator reservation. The MLX limit is a library guideline. Receipts report the maximum sampled physical footprint separately from the kernel-reported lifetime maximum. Process count is observed through the single fixed worker design and group cleanup; this interface does not claim an OS-enforced one-process quota.
 

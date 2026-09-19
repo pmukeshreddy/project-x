@@ -1,0 +1,201 @@
+started=2026-09-19T21:17:18Z
+........................................................................ [ 17%]
+........................................................................ [ 34%]
+........................................................................ [ 52%]
+........................................................................ [ 69%]
+........................................................................ [ 86%]
+....................................FFFFFFF......F....                   [100%]
+=================================== FAILURES ===================================
+____ test_real_process_crash_recovers_exact_committed_history[uncommitted] _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_real_process_crash_recove0')
+point = 'uncommitted'
+
+    @pytest.mark.parametrize('point', ['uncommitted', 'committed', 'partial', 'append_before_fsync',
+                                     'fsync_before_ack', 'ack_uncommitted', 'reply_lost'])
+    def test_real_process_crash_recovers_exact_committed_history(tmp_path, point):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        child = subprocess.run([sys.executable, '-c', CHILD, str(reg.root), str(store.root),
+                                spec.model_dump_json(), point], capture_output=True, timeout=15)
+>       assert child.returncode == 51, child.stderr.decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 51
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "\nimport os, sys\nfr...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_registry_durability.py:63: AssertionError
+_____ test_real_process_crash_recovers_exact_committed_history[committed] ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_real_process_crash_recove1')
+point = 'committed'
+
+    @pytest.mark.parametrize('point', ['uncommitted', 'committed', 'partial', 'append_before_fsync',
+                                     'fsync_before_ack', 'ack_uncommitted', 'reply_lost'])
+    def test_real_process_crash_recovers_exact_committed_history(tmp_path, point):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        child = subprocess.run([sys.executable, '-c', CHILD, str(reg.root), str(store.root),
+                                spec.model_dump_json(), point], capture_output=True, timeout=15)
+>       assert child.returncode == 51, child.stderr.decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 51
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "\nimport os, sys\nfr...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_registry_durability.py:63: AssertionError
+______ test_real_process_crash_recovers_exact_committed_history[partial] _______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_real_process_crash_recove2')
+point = 'partial'
+
+    @pytest.mark.parametrize('point', ['uncommitted', 'committed', 'partial', 'append_before_fsync',
+                                     'fsync_before_ack', 'ack_uncommitted', 'reply_lost'])
+    def test_real_process_crash_recovers_exact_committed_history(tmp_path, point):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        child = subprocess.run([sys.executable, '-c', CHILD, str(reg.root), str(store.root),
+                                spec.model_dump_json(), point], capture_output=True, timeout=15)
+>       assert child.returncode == 51, child.stderr.decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 51
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "\nimport os, sys\nfr...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_registry_durability.py:63: AssertionError
+_ test_real_process_crash_recovers_exact_committed_history[append_before_fsync] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_real_process_crash_recove3')
+point = 'append_before_fsync'
+
+    @pytest.mark.parametrize('point', ['uncommitted', 'committed', 'partial', 'append_before_fsync',
+                                     'fsync_before_ack', 'ack_uncommitted', 'reply_lost'])
+    def test_real_process_crash_recovers_exact_committed_history(tmp_path, point):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        child = subprocess.run([sys.executable, '-c', CHILD, str(reg.root), str(store.root),
+                                spec.model_dump_json(), point], capture_output=True, timeout=15)
+>       assert child.returncode == 51, child.stderr.decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 51
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "\nimport os, sys\nfr...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_registry_durability.py:63: AssertionError
+__ test_real_process_crash_recovers_exact_committed_history[fsync_before_ack] __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_real_process_crash_recove4')
+point = 'fsync_before_ack'
+
+    @pytest.mark.parametrize('point', ['uncommitted', 'committed', 'partial', 'append_before_fsync',
+                                     'fsync_before_ack', 'ack_uncommitted', 'reply_lost'])
+    def test_real_process_crash_recovers_exact_committed_history(tmp_path, point):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        child = subprocess.run([sys.executable, '-c', CHILD, str(reg.root), str(store.root),
+                                spec.model_dump_json(), point], capture_output=True, timeout=15)
+>       assert child.returncode == 51, child.stderr.decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 51
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "\nimport os, sys\nfr...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_registry_durability.py:63: AssertionError
+__ test_real_process_crash_recovers_exact_committed_history[ack_uncommitted] ___
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_real_process_crash_recove5')
+point = 'ack_uncommitted'
+
+    @pytest.mark.parametrize('point', ['uncommitted', 'committed', 'partial', 'append_before_fsync',
+                                     'fsync_before_ack', 'ack_uncommitted', 'reply_lost'])
+    def test_real_process_crash_recovers_exact_committed_history(tmp_path, point):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        child = subprocess.run([sys.executable, '-c', CHILD, str(reg.root), str(store.root),
+                                spec.model_dump_json(), point], capture_output=True, timeout=15)
+>       assert child.returncode == 51, child.stderr.decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 51
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "\nimport os, sys\nfr...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_registry_durability.py:63: AssertionError
+_____ test_real_process_crash_recovers_exact_committed_history[reply_lost] _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_real_process_crash_recove6')
+point = 'reply_lost'
+
+    @pytest.mark.parametrize('point', ['uncommitted', 'committed', 'partial', 'append_before_fsync',
+                                     'fsync_before_ack', 'ack_uncommitted', 'reply_lost'])
+    def test_real_process_crash_recovers_exact_committed_history(tmp_path, point):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        child = subprocess.run([sys.executable, '-c', CHILD, str(reg.root), str(store.root),
+                                spec.model_dump_json(), point], capture_output=True, timeout=15)
+>       assert child.returncode == 51, child.stderr.decode()
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 51
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "\nimport os, sys\nfr...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_registry_durability.py:63: AssertionError
+_________________ test_two_real_processes_cannot_claim_one_job _________________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1164/test_two_real_processes_cannot0')
+
+    def test_two_real_processes_cannot_claim_one_job(tmp_path):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        job = reg.enqueue(spec)
+        code = r'''
+    import json,sys
+    from pathlib import Path
+    from feature_rl.artifacts import ArtifactStore
+    from feature_rl.contracts import ActorRole
+    from feature_rl.registry import Registry, ClaimConflict
+    root, objects, job, owner = sys.argv[1:]
+    reg=Registry(Path(root), ArtifactStore(Path(objects),ActorRole.CONTROLLER))
+    print('ready',flush=True)
+    sys.stdin.readline()
+    try:
+        claim=reg.claim(job,owner=owner,claim_key=owner)
+        print(claim.model_dump_json(),flush=True)
+    except ClaimConflict:
+        raise SystemExit(3)
+    '''
+        children = [subprocess.Popen([sys.executable, '-c', code, str(reg.root), str(store.root), job.job_id, owner],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    for owner in ('worker-1', 'worker-2')]
+        try:
+            for child in children:
+>               assert child.stdout.readline().strip() == 'ready'
+E               AssertionError: assert '' == 'ready'
+E                 
+E                 - ready
+
+tests/test_registry_durability.py:150: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_registry_durability.py::test_real_process_crash_recovers_exact_committed_history[uncommitted]
+FAILED tests/test_registry_durability.py::test_real_process_crash_recovers_exact_committed_history[committed]
+FAILED tests/test_registry_durability.py::test_real_process_crash_recovers_exact_committed_history[partial]
+FAILED tests/test_registry_durability.py::test_real_process_crash_recovers_exact_committed_history[append_before_fsync]
+FAILED tests/test_registry_durability.py::test_real_process_crash_recovers_exact_committed_history[fsync_before_ack]
+FAILED tests/test_registry_durability.py::test_real_process_crash_recovers_exact_committed_history[ack_uncommitted]
+FAILED tests/test_registry_durability.py::test_real_process_crash_recovers_exact_committed_history[reply_lost]
+FAILED tests/test_registry_durability.py::test_two_real_processes_cannot_claim_one_job
+8 failed, 406 passed in 95.34s (0:01:35)
+completed=2026-09-19T21:18:53Z
+exit_status=1
