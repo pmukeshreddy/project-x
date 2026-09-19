@@ -1,0 +1,20 @@
+RESOURCE_GATE {"scope": "unit_diagnostic_load_only", "declared": {"memory_bytes": 67108864, "cpu_seconds": 1.0, "pids": 8, "disk_bytes": 8388608}, "recipe": {"memory_bytes": 536870912, "cpu_seconds": 60.0, "pids": 64, "disk_bytes": 134217728}, "accepted": true}
+FBASELINE_CLASSIFICATION {"scope": "unit_diagnostic_preflight_only", "reward": 0, "disposition": "candidate_rejection", "reason": "source submission rejected: malformed source tar", "case_statuses": ["not_run", "not_run"], "build_evidence": null}
+F
+=================================== FAILURES ===================================
+__________ test_task_resource_limits_below_fixed_runtime_must_reject ___________
+docs/evidence/M4/review-core-round1/test_core_concerns.py:32: in test_task_resource_limits_below_fixed_runtime_must_reject
+    assert not any(enforced[name] > value for name, value in declared.items()), \
+E   AssertionError: Unsupported resource envelope was admitted by M4
+E   assert not True
+E    +  where True = any(<generator object test_task_resource_limits_below_fixed_runtime_must_reject.<locals>.<genexpr> at 0x107ec6960>)
+___________ test_malformed_trusted_baseline_is_not_a_candidate_zero ____________
+docs/evidence/M4/review-core-round1/test_core_concerns.py:55: in test_malformed_trusted_baseline_is_not_a_candidate_zero
+    assert receipt.reward is None, "An invalid trusted baseline was attributed to this candidate"
+E   AssertionError: An invalid trusted baseline was attributed to this candidate
+E   assert 0 is None
+E    +  where 0 = GradeReceipt(version='m4-grade-v1', task=ArtifactRef(sha256='e306e05c750b0ac463bbe7ea8137ae3a355b4a42ff561ac4e18056676...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', recorded_at=datetime.datetime(2026, 9, 19, 21, 58, 14, 486959, tzinfo=TzInfo(0))).reward
+=========================== short test summary info ============================
+FAILED docs/evidence/M4/review-core-round1/test_core_concerns.py::test_task_resource_limits_below_fixed_runtime_must_reject
+FAILED docs/evidence/M4/review-core-round1/test_core_concerns.py::test_malformed_trusted_baseline_is_not_a_candidate_zero
+2 failed in 0.13s

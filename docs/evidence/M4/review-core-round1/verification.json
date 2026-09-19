@@ -1,0 +1,114 @@
+{
+  "implementation_commit": "02aee5494ba93b195e0b38f9fbc367f06585df5a",
+  "parent_commit": "fa6a1b884365a8f89d37beaf6bc180b945d088fa",
+  "scope": "source inspection plus two unit/preflight diagnostics; no worker execution",
+  "source_checks": [
+    {
+      "path": "src/feature_rl/verifiers/__init__.py",
+      "sha256": "be25960ccb3d02a40fa3169427ea09b35f1dac1595ff8273079a14e4910af16a",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/verifiers/language.py",
+      "sha256": "63e787db34694d860a579361f193936c9c423ff9c6dbc0a1c7096de1e1feeb1c",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/verifiers/loader.py",
+      "sha256": "52b1d56f75af8595822a2ad5f452bdb02d7e4b7386f4bd3d7f52f8de4be5320a",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/verifiers/models.py",
+      "sha256": "a641d4548fe000e59fb4333a4e8322fc49d34cbe46c8783e562a4ca09081807b",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/submission/__init__.py",
+      "sha256": "4f14c88c3d68070b3e9eeb2c5b713203c5c83f09a452a5de69866bfdd8df900e",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/submission/service.py",
+      "sha256": "ac87cddacc3c2cc3de694874cf643b02fca3f537f3b7639a3dff9c0a03f52908",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/submission/source.py",
+      "sha256": "f53fa387304d4369e1141c8de2b3b2a0e27773a36b092adaf1ca0652d7766716",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/grading/__init__.py",
+      "sha256": "0a082acf7bb9960d6d909aa30b4b4d6c12a9522b13097dedadc9ac5e2cf4b1a4",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/grading/models.py",
+      "sha256": "70696d2278035863aab99db10b0f632616ffb1bb4f4d2d396ad8e1c6192d8184",
+      "matches": true
+    },
+    {
+      "path": "src/feature_rl/grading/service.py",
+      "sha256": "e86da0a6f671660f31eb81aa77f27c550da0e8f434db987a12e837eecc1d8a85",
+      "matches": true
+    },
+    {
+      "path": "tests/m4_fixtures.py",
+      "sha256": "38985e25bfcd79efdd67b9c1850527643c8c58076c34fec5a6916b21224419ac",
+      "matches": true
+    },
+    {
+      "path": "tests/test_grading.py",
+      "sha256": "19e7cb200eb22c3f7b8e46ef1dd8b79b37f06fd2ba2d9ae04652bcc937a928fb",
+      "matches": true
+    },
+    {
+      "path": "tests/test_grading_docker.py",
+      "sha256": "7f3dbc30d28c2cd1970f6f897c5eaa4fd30a917455a0d62766b88367c7e20683",
+      "matches": true
+    },
+    {
+      "path": "tests/test_submission.py",
+      "sha256": "a7c45ae076253e3206a2bc2d756d58ab2aac82806a26e297f122cbf9749d44b4",
+      "matches": true
+    },
+    {
+      "path": "tests/test_verifiers.py",
+      "sha256": "389dabab3ca1249729a19f2c8415b8edd09def0397f3facc44c6dec010f5fda3",
+      "matches": true
+    }
+  ],
+  "owner_log_checks": [
+    {
+      "path": "docs/evidence/M4/core/real-route-attempt1.log",
+      "matches": true
+    },
+    {
+      "path": "docs/evidence/M4/core/build-and-archive-red.log",
+      "matches": true
+    },
+    {
+      "path": "docs/evidence/M4/core/build-cost-red.log",
+      "matches": true
+    },
+    {
+      "path": "docs/evidence/M4/core/build-cost-red-confirmed.log",
+      "matches": true
+    },
+    {
+      "path": "docs/evidence/M4/core/build-cost-green.log",
+      "matches": true
+    },
+    {
+      "path": "docs/evidence/M4/core/focused-green.log",
+      "matches": true
+    }
+  ],
+  "diagnostic_command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:tests .venv/bin/python -m pytest -q -s -p no:cacheprovider docs/evidence/M4/review-core-round1/test_core_concerns.py --basetemp=docs/evidence/M4/review-core-round1/pytest-tmp --tb=short",
+  "diagnostic_exit_status": 1,
+  "diagnostic_result": "2 failed in 0.13s",
+  "review_sha256": "17909c84a86d1cd81b1ea4c65197375ff06313187bd165cd9a87f0341f7aaf5a",
+  "diagnostic_source_sha256": "558dcb080a3dd1731bb3bc413c2771908e359bed932be7b35f39dc75dc7c7839",
+  "diagnostic_log_sha256": "cb1547929ca45ded37b62c331ccb36bedd1f85fc4fc484f2f152a7dcbb8eb6f4"
+}

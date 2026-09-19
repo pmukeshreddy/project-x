@@ -16,9 +16,9 @@ Host CPython3.13.7/macOS26.3/M4 arm64/16GiB; use `PYTHONPATH=src .venv/bin/pytho
 | --- | --- | --- |
 | M0 | `/root/m0_contracts` | Contracts/store/provenance/MLX/bounded reads reviewed and integrated |
 | M1 | `/root/m1_sources` | Intake/history/splits reviewed and integrated |
-| M2 | `/root/m2_authoring_recovery` | Authoring/scenarios d64f172, handoffd973d19; independent round3 ACTIVE |
+| M2 | `/root/m2_authoring_recovery` | Authoring/scenarios d64f172; ACTIVE on round3 C1/C2 compatibility fixes |
 | M3 | `/root/m3_runtime` | Runtime2190af0 reviewed PASS, integrated342tests PASS |
-| M4 | `/root/m4_grading` | Core02aee54 focused checks complete; independent core review ACTIVE; checker finalization next |
+| M4 | `/root/m4_grading` | Core430df6f independently PASS; qualification integration ready, checker finalization next |
 | M5 | `/root/m5_qualification` | Signature preflight only; actual qualification implementation next |
 | M6 | `/root/m6_factory` | Registryfa6a1b8 reviewed PASS; ACTIVE on BUILT root/final solver package |
 | M7 | `/root/m7_learning` | Pinned compatibility audit only; agent runner, GRPO and SFT code required |
@@ -28,13 +28,13 @@ Old `/root/m2_authoring` acknowledged read-only transfer and FINAL, freeing stal
 
 ## Immediate work
 
-Finish bounded M2/M4 review fixes, then actual cross-module integration. M6 current packaging slice consumes actual frozen M0 and reviewed M3 inputs, no future API guesses. M5 implements actual qualification when M4 core clears; M4 completes generated-checker/finalization when M2 clears. M6 orchestration/admission/CLI and M7/M8 follow. Do not wait for new model calls or GPU execution. Root accepted M6 round2 review; no unchanged registry suite/hash rerun needed.
+M4 focused fixes and independent review are complete; move its core to actual M5 integration. Finish only M2 C1/C2 recovery fixes in parallel with M6 packaging. M6 current packaging slice consumes actual frozen M0 and reviewed M3 inputs, no future API guesses. M5 implements actual qualification when M4 core clears; M4 completes generated-checker/finalization when M2 clears. M6 orchestration/admission/CLI and M7/M8 follow. Do not wait for new model calls or GPU execution. Root accepted M6 round2 review; no unchanged registry suite/hash rerun needed.
 
 ## M2 code and separate exhausted construction
 
 Read `docs/interfaces-M2.md`, `docs/reports/M2-authoring.md`, authoring/review briefs and `docs/decisions/M2-proposal-finalization.md`, `M2-authoring-execution-budget.md`. Real M3 discovery, bounded B retrieval, store-backed source resolution, M0-derived proposals/finalizers, explicit scenario planning, immutable repair journals and provider/journal/final-artifact replay are implemented.
 
-Round2 review `docs/reviews/M2-authoring-round2.md` retained B1-P1 exact recovered-result archive/cost binding, B2-P1 failed-generation publication recovery, B3-P2 valid frozen public-check joins. Same-owner fix **d64f172efb2d50ce9303725a08ed2fcfd9f4a65f**, handoff **d973d19801881b7eb1222973398abea1da4034eb**, **146focused passes1.01s**; integrated seed default is `m4-sha256-v1`, coverage described as structural ID coverage, not entailment. Same reviewer round3 ACTIVE on this delta only. No native/tokenizer/Docker/full suite in this fix. Historical137focused pass log is0.97s. Owner414full passes97.85s exceeded focused-only instructions and lacked source stability while M4 edited: not root integration evidence.
+Round2 review `docs/reviews/M2-authoring-round2.md` retained B1-P1 exact recovered-result archive/cost binding, B2-P1 failed-generation publication recovery, B3-P2 valid frozen public-check joins. Same-owner fix **d64f172efb2d50ce9303725a08ed2fcfd9f4a65f**, handoff **d973d19801881b7eb1222973398abea1da4034eb**, **146focused passes1.01s**; integrated seed default is `m4-sha256-v1`, coverage described as structural ID coverage, not entailment. Round3 closed B1-B3 but confirmed two P2 compatibility defects: complete pre-execution archive variants were rejected by the eleven-archive assumption, and base64 response receipt sizing exceeded the new decoded cap. The same owner is ACTIVE on only C1/C2; see `docs/reviews/M2-authoring-round3.md`. No further audit expansion. No native/tokenizer/Docker/full suite in this fix. Historical137focused pass log is0.97s. Owner414full passes97.85s exceeded focused-only instructions and lacked source stability while M4 edited: not root integration evidence.
 
 **Actual Click construction FAILED at contract generation.** One B-only M3 discovery succeeded; three contract calls consumed. No frozen contract/scenario, H feasibility authorization, checker, qualification or salvage. No further contract call.
 
@@ -60,7 +60,7 @@ Product02aee54, `docs/interfaces-M4.md`, `docs/reports/M4.md`, consolidated `doc
 
 **45focused tests passed**. Real diagnostic B route **12tests passed192.71s/14grades**: baseline/shadow/state success, regression/hardcoded/earlyexit/crash/timeout/malformed/duplicate/forged/excessiveoutput zero, absent-socket null then same source+seed+manifest retry success. Eight hostile archives rejected before build. Confirmed Flit module/package conflict exposed omitted build cost: fixed, focused real regression passed6.72s with measured wall/CPU and complete not-run ledger. Two earlier invalid-build assumptions retained. Total26diagnostic grades/fivecontexts; raw refs/costs/identities in linked summary. No H/model or requested-feature qualification claim.
 
-Stop expanding closed checks. Independent first core review ACTIVE, then integration. Same M4 owner still must implement M2-backed checker proposal/finalization and downstream qualification support. Current fixtures are diagnostic echo preservation, not the requested feature. Structural joins do not prove semantic validity.
+Independent core round1 found P1 task resource envelope and P2 invalid trusted B attributed to the candidate. Same-owner430df6f4a2406fd9a669e11de2e963a2dcf73be8 fixes both;58focused tests passed0.53s including the unchanged reviewer reproductions. `docs/reviews/M4-core-round2.md`: specPASS/qualityPASS, no residual findings. Root read and accepted the review. No Docker/model/H rerun. Stop expanding these closed checks; integrate the approved core with M5. Same M4 owner still must implement M2-backed checker proposal/finalization and downstream qualification support. Current fixtures are diagnostic echo preservation, not the requested feature. Structural joins do not prove semantic validity.
 
 ## M6 reviewed registry and active packaging
 
