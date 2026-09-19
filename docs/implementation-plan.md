@@ -38,7 +38,7 @@
 
 ## Ownership and execution
 
-Coordinator `/root` owns this plan, `docs/progress.md`, dispatch briefs, interface decisions, evidence inventory, scheduling and integration verification. Product defects return to their module owner. One product implementer at a time; independent read-only research/review may run concurrently. The empty workspace has no existing branch/code to protect; work in place on `implementation/feature-rl`. Do not alter supplied documents.
+Coordinator `/root` owns this plan, `docs/progress.md`, dispatch briefs, interface decisions, evidence inventory, scheduling and integration verification. Product defects return to their module owner. Under `docs/decisions/independent-code-slices.md`, at most two owners may implement independent slices with already reviewed dependencies, separate writable paths/test state and no shared configuration changes; root and a review slot remain available. Dependent service integration waits for actual reviewed APIs. Work in place on `implementation/feature-rl`; do not alter supplied documents.
 
 | Module | Owner identity when assigned | Exclusive writable product paths | Dependencies |
 | --- | --- | --- | --- |
