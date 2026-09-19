@@ -1,0 +1,413 @@
+FFFFFFFFFFFFFF                                                           [100%]
+=================================== FAILURES ===================================
+_________ test_build_freezes_complete_safe_package_and_idempotent_root _________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_build_freezes_complete_sa0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d283e0>
+
+    def test_build_freezes_complete_safe_package_and_idempotent_root(tmp_path, monkeypatch):
+>       m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:119: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+_____ test_prerequisite_failure_is_typed_and_never_builds_a_root[missing] ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_prerequisite_failure_is_t0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d288a0>
+drift = 'missing'
+
+    @pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'scenario', 'public-check'])
+    def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeypatch, drift):
+>       m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+_____ test_prerequisite_failure_is_typed_and_never_builds_a_root[baseline] _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_prerequisite_failure_is_t1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d16570>
+drift = 'baseline'
+
+    @pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'scenario', 'public-check'])
+    def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeypatch, drift):
+>       m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+______ test_prerequisite_failure_is_typed_and_never_builds_a_root[policy] ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_prerequisite_failure_is_t2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d20c00>
+drift = 'policy'
+
+    @pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'scenario', 'public-check'])
+    def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeypatch, drift):
+>       m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+_____ test_prerequisite_failure_is_typed_and_never_builds_a_root[scenario] _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_prerequisite_failure_is_t3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d21040>
+drift = 'scenario'
+
+    @pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'scenario', 'public-check'])
+    def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeypatch, drift):
+>       m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+___ test_prerequisite_failure_is_typed_and_never_builds_a_root[public-check] ___
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_prerequisite_failure_is_t4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1077cab50>
+drift = 'public-check'
+
+    @pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'scenario', 'public-check'])
+    def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeypatch, drift):
+>       m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+__ test_explicit_allowlist_cannot_admit_forbidden_source_members[.git/config] __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_explicit_allowlist_cannot0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1077cae50>
+bad_path = '.git/config'
+
+    @pytest.mark.parametrize('bad_path', ['.git/config', '.GIT/config', 'dist/click.whl', 'src/__pycache__/leak.pyc', '../escape'])
+    def test_explicit_allowlist_cannot_admit_forbidden_source_members(tmp_path, monkeypatch, bad_path):
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode='w') as archive:
+            item = tarfile.TarInfo(bad_path)
+            item.size = 7
+            archive.addfile(item, io.BytesIO(b'PRIVATE'))
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch, archive=output.getvalue(), files=(bad_path,))
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:176: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+__ test_explicit_allowlist_cannot_admit_forbidden_source_members[.GIT/config] __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_explicit_allowlist_cannot1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10781b110>
+bad_path = '.GIT/config'
+
+    @pytest.mark.parametrize('bad_path', ['.git/config', '.GIT/config', 'dist/click.whl', 'src/__pycache__/leak.pyc', '../escape'])
+    def test_explicit_allowlist_cannot_admit_forbidden_source_members(tmp_path, monkeypatch, bad_path):
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode='w') as archive:
+            item = tarfile.TarInfo(bad_path)
+            item.size = 7
+            archive.addfile(item, io.BytesIO(b'PRIVATE'))
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch, archive=output.getvalue(), files=(bad_path,))
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:176: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+_ test_explicit_allowlist_cannot_admit_forbidden_source_members[dist/click.whl] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_explicit_allowlist_cannot2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10781b5c0>
+bad_path = 'dist/click.whl'
+
+    @pytest.mark.parametrize('bad_path', ['.git/config', '.GIT/config', 'dist/click.whl', 'src/__pycache__/leak.pyc', '../escape'])
+    def test_explicit_allowlist_cannot_admit_forbidden_source_members(tmp_path, monkeypatch, bad_path):
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode='w') as archive:
+            item = tarfile.TarInfo(bad_path)
+            item.size = 7
+            archive.addfile(item, io.BytesIO(b'PRIVATE'))
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch, archive=output.getvalue(), files=(bad_path,))
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:176: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+_ test_explicit_allowlist_cannot_admit_forbidden_source_members[src/__pycache__/leak.pyc] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_explicit_allowlist_cannot3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d33cb0>
+bad_path = 'src/__pycache__/leak.pyc'
+
+    @pytest.mark.parametrize('bad_path', ['.git/config', '.GIT/config', 'dist/click.whl', 'src/__pycache__/leak.pyc', '../escape'])
+    def test_explicit_allowlist_cannot_admit_forbidden_source_members(tmp_path, monkeypatch, bad_path):
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode='w') as archive:
+            item = tarfile.TarInfo(bad_path)
+            item.size = 7
+            archive.addfile(item, io.BytesIO(b'PRIVATE'))
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch, archive=output.getvalue(), files=(bad_path,))
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:176: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+___ test_explicit_allowlist_cannot_admit_forbidden_source_members[../escape] ___
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_explicit_allowlist_cannot4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d32dd0>
+bad_path = '../escape'
+
+    @pytest.mark.parametrize('bad_path', ['.git/config', '.GIT/config', 'dist/click.whl', 'src/__pycache__/leak.pyc', '../escape'])
+    def test_explicit_allowlist_cannot_admit_forbidden_source_members(tmp_path, monkeypatch, bad_path):
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode='w') as archive:
+            item = tarfile.TarInfo(bad_path)
+            item.size = 7
+            archive.addfile(item, io.BytesIO(b'PRIVATE'))
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch, archive=output.getvalue(), files=(bad_path,))
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:176: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+______ test_allowlist_must_cover_exact_B_and_controller_role_is_required _______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_allowlist_must_cover_exac0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107da9090>
+
+    def test_allowlist_must_cover_exact_B_and_controller_role_is_required(tmp_path, monkeypatch):
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:183: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+______ test_post_freeze_root_publication_reuses_exact_snapshot_and_costs _______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_post_freeze_root_publicat0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d44e90>
+
+    def test_post_freeze_root_publication_reuses_exact_snapshot_and_costs(tmp_path, monkeypatch):
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:191: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+_________ test_pending_freeze_receipt_is_replayable_without_reassembly _________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1188/test_pending_freeze_receipt_is0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107d46090>
+
+    def test_pending_freeze_receipt_is_replayable_without_reassembly(tmp_path, monkeypatch):
+>       m, store, reg, builder, inputs, *_ = fixture(tmp_path, monkeypatch)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory.py:214: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory.py:34: in fixture
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.pipeline') is not None, 'M6 task builder is missing'
+E       AssertionError: M6 task builder is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x105af6de0>('feature_rl.pipeline')
+E        +    where <function find_spec at 0x105af6de0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_factory.py:24: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_factory.py::test_build_freezes_complete_safe_package_and_idempotent_root
+FAILED tests/test_factory.py::test_prerequisite_failure_is_typed_and_never_builds_a_root[missing]
+FAILED tests/test_factory.py::test_prerequisite_failure_is_typed_and_never_builds_a_root[baseline]
+FAILED tests/test_factory.py::test_prerequisite_failure_is_typed_and_never_builds_a_root[policy]
+FAILED tests/test_factory.py::test_prerequisite_failure_is_typed_and_never_builds_a_root[scenario]
+FAILED tests/test_factory.py::test_prerequisite_failure_is_typed_and_never_builds_a_root[public-check]
+FAILED tests/test_factory.py::test_explicit_allowlist_cannot_admit_forbidden_source_members[.git/config]
+FAILED tests/test_factory.py::test_explicit_allowlist_cannot_admit_forbidden_source_members[.GIT/config]
+FAILED tests/test_factory.py::test_explicit_allowlist_cannot_admit_forbidden_source_members[dist/click.whl]
+FAILED tests/test_factory.py::test_explicit_allowlist_cannot_admit_forbidden_source_members[src/__pycache__/leak.pyc]
+FAILED tests/test_factory.py::test_explicit_allowlist_cannot_admit_forbidden_source_members[../escape]
+FAILED tests/test_factory.py::test_allowlist_must_cover_exact_B_and_controller_role_is_required
+FAILED tests/test_factory.py::test_post_freeze_root_publication_reuses_exact_snapshot_and_costs
+FAILED tests/test_factory.py::test_pending_freeze_receipt_is_replayable_without_reassembly
+14 failed in 0.25s
