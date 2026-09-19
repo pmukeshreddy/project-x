@@ -1,0 +1,92 @@
+{
+  "base_revision": "cffe50759de88aba1df5fc186839531043fa2083",
+  "commands": [
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "name": "focused",
+      "stderr": "docs/evidence/M2/provider-v3-fixround1-focused-tests.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround1-focused-tests.stdout",
+      "stdout_sha256": "21b48b32d9d2f27afe503a7f30afab0dc147595cacc58b732f987caa948eb9bd"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "name": "full",
+      "stderr": "docs/evidence/M2/provider-v3-fixround1-full-tests.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround1-full-tests.stdout",
+      "stdout_sha256": "53b0300231e0df74850d526f31be002bb75e498dac73d1043de286bc2f4f9b6e"
+    }
+  ],
+  "committed_product_revision": null,
+  "excluded_unowned_paths": [
+    "docs/evidence/M2/coordinator-v3-native.py"
+  ],
+  "limitations": [
+    "This precommit receipt binds working-tree bytes and does not claim a committed source revision.",
+    "No MLX model was loaded and no native inference was performed in fix round 1.",
+    "The coordinator current-version native verification remains pending independent re-review."
+  ],
+  "native_inference_calls": 0,
+  "preserved_review_evidence": "docs/evidence/M2/review",
+  "producer": "M2 provider owner fix round 1",
+  "product_and_test_inventory": {
+    "src/feature_rl/generation/__init__.py": {
+      "bytes": 1327,
+      "sha256": "feab8f63dfd2344003792855341731be6d9125cf707822104b1b8316fcb7c278"
+    },
+    "src/feature_rl/generation/_worker.py": {
+      "bytes": 11650,
+      "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed"
+    },
+    "src/feature_rl/generation/backend.py": {
+      "bytes": 11173,
+      "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647"
+    },
+    "src/feature_rl/generation/models.py": {
+      "bytes": 7737,
+      "sha256": "4ee0c21c3c8e8bb2abc9bb6e6c2b4b0229573733ce7fc61359affa9b22669305"
+    },
+    "src/feature_rl/generation/protocol.py": {
+      "bytes": 3268,
+      "sha256": "c0a84ee32415a666edabc84a9644c2d56eb53b3c9c31df22321e3299f933fba1"
+    },
+    "src/feature_rl/generation/provider.py": {
+      "bytes": 36510,
+      "sha256": "62cc3a3b36d0d8a84c520a5719d303603f7251d371f146288e32273d419053be"
+    },
+    "src/feature_rl/generation/runner.py": {
+      "bytes": 9828,
+      "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+    },
+    "tests/test_generation.py": {
+      "bytes": 33711,
+      "sha256": "869df7d5f6e6757c723602ced60448f9fcb0f45fa6c6b96695a4ae911a19328d"
+    }
+  },
+  "protocol_version": 3,
+  "recorded_at_utc": "2026-09-19T10:59:12.926217Z",
+  "remote_compute_calls": 0,
+  "schema_version": 1,
+  "scope": "unit_diagnostic_and_full_test_verification",
+  "workspace_head_at_verification": "0785bb1f8815cfbf32a86c381445e671bcb09c4d"
+}

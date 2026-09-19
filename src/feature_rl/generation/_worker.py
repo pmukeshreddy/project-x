@@ -14,6 +14,9 @@ import time
 
 MODEL_ID = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
 REVISION = "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b"
+PROTOCOL_VERSION = 3
+MODEL_MANIFEST_SHA256 = "697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0"
+DEPENDENCY_MANIFEST_SHA256 = "d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831"
 FILES = {
     "added_tokens.json": (707, "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"),
     "chat_template.jinja": (4040, "40c21f34cf67d8c760ef72f8ad3ae5afad514299d4b06e91dd9a8d705af7b541"),
@@ -42,8 +45,22 @@ VERSIONS = {
 }
 
 
-def emit(event: str, **values: object) -> None:
-    print(json.dumps({"event": event, **values}, sort_keys=True, allow_nan=False), flush=True)
+def emit(request: dict, event: str, **values: object) -> None:
+    print(
+        json.dumps(
+            {
+                "event": event,
+                "protocol_version": PROTOCOL_VERSION,
+                "request_id": request["request_id"],
+                "response_id": request["response_id"],
+                "prompt_id": request["prompt_id"],
+                **values,
+            },
+            sort_keys=True,
+            allow_nan=False,
+        ),
+        flush=True,
+    )
 
 
 def digest(path: pathlib.Path) -> str:
@@ -61,11 +78,11 @@ def exact_request() -> dict:
     request = json.loads(raw)
     expected = {
         "protocol_version", "model_directory", "model_id", "revision", "response_id", "prompt",
-        "max_input_tokens", "max_output_tokens", "seed", "memory",
+        "request_id", "prompt_id", "max_input_tokens", "max_output_tokens", "seed", "memory",
     }
     if not isinstance(request, dict) or set(request) != expected:
         raise RuntimeError("worker request fields differ from protocol")
-    if request["protocol_version"] != 2 or request["model_id"] != MODEL_ID or request["revision"] != REVISION:
+    if request["protocol_version"] != PROTOCOL_VERSION or request["model_id"] != MODEL_ID or request["revision"] != REVISION:
         raise RuntimeError("worker request identity mismatch")
     if type(request["max_input_tokens"]) is not int or not 0 < request["max_input_tokens"] <= 262_144:
         raise RuntimeError("worker input-token cap is invalid")
@@ -87,7 +104,10 @@ def exact_request() -> dict:
 
 
 def verify_runtime(request: dict) -> tuple[pathlib.Path, dict]:
-    if os.environ.get("HF_HUB_OFFLINE") != "1" or os.environ.get("TRANSFORMERS_OFFLINE") != "1":
+    if any(
+        os.environ.get(name) != "1"
+        for name in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_DATASETS_OFFLINE")
+    ):
         raise RuntimeError("offline inference environment is required")
     model = pathlib.Path(request["model_directory"])
     if not model.is_absolute() or not model.is_dir() or model.is_symlink():
@@ -107,9 +127,20 @@ def verify_runtime(request: dict) -> tuple[pathlib.Path, dict]:
     if actual_versions != VERSIONS:
         raise RuntimeError("installed dependency closure mismatch")
     emit(
+        request,
         "identity_validated", model_id=MODEL_ID, revision=REVISION,
         config_sha256=FILES["config.json"][1], tokenizer_sha256=FILES["tokenizer.json"][1],
         weights_sha256=FILES["model.safetensors"][1], dependency_versions=actual_versions,
+        model_manifest_sha256=MODEL_MANIFEST_SHA256,
+        dependency_manifest_sha256=DEPENDENCY_MANIFEST_SHA256,
+        seed=request["seed"],
+        prompt_sha256=hashlib.sha256(request["prompt"].encode("utf-8")).hexdigest(),
+        worker_source_sha256=digest(pathlib.Path(__file__)),
+        offline_environment={
+            "HF_HUB_OFFLINE": os.environ.get("HF_HUB_OFFLINE"),
+            "TRANSFORMERS_OFFLINE": os.environ.get("TRANSFORMERS_OFFLINE"),
+            "HF_DATASETS_OFFLINE": os.environ.get("HF_DATASETS_OFFLINE"),
+        },
         local_files_only=True, remote_code=False,
     )
     return model, config
@@ -136,12 +167,14 @@ def main() -> int:
     )
     if len(input_ids) > request["max_input_tokens"]:
         emit(
+            request,
             "input_rejected", actual_input_tokens=len(input_ids),
             max_input_tokens=request["max_input_tokens"], model_load_started=False,
             inference_started=False,
         )
         return 65
     emit(
+        request,
         "input_accepted", actual_input_tokens=len(input_ids), input_token_ids=input_ids,
         max_input_tokens=request["max_input_tokens"],
     )
@@ -155,6 +188,7 @@ def main() -> int:
     previous_wired = mx.set_wired_limit(request["memory"]["wired_limit_bytes"])
     mx.reset_peak_memory()
     emit(
+        request,
         "memory_controls_set",
         mlx_memory_guideline_bytes=request["memory"]["guideline_bytes"],
         mlx_cache_limit_bytes=request["memory"]["cache_limit_bytes"],
@@ -168,7 +202,8 @@ def main() -> int:
     if loaded_config.get("model_type") != "qwen3":
         raise RuntimeError("loaded model identity mismatch")
     emit(
-        "model_loaded", fresh_process=True, fresh_prompt_cache=True,
+        request, "model_loaded", model_id=MODEL_ID, revision=REVISION,
+        fresh_process=True, fresh_prompt_cache=True,
         active_memory_bytes=mx.get_active_memory(), peak_memory_bytes=mx.get_peak_memory(),
         cache_memory_bytes=mx.get_cache_memory(),
     )
@@ -190,6 +225,7 @@ def main() -> int:
             raise RuntimeError("selected model logprob is nonfinite")
         generated.append(token_id)
         emit(
+            request,
             "token", position=position, token_id=token_id,
             selected_model_logprob=selected_model_logprob,
             text_fragment=tokenizer.decode([token_id], skip_special_tokens=False),
@@ -201,8 +237,9 @@ def main() -> int:
         raise RuntimeError("emitted output token cap violated")
     truncated = finish_reason == "length" and len(generated) == request["max_output_tokens"]
     emit(
+        request,
         "completed", model_id=MODEL_ID, revision=REVISION,
-        response_id=request["response_id"], input_tokens=len(input_ids),
+        input_tokens=len(input_ids),
         output_tokens=len(generated), max_output_tokens=request["max_output_tokens"],
         finish_reason=finish_reason, truncated=truncated,
         sampling_policy="greedy_argmax",

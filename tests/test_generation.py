@@ -6,7 +6,9 @@ import json
 import hashlib
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
@@ -31,6 +33,12 @@ from feature_rl.generation import (
     VerifiedBackend,
     VerifiedDependencies,
     VerifiedModel,
+)
+import feature_rl.generation.runner as runner_module
+
+ARCHIVE_NAMES = (
+    "attempt", "request", "response", "retrieval", "schema", "options",
+    "provenance", "usage", "cost", "events", "status",
 )
 
 
@@ -81,7 +89,10 @@ def limits(**updates) -> GenerationLimits:
     return GenerationLimits(**(values | updates))
 
 
-def request(*, stage=GenerationStage.INITIAL_AUTHORING, contexts=None) -> GenerationRequest:
+def request(
+    *, stage=GenerationStage.INITIAL_AUTHORING, contexts=None,
+    generation_limits: GenerationLimits | None = None,
+) -> GenerationRequest:
     return GenerationRequest(
         request_id="REQ_CALL_1",
         response_id="RESP_1",
@@ -91,7 +102,7 @@ def request(*, stage=GenerationStage.INITIAL_AUTHORING, contexts=None) -> Genera
         instruction="Extract the requested structured data.",
         contexts=tuple(contexts or (context(),)),
         allowed_requirement_ids=("FEATURE_1",),
-        limits=limits(),
+        limits=generation_limits or limits(),
         seed=0,
     )
 
@@ -297,9 +308,67 @@ def test_runner_enforces_deadline_and_records_resource_policy(tmp_path):
     assert outcome.process_group_cleanup_verified is True
 
 
+def test_runner_monitor_exception_returns_partial_outcome_after_cleanup(tmp_path):
+    """A watchdog exception must not escape while its owned child remains alive."""
+    with patch.object(
+        runner_module, "_footprint", side_effect=OSError("injected observation failure")
+    ):
+        outcome = BoundedProcessRunner().run(
+            command=(sys.executable, "-I", "-c", "import time; time.sleep(3)"),
+            stdin=b"",
+            cwd=tmp_path,
+            environment={"PATH": "/usr/bin:/bin"},
+            limits=limits(wall_seconds=0.25),
+        )
+    assert outcome.termination == "monitoring_failure"
+    assert outcome.monitoring_failures == 1
+    assert outcome.monitor_error_type == "OSError"
+    assert outcome.process_group_cleanup_verified is True
+    assert outcome.exit_status is not None
+
+
+def test_runner_single_lost_watchdog_observation_fails_closed(tmp_path):
+    """A later successful sample cannot erase an earlier watchdog gap."""
+    with patch.object(runner_module, "_footprint", return_value=None):
+        outcome = BoundedProcessRunner().run(
+            command=(sys.executable, "-I", "-c", "import time; time.sleep(3)"),
+            stdin=b"",
+            cwd=tmp_path,
+            environment={"PATH": "/usr/bin:/bin"},
+            limits=limits(wall_seconds=0.25),
+        )
+    assert outcome.termination == "monitoring_failure"
+    assert outcome.monitoring_failures == 1
+    assert outcome.memory_samples == 0
+    assert outcome.process_group_cleanup_verified is True
+
+
+def test_runner_interruption_still_cleans_and_returns_partial_outcome(tmp_path):
+    """Controller interruption is classified only after bounded group cleanup."""
+    with patch.object(runner_module, "_footprint", side_effect=KeyboardInterrupt):
+        outcome = BoundedProcessRunner().run(
+            command=(sys.executable, "-I", "-c", "import time; time.sleep(3)"),
+            stdin=b"",
+            cwd=tmp_path,
+            environment={"PATH": "/usr/bin:/bin"},
+            limits=limits(wall_seconds=0.25),
+        )
+    assert outcome.termination == "interrupted"
+    assert outcome.monitoring_failures == 1
+    assert outcome.monitor_error_type == "KeyboardInterrupt"
+    assert outcome.process_group_cleanup_verified is True
+    assert outcome.exit_status is not None
+
+
 class SmokeContent(StrictModel):
     ok: bool
     nonce: str
+
+
+class StructuredContent(StrictModel):
+    values: tuple[str, ...]
+    visibility: Visibility
+    recorded_at: datetime
 
 
 class FakeBackend:
@@ -319,6 +388,7 @@ class FakeBackend:
                 revision="50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
                 file_count=11,
                 total_bytes=2_278_969_697,
+                config_sha256="574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849",
                 tokenizer_sha256="aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
                 weights_sha256="2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f",
             ),
@@ -329,13 +399,67 @@ class FakeBackend:
 
 
 def worker_events(*, event_override=None, truncated=False):
+    common = {
+        "protocol_version": 3,
+        "request_id": "REQ_CALL_1",
+        "response_id": "RESP_1",
+        "prompt_id": "PROMPT_1",
+    }
     events = [
-        {"event": "identity_validated", "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit", "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b"},
-        {"event": "input_accepted", "actual_input_tokens": 41, "input_token_ids": list(range(41)), "max_input_tokens": 2048},
-        {"event": "memory_controls_set", "mlx_memory_guideline_bytes": 3_758_096_384, "mlx_cache_limit_bytes": 0, "mlx_wired_limit_bytes": 3_758_096_384},
-        {"event": "model_loaded", "fresh_process": True, "fresh_prompt_cache": True},
-        {"event": "token", "position": 1, "token_id": 100, "selected_model_logprob": -0.25, "text_fragment": "{"},
-        {"event": "completed", "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit", "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b", "input_tokens": 41, "output_tokens": 1, "max_output_tokens": 128, "finish_reason": "stop", "sampling_policy": "greedy_argmax", "truncated": truncated, "output_text": json.dumps({"response_id":"RESP_1","source_ids":["SRC_1"],"requirement_ids":["FEATURE_1"],"content":{"ok":True,"nonce":"unit"}}), "fresh_process": True, "fresh_prompt_cache": True},
+        common | {
+            "event": "identity_validated",
+            "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+            "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+            "config_sha256": "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849",
+            "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+            "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f",
+            "model_manifest_sha256": "697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0",
+            "dependency_manifest_sha256": "d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831",
+            "dependency_versions": {"mlx": "0.32.2"},
+            "seed": 0,
+            "prompt_sha256": "AUTO",
+            "worker_source_sha256": "AUTO",
+            "offline_environment": {
+                "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
+                "HF_DATASETS_OFFLINE": "1",
+            },
+            "local_files_only": True,
+            "remote_code": False,
+        },
+        common | {"event": "input_accepted", "actual_input_tokens": 41, "input_token_ids": list(range(41)), "max_input_tokens": 2048},
+        common | {
+            "event": "memory_controls_set",
+            "mlx_memory_guideline_bytes": 3_758_096_384,
+            "mlx_cache_limit_bytes": 0,
+            "mlx_wired_limit_bytes": 3_758_096_384,
+            "previous_memory_limit_bytes": 5_000_000_000,
+            "previous_cache_limit_bytes": 5_000_000_000,
+            "previous_wired_limit_bytes": 0,
+        },
+        common | {
+            "event": "model_loaded",
+            "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+            "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+            "fresh_process": True, "fresh_prompt_cache": True,
+            "active_memory_bytes": 2_000_000_000,
+            "peak_memory_bytes": 2_100_000_000,
+            "cache_memory_bytes": 0,
+        },
+        common | {"event": "token", "position": 1, "token_id": 100, "selected_model_logprob": -0.25, "text_fragment": "{"},
+        common | {
+            "event": "completed",
+            "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+            "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+            "input_tokens": 41, "output_tokens": 1, "max_output_tokens": 128,
+            "finish_reason": "stop", "sampling_policy": "greedy_argmax",
+            "truncated": truncated,
+            "output_text": json.dumps({"response_id":"RESP_1","source_ids":["SRC_1"],"requirement_ids":["FEATURE_1"],"content":{"ok":True,"nonce":"unit"}}),
+            "inference_seconds": 0.5, "total_seconds": 1.0,
+            "active_memory_bytes": 2_050_000_000,
+            "peak_memory_bytes": 2_100_000_000,
+            "cache_memory_bytes": 0,
+            "fresh_process": True, "fresh_prompt_cache": True,
+        },
     ]
     if event_override is not None:
         events.insert(-1, event_override)
@@ -344,25 +468,46 @@ def worker_events(*, event_override=None, truncated=False):
 
 class FakeRunner:
     def __init__(self, stdout=None, termination="process_exit", exit_status=0):
-        self.stdout = stdout or worker_events()
+        self.stdout = worker_events() if stdout is None else stdout
         self.termination = termination
         self.exit_status = exit_status
         self.calls = []
 
     def run(self, **values):
         self.calls.append(values)
+        stdout = self.stdout
+        try:
+            events = [json.loads(line) for line in stdout.splitlines()]
+            sent = json.loads(values["stdin"])
+            if events and events[0].get("prompt_sha256") == "AUTO":
+                events[0]["prompt_sha256"] = hashlib.sha256(sent["prompt"].encode()).hexdigest()
+            if events and events[0].get("worker_source_sha256") == "AUTO":
+                events[0]["worker_source_sha256"] = hashlib.sha256(
+                    Path("src/feature_rl/generation/_worker.py").read_bytes()
+                ).hexdigest()
+            stdout = ("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
         return ProcessOutcome(
             termination=self.termination,
             exit_status=self.exit_status,
             wall_seconds=1.5,
             cpu_seconds=1.0,
-            stdout=self.stdout,
+            stdout=stdout,
             stderr=b"",
             memory_samples=5,
             max_sampled_physical_footprint_bytes=2_000_000_000,
             max_reported_lifetime_physical_footprint_bytes=2_100_000_000,
             breach_sample=None,
             process_group_cleanup_verified=True,
+            monitoring_failures=1 if self.termination == "monitoring_failure" else 0,
+            monitor_error_type=(
+                "ObservationUnavailable" if self.termination == "monitoring_failure" else None
+            ),
+            monitor_error=(
+                "proc_pid_rusage returned no observation"
+                if self.termination == "monitoring_failure" else None
+            ),
         )
 
 
@@ -381,15 +526,30 @@ def test_provider_validates_envelope_and_archives_complete_call(tmp_path):
     assert result.cost.measurement == "partial"
     assert result.record.success is True
     assert set(result.record.archives) == {
-        "request", "response", "retrieval", "schema", "options", "provenance",
+        "attempt", "request", "response", "retrieval", "schema", "options", "provenance",
         "usage", "cost", "events", "status",
     }
+    assert result.record.publication_complete is True
+    assert result.record.generation_succeeded is True
     response_receipt = json.loads(store.get_bytes(result.record.archives["response"]))
+    usage_receipt = json.loads(store.get_bytes(result.record.archives["usage"]))
+    attempt_receipt = json.loads(store.get_bytes(result.record.archives["attempt"]))
+    assert usage_receipt["accepted_response_usage"] is True
+    assert usage_receipt["accepted"]["token_ids"] == [100]
+    assert attempt_receipt["protocol_version"] == 3
+    assert attempt_receipt["producer"] == "feature_rl.generation.LocalGenerationProvider"
+    assert attempt_receipt["recorded_at"].endswith("Z")
+    assert attempt_receipt["source_sha256"]["provider.py"] == hashlib.sha256(
+        Path("src/feature_rl/generation/provider.py").read_bytes()
+    ).hexdigest()
+    assert attempt_receipt["model_config_sha256"] == (
+        "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849"
+    )
     assert response_receipt["max_sampled_physical_footprint_bytes"] == 2_000_000_000
     assert response_receipt["max_reported_lifetime_physical_footprint_bytes"] == 2_100_000_000
     assert response_receipt["process_group_cleanup_verified"] is True
     sent = json.loads(runner.calls[0]["stdin"])
-    assert sent["protocol_version"] == 2
+    assert sent["protocol_version"] == 3
     assert sent["response_id"] == "RESP_1"
     assert sent["max_output_tokens"] == 128
     assert "SRC_1" in sent["prompt"]
@@ -400,6 +560,88 @@ def test_provider_validates_envelope_and_archives_complete_call(tmp_path):
     assert {"HF_HUB_CACHE", "HF_XET_CACHE", "TRANSFORMERS_CACHE"} <= set(child_env)
 
 
+def test_provider_validates_nested_strict_types_through_json_transport(tmp_path):
+    """JSON arrays, enums and timestamps must reach strict models through JSON mode."""
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = {
+        "values": ["one", "two"],
+        "visibility": "authoring",
+        "recorded_at": "2026-09-19T10:00:00Z",
+    }
+    events[-1]["output_text"] = json.dumps(envelope)
+    runner = FakeRunner(stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode())
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(), archive=store.put_bytes, runner=runner
+    ).generate(request(), StructuredContent)
+    assert result.content.values == ("one", "two")
+    assert result.content.visibility is Visibility.AUTHORING
+    assert result.content.recorded_at == datetime(2026, 9, 19, 10, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize(
+    "invalid_content",
+    [
+        {"values": ["valid"], "visibility": "unknown", "recorded_at": "2026-09-19T10:00:00Z"},
+        {"values": [1], "visibility": "authoring", "recorded_at": "2026-09-19T10:00:00Z"},
+        {"values": ["valid"], "visibility": "authoring", "recorded_at": "not-a-time"},
+    ],
+)
+def test_provider_json_transport_keeps_nested_strict_rejections(tmp_path, invalid_content):
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = invalid_content
+    events[-1]["output_text"] = json.dumps(envelope)
+    runner = FakeRunner(stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode())
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(), archive=store.put_bytes, runner=runner
+    )
+    with pytest.raises(GenerationProviderError, match="strict schema"):
+        provider.generate(request(), StructuredContent)
+
+
+@pytest.mark.parametrize(
+    ("event_index", "field", "value"),
+    [
+        (0, "config_sha256", "0" * 64),
+        (0, "tokenizer_sha256", "0" * 64),
+        (0, "weights_sha256", "0" * 64),
+        (0, "model_manifest_sha256", "0" * 64),
+        (0, "dependency_manifest_sha256", "0" * 64),
+        (0, "dependency_versions", {"mlx": "0.0.0"}),
+        (0, "seed", 1),
+        (0, "prompt_sha256", "0" * 64),
+        (0, "worker_source_sha256", "0" * 64),
+        (0, "local_files_only", False),
+        (0, "remote_code", True),
+        (0, "unexpected", "forbidden"),
+        (1, "max_input_tokens", 2047),
+        (2, "previous_cache_limit_bytes", None),
+        (3, "model_id", "different/model"),
+        (4, "selected_model_logprob", 0.01),
+        (4, "text_fragment", 123),
+        (5, "response_id", "DIFFERENT_RESPONSE"),
+        (5, "inference_seconds", -0.1),
+    ],
+)
+def test_exact_event_protocol_rejects_each_one_field_mutation(
+    tmp_path, event_index, field, value
+):
+    """Backend, request, measurement and score evidence cannot drift silently."""
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    events[event_index][field] = value
+    stdout = ("\n".join(json.dumps(item) for item in events) + "\n").encode()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(), archive=store.put_bytes, runner=FakeRunner(stdout=stdout)
+    )
+    with pytest.raises(GenerationProviderError) as caught:
+        provider.generate(request(), SmokeContent)
+    assert caught.value.record.success is False
+
+
 @pytest.mark.parametrize(
     ("stdout", "termination", "message"),
     [
@@ -408,6 +650,7 @@ def test_provider_validates_envelope_and_archives_complete_call(tmp_path):
         (worker_events().replace(b'"selected_model_logprob": -0.25, ', b''), "process_exit", "logprob"),
         (b"not-json\n", "process_exit", "JSON"),
         (worker_events(), "memory_cap", "memory_cap"),
+        (worker_events(), "monitoring_failure", "monitoring_failure"),
     ],
 )
 def test_provider_fails_closed_and_archives_failure(tmp_path, stdout, termination, message):
@@ -429,31 +672,30 @@ def test_provider_fails_closed_and_archives_failure(tmp_path, stdout, terminatio
         assert archived_usage["observed"]["token_ids"] == [100]
         assert archived_usage["observed"]["selected_model_logprobs"] == [-0.25]
         assert archived_usage["observed"]["behavior_logprobs"] is None
+    if termination == "monitoring_failure":
+        response = json.loads(store.get_bytes(caught.value.record.archives["response"]))
+        assert response["monitoring_failures"] == 1
+        assert response["monitor_error_type"] == "ObservationUnavailable"
+        assert caught.value.response == response
 
 
 def test_provider_retains_pre_inference_rejection_count_as_partial_cost(tmp_path):
     """A rejected prompt's known token count is cost evidence, never successful usage."""
-    stdout = (
-        json.dumps({
-            "event": "identity_validated",
-            "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
-            "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
-        })
-        + "\n"
-        + json.dumps({
-            "event": "input_rejected", "actual_input_tokens": 381,
-            "max_input_tokens": 16, "model_load_started": False,
-            "inference_started": False,
-        })
-        + "\n"
-    ).encode()
+    identity = json.loads(worker_events().splitlines()[0])
+    rejected = {
+        "protocol_version": 3, "request_id": "REQ_CALL_1", "response_id": "RESP_1",
+        "prompt_id": "PROMPT_1", "event": "input_rejected",
+        "actual_input_tokens": 381, "max_input_tokens": 16,
+        "model_load_started": False, "inference_started": False,
+    }
+    stdout = (json.dumps(identity) + "\n" + json.dumps(rejected) + "\n").encode()
     store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
     provider = LocalGenerationProvider(
         backend=FakeBackend(), archive=store.put_bytes,
         runner=FakeRunner(stdout=stdout, exit_status=65),
     )
     with pytest.raises(GenerationProviderError) as caught:
-        provider.generate(request(), SmokeContent)
+        provider.generate(request(generation_limits=limits(input_tokens=16)), SmokeContent)
     usage_receipt = json.loads(store.get_bytes(caught.value.record.archives["usage"]))
     cost_receipt = json.loads(store.get_bytes(caught.value.record.archives["cost"]))
     assert usage_receipt["accepted_response_usage"] is False
@@ -462,3 +704,83 @@ def test_provider_retains_pre_inference_rejection_count_as_partial_cost(tmp_path
     assert cost_receipt["input_tokens"] == 381
     assert cost_receipt["output_tokens"] == 0
     assert cost_receipt["measurement"] == "partial"
+
+
+def test_failed_envelope_never_uses_accepted_usage_shape(tmp_path):
+    """Valid token events do not make an invalid response acceptable."""
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["requirement_ids"] = ["UNKNOWN_REQUIREMENT"]
+    events[-1]["output_text"] = json.dumps(envelope)
+    stdout = ("\n".join(json.dumps(item) for item in events) + "\n").encode()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(), archive=store.put_bytes, runner=FakeRunner(stdout=stdout)
+    )
+    with pytest.raises(GenerationProviderError, match="unknown requirement") as caught:
+        provider.generate(request(), SmokeContent)
+    archived = json.loads(store.get_bytes(caught.value.record.archives["usage"]))
+    assert archived["accepted_response_usage"] is False
+    assert archived["accepted"] is None
+    assert archived["observed"]["input_tokens"] == 41
+    assert archived["observed"]["token_ids"] == [100]
+
+
+def test_attempt_registration_failure_prevents_execution_and_is_recoverable(tmp_path):
+    """An unavailable archive cannot leave an unattributed model execution."""
+    runner = FakeRunner()
+
+    def unavailable(*_args):
+        raise OSError("store unavailable")
+
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(), archive=unavailable, runner=runner
+    )
+    with pytest.raises(GenerationProviderError, match="registration failed") as caught:
+        provider.generate(request(), SmokeContent)
+    assert runner.calls == []
+    assert caught.value.record.archives == {}
+    assert caught.value.record.publication_complete is False
+    assert caught.value.recovery is not None
+    assert caught.value.cost.measurement == "unknown"
+    with pytest.raises(GenerationProviderError, match="replay failed") as replayed:
+        caught.value.replay_publication(unavailable)
+    assert replayed.value.record.publication_complete is False
+    assert replayed.value.recovery is not None
+    assert runner.calls == []
+
+
+def test_archive_failure_retains_outcome_and_replays_without_execution(tmp_path):
+    """Post-execution publication can resume from bounded payloads without a new call."""
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    published = []
+
+    def fail_response_once(data, kind, visibility):
+        if kind == "generation-response" and kind not in published:
+            published.append(kind)
+            raise OSError("injected archive publication failure")
+        ref = store.put_bytes(data, kind, visibility)
+        published.append(kind)
+        return ref
+
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(), archive=fail_response_once, runner=runner
+    )
+    with pytest.raises(GenerationProviderError, match="archive publication failed") as caught:
+        provider.generate(request(), SmokeContent)
+    failure = caught.value
+    assert len(runner.calls) == 1
+    assert failure.record.generation_succeeded is True
+    assert failure.record.publication_complete is False
+    assert set(failure.record.archives) == {"attempt", "request"}
+    assert failure.response["wall_seconds"] == 1.5
+    assert failure.cost.input_tokens == 41
+    assert failure.cost.output_tokens == 1
+    assert failure.usage_observation["token_ids"] == [100]
+
+    recovered = failure.replay_publication(store.put_bytes)
+    assert len(runner.calls) == 1
+    assert recovered.success is True
+    assert recovered.publication_complete is True
+    assert set(recovered.archives) == set(ARCHIVE_NAMES)

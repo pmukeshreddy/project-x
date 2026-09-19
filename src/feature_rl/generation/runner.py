@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ctypes
-import math
 import os
 import resource
 import signal
@@ -32,7 +31,7 @@ class FootprintSample:
 @dataclass(frozen=True)
 class ProcessOutcome:
     termination: str
-    exit_status: int
+    exit_status: int | None
     wall_seconds: float
     cpu_seconds: float
     stdout: bytes
@@ -42,6 +41,10 @@ class ProcessOutcome:
     max_reported_lifetime_physical_footprint_bytes: int | None
     breach_sample: FootprintSample | None
     process_group_cleanup_verified: bool
+    monitoring_failures: int = 0
+    monitor_error_type: str | None = None
+    monitor_error: str | None = None
+    cleanup_error: str | None = None
     cpu_limit_enforcement: str = "kernel_rlimit_cpu"
     file_size_limit_enforcement: str = "kernel_rlimit_fsize"
     memory_limit_enforcement: str = "sampled_proc_pid_rusage_20ms"
@@ -76,7 +79,7 @@ def _footprint(library, pid: int) -> FootprintSample | None:
 def _kill_group(pid: int) -> None:
     try:
         os.killpg(pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except OSError:
         pass
 
 
@@ -85,7 +88,7 @@ def _group_absent(pid: int) -> bool:
         os.killpg(pid, 0)
     except ProcessLookupError:
         return True
-    except PermissionError:
+    except OSError:
         return False
     return False
 
@@ -136,30 +139,31 @@ class BoundedProcessRunner:
                 )
                 termination = "process_exit"
                 samples = 0
-                failed_samples = 0
+                monitoring_failures = 0
                 max_physical = 0
                 max_lifetime = 0
                 breach: FootprintSample | None = None
-                while process.poll() is None:
-                    elapsed = time.monotonic() - started
-                    if elapsed >= limits.wall_seconds:
-                        termination = "deadline"
-                        _kill_group(process.pid)
-                        break
-                    combined_size = stdout_path.stat().st_size + stderr_path.stat().st_size
-                    if combined_size >= limits.output_bytes:
-                        termination = "output_cap"
-                        _kill_group(process.pid)
-                        break
-                    sample = _footprint(library, process.pid)
-                    if sample is None:
-                        failed_samples += 1
-                        if failed_samples >= 3:
-                            termination = "monitoring_failure"
-                            _kill_group(process.pid)
+                monitor_error_type: str | None = None
+                monitor_error: str | None = None
+                cleanup_error: str | None = None
+                exit_status: int | None = None
+                try:
+                    while process.poll() is None:
+                        elapsed = time.monotonic() - started
+                        if elapsed >= limits.wall_seconds:
+                            termination = "deadline"
                             break
-                    else:
-                        failed_samples = 0
+                        combined_size = stdout_path.stat().st_size + stderr_path.stat().st_size
+                        if combined_size > limits.output_bytes:
+                            termination = "output_cap"
+                            break
+                        sample = _footprint(library, process.pid)
+                        if sample is None:
+                            monitoring_failures += 1
+                            monitor_error_type = "ObservationUnavailable"
+                            monitor_error = "proc_pid_rusage returned no observation"
+                            termination = "monitoring_failure"
+                            break
                         samples += 1
                         max_physical = max(max_physical, sample.physical_footprint_bytes)
                         max_lifetime = max(
@@ -168,21 +172,45 @@ class BoundedProcessRunner:
                         if sample.physical_footprint_bytes > limits.physical_footprint_kill_bytes:
                             breach = sample
                             termination = "memory_cap"
-                            _kill_group(process.pid)
                             break
-                    time.sleep(limits.physical_footprint_poll_seconds)
-                try:
-                    exit_status = process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    termination = "cleanup_failure"
+                        time.sleep(limits.physical_footprint_poll_seconds)
+                except BaseException as caught:
+                    monitoring_failures += 1
+                    monitor_error_type = type(caught).__name__
+                    monitor_error = str(caught)
+                    termination = (
+                        "interrupted" if isinstance(caught, (KeyboardInterrupt, SystemExit))
+                        else "monitoring_failure"
+                    )
+                finally:
                     _kill_group(process.pid)
-                    exit_status = process.wait(timeout=2)
+                    try:
+                        exit_status = process.wait(timeout=2)
+                    except BaseException as caught:
+                        cleanup_error = f"{type(caught).__name__}: {caught}"
+                        termination = "cleanup_failure"
+                        try:
+                            process.kill()
+                            exit_status = process.wait(timeout=2)
+                        except BaseException as final_error:
+                            cleanup_error += f"; final cleanup: {type(final_error).__name__}: {final_error}"
             if not _group_absent(process.pid):
                 _kill_group(process.pid)
                 time.sleep(0.05)
             cleanup = _group_absent(process.pid)
-            stdout = stdout_path.read_bytes()
-            stderr = stderr_path.read_bytes()
+            if not cleanup and cleanup_error is None:
+                cleanup_error = "process group still present after bounded cleanup"
+                termination = "cleanup_failure"
+            try:
+                stdout = stdout_path.read_bytes()
+                stderr = stderr_path.read_bytes()
+            except BaseException as caught:
+                stdout = b""
+                stderr = b""
+                monitoring_failures += 1
+                monitor_error_type = type(caught).__name__
+                monitor_error = str(caught)
+                termination = "monitoring_failure"
             combined = len(stdout) + len(stderr)
             if combined > limits.output_bytes:
                 excess = combined - limits.output_bytes
@@ -213,4 +241,8 @@ class BoundedProcessRunner:
             max_reported_lifetime_physical_footprint_bytes=max_lifetime if samples else None,
             breach_sample=breach,
             process_group_cleanup_verified=cleanup,
+            monitoring_failures=monitoring_failures,
+            monitor_error_type=monitor_error_type,
+            monitor_error=monitor_error,
+            cleanup_error=cleanup_error,
         )

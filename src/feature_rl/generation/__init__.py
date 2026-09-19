@@ -3,13 +3,18 @@
 from .models import (
     AuthoringContext,
     GenerationCallRecord,
+    GenerationAttemptMetadata,
     GenerationLimits,
     GenerationRequest,
     GenerationResult,
     GenerationStage,
     GenerationUsage,
 )
-from .provider import GenerationProviderError, LocalGenerationProvider
+from .provider import (
+    GenerationProviderError,
+    GenerationPublicationRecovery,
+    LocalGenerationProvider,
+)
 from .runner import BoundedProcessRunner, ProcessBoundaryError, ProcessOutcome
 from .backend import (
     BackendConfigurationError,
@@ -30,7 +35,9 @@ __all__ = [
     "BoundedProcessRunner",
     "GenerationLimits",
     "GenerationCallRecord",
+    "GenerationAttemptMetadata",
     "GenerationProviderError",
+    "GenerationPublicationRecovery",
     "GenerationRequest",
     "GenerationResult",
     "GenerationStage",

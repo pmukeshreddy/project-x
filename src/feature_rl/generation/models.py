@@ -7,7 +7,17 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from feature_rl.contracts import ArtifactRef, CostRecord, Identifier, StrictModel, Text, Visibility
+from feature_rl.contracts import (
+    ArtifactRef,
+    CostRecord,
+    Digest,
+    Identifier,
+    Revision,
+    StrictModel,
+    Text,
+    UTCDateTime,
+    Visibility,
+)
 
 
 class GenerationStage(str, Enum):
@@ -124,7 +134,9 @@ class GenerationUsage(StrictModel):
     input_token_ids: tuple[Annotated[int, Field(ge=0)], ...]
     output_tokens: Annotated[int, Field(ge=0)]
     token_ids: tuple[Annotated[int, Field(ge=0)], ...]
-    selected_model_logprobs: tuple[float, ...]
+    selected_model_logprobs: tuple[
+        Annotated[float, Field(le=0, allow_inf_nan=False)], ...
+    ]
     sampling_policy: Literal["greedy_argmax"]
     behavior_logprobs: Literal[None] = None
     finish_reason: Literal["stop"]
@@ -142,11 +154,34 @@ class GenerationUsage(StrictModel):
 
 
 class GenerationCallRecord(StrictModel):
+    attempt_id: Identifier
+    recorded_at: UTCDateTime
     request_id: Identifier
     response_id: Identifier
     success: bool
+    generation_succeeded: bool
+    publication_complete: bool
     error_code: str | None
     archives: dict[str, ArtifactRef]
+
+
+class GenerationAttemptMetadata(StrictModel):
+    attempt_id: Identifier
+    recorded_at: UTCDateTime
+    producer: Literal["feature_rl.generation.LocalGenerationProvider"]
+    protocol_version: Literal[3]
+    request_id: Identifier
+    response_id: Identifier
+    prompt_id: Identifier
+    request_sha256: Digest
+    output_schema_sha256: Digest
+    source_sha256: dict[str, Digest]
+    configured_model_id: Text
+    configured_model_revision: Revision
+    model_config_sha256: Digest
+    model_manifest_sha256: Digest
+    dependency_manifest_sha256: Digest
+    dependency_versions: dict[str, str]
 
 
 class GenerationResult(StrictModel):

@@ -14,6 +14,7 @@ from feature_rl.contracts import Digest, StrictModel
 
 MODEL_ID = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
 MODEL_REVISION = "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b"
+MODEL_CONFIG_SHA256 = "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849"
 MODEL_MANIFEST_SHA256 = "697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0"
 DEPENDENCY_MANIFEST_SHA256 = "d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831"
 MODEL_FILES = frozenset({
@@ -70,6 +71,7 @@ class VerifiedModel(StrictModel):
     revision: str
     file_count: int
     total_bytes: int
+    config_sha256: Digest
     tokenizer_sha256: Digest
     weights_sha256: Digest
 
@@ -194,6 +196,7 @@ def verify_model_files(manifest: object, model_directory: Path) -> VerifiedModel
         revision=MODEL_REVISION,
         file_count=len(by_path),
         total_bytes=total,
+        config_sha256=by_path["config.json"]["sha256"],
         tokenizer_sha256=by_path["tokenizer.json"]["sha256"],
         weights_sha256=by_path["model.safetensors"]["sha256"],
     )
