@@ -405,7 +405,7 @@ def test_git_runner_cleans_descendants_after_leader_exit(tmp_path, exit_status):
         pytest.fail("Git command descendant survived process-group cleanup")
 
 
-def test_git_runner_cleans_descendants_on_timeout(tmp_path):
+def test_git_runner_cleans_descendants_on_timeout(tmp_path, monkeypatch):
     """Catches timeout cleanup killing only the foreground process."""
     from feature_rl.history import GitHistory, HistoryError
 
@@ -423,9 +423,46 @@ def test_git_runner_cleans_descendants_on_timeout(tmp_path):
     history = GitHistory(repo / ".git", timeout_seconds=0.2)
     history._argv = lambda *_args: (str(helper), str(child_pid))
 
-    with pytest.raises(HistoryError, match="timed out"):
-        history._run_bytes("diagnostic")
+    import importlib
 
+    git_module = importlib.import_module("feature_rl.history.git")
+    real_popen = subprocess.Popen
+    observed_child = False
+
+    def cleanup_setup(process):
+        current_popen = git_module.subprocess.Popen
+        git_module.subprocess.Popen = real_popen
+        try:
+            GitHistory._kill(process)
+        finally:
+            git_module.subprocess.Popen = current_popen
+
+    def popen_after_child(*args, **kwargs):
+        nonlocal observed_child
+        process = real_popen(*args, **kwargs)
+        if tuple(args[0])[0] != str(helper):
+            return process
+        startup_deadline = time.monotonic() + 2
+        while not child_pid.exists():
+            if process.poll() is not None or time.monotonic() >= startup_deadline:
+                cleanup_setup(process)
+                pytest.fail("timeout helper did not start its background child")
+            time.sleep(0.005)
+        child = int(child_pid.read_text())
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            cleanup_setup(process)
+            pytest.fail("timeout helper child exited before the deadline test")
+        observed_child = True
+        return process
+
+    with monkeypatch.context() as patch:
+        patch.setattr(git_module.subprocess, "Popen", popen_after_child)
+        with pytest.raises(HistoryError, match="timed out"):
+            history._run_bytes("diagnostic")
+
+    assert observed_child
     pid = int(child_pid.read_text())
     status = subprocess.run(
         ("/bin/ps", "-o", "stat=", "-p", str(pid)),
