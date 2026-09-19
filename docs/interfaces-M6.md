@@ -171,3 +171,19 @@ released = resolver.resolve_released(task_ref)  # exact stored TaskBundle
 `profiles` is a tuple of one to 32 actual `TaskLifecycle` instances sharing the same controller store and Registry. Duplicate version profiles reject because their current trust could be ambiguous. Each profile supplies supported lifecycle/M5/grader/runtime/builder revisions and the current actual external human verifier. Candidate-specific qualification policies are resolved from the selected release configuration; they do not choose code, service versions or external trust. Multiple policies can share one profile. Unsupported or ambiguous selected chains raise `AdmissionRejected`.
 
 The resolver exposes `.store`, `.registry`, `.configuration` (private `m6-resolver-configuration` ref with explicit profile dependencies) and `.revision`, matching consumer identity needs. Every call enforces exact Tn→accepted Q→BUILT T0 equality, actual legal Registry transitions and current M5/quarantine/revocation. It dispatches no grade, source, model, transition or Registry job. Existing selected CAS/configuration bytes are reasserted idempotently. Audit historical reads grant no admission. A consumer's one `TaskBuilder` must still match the accepted Q.task construction revision when calling `builder.solver_package(Q.task)`.
+# Factory source admission
+
+```python
+from feature_rl.pipeline import Factory, SourceDisposition, read_source_disposition
+
+factory = Factory(store=controller_store, registry=registry, revision=git_revision)
+result = factory.screen_source(candidate_ref)  # actual complete M0 CandidateRecord
+source = read_source_disposition(controller_store, result.artifacts[0])
+job = registry.job(source.claim.job_id)
+```
+
+The selected source job has `operation='construct'`, `inputs=(candidate_ref,)`, private `m6-source-policy` configuration, the actual Factory implementation revision, and `invocation='m6-source-admission'`. The result contains one private `m6-source-disposition` byte record. `SourceDisposition` binds `claim`, `candidate`, `repository_family`, `request_lineage`, exact M0 `screening` and `license`, `partition`, `source_status` (`eligible`, `rejected`, `unresolved`), `disposition`, `reason`, `original_costs`, reconciled `costs`, `revision` and `recorded_at`. `version` is `m6-source-disposition-v1`.
+
+Rejected-source audits require the exact completed job/result/claim and record, equality with the retained CandidateRecord, `source_status='rejected'`, and `disposition='candidate_rejection'`. That outcome derives only from actual rejected screening or an ineligible license. Unsupported/infrastructure/provisional/unresolved prerequisites are not semantic source rejections. This route creates no TaskBundle or RolloutRecord. Reading the record is historical, not current admission.
+
+`Factory.recover(claim)` recovers a durably frozen source outcome; an unknown pre-freeze attempt raises `FactoryRecoveryRequired`. `Factory.retry_publication(FactoryPublicationFailed)` retries retained exact bytes and costs without source execution. These capabilities stay private. Source aggregate costs are imported once per exact immutable candidate, including reuse from another Factory revision under the same source protocol. The original selected result/revision is preserved; downstream construction references it instead of adding those costs again.
