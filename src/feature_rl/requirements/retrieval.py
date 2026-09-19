@@ -111,6 +111,8 @@ class BaselineRetriever:
                     raise RetrievalRejected("baseline archive exceeds its file cap")
                 for member in members:
                     _safe_path(member.name)
+                    if member.isdir():
+                        continue
                     if not member.isfile() or member.name in files:
                         raise RetrievalRejected("baseline archive contains unsupported members")
                     expanded += member.size

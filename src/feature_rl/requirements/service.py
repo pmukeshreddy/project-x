@@ -65,6 +65,33 @@ class ContractAuthoringResult:
     journal_refs: tuple[ArtifactRef, ...]
 
 
+@dataclass(frozen=True)
+class AuthoringPublicationPending(RuntimeError):
+    """A validated artifact can be published again without another model call."""
+
+    artifact: RequirementContract | object
+    generation: GenerationResult
+    prior_journal_refs: tuple[ArtifactRef, ...]
+    journal_payload: bytes
+    journal_kind: str
+    journal_visibility: Visibility
+    publication_error: str
+
+    def __post_init__(self):
+        RuntimeError.__init__(
+            self,
+            "authoring result publication failed after successful generation: "
+            + self.publication_error,
+        )
+
+    def replay(self, store: ArtifactStore) -> tuple[ArtifactRef, tuple[ArtifactRef, ...]]:
+        journal = store.put_bytes(
+            self.journal_payload, self.journal_kind, self.journal_visibility
+        )
+        artifact = store.put_artifact(self.artifact)
+        return artifact, self.prior_journal_refs + (journal,)
+
+
 def build_contract_request(
     *,
     request_id: str,
@@ -152,7 +179,7 @@ class ContractAuthoringService:
         self.revision = revision
         self.evidence_scope = evidence_scope
 
-    def _journal(
+    def _journal_payload(
         self,
         candidate: GenerationCandidate,
         index: int,
@@ -160,7 +187,7 @@ class ContractAuthoringService:
         status: str,
         error: Exception | None,
         result: GenerationResult | None,
-    ) -> ArtifactRef:
+    ) -> bytes:
         record = result.record if result is not None else getattr(error, "record", None)
         cost = result.cost if result is not None else getattr(error, "cost", None)
         payload = {
@@ -177,8 +204,13 @@ class ContractAuthoringService:
             "generation_record": record.model_dump(mode="json") if record is not None else None,
             "cost": cost.model_dump(mode="json") if cost is not None else None,
         }
+        return canonical_json(payload)
+
+    def _journal(self, candidate, index, *, status, error, result) -> ArtifactRef:
         return self.store.put_bytes(
-            canonical_json(payload), "contract-authoring-journal", Visibility.AUTHORING
+            self._journal_payload(candidate, index, status=status, error=error, result=result),
+            "contract-authoring-journal",
+            Visibility.AUTHORING,
         )
 
     def _validate_prior(self, refs: tuple[ArtifactRef, ...]) -> None:
@@ -285,10 +317,25 @@ class ContractAuthoringService:
                     self._journal(candidate, index, status="rejected", error=error, result=result)
                 )
                 continue
-            journal_refs.append(
-                self._journal(candidate, index, status="accepted", error=None, result=result)
+            journal_payload = self._journal_payload(
+                candidate, index, status="accepted", error=None, result=result
             )
-            contract_ref = self.store.put_artifact(contract)
+            try:
+                accepted_journal = self.store.put_bytes(
+                    journal_payload, "contract-authoring-journal", Visibility.AUTHORING
+                )
+                contract_ref = self.store.put_artifact(contract)
+            except Exception as error:
+                raise AuthoringPublicationPending(
+                    artifact=contract,
+                    generation=result,
+                    prior_journal_refs=tuple(journal_refs),
+                    journal_payload=journal_payload,
+                    journal_kind="contract-authoring-journal",
+                    journal_visibility=Visibility.AUTHORING,
+                    publication_error=f"{type(error).__name__}: {error}",
+                ) from error
+            journal_refs.append(accepted_journal)
             return ContractAuthoringResult(
                 contract=contract,
                 contract_ref=contract_ref,

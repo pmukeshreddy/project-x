@@ -1,0 +1,19 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 435, in <module>
+    main()
+    ~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 431, in main
+    {"contract": contract, "scenario": scenario}[args.stage]()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 295, in contract
+    retrieved = retrieve(refs, payloads["baseline"])
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 189, in retrieve
+    ).retrieve(requests)
+      ~~~~~~~~^^^^^^^^^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/requirements/retrieval.py", line 136, in retrieve
+    files, expanded = self._files()
+                      ~~~~~~~~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/requirements/retrieval.py", line 115, in _files
+    raise RetrievalRejected("baseline archive contains unsupported members")
+feature_rl.requirements.retrieval.RetrievalRejected: baseline archive contains unsupported members

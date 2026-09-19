@@ -25,6 +25,7 @@ from feature_rl.generation.provider import GenerationProviderError
 from feature_rl.requirements import (
     AuthoringExhausted,
     AuthoringEvidenceResolver,
+    AuthoringPublicationPending,
     GenerationCandidate,
     GroundedSource,
 )
@@ -40,6 +41,19 @@ class ScenarioAuthoringResult:
     plan_ref: ArtifactRef
     generation: GenerationResult
     journal_refs: tuple[ArtifactRef, ...]
+
+
+def _contract_context(
+    contract: RequirementContract, contract_ref: ArtifactRef
+) -> AuthoringContext:
+    return AuthoringContext(
+        context_id="FROZEN_CONTRACT",
+        role="contract",
+        source=contract_ref,
+        locator=f"artifact:RequirementContract:{contract_ref.sha256}",
+        text=canonical_json(contract.model_dump(mode="json")).decode(),
+        provenance_label="existing_obligation",
+    )
 
 
 def build_scenario_request(
@@ -70,16 +84,7 @@ def build_scenario_request(
             provenance_label=source.provenance_label,
         )
         for source in admitted
-    ) + (
-        AuthoringContext(
-            context_id="FROZEN_CONTRACT",
-            role="contract",
-            source=contract_ref,
-            locator=f"artifact:RequirementContract:{contract_ref.sha256}",
-            text=canonical_json(contract.model_dump(mode="json")).decode(),
-            provenance_label="existing_obligation",
-        ),
-    )
+    ) + (_contract_context(contract, contract_ref),)
     return GenerationRequest(
         request_id=request_id,
         response_id=response_id,
@@ -154,6 +159,7 @@ class ScenarioAuthoringService:
         self,
         candidates: tuple[GenerationCandidate, ...],
         contract_ref: ArtifactRef,
+        contract: RequirementContract,
         prior_journal_refs: tuple[ArtifactRef, ...],
         sources: tuple[GroundedSource, ...],
     ) -> None:
@@ -174,8 +180,16 @@ class ScenarioAuthoringService:
             contract_contexts = [
                 context for context in candidate.request.contexts if context.role == "contract"
             ]
-            if len(contract_contexts) != 1 or contract_contexts[0].source != contract_ref:
-                raise ValueError("scenario request does not contain the exact frozen contract")
+            if len(contract_contexts) != 1 or contract_contexts[0] != _contract_context(
+                contract, contract_ref
+            ):
+                raise ValueError("scenario request does not contain the exact frozen contract context")
+            all_ids = tuple(
+                requirement.requirement_id
+                for requirement in contract.requirements + contract.compatibility_obligations
+            )
+            if candidate.request.allowed_requirement_ids != all_ids:
+                raise ValueError("scenario request IDs differ from the exact frozen contract")
             evidence_contexts = tuple(
                 context for context in candidate.request.contexts if context.role != "contract"
             )
@@ -191,7 +205,7 @@ class ScenarioAuthoringService:
         if len(identities) != len(candidates):
             raise ValueError("scenario candidate request identities must be unique")
 
-    def _journal(self, candidate, index, *, status, error, result):
+    def _journal_payload(self, candidate, index, *, status, error, result):
         record = result.record if result is not None else getattr(error, "record", None)
         cost = result.cost if result is not None else getattr(error, "cost", None)
         payload = {
@@ -208,8 +222,13 @@ class ScenarioAuthoringService:
             "generation_record": record.model_dump(mode="json") if record is not None else None,
             "cost": cost.model_dump(mode="json") if cost is not None else None,
         }
+        return canonical_json(payload)
+
+    def _journal(self, candidate, index, *, status, error, result):
         return self.store.put_bytes(
-            canonical_json(payload), "scenario-authoring-journal", Visibility.PRIVATE
+            self._journal_payload(candidate, index, status=status, error=error, result=result),
+            "scenario-authoring-journal",
+            Visibility.PRIVATE,
         )
 
     def generate(
@@ -224,10 +243,10 @@ class ScenarioAuthoringService:
         prior_journal_refs = tuple(ArtifactRef.model_validate(ref) for ref in prior_journal_refs)
         sources = tuple(self.resolver.resolve(sources))
         inputs = ScenarioFinalizationInputs.model_validate(inputs)
-        self._validate_plan(candidates, inputs.contract, prior_journal_refs, sources)
         resolved = self.store.get_artifact(inputs.contract, max_envelope_bytes=512 * 1024)
         if not isinstance(resolved, RequirementContract):
             raise ScenarioJoinError("frozen contract reference did not resolve to RequirementContract")
+        self._validate_plan(candidates, inputs.contract, resolved, prior_journal_refs, sources)
         journal_refs = list(prior_journal_refs)
         for index, candidate in enumerate(candidates, len(prior_journal_refs) + 1):
             result = None
@@ -268,10 +287,25 @@ class ScenarioAuthoringService:
                     self._journal(candidate, index, status="rejected", error=error, result=result)
                 )
                 continue
-            journal_refs.append(
-                self._journal(candidate, index, status="accepted", error=None, result=result)
+            journal_payload = self._journal_payload(
+                candidate, index, status="accepted", error=None, result=result
             )
-            plan_ref = self.store.put_artifact(plan)
+            try:
+                accepted_journal = self.store.put_bytes(
+                    journal_payload, "scenario-authoring-journal", Visibility.PRIVATE
+                )
+                plan_ref = self.store.put_artifact(plan)
+            except Exception as error:
+                raise AuthoringPublicationPending(
+                    artifact=plan,
+                    generation=result,
+                    prior_journal_refs=tuple(journal_refs),
+                    journal_payload=journal_payload,
+                    journal_kind="scenario-authoring-journal",
+                    journal_visibility=Visibility.PRIVATE,
+                    publication_error=f"{type(error).__name__}: {error}",
+                ) from error
+            journal_refs.append(accepted_journal)
             return ScenarioAuthoringResult(
                 plan=plan,
                 plan_ref=plan_ref,

@@ -10,6 +10,7 @@ import math
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 from transformers import AutoTokenizer
 
@@ -33,6 +34,7 @@ from feature_rl.requirements import (
     AuthoringEvidenceResolver,
     BaselineRetriever,
     ClickDiscoveryService,
+    ClickDiscoveryObservation,
     ContractAuthoringService,
     ContractFinalizationInputs,
     GenerationCandidate,
@@ -157,6 +159,82 @@ def prepare_runtime(
         refs["baseline"], tuple(pins), source_evidence=source_evidence(refs)
     )
     return runtime, prepared
+
+
+def _stored_refs(kind: str) -> tuple[ArtifactRef, ...]:
+    found = []
+    for path in STORE_PATH.glob("*.json"):
+        envelope = json.loads(path.read_text())
+        if envelope.get("kind") == kind:
+            found.append(
+                ArtifactRef(
+                    sha256=path.stem,
+                    kind=kind,
+                    schema_version=envelope["schema_version"],
+                    visibility=Visibility(envelope["visibility"]),
+                    encoding=envelope["encoding"],
+                )
+            )
+    return tuple(found)
+
+
+def _receipt_cost(store: ArtifactStore, evidence: ArtifactRef, category: str) -> CostRecord:
+    value = json.loads(
+        store.get_bytes(evidence, max_envelope_bytes=3 * 1024 * 1024, max_payload_bytes=2 * 1024 * 1024)
+    )
+    return CostRecord(
+        category=category,
+        wall_seconds=value["lifecycle_wall_seconds"],
+        cpu_seconds=value["maximum_cpu_seconds"],
+        gpu_seconds=None,
+        input_tokens=None,
+        output_tokens=None,
+        human_minutes=None,
+        usd=None,
+        measurement="partial",
+        note=(
+            "Recovered from the exact retained M3 receipt after the authoring controller "
+            "failed during later inert retrieval; no discovery rerun."
+        ),
+    )
+
+
+def retained_discovery(store: ArtifactStore):
+    matches = _stored_refs("click-runtime-discovery")
+    if not matches:
+        return None
+    if len(matches) != 1:
+        raise RuntimeError("expected exactly one retained Click discovery")
+    source = matches[0]
+    text = store.get_bytes(source, max_envelope_bytes=256 * 1024, max_payload_bytes=128 * 1024).decode()
+    observation = ClickDiscoveryObservation.model_validate_json(text)
+    private = (
+        ArtifactRef(
+            sha256=observation.build_evidence_sha256, kind="environment-execution",
+            schema_version=1, visibility=Visibility.PRIVATE, encoding="bytes",
+        ),
+        ArtifactRef(
+            sha256=observation.execution_evidence_sha256, kind="environment-execution",
+            schema_version=1, visibility=Visibility.PRIVATE, encoding="bytes",
+        ),
+    )
+    context = GroundedSource(
+        context_id="M3_CLICK_DISCOVERY",
+        role="baseline",
+        source=source,
+        locator="m3:click-runtime-discovery-v1",
+        text=text,
+        provenance_label="existing_obligation",
+    )
+    return SimpleNamespace(
+        observation=observation,
+        context=context,
+        private_evidence=private,
+        costs=(
+            _receipt_cost(store, private[0], "construction"),
+            _receipt_cost(store, private[1], "execution"),
+        ),
+    )
 
 
 def retrieval_policy() -> RetrievalPolicy:
@@ -290,8 +368,13 @@ def contract() -> None:
         raise RuntimeError("production state already exists; refusing to repeat discovery/generation")
     store = ArtifactStore(STORE_PATH, ActorRole.CONTROLLER)
     setup, refs, payloads = load_inputs(store)
-    runtime, prepared = prepare_runtime(store, setup, refs)
-    discovered = ClickDiscoveryService(runtime=runtime).discover(prepared)
+    discovered = retained_discovery(store)
+    if discovered is None:
+        runtime, prepared = prepare_runtime(store, setup, refs)
+        discovered = ClickDiscoveryService(runtime=runtime).discover(prepared)
+        recipe_ref = prepared.recipe
+    else:
+        recipe_ref = discovered.observation.recipe
     retrieved = retrieve(refs, payloads["baseline"])
     retrieval_ref = store.put_bytes(
         canonical_json(retrieved.receipt.model_dump(mode="json")),
@@ -329,7 +412,7 @@ def contract() -> None:
         created_at=datetime.now(timezone.utc),
         inputs=(
             refs["baseline"], refs["request_evidence"], refs["license_text"],
-            prepared.recipe, discovered.context.source, retrieval_ref,
+            recipe_ref, discovered.context.source, retrieval_ref,
         ),
         evidence=(evidence,),
     )
@@ -341,7 +424,7 @@ def contract() -> None:
         runtime_discovery=discovered.context.source,
         allowed_changes=allowed,
         public_checks=(),
-        episode_limits=runtime.recipe(prepared).limits,
+        episode_limits=store.get_artifact(recipe_ref, max_envelope_bytes=512 * 1024).limits,
         provenance_label="reconstructed_specification",
         visibility=Visibility.AUTHORING,
         provenance=provenance,
@@ -356,7 +439,10 @@ def contract() -> None:
         "revision": REVISION,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "refs": {name: value.model_dump(mode="json") for name, value in refs.items()},
-        "prepared_recipe": prepared.recipe.model_dump(mode="json"),
+        "prepared_recipe": recipe_ref.model_dump(mode="json"),
+        "discovery_private_evidence": [
+            item.model_dump(mode="json") for item in discovered.private_evidence
+        ],
         "discovery": discovered.context.source.model_dump(mode="json"),
         "retrieval_receipt": retrieval_ref.model_dump(mode="json"),
         "sources": [item.model_dump(mode="json") for item in sources],

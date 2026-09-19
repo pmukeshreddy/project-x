@@ -24,6 +24,7 @@ from feature_rl.contracts import (
 from feature_rl.requirements import (
     AuthoringExhausted,
     AuthoringEvidenceResolver,
+    AuthoringPublicationPending,
     ContractAuthoringService,
     ContractFinalizationInputs,
     ContractFinalizer,
@@ -654,6 +655,30 @@ def test_contract_service_requires_diagnosed_changed_repairs_and_preserves_exhau
     assert len(repaired.journal_refs) == 2
 
 
+def test_contract_publication_failure_replays_without_another_generation(tmp_path, monkeypatch):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    provider = FakeProvider((provider_result(contract_proposal()),))
+    service = ContractAuthoringService(
+        provider=provider,
+        store=store,
+        resolver=FakeEvidenceResolver(sources()),
+        revision="2" * 40,
+        evidence_scope="unit_diagnostic",
+    )
+    original = store.put_artifact
+    monkeypatch.setattr(store, "put_artifact", lambda artifact: (_ for _ in ()).throw(OSError("disk")))
+    with pytest.raises(AuthoringPublicationPending) as caught:
+        service.generate(
+            (GenerationCandidate(request=contract_request()),), contract_inputs(), sources()
+        )
+    assert len(provider.calls) == 1
+    monkeypatch.setattr(store, "put_artifact", original)
+    artifact_ref, journal_refs = caught.value.replay(store)
+    assert store.get_artifact(artifact_ref) == caught.value.artifact
+    assert len(journal_refs) == 1
+    assert len(provider.calls) == 1
+
+
 def test_scenario_request_and_service_resolve_exact_stored_contract(tmp_path):
     store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
     contract = finalized_contract()
@@ -684,6 +709,83 @@ def test_scenario_request_and_service_resolve_exact_stored_contract(tmp_path):
     )
     assert result.plan.contract == contract_ref
     assert store.get_artifact(result.plan_ref) == result.plan
+
+
+def test_scenario_publication_failure_replays_without_another_generation(tmp_path, monkeypatch):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    contract = finalized_contract()
+    contract_ref = store.put_artifact(contract)
+    request = build_scenario_request(
+        request_id="SCENARIO_REPLAY_REQ",
+        response_id="SCENARIO_REPLAY_RESP",
+        prompt_id="SCENARIO_REPLAY_PROMPT",
+        contract=contract,
+        contract_ref=contract_ref,
+        sources=sources(),
+        limits=generation_limits(),
+        seed=0,
+    )
+    provider = FakeProvider((provider_result(scenario_proposal()),))
+    service = ScenarioAuthoringService(
+        provider=provider,
+        store=store,
+        resolver=FakeEvidenceResolver(sources()),
+        revision="2" * 40,
+        evidence_scope="unit_diagnostic",
+    )
+    original = store.put_artifact
+    monkeypatch.setattr(store, "put_artifact", lambda artifact: (_ for _ in ()).throw(OSError("disk")))
+    with pytest.raises(AuthoringPublicationPending) as caught:
+        service.generate(
+            (GenerationCandidate(request=request),), scenario_inputs(contract_ref), sources()
+        )
+    assert len(provider.calls) == 1
+    monkeypatch.setattr(store, "put_artifact", original)
+    artifact_ref, journal_refs = caught.value.replay(store)
+    assert store.get_artifact(artifact_ref) == caught.value.artifact
+    assert len(journal_refs) == 1
+    assert len(provider.calls) == 1
+
+
+@pytest.mark.parametrize("mutation", ("text", "ids"))
+def test_scenario_service_rejects_forged_contract_context_or_ids(tmp_path, mutation):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    contract = finalized_contract()
+    contract_ref = store.put_artifact(contract)
+    built = build_scenario_request(
+        request_id="SCENARIO_REQ_FORGED",
+        response_id="SCENARIO_RESP_FORGED",
+        prompt_id="SCENARIO_PROMPT_FORGED",
+        contract=contract,
+        contract_ref=contract_ref,
+        sources=sources(),
+        limits=generation_limits(),
+        seed=0,
+    )
+    if mutation == "text":
+        changed = built.model_copy(
+            update={
+                "contexts": (
+                    *built.contexts[:-1],
+                    built.contexts[-1].model_copy(update={"text": "{}"}),
+                )
+            }
+        )
+    else:
+        changed = built.model_copy(update={"allowed_requirement_ids": ("FEATURE_COMMAND_SUGGESTION",)})
+    service = ScenarioAuthoringService(
+        provider=FakeProvider((provider_result(scenario_proposal()),)),
+        store=store,
+        resolver=FakeEvidenceResolver(sources()),
+        revision="2" * 40,
+        evidence_scope="unit_diagnostic",
+    )
+    with pytest.raises(ValueError, match="exact frozen contract"):
+        service.generate(
+            (GenerationCandidate(request=changed),),
+            scenario_inputs(contract_ref),
+            sources(),
+        )
 
 
 class FakeRuntime:
@@ -795,6 +897,44 @@ def source_archive(files: dict[str, bytes]) -> bytes:
             info.mode = 0o644
             archive.addfile(info, io.BytesIO(data))
     return output.getvalue()
+
+
+def source_archive_with_directory_and_link(*, link: bool = False) -> bytes:
+    output = io.BytesIO()
+    with tarfile.open(fileobj=output, mode="w", format=tarfile.PAX_FORMAT) as archive:
+        directory = tarfile.TarInfo("src/click")
+        directory.type = tarfile.DIRTYPE
+        archive.addfile(directory)
+        info = tarfile.TarInfo("src/click/core.py")
+        info.size = 4
+        archive.addfile(info, io.BytesIO(b"one\n"))
+        if link:
+            linked = tarfile.TarInfo("src/click/linked.py")
+            linked.type = tarfile.SYMTYPE
+            linked.linkname = "core.py"
+            archive.addfile(linked)
+    return output.getvalue()
+
+
+def test_baseline_retriever_accepts_directory_metadata_but_rejects_links():
+    policy = RetrievalPolicy(
+        allowed_paths=("src/click/core.py",),
+        max_archive_bytes=1024 * 1024,
+        max_files=10,
+        max_selected_bytes=64,
+        max_spans=2,
+    )
+    request = (RetrievalRequest(context_id="CORE", path="src/click/core.py", line_ranges=((1, 1),)),)
+    result = BaselineRetriever(
+        baseline=BASELINE, archive=source_archive_with_directory_and_link(), policy=policy
+    ).retrieve(request)
+    assert result.sources[0].text == "one\n"
+    with pytest.raises(RetrievalRejected, match="unsupported members"):
+        BaselineRetriever(
+            baseline=BASELINE,
+            archive=source_archive_with_directory_and_link(link=True),
+            policy=policy,
+        ).retrieve(request)
 
 
 def test_baseline_retriever_enforces_allowlist_ranges_and_records_exact_spans():
