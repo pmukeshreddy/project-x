@@ -94,6 +94,7 @@ class PullRequestIntakeSpec:
     license_name: str
     integration: Literal["merge", "squash", "rebase", "linear"]
     admissible_cutoff: datetime
+    recorded_at: datetime
     provenance_label: Literal["historical_request", "reconstructed_specification"]
     mixed_paths: Mapping[str, str]
     max_tree_archive_bytes: int
@@ -117,6 +118,8 @@ class PullRequestIntakeSpec:
             self.admissible_cutoff
         ):
             raise ValueError("admissible_cutoff must explicitly use UTC")
+        if self.recorded_at.utcoffset() != timezone.utc.utcoffset(self.recorded_at):
+            raise ValueError("recorded_at must explicitly use UTC")
         if type(self.max_tree_archive_bytes) is not int or self.max_tree_archive_bytes <= 0:
             raise ValueError("max_tree_archive_bytes must be positive")
 
@@ -326,7 +329,7 @@ class GitHubPullRequestIntake:
         proof_ref = self.store.put_bytes(
             _canonical(proof), "source-inspection-log", Visibility.PRIVATE
         )
-        recorded_at = datetime.now(timezone.utc)
+        recorded_at = spec.recorded_at
         evidence = (
             EvidenceRecord(
                 producer="feature_rl.intake.GitHubPullRequestIntake",

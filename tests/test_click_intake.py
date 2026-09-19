@@ -199,16 +199,20 @@ def test_connected_intake_builds_private_source_pair_and_safe_authoring_view(tmp
         license_name="license",
         integration="squash",
         admissible_cutoff=cutoff,
+        recorded_at=datetime(2026, 9, 19, 1, 0, tzinfo=timezone.utc),
         provenance_label="reconstructed_specification",
         mixed_paths={"src/options.py": "Companion option formatting behavior"},
         max_tree_archive_bytes=1_000_000,
     )
-    result = GitHubPullRequestIntake(
+    intake = GitHubPullRequestIntake(
         store=controller_store,
         catalog=catalog,
         history=GitHistory(repo / ".git"),
         factory_revision="a" * 40,
-    ).ingest(spec, split)
+    )
+    result = intake.ingest(spec, split)
+    repeated = intake.ingest(spec, split)
+    assert repeated == result
 
     candidate = controller_store.get_artifact(result.candidate)
     pair = controller_store.get_artifact(result.source_pair)
