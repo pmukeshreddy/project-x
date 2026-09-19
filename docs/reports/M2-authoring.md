@@ -2,7 +2,7 @@
 
 ## Result
 
-The authoring/scenario product is implemented at product revision `7b8974637e9ffc5bab79f9590b90c7021228d473`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, an explicit scenario-planning stage, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
+The authoring/scenario product is implemented at product revision `d64f172efb2d50ce9303725a08ed2fcfd9f4a65f`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, an explicit scenario-planning stage, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
 
 The actual Click construction gate did not pass. One M3 discovery succeeded. Three contract calls consumed the stage budget: two reached the fixed 120-second deadline, and the final concise call completed but returned a duplicate-key response. No contract was frozen, no privileged H feasibility review was authorized, and no scenario call was made. There is no handwritten or salvaged production artifact.
 
@@ -13,9 +13,9 @@ The public modules are `feature_rl.requirements` and `feature_rl.scenarios`; the
 - `ClickDiscoveryService`, `BaselineRetriever`, and `AuthoringEvidenceResolver` bind model-visible text to exact controller-store artifacts.
 - `RequirementContractProposal` and `ScenarioPlanProposal` derive their semantic fields from M0 definitions.
 - `ContractAuthoringService` and `ScenarioAuthoringService` enforce one initial attempt plus two diagnosed, materially changed repairs and return real stored M0 artifacts on success.
-- `AuthoringExhausted` retains rejected attempt refs. `GenerationProviderError.replay_result`, `AuthoringJournalPublicationPending.replay`, and `AuthoringPublicationPending.replay` resume storage/finalization without another model call.
+- `AuthoringExhausted` retains rejected attempt refs. `GenerationProviderError.replay_result` and `replay_error`, `AuthoringJournalPublicationPending.replay`, and `AuthoringPublicationPending.replay` resume storage, rejection journaling, or finalization without another model call. Recovered outcomes must match their bounded immutable request/schema/context/status/content/usage/cost archives exactly.
 
-Contract finalization checks the resolved request text and provenance classification, discovery-bound entry points and observations, ID namespace, allowed changes, quote/locator/source/label grounding, and ambiguity disposition. Scenario planning additionally requires the exact canonical frozen-contract context and IDs, the contract's admitted request/B/discovery reference set, its request text/provenance, its observation set, mandatory feature-plus-compatibility coverage, oracle grounding, and the fixed same-case seed policy.
+Contract finalization checks the resolved request text and provenance classification, discovery-bound entry points and observations, ID namespace, allowed changes, quote/locator/source/label grounding, and ambiguity disposition. Scenario planning additionally requires the exact canonical frozen-contract context and IDs, the contract's admitted request/B/discovery/public-check reference set, its request text/provenance, its observation set, structural mandatory feature-plus-compatibility ID coverage, oracle grounding, and the fixed same-case seed policy. This structural coverage does not prove semantic entailment or checker discrimination.
 
 ## Actual B-only construction
 
@@ -59,7 +59,15 @@ Focused final command:
 ./.venv/bin/pytest -q tests/test_authoring.py tests/test_generation.py
 ```
 
-Result: **137 passed in 0.96s**, exit 0. It covers proposal derivation, source resolution, actual discovery binding, archive retrieval, forged text/locators/refs, request/provenance joins, unsupported entry points/observations, ambiguity and ID failures, contract/scenario coverage and seed joins, exact frozen-contract text/source/ID joins, semantic repair changes, exhaustion, provider recovery, journal replay, and final-artifact replay.
+Result: **137 passed in 0.97s**, exit 0. It covers proposal derivation, source resolution, actual discovery binding, archive retrieval, forged text/locators/refs, request/provenance joins, unsupported entry points/observations, ambiguity and ID failures, structural contract/scenario ID coverage and seed joins, exact frozen-contract text/source/ID joins, semantic repair changes, exhaustion, provider recovery, journal replay, and final-artifact replay.
+
+Round-two focused correction command:
+
+```sh
+PYTHONPATH=src ./.venv/bin/pytest -q tests/test_authoring.py tests/test_generation.py
+```
+
+Result: **146 passed in 1.01s**, exit 0. It adds exact recovered-request/schema/context/status/content/usage/cost binding for both services, failed-generation publication replay and rejection-journal recovery without provider reuse, exact frozen public-check admission, and the `m4-sha256-v1` reproduction default. An earlier identical pytest invocation printed 146 passes in 1.12s, but its wrapper then failed because it assigned zsh's read-only `status` variable; that wrapper did not capture pytest's exit status and is retained separately rather than treated as verification.
 
 Affected full-suite command:
 
