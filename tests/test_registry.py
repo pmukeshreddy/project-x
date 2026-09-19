@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sqlite3
 
 import pytest
 from pydantic import ValidationError
@@ -42,10 +43,11 @@ def observation(m, source, wall=None, revision=1, upstream='external-call-1'):
                              revision=revision, receipts=(source,), costs=(cost(wall),))
 
 
-def result(output, costs):
+def result(output, costs, *, evidence_artifacts=None):
     evidence = EvidenceRecord(producer='registry synthetic check', command=('inert',),
                               recorded_at=datetime(2026, 9, 19, tzinfo=timezone.utc), exit_status=0,
-                              artifacts=(output,), revision='a' * 40, scope='unit_diagnostic')
+                              artifacts=(output,) if evidence_artifacts is None else evidence_artifacts,
+                              revision='a' * 40, scope='unit_diagnostic')
     return OperationResult(operation='construct', disposition=Disposition.SUCCESS,
                            artifacts=(output,), evidence=(evidence,), costs=costs,
                            reason='Synthetic immutable-result publication only')
@@ -234,6 +236,64 @@ def test_job_outputs_extend_quarantine_trace_without_task_admission(tmp_path):
         reg.assert_usable(output)
 
 
+def test_quarantined_result_evidence_blocks_completion_without_losing_accounting(tmp_path):
+    m, store, reg, source, config, spec = setup(tmp_path)
+    proof = store.put_bytes(b'independent completion proof', 'registry-proof', Visibility.PRIVATE)
+    output = store.put_bytes(b'output is not the proof', 'registry-output', Visibility.PRIVATE)
+    job = reg.enqueue(spec)
+    claim = reg.claim(job.job_id, owner='worker', claim_key='proof-claim')
+    obs = reg.reconcile(claim, observation(m, proof))
+    reg.quarantine(proof, notice_id='bad-proof', reason='synthetic proof defect', evidence=(config,))
+    before = reg.events()
+    with pytest.raises(m.QuarantinedError):
+        reg.complete(claim, result(output, (cost(),), evidence_artifacts=(proof,)),
+                     observations=(obs.observation_id,))
+    assert reg.events() == before
+    assert reg.job(job.job_id).state == 'running' and reg.job(job.job_id).result is None
+    assert reg.trace(proof).jobs == ()
+    reg.abandon(claim, reason='completion proof was invalidated', evidence=(proof,))
+    late = reg.reconcile(claim, observation(m, proof, wall=3.0, revision=2))
+    assert reg.accounting(job.job_id).observations == (late,)
+    assert reg.attempts(job.job_id)[0].state == 'abandoned'
+
+
+def test_materialized_growth_is_rejected_before_unreadable_history_is_committed(tmp_path):
+    m, store, reg, source, config, spec = setup(tmp_path, max_event_bytes=2200, max_attempts_per_job=100)
+    spec = spec.model_copy(update={'attempt_limit': 100})
+    queued = reg.enqueue(spec)
+
+    def stored():
+        with sqlite3.connect(reg.root / 'index.sqlite3') as con:
+            return (con.execute('SELECT sequence,semantic_key,body FROM events ORDER BY sequence').fetchall(),
+                    con.execute('SELECT namespace,key,body FROM records ORDER BY namespace,key').fetchall(),
+                    con.execute('SELECT acknowledged FROM meta').fetchone())
+
+    for number in range(1, 31):
+        before = stored()
+        journal = (reg.root / 'events.jsonl').read_bytes()
+        try:
+            claim = reg.claim(queued.job_id, owner='worker', claim_key='bounded-' + str(number))
+        except m.RegistryLimit as exc:
+            assert 'materialized index' in str(exc)
+            break
+        assert max(len(row[2]) for row in stored()[1]) <= reg.limits.max_event_bytes
+        reg.abandon(claim, reason='synthetic interruption', evidence=(source,))
+        queued = reg.retry(queued.job_id, reason='synthetic diagnosed retry', evidence=(config,))
+    else:
+        pytest.fail('the bounded reproduction did not reach the materialized row limit')
+
+    assert stored() == before
+    assert (reg.root / 'events.jsonl').read_bytes() == journal
+    assert max(len(row[2]) for row in before[0]) < reg.limits.max_event_bytes
+    assert reg.recover().event_count == len(before[0])
+    assert reg.recover().appended_bytes == 0
+    assert reg.job(queued.job_id) == queued and reg.enqueue(spec) == queued
+    assert tuple(attempt.claim.attempt_id for attempt in reg.attempts(queued.job_id)) == queued.attempts
+    assert reg.accounting(queued.job_id).unobserved_attempts == queued.attempts
+    late = reg.reconcile(claim, observation(m, source, wall=2.0))
+    assert reg.accounting(queued.job_id).observations == (late,)
+
+
 def test_old_claim_replay_cannot_authorize_another_dispatch(tmp_path):
     m, store, reg, source, config, spec = setup(tmp_path)
     job = reg.enqueue(spec)
@@ -264,12 +324,9 @@ def test_missing_lock_and_hardlinked_database_rejected(tmp_path):
         reg.recover()
 
 
-def test_real_typed_reference_closure_traces_runs_and_checkpoints(tmp_path):
-    # The production mutation caught here is treating typed artifacts as opaque
-    # metadata, losing TaskBundle/consumed_tasks/provenance dependency edges.
+def typed_artifacts(store):
     from test_contracts_examples import examples
     from feature_rl.contracts import ARTIFACT_TYPES
-    m, store, reg, source, config, spec = setup(tmp_path)
     published, raw = {}, {}
     def replace(value):
         if isinstance(value, dict):
@@ -289,6 +346,14 @@ def test_real_typed_reference_closure_traces_runs_and_checkpoints(tmp_path):
                  'EnvironmentRecipe', 'VerifierBundle', 'TaskBundle', 'RolloutRecord', 'TrainingCheckpoint'):
         artifact = ARTIFACT_TYPES[kind].model_validate_json(json.dumps(replace(data[kind])))
         published[kind] = store.put_artifact(artifact)
+    return published
+
+
+def test_real_typed_reference_closure_traces_runs_and_checkpoints(tmp_path):
+    # The production mutation caught here is treating typed artifacts as opaque
+    # metadata, losing TaskBundle/consumed_tasks/provenance dependency edges.
+    m, store, reg, source, config, spec = setup(tmp_path)
+    published = typed_artifacts(store)
     reg.register(published['RolloutRecord'])
     reg.register(published['TrainingCheckpoint'])
     reg.quarantine(published['RequirementContract'], notice_id='contract-defect',
@@ -296,3 +361,39 @@ def test_real_typed_reference_closure_traces_runs_and_checkpoints(tmp_path):
     trace = reg.trace(published['RequirementContract'])
     assert published['RolloutRecord'] in trace.runs
     assert published['TrainingCheckpoint'] in trace.checkpoints
+
+
+def test_later_result_evidence_quarantine_traces_consumers_but_retains_history(tmp_path):
+    m, store, reg, source, config, spec = setup(tmp_path)
+    published = typed_artifacts(store)
+    task, rollout, checkpoint = (published[kind] for kind in ('TaskBundle', 'RolloutRecord', 'TrainingCheckpoint'))
+    proof = store.put_bytes(b'independent selected result proof', 'registry-proof', Visibility.PRIVATE)
+    output = store.put_bytes(b'downstream synthetic output', 'registry-output', Visibility.PRIVATE)
+    job = reg.enqueue(spec)
+    claim = reg.claim(job.job_id, owner='worker', claim_key='proof-claim')
+    obs = reg.reconcile(claim, observation(m, source))
+    selected = result(task, (cost(),), evidence_artifacts=(proof,))
+    completed = reg.complete(claim, selected, observations=(obs.observation_id,))
+    consumer = reg.enqueue(spec.model_copy(update={'inputs': (task,), 'invocation': 'consumer'}))
+    consumer_claim = reg.claim(consumer.job_id, owner='worker', claim_key='consumer-claim')
+    consumer_obs = reg.reconcile(consumer_claim, observation(m, source, upstream='consumer-call'))
+    consumed = reg.complete(consumer_claim, result(output, (cost(),)), observations=(consumer_obs.observation_id,))
+    reg.register(rollout)
+    reg.register(checkpoint)
+    reg.quarantine(proof, notice_id='late-proof-defect', reason='synthetic later proof defect', evidence=(config,))
+
+    trace = reg.trace(proof)
+    assert {proof, task, output, rollout, checkpoint} <= set(trace.artifacts)
+    assert set(trace.jobs) == {job.job_id, consumer.job_id}
+    assert trace.runs == (rollout,) and trace.checkpoints == (checkpoint,)
+    for ref in (task, output, rollout, checkpoint):
+        with pytest.raises(m.QuarantinedError):
+            reg.assert_usable(ref)
+    late = reg.reconcile(claim, observation(m, source, wall=4.0, revision=2))
+    before = reg.events()
+    assert reg.complete(claim, selected, observations=(obs.observation_id,)) == completed
+    assert reg.events() == before
+    assert reg.job(job.job_id) == completed and reg.job(consumer.job_id) == consumed
+    assert reg.accounting(job.job_id).observations == (late,)
+    assert reg.job(job.job_id).result.costs == (cost(),)
+    assert reg.recover().event_count == len(before)

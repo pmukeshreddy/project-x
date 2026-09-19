@@ -49,8 +49,8 @@ provenance/evidence/consumed tasks, to dependency closure. Opaque bytes are neve
 parsed or executed. Explicit dependencies supplement the intrinsic references;
 that declaration is immutable. Registering the same digest with different metadata
 or dependencies fails. Cycles and configured closure/graph/read limits fail closed.
-Job input/configuration and selected output relationships extend descendant tracing
-without rewriting artifact declarations.
+Job input/configuration and the selected result's evidence artifacts extend
+descendant tracing through its outputs without rewriting artifact declarations.
 
 The job states are queued → running → completed, or running → paused/exhausted
 through explicit abandonment. Only a paused job can be explicitly retried, with
@@ -96,7 +96,8 @@ or add the result's duplicate cost representation to this ledger.
 Before `complete`, reconcile each actual current-attempt observation. Pass all its
 latest observation IDs as a tuple. `OperationResult.costs` must exactly equal those
 snapshots' cost records, concatenated in lexicographic observation-ID order. The
-operation name must match the job. Every result/evidence artifact is resolved.
+operation name must match the job. Every result/evidence artifact is resolved;
+initial completion also checks those references against current quarantine.
 This selects one immutable result snapshot; identical completion retries return
 it, and changed completions fail. Later costs change accounting history, not the
 selected result. Earlier abandoned attempts remain in the separate ledger. A
@@ -126,7 +127,10 @@ attempt as unobserved. The registry cannot reconstruct unknown billing or execut
 SQLite's immutable ordered/hash-linked events are authoritative. The materialized
 index is replayed and compared against that history on every operation. Canonical
 event bytes, semantic keys, ordering and sizes are checked. Mutations and their new
-events commit together. JSONL publication follows the commit; every public call
+events commit together. Prospective materialized records must satisfy the same
+count, total-byte and per-record byte bounds used by recovery before a new event
+is written. A rejected growth mutation preserves the prior readable history.
+JSONL publication follows the commit; every public call
 first reconciles the verified projection under a local process lock and SQLite
 transactions. Full history/index replay favors a small first pipeline over throughput.
 
@@ -153,6 +157,9 @@ Quarantine notices bind exact registered refs and real supplied evidence. Tracin
 includes artifact descendants, affected jobs, RolloutRecord refs and TrainingCheckpoint
 refs. A later explicit lift appends a resolution and retains the notice and affected
 historical trace. Damaged root bytes can be quarantined using separate intact evidence.
+Quarantining selected result evidence affects the completed job, its outputs and
+their consumers. Identical completion replay and historical readback still return
+the saved result; quarantine does not block abandonment or late cost reconciliation.
 `assert_usable` checks current storage/dependency quarantine status only. It does not
 validate human review or Tn→Q→T0 admission; actual M5/M6 gates must still run. Readback
 of an old completed job is historical bookkeeping, not permission to consume it.

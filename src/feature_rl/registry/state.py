@@ -30,6 +30,10 @@ def updated(value, **changes):
     return validated(type(value), document(value) | {k: document(v) for k, v in changes.items()})
 
 
+def _result_evidence(result):
+    return tuple(ref for evidence in result.evidence for ref in evidence.artifacts)
+
+
 class State:
     def __init__(self, limits):
         self.limits = limits
@@ -105,7 +109,10 @@ class State:
                 if any(ref.sha256 in seen for ref in record.dependencies):
                     seen.add(key)
             for key, job in self.jobs.items():
-                if any(ref.sha256 in seen for ref in (*job.spec.inputs, job.spec.configuration)):
+                dependencies = (*job.spec.inputs, job.spec.configuration)
+                if job.result is not None:
+                    dependencies += _result_evidence(job.result)
+                if any(ref.sha256 in seen for ref in dependencies):
                     jobs.add(key)
                     if job.result is not None:
                         seen.update(ref.sha256 for ref in job.result.artifacts)
@@ -250,7 +257,7 @@ class State:
             costs = tuple(cost for key in wanted for cost in self.observations[key].observation.costs)
             if result.costs != costs:
                 raise RegistryConflict('result costs do not match the declared snapshot records')
-            self.usable((*job.spec.inputs, job.spec.configuration, *result.artifacts))
+            self.usable((*job.spec.inputs, job.spec.configuration, *result.artifacts, *_result_evidence(result)))
             self.attempts[claim.attempt_id] = updated(attempt, state='completed')
             self.jobs[job.job_id] = updated(job, state='completed', result=result, result_observations=list(wanted))
         elif action == 'quarantine':

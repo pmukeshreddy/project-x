@@ -1,0 +1,39 @@
+{
+  "diagnostic": "Trusted synthetic focused M6 review regressions; no real task, approval or reward",
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_registry.py",
+    "-k",
+    "quarantined_result_evidence or materialized_growth or later_result_evidence"
+  ],
+  "environment": {
+    "PYTHONPATH": "src"
+  },
+  "observed_head": "0cb1d293907da0325081abaaea4006ffad0a1b5e",
+  "source_sha256_before": {
+    "src/feature_rl/registry/__init__.py": "c9b303f231a63377f881c70c3a0d58cf4fd778d12c039aa0ccf28d0d448c443a",
+    "src/feature_rl/registry/core.py": "625dc5dee237befe7db5f15dc5c9b3e2c0134cd0cd9e46e5a338310f03d6736b",
+    "src/feature_rl/registry/models.py": "c138bad378120deadb1da24e8451ef9261140551058d5efd73fa386c832fe545",
+    "src/feature_rl/registry/state.py": "0e6c8a3ff745f4a6f5e6289170f6e8d185831dab6f7bbe01e5605e7081cef186",
+    "src/feature_rl/registry/storage.py": "2cf64d5e70bb614d99c6678a62e949a5302921e97ab88ff7aa3f0c5fb5f8938d",
+    "tests/test_registry.py": "9be3c6d20e3241e352f8b47321ef081cf581266d40692fa14fbd7d16e5b40112",
+    "tests/test_registry_durability.py": "d1954202a18eb75fdd592b094f066f3d27a448134beb564b2627de9abb612d34"
+  },
+  "started_at": "2026-09-19T21:32:53.606755+00:00",
+  "ended_at": "2026-09-19T21:32:56.917820+00:00",
+  "elapsed_seconds": 3.3108697088900954,
+  "exit_status": 1,
+  "source_sha256_after": {
+    "src/feature_rl/registry/__init__.py": "c9b303f231a63377f881c70c3a0d58cf4fd778d12c039aa0ccf28d0d448c443a",
+    "src/feature_rl/registry/core.py": "625dc5dee237befe7db5f15dc5c9b3e2c0134cd0cd9e46e5a338310f03d6736b",
+    "src/feature_rl/registry/models.py": "c138bad378120deadb1da24e8451ef9261140551058d5efd73fa386c832fe545",
+    "src/feature_rl/registry/state.py": "0e6c8a3ff745f4a6f5e6289170f6e8d185831dab6f7bbe01e5605e7081cef186",
+    "src/feature_rl/registry/storage.py": "2cf64d5e70bb614d99c6678a62e949a5302921e97ab88ff7aa3f0c5fb5f8938d",
+    "tests/test_registry.py": "9be3c6d20e3241e352f8b47321ef081cf581266d40692fa14fbd7d16e5b40112",
+    "tests/test_registry_durability.py": "d1954202a18eb75fdd592b094f066f3d27a448134beb564b2627de9abb612d34"
+  },
+  "output_sha256": "ffd38573ee70640224f9c6b4e7b3f5da86e225aa7e5d1b0d1dd9a4b81223fa34"
+}

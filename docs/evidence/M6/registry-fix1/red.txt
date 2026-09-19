@@ -1,0 +1,90 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_quarantined_result_evidence_blocks_completion_without_losing_accounting _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1173/test_quarantined_result_eviden0')
+
+    def test_quarantined_result_evidence_blocks_completion_without_losing_accounting(tmp_path):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        proof = store.put_bytes(b'independent completion proof', 'registry-proof', Visibility.PRIVATE)
+        output = store.put_bytes(b'output is not the proof', 'registry-output', Visibility.PRIVATE)
+        job = reg.enqueue(spec)
+        claim = reg.claim(job.job_id, owner='worker', claim_key='proof-claim')
+        obs = reg.reconcile(claim, observation(m, proof))
+        reg.quarantine(proof, notice_id='bad-proof', reason='synthetic proof defect', evidence=(config,))
+        before = reg.events()
+>       with pytest.raises(m.QuarantinedError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE QuarantinedError
+
+tests/test_registry.py:248: Failed
+_ test_materialized_growth_is_rejected_before_unreadable_history_is_committed __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1173/test_materialized_growth_is_re0')
+
+    def test_materialized_growth_is_rejected_before_unreadable_history_is_committed(tmp_path):
+        m, store, reg, source, config, spec = setup(tmp_path, max_event_bytes=2200, max_attempts_per_job=100)
+        spec = spec.model_copy(update={'attempt_limit': 100})
+        queued = reg.enqueue(spec)
+    
+        def stored():
+            with sqlite3.connect(reg.root / 'index.sqlite3') as con:
+                return (con.execute('SELECT sequence,semantic_key,body FROM events ORDER BY sequence').fetchall(),
+                        con.execute('SELECT namespace,key,body FROM records ORDER BY namespace,key').fetchall(),
+                        con.execute('SELECT acknowledged FROM meta').fetchone())
+    
+        for number in range(1, 31):
+            before = stored()
+            journal = (reg.root / 'events.jsonl').read_bytes()
+            try:
+                claim = reg.claim(queued.job_id, owner='worker', claim_key='bounded-' + str(number))
+            except m.RegistryLimit as exc:
+                assert 'materialized index' in str(exc)
+                break
+>           assert max(len(row[2]) for row in stored()[1]) <= reg.limits.max_event_bytes
+E           assert 2250 <= 2200
+E            +  where 2250 = max(<generator object test_materialized_growth_is_rejected_before_unreadable_history_is_committed.<locals>.<genexpr> at 0x107ba7060>)
+E            +  and   2200 = RegistryLimits(max_active_jobs=32, max_jobs=1000, max_attempts_per_job=100, max_artifacts=10000, max_closure_artifacts...ifact_envelope_bytes=8388608, max_artifact_payload_bytes=4194304, max_closure_bytes=33554432, lock_timeout_seconds=1.0).max_event_bytes
+E            +    where RegistryLimits(max_active_jobs=32, max_jobs=1000, max_attempts_per_job=100, max_artifacts=10000, max_closure_artifacts...ifact_envelope_bytes=8388608, max_artifact_payload_bytes=4194304, max_closure_bytes=33554432, lock_timeout_seconds=1.0) = <feature_rl.registry.core.Registry object at 0x1078a1810>.limits
+
+tests/test_registry.py:279: AssertionError
+__ test_later_result_evidence_quarantine_traces_consumers_but_retains_history __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1173/test_later_result_evidence_qua0')
+
+    def test_later_result_evidence_quarantine_traces_consumers_but_retains_history(tmp_path):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        published = typed_artifacts(store)
+        task, rollout, checkpoint = (published[kind] for kind in ('TaskBundle', 'RolloutRecord', 'TrainingCheckpoint'))
+        proof = store.put_bytes(b'independent selected result proof', 'registry-proof', Visibility.PRIVATE)
+        output = store.put_bytes(b'downstream synthetic output', 'registry-output', Visibility.PRIVATE)
+        job = reg.enqueue(spec)
+        claim = reg.claim(job.job_id, owner='worker', claim_key='proof-claim')
+        obs = reg.reconcile(claim, observation(m, source))
+        selected = result(task, (cost(),), evidence_artifacts=(proof,))
+        completed = reg.complete(claim, selected, observations=(obs.observation_id,))
+        consumer = reg.enqueue(spec.model_copy(update={'inputs': (task,), 'invocation': 'consumer'}))
+        consumer_claim = reg.claim(consumer.job_id, owner='worker', claim_key='consumer-claim')
+        consumer_obs = reg.reconcile(consumer_claim, observation(m, source, upstream='consumer-call'))
+        consumed = reg.complete(consumer_claim, result(output, (cost(),)), observations=(consumer_obs.observation_id,))
+        reg.register(rollout)
+        reg.register(checkpoint)
+        reg.quarantine(proof, notice_id='late-proof-defect', reason='synthetic later proof defect', evidence=(config,))
+    
+        trace = reg.trace(proof)
+>       assert {proof, task, output, rollout, checkpoint} <= set(trace.artifacts)
+E       AssertionError: assert {ArtifactRef(...oding='json')} <= {ArtifactRef(...ding='bytes')}
+E         
+E         Extra items in the left set:
+E         ArtifactRef(sha256='93a63e40ce99cae335ee1395e8af5ecda012b516d23ba396f06f732236bb7875', kind='RolloutRecord', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, encoding='json')
+E         ArtifactRef(sha256='508c239fa16f49637e32119de93d838c750e999c8d9d06afab2a3e168e4be89e', kind='registry-output', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, encoding='bytes')
+E         ArtifactRef(sha256='5264c31ee87e48b90c7ec61defa3315d9300737001564e52f4bc94be7b0fe865', kind='TrainingCheckpoint', schema_version=1, visibility=<Visibility.PRIVATE: 'privat...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+tests/test_registry.py:386: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_registry.py::test_quarantined_result_evidence_blocks_completion_without_losing_accounting
+FAILED tests/test_registry.py::test_materialized_growth_is_rejected_before_unreadable_history_is_committed
+FAILED tests/test_registry.py::test_later_result_evidence_quarantine_traces_consumers_but_retains_history
+3 failed, 19 deselected in 3.03s

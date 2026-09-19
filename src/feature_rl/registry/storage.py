@@ -177,6 +177,11 @@ class Storage:
         if len(rows) != 1 or rows[0][0] != self.configuration or type(rows[0][1]) is not int or rows[0][1] < 0:
             raise RegistryIntegrityError('registry configuration/version or acknowledgement mismatch')
 
+    def check_record_bounds(self, count, size, longest):
+        if (count > self.limits.max_artifacts + self.limits.max_jobs + self.limits.max_events * 2
+                or size > self.limits.max_journal_bytes * 4 or longest > self.limits.max_event_bytes):
+            raise RegistryLimit('materialized index exceeds configured bounds')
+
     def load(self, con):
         count, size, longest = con.execute('SELECT count(*), coalesce(sum(length(body)),0), coalesce(max(length(body)),0) FROM events').fetchone()
         if count > self.limits.max_events or size > self.limits.max_journal_bytes or longest > self.limits.max_event_bytes:
@@ -199,10 +204,7 @@ class Storage:
                 raw.append(body)
         except (ValidationError, ValueError, RecursionError, RegistryConflict) as exc:
             raise RegistryIntegrityError('invalid authoritative event history') from exc
-        rows_count, rows_size, row_max = con.execute('SELECT count(*), coalesce(sum(length(body)),0), coalesce(max(length(body)),0) FROM records').fetchone()
-        if (rows_count > self.limits.max_artifacts + self.limits.max_jobs + self.limits.max_events * 2
-                or rows_size > self.limits.max_journal_bytes * 4 or row_max > self.limits.max_event_bytes):
-            raise RegistryLimit('materialized index exceeds configured bounds')
+        self.check_record_bounds(*con.execute('SELECT count(*), coalesce(sum(length(body)),0), coalesce(max(length(body)),0) FROM records').fetchone())
         actual = {(namespace, key): body for namespace, key, body in con.execute('SELECT namespace,key,body FROM records')}
         if state.rows() != actual:
             raise RegistryIntegrityError('materialized index differs from authoritative history')
@@ -246,9 +248,12 @@ class Storage:
             return reader(state, events)
 
     def persist(self, con, event, body, state):
+        rows = state.rows()
+        sizes = [len(body) for body in rows.values()]
+        self.check_record_bounds(len(rows), sum(sizes), max(sizes, default=0))
         con.execute('INSERT INTO events VALUES(?,?,?)', (event.sequence, event.semantic_key, body))
         con.execute('DELETE FROM records')
-        con.executemany('INSERT INTO records VALUES(?,?,?)', [(namespace, key, body) for (namespace, key), body in state.rows().items()])
+        con.executemany('INSERT INTO records VALUES(?,?,?)', [(namespace, key, body) for (namespace, key), body in rows.items()])
 
     def change(self, builder):
         with self.session() as (con, directory):
