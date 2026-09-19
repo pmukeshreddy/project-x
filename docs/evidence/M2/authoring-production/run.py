@@ -178,6 +178,23 @@ def _stored_refs(kind: str) -> tuple[ArtifactRef, ...]:
     return tuple(found)
 
 
+def prior_contract_journals(store: ArtifactStore) -> tuple[ArtifactRef, ...]:
+    ordered = []
+    for artifact in _stored_refs("contract-authoring-journal"):
+        payload = json.loads(
+            store.get_bytes(
+                artifact, max_envelope_bytes=96 * 1024, max_payload_bytes=64 * 1024
+            )
+        )
+        if payload.get("status") != "rejected":
+            continue
+        ordered.append((payload["attempt_index"], artifact, payload))
+    ordered.sort(key=lambda item: item[0])
+    if [item[0] for item in ordered] != list(range(1, len(ordered) + 1)):
+        raise RuntimeError("retained contract journals are not sequential")
+    return tuple(item[1] for item in ordered)
+
+
 def _receipt_cost(store: ArtifactStore, evidence: ArtifactRef, category: str) -> CostRecord:
     value = json.loads(
         store.get_bytes(evidence, max_envelope_bytes=3 * 1024 * 1024, max_payload_bytes=2 * 1024 * 1024)
@@ -403,7 +420,32 @@ def contract() -> None:
         supported_observables=discovered.observation.supported_observables,
         allowed_changes=allowed, limits=limits(16_384), seed=0,
     )
-    frozen, measurement = measure(tokenizer, draft, RequirementContractProposal, "contract")
+    prior_journals = prior_contract_journals(store)
+    if len(prior_journals) > 2:
+        raise RuntimeError("contract repair budget is exhausted")
+    diagnosis = None
+    changed_input = None
+    label = "contract"
+    if prior_journals:
+        repair = len(prior_journals)
+        label = f"contract-repair-{repair}"
+        diagnosis = (
+            "The previous worker reached the fixed 120-second deadline after emitting "
+            "a long unfinished response."
+        )
+        changed_input = (
+            "Require concise one-sentence fields, combine evidence where possible, and "
+            "exclude commentary while preserving every supported semantic obligation."
+        )
+        draft = draft.model_copy(
+            update={
+                "request_id": f"CLICK_CONTRACT_REPAIR_{repair}",
+                "response_id": f"CLICK_CONTRACT_REPAIR_RESPONSE_{repair}",
+                "prompt_id": f"CLICK_CONTRACT_REPAIR_PROMPT_{repair}",
+                "instruction": draft.instruction + " " + changed_input,
+            }
+        )
+    frozen, measurement = measure(tokenizer, draft, RequirementContractProposal, label)
     provider = LocalGenerationProvider(backend=backend, archive=store.put_bytes)
     evidence = source_evidence(refs)
     provenance = Provenance(
@@ -434,7 +476,16 @@ def contract() -> None:
         provider=provider, store=store,
         resolver=resolver(store, refs, discovered.context.source),
         revision=REVISION,
-    ).generate((GenerationCandidate(request=frozen),), inputs, sources)
+    ).generate(
+        (
+            GenerationCandidate(
+                request=frozen, diagnosis=diagnosis, changed_input=changed_input
+            ),
+        ),
+        inputs,
+        sources,
+        prior_journal_refs=prior_journals,
+    )
     state = {
         "revision": REVISION,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -451,7 +502,7 @@ def contract() -> None:
         "contract_generation_record": result.generation.record.model_dump(mode="json"),
         "contract_usage": result.generation.usage.model_dump(mode="json"),
         "contract_measurement": measurement,
-        "native_calls": 1,
+        "native_calls": len(result.journal_refs),
         "license_prompted": False,
     }
     write_json(STATE_PATH, state)
