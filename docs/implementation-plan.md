@@ -87,10 +87,10 @@ These are instance methods on configured services, not globals with hidden state
 
 ### Task 3: M2 configured provider slice
 
-- [ ] Implement a real explicitly configured provider with pinned model/prompt/options, request/response/cost archive, strict structured output and bounded failures. No canned production provider.
+- [x] Implement a real explicitly configured provider with pinned model/prompt/options, request/response/cost archive, strict structured output and bounded failures. Reviewed provider producte14f679; current native integration still pending below.
 - [ ] Test malformed output, missing provenance, response truncation, configuration absence and budget exhaustion; real provider smoke only when configured and authorized.
-- [ ] Publish exact authoring/discovery interfaces for M3; mark M2 partial until Task 5.
-- [ ] Independent review.
+- [x] Publish provider interfaces for M3; discovery remains Task5 and M2 partial.
+- [x] Independent provider code review: round5 specification/quality PASS; root current-source full/native gate remains pending.
 
 ### Task 4: M3 construction and lifecycle
 

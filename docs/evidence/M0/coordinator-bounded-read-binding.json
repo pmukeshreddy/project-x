@@ -1,0 +1,215 @@
+{
+  "scope": "coordinator source/evidence binding only; no test rerun",
+  "recorded_at": "2026-09-19T18:44:17.400209+00:00",
+  "product_revision": "bf065ec738f29f13cf0cc783b53353adcbe6fab8",
+  "assigned_base_revision": "0a08c916f68a82fb865696a355cfb63965b86f30",
+  "verification_receipt_sha256": "551b38d1a8d8e92b35d8fb98524a53355e449c77de1ef9ceee37b20cfd977fde",
+  "identities": [
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_artifacts_bounded.py",
+        "tests/test_artifacts.py",
+        "tests/test_contracts.py",
+        "tests/test_contracts_examples.py"
+      ],
+      "path": "src/feature_rl/artifacts/store.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_artifacts_bounded.py",
+        "tests/test_artifacts.py",
+        "tests/test_contracts.py",
+        "tests/test_contracts_examples.py"
+      ],
+      "path": "src/feature_rl/artifacts/__init__.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_artifacts_bounded.py",
+        "tests/test_artifacts.py",
+        "tests/test_contracts.py",
+        "tests/test_contracts_examples.py"
+      ],
+      "path": "tests/test_artifacts_bounded.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_artifacts_bounded.py",
+        "tests/test_artifacts.py",
+        "tests/test_contracts.py",
+        "tests/test_contracts_examples.py"
+      ],
+      "path": "tests/test_artifacts.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_artifacts_bounded.py",
+        "tests/test_artifacts.py",
+        "tests/test_contracts.py",
+        "tests/test_contracts_examples.py"
+      ],
+      "path": "docs/interfaces.md",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "path": "src/feature_rl/artifacts/store.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "path": "src/feature_rl/artifacts/__init__.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "path": "tests/test_artifacts_bounded.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "path": "tests/test_artifacts.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "path": "docs/interfaces.md",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "src/feature_rl/artifacts",
+        "tests/test_artifacts_bounded.py",
+        "docs/interfaces.md"
+      ],
+      "path": "src/feature_rl/artifacts/store.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "src/feature_rl/artifacts",
+        "tests/test_artifacts_bounded.py",
+        "docs/interfaces.md"
+      ],
+      "path": "src/feature_rl/artifacts/__init__.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "src/feature_rl/artifacts",
+        "tests/test_artifacts_bounded.py",
+        "docs/interfaces.md"
+      ],
+      "path": "tests/test_artifacts_bounded.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "src/feature_rl/artifacts",
+        "tests/test_artifacts_bounded.py",
+        "docs/interfaces.md"
+      ],
+      "path": "tests/test_artifacts.py",
+      "matches_receipt": true,
+      "matches_commit": true
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "src/feature_rl/artifacts",
+        "tests/test_artifacts_bounded.py",
+        "docs/interfaces.md"
+      ],
+      "path": "docs/interfaces.md",
+      "matches_receipt": true,
+      "matches_commit": true
+    }
+  ],
+  "all_match": true,
+  "owned_diff": {
+    "path": ".superpowers/sdd/implementation-plan/review-0a08c91..bf065ec-M0-bounded.diff",
+    "bytes": 76393,
+    "sha256": "6cf10681b11de9c9ae2bb6301c54d40366697aa9ff4b3dc2395d85a0474cfb8a"
+  }
+}

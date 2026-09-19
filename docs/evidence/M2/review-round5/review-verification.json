@@ -1,0 +1,287 @@
+{
+  "ArtifactStore_source_sha256_during_diagnostic": {
+    "src/feature_rl/artifacts/__init__.py": "48d4ae3705e12efa11cdce3d9844679060b6c617500592c15e74f13a7e0878cf",
+    "src/feature_rl/artifacts/store.py": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c"
+  },
+  "ArtifactStore_status_during_diagnostic": " M src/feature_rl/artifacts/__init__.py\n M src/feature_rl/artifacts/store.py\n",
+  "assigned_base_revision": "840e11407d6c0c15548678fef2f2102dd58d100e",
+  "case_count": 44,
+  "changed_product_paths": [
+    "docs/interfaces-M2.md",
+    "docs/reports/M2-provider.md",
+    "src/feature_rl/generation/provider.py",
+    "tests/test_generation.py"
+  ],
+  "owner_binding_checks": {
+    "docs/evidence/M2/provider-v3-fixround5-decimal-red-tests.stderr": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-decimal-red-tests.stdout": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 1314,
+        "sha256": "b7b24f25147ee2b005d67b54794d70b80edba46d56bf1c0b4a5d969063458a80"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-extra-allow-red-tests.stderr": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-extra-allow-red-tests.stdout": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 3654,
+        "sha256": "396d8c9640acb516c0eae4283b2144280b12708b8ace3dfa07bcbc0af4c19cae"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-focused-tests.stderr": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-focused-tests.stdout": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 179,
+        "sha256": "9c33149b6e0063f1df9ff2c783620787538d7ef645aa18b6a0945a96e414bc07"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-full-tests.stderr": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-full-tests.stdout": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 341,
+        "sha256": "a023ab9acb3a742c6ac231eff8c175f89023c1f415ff13eb98f5d73d7f49d786"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-pre-extra-focused-tests.stderr": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-pre-extra-focused-tests.stdout": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 179,
+        "sha256": "bcd888f70bb3d6476f20a400ac052bdf0082ca7c9ce5e1f62f9476ea79cb4de4"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-pre-extra-full-tests.stderr": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-pre-extra-full-tests.stdout": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 341,
+        "sha256": "c2ebcf4145aedffb668cc0a83a3af55dedc4953acd2db45a6998c38f2109308f"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-red-tests.stderr": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "receipt_match": true
+    },
+    "docs/evidence/M2/provider-v3-fixround5-red-tests.stdout": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 123272,
+        "sha256": "42b7ba2810bbc2754a85d938125af722fb35a2eaf452c41255605c9c8b32c142"
+      },
+      "receipt_match": true
+    },
+    "docs/interfaces-M2.md": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 14088,
+        "sha256": "27ffc0a07c8e1465fc11fa0c5524b1e75e178b17d555033b9216aa559ebd3ae9"
+      },
+      "receipt_match": true
+    },
+    "docs/reports/M2-provider.md": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 3383,
+        "sha256": "d2cab10c2f92e24ea720c7c039a22ed5b5f9ab1bd086ded8240557ee7958bbfb"
+      },
+      "receipt_match": true
+    },
+    "src/feature_rl/generation/__init__.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 1405,
+        "sha256": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950"
+      },
+      "receipt_match": true
+    },
+    "src/feature_rl/generation/_worker.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 11650,
+        "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed"
+      },
+      "receipt_match": true
+    },
+    "src/feature_rl/generation/backend.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 11173,
+        "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647"
+      },
+      "receipt_match": true
+    },
+    "src/feature_rl/generation/models.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 7960,
+        "sha256": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc"
+      },
+      "receipt_match": true
+    },
+    "src/feature_rl/generation/protocol.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 3857,
+        "sha256": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10"
+      },
+      "receipt_match": true
+    },
+    "src/feature_rl/generation/provider.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 55379,
+        "sha256": "dec64bb8b8ed0983faf426664a875fb5bea408f3108c0d5a5abf30b0bb5314e9"
+      },
+      "receipt_match": true
+    },
+    "src/feature_rl/generation/runner.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 9828,
+        "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+      },
+      "receipt_match": true
+    },
+    "tests/test_generation.py": {
+      "exact_commit_match": true,
+      "identity": {
+        "bytes": 69918,
+        "sha256": "918225a1f826986e65255b0a292ba6659b7186e5b53de9e81c243da870026769"
+      },
+      "receipt_match": true
+    }
+  },
+  "owner_binding_count": 24,
+  "owner_final_test_results": {
+    "focused": "........................................................................ [ 73%]\n..........................                                               [100%]\n98 passed in 1.34s\n",
+    "full": "........................................................................ [ 28%]\n........................................................................ [ 56%]\n........................................................................ [ 85%]\n.....................................                                    [100%]\n253 passed in 18.41s\n"
+  },
+  "owner_receipt": {
+    "bytes": 9500,
+    "path": "docs/evidence/M2/provider-v3-fixround5-verification.json",
+    "sha256": "b934cf17f0239a275457c397917f6d205ce59e47698c42150b85d29417f7c9c3"
+  },
+  "producer": "independent reviewer /root/review_m2_provider",
+  "protected_diff_vs_reviewed_product": "",
+  "protected_paths": [
+    "src/feature_rl/generation",
+    "tests/test_generation.py",
+    "docs/interfaces-M2.md",
+    "docs/reports/M2-provider.md",
+    "docs/reviews/M2-provider.md",
+    "docs/reviews/M2-provider-round1.md",
+    "docs/reviews/M2-provider-round2.md",
+    "docs/reviews/M2-provider-round3.md",
+    "docs/reviews/M2-provider-round4.md",
+    "docs/evidence/M2/review",
+    "docs/evidence/M2/review-round1",
+    "docs/evidence/M2/review-round2",
+    "docs/evidence/M2/review-round3",
+    "docs/evidence/M2/review-round4"
+  ],
+  "recorded_at_utc": "2026-09-19T18:42:33.896842+00:00",
+  "review_package": {
+    "bytes": 40451,
+    "path": ".superpowers/sdd/implementation-plan/review-840e114..e14f679-M2-product.diff",
+    "sha256": "9df907c52ffc5a44606663ef871d9dda8f92d903d4aada5ed17747cff88faef1"
+  },
+  "reviewed_product_revision": "e14f67983db678813afcfeb191532e691b0b20e3",
+  "reviewer_evidence": {
+    "docs/evidence/M2/review-round5/diagnostic-execution.json": {
+      "bytes": 769,
+      "sha256": "7dda35b650823e0cdcbbae5da17fe6bfe8b2e770b7b8af03fd100ae91a4b6f3f"
+    },
+    "docs/evidence/M2/review-round5/reproduce-round5.py": {
+      "bytes": 14127,
+      "sha256": "bea29ce508780e21f0e4d8810b406fe1391922360543071f79411658dec2bfd5"
+    },
+    "docs/evidence/M2/review-round5/round5-diagnostics.json": {
+      "bytes": 88475,
+      "sha256": "8dbed980288d979f7f52aab16104f193d469ea056b2caf88eb58b2f1090e641a"
+    },
+    "docs/evidence/M2/review-round5/round5-diagnostics.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "reviewer_execution": {
+    "command": [
+      "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+      "-B",
+      "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/review-round5/reproduce-round5.py"
+    ],
+    "environment_overrides": {
+      "PYTHONPATH": "src:tests"
+    },
+    "exit_status": 0,
+    "finished_at_utc": "2026-09-19T18:21:41.613723+00:00",
+    "started_at_utc": "2026-09-19T18:21:41.112349+00:00",
+    "stderr": "docs/evidence/M2/review-round5/round5-diagnostics.stderr",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout": "docs/evidence/M2/review-round5/round5-diagnostics.json",
+    "stdout_bytes": 88475,
+    "stdout_sha256": "8dbed980288d979f7f52aab16104f193d469ea056b2caf88eb58b2f1090e641a"
+  },
+  "scope_limitations": [
+    "M0 optional bounded-read work was dirty but source-hash-stable during the default-read diagnostic. Its implementation is outside this exact M2 approval.",
+    "44 full-provider cases used only trusted unit schemas, explicit backend/runner doubles and temporary real ArtifactStore publication/resolution. Unit examples/events/tokens/costs are synthetic and make no empirical qualification claim.",
+    "No native/model load/download/install/candidate/historical/remote execution. No unchanged full suite rerun. Current-source coordinator native and integrated full suite remain pending."
+  ],
+  "workspace_status_at_verification": " M docs/interfaces.md\n M src/feature_rl/artifacts/__init__.py\n M src/feature_rl/artifacts/store.py\n?? .DS_Store\n?? .superpowers/\n?? docs/.DS_Store\n?? docs/evidence/M0/bounded-reads/\n?? docs/evidence/M2/review-round5/\n?? src/.DS_Store\n?? tests/.DS_Store\n?? tests/test_artifacts_bounded.py\n"
+}

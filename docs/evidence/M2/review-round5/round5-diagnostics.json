@@ -1,0 +1,2067 @@
+{
+  "ArtifactStore_git_status_before": " M src/feature_rl/artifacts/__init__.py\n M src/feature_rl/artifacts/store.py\n",
+  "ArtifactStore_scope_note": "M0 is independently adding optional bounded reads; these checks use default store reads only and do not approve that extension",
+  "ArtifactStore_source_sha256_after": {
+    "src/feature_rl/artifacts/__init__.py": "48d4ae3705e12efa11cdce3d9844679060b6c617500592c15e74f13a7e0878cf",
+    "src/feature_rl/artifacts/store.py": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c"
+  },
+  "ArtifactStore_source_sha256_before": {
+    "src/feature_rl/artifacts/__init__.py": "48d4ae3705e12efa11cdce3d9844679060b6c617500592c15e74f13a7e0878cf",
+    "src/feature_rl/artifacts/store.py": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c"
+  },
+  "case_count": 44,
+  "cases": {
+    "AfterChainNumericLiteralContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7582,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": true,
+        "number": 3
+      },
+      "provider_omit_callbacks": [],
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true,
+        "number": "3"
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "1a36547f02df248dd7b30717b297459ebad2a0c49d76cd6547a7eced77fda2e5",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "321430b6a0b4157b23e533c2eab1199a8945250abc1236eb0a5fc8542838e278",
+        "status": "5013479b9b513119e47e2b8c23621d5ab3845bd44232af76079218c42dc0ac73",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "AfterChainNumericLiteralContent",
+      "success": false
+    },
+    "AfterChainStringLiteralContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15685,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": "ready",
+        "number": 3
+      },
+      "provider_omit_callbacks": [],
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": "ready",
+        "number": "3"
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "908cd235081dd3eae3199db0d8de05272931f3a5d8cc260cfe740cc077fa5df7",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "ef529a2f7f795c268e0e71c2420bbeca488da489302a313acd7d570c7270688f",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "8c644243c86678cf0a601905bbd945e341b9f292f55acec77e59855825b54a64",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "201b13d753c91a11e5d3c712d8c1c2b174a373ea5568aa22f33123ae9705ef33",
+        "status": "ca816e7003ee14163034f5c867208cbc7f948c5e5d31f487f8e35c8c81e660b0",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "runner_double_calls": 1,
+      "schema": "AfterChainStringLiteralContent",
+      "success": true
+    },
+    "ExtraAllowNestedContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7712,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": true,
+        "item": {
+          "x": 1,
+          "y": 2
+        }
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true,
+        "item": {
+          "x": 1,
+          "y": 2
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "9af949942deafe1fdf5fc9e311f507ff5be48409d927108b415804aecd61ba33",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "9f93dace9d03b8891ca4ba7c009906e67915da8cd3b1674a2419422407e5c759",
+        "status": "412e056af1e8e6259422ff42c73033aec701f7088e141fa65902c796cc3b5132",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "ExtraAllowNestedContent",
+      "success": false
+    },
+    "ExtraAllowRootContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7535,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": true,
+        "x": 1,
+        "y": 2
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true,
+        "x": 1,
+        "y": 2
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "f1a8232a7975984a1c89622a8bdfcdafe9f99bb28964ac6ab86982eef1690453",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "9a79612793942eb9e3681c1a221ef14fa33608a2bd89002271fd440e6dae7703",
+        "status": "eccb03256bb8993b2c1189349858bfd22f72e25fa9e10957240f9478c597053a",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "ExtraAllowRootContent",
+      "success": false
+    },
+    "GuardedModelFrozenSetContent_equal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7820,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": false,
+      "ordinary_JSON_error": "1 validation error for GuardedModelFrozenSetContent\nvalues\n  Frozenset should have at least 2 items after validation, not 1 [type=too_short, input_value=[{'flag': True, 'label': ...True, 'label': 'first'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "first"
+          }
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "ddbac4adf3843224c0eed79b14d8fa0cb180d2d05a9421dce8cd3b2db016a5ec",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "005d6276d9277b9f5bd3c08b6a44086b32af15fb41ad2755a7cfac86e288502b",
+        "status": "72f1f7cdc7eb10c84273b7f4fd29d5c7a71d76e6d0e74ae4f400b9945e840507",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "GuardedModelFrozenSetContent",
+      "success": false
+    },
+    "GuardedModelFrozenSetContent_unequal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7820,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "second"
+          },
+          {
+            "flag": true,
+            "label": "first"
+          }
+        ]
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "second"
+          }
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "19d178fa88d98975358b072c3e36d76e8b17973d005f81b5abe22c73a4badb3f",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "005d6276d9277b9f5bd3c08b6a44086b32af15fb41ad2755a7cfac86e288502b",
+        "status": "f9c856234c18981e715770095980f382ccca09989ea5d30bb7ffc451fb8f8c01",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "GuardedModelFrozenSetContent",
+      "success": false
+    },
+    "GuardedModelSetContent_equal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7814,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": false,
+      "ordinary_JSON_error": "1 validation error for GuardedModelSetContent\nvalues\n  Set should have at least 2 items after validation, not 1 [type=too_short, input_value=[{'flag': True, 'label': ...True, 'label': 'first'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "first"
+          }
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "8429449ba7209570cb3a68d65d2c5cf7fbb606106cbdb976cb51117f066ae12b",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "e3a09b1e887385365d8e9c4549733a4a1de23ac22d81d5d61a94d0b653714a38",
+        "status": "b2999997caf06b23edfd54ffcf84d0749b614d0036a330f4d212eead73202824",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "GuardedModelSetContent",
+      "success": false
+    },
+    "GuardedModelSetContent_unequal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7814,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "second"
+          },
+          {
+            "flag": true,
+            "label": "first"
+          }
+        ]
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "second"
+          }
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "fe262a4e5a2293c175ab3d1ec2feb8780b9fff9771fbe6c619ba40b27ba58287",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "e3a09b1e887385365d8e9c4549733a4a1de23ac22d81d5d61a94d0b653714a38",
+        "status": "a48240310de4a626a1996bb109352d523cecccedfa96731b258611421019df4f",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "GuardedModelSetContent",
+      "success": false
+    },
+    "MixedLiteralContent_NumberAlternative": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15994,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "mode": {
+          "flag": 1
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "dba0853756c4adedc432ae0bced255d2a04b0d5d08d87af136b4448561c245a5",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "fb6e903c6590252d1f48cec00afbc701e23ac0f9d7fd740111efc52bca00c84a",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e6465de29b16c0941dfdeabac27916a9be4e3ffc0a1e650fffdc037910955ea3",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "397b722c294b45971fbfc13c1627de19c947cba6af49b44a66862cfc1d93a451",
+        "status": "f33a9ecb0fdd39e0b0707739fac279e484c85c8ac8600f6974a9613b054083ac",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "mode": {
+          "flag": 1
+        }
+      },
+      "returned_type": "NumberAlternative",
+      "runner_double_calls": 1,
+      "schema": "MixedLiteralContent",
+      "success": true
+    },
+    "MultipleBoolInt_bool": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15545,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "1d90baa3595a55778916e598e316e4c6aee6f639f16b04218350d1eb005eec29",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "a764e3a0bf1bd3aa9521629855626acd3443553d579449e7c88cd61123801b91",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "7870a4f12dd195b775aa991c37c73c2f649a3ed7f08db95a26450365d4175fcb",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "72c05d0958c023d7281879420471c046e2762e462d27636984b365f0e6b97a15",
+        "status": "9c78a7f3c4503f3f7720ddb861e0af75db0bda359858378110451a9728bbe354",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "flag": true
+      },
+      "returned_type": "bool",
+      "runner_double_calls": 1,
+      "schema": "MultipleBoolInt",
+      "success": true
+    },
+    "MultipleBoolInt_int": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15538,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": 1
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "887d14e6385af94b70b2f258bb555ff32c570ddf439ec6be8825e1375aaa97da",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "cbf43c0f0e8e13a558108d2ad43a22ae5d3d5475957fcfe99e8096da2f47357c",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "abdf08b2040222b0097aacc1c3e70ecb8b66d841b4159e7df433d45971542730",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "72c05d0958c023d7281879420471c046e2762e462d27636984b365f0e6b97a15",
+        "status": "d7597986d823783c32703a52a4413b21f2a9006520622e130506466004ade702",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "flag": 1
+      },
+      "returned_type": "int",
+      "runner_double_calls": 1,
+      "schema": "MultipleBoolInt",
+      "success": true
+    },
+    "MultipleIntFloat_float": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15548,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "value": 3.0
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "a68519ba71fa55810270558a53887dbec8f2a28e4f6e412371ae30c3cb0fa77b",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "a48f81baf859ba16898cc2a4eeb062d78d86ee8a518077b2eda6804e9a2816a2",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "8330fa01c57ede09ef35184f439da1421c20f8595c827ed7993554ce1f4608a7",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "6250261cd2fb74dc9e2ee919d5acbfec1230fda3bfdf502711655b11584cb773",
+        "status": "f8d0af640fe1919cd0398d7920fb6b6968e5298d174611b1c44942ce8ab59d7b",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "value": 3.0
+      },
+      "returned_type": "float",
+      "runner_double_calls": 1,
+      "schema": "MultipleIntFloat",
+      "success": true
+    },
+    "NestedGuardedModelFrozenSetContent_equal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 8024,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": false,
+      "ordinary_JSON_error": "1 validation error for NestedGuardedModelFrozenSetContent\npayload.values\n  Frozenset should have at least 2 items after validation, not 1 [type=too_short, input_value=[{'flag': True, 'label': ...True, 'label': 'first'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "payload": {
+          "values": [
+            {
+              "flag": true,
+              "label": "first"
+            },
+            {
+              "flag": true,
+              "label": "first"
+            }
+          ]
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "4e31065d533103dd32970683942ba7464c6057708c8183e153ac314ebddc069e",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "0585d5e4ed8296e0b1afcfdcfbcfa0e99d6471c42d717551f68c3ae6f79eb7c3",
+        "status": "c7525a56a72e4d36651d53854504308b9893e0475a1507e0ddde83d504df6373",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "NestedGuardedModelFrozenSetContent",
+      "success": false
+    },
+    "NestedGuardedModelFrozenSetContent_unequal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 8024,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "payload": {
+          "values": [
+            {
+              "flag": true,
+              "label": "second"
+            },
+            {
+              "flag": true,
+              "label": "first"
+            }
+          ]
+        }
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "payload": {
+          "values": [
+            {
+              "flag": true,
+              "label": "first"
+            },
+            {
+              "flag": true,
+              "label": "second"
+            }
+          ]
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "23cd3eb7033c4dbde5a291cb57cfccd42ff2d2825e5ff03c3776ae23c8dfdf7a",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "0585d5e4ed8296e0b1afcfdcfbcfa0e99d6471c42d717551f68c3ae6f79eb7c3",
+        "status": "ad58add621941829310941ed20747e47a330c30e52932420a0d211e2566e21eb",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "NestedGuardedModelFrozenSetContent",
+      "success": false
+    },
+    "NestedGuardedModelSetContent_equal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 8000,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": false,
+      "ordinary_JSON_error": "1 validation error for NestedGuardedModelSetContent\npayload.values\n  Set should have at least 2 items after validation, not 1 [type=too_short, input_value=[{'flag': True, 'label': ...True, 'label': 'first'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "payload": {
+          "values": [
+            {
+              "flag": true,
+              "label": "first"
+            },
+            {
+              "flag": true,
+              "label": "first"
+            }
+          ]
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "55d6de2a4550bdafd975ef21d801612173b5737a9ed58299d338fe1b5b3568e1",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "7a15eaa554c83abe6d6556e24d59986f4cfe5bbd52dd64cf58c3bed805ebcf33",
+        "status": "fe431ef96fa932076a6fd21e04fe2c84dd5fe4912548be802b4bd749288d81c2",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "NestedGuardedModelSetContent",
+      "success": false
+    },
+    "NestedGuardedModelSetContent_unequal": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 8000,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "payload": {
+          "values": [
+            {
+              "flag": true,
+              "label": "second"
+            },
+            {
+              "flag": true,
+              "label": "first"
+            }
+          ]
+        }
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "payload": {
+          "values": [
+            {
+              "flag": true,
+              "label": "first"
+            },
+            {
+              "flag": true,
+              "label": "second"
+            }
+          ]
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "a697445ddc4a14635bdd96091d4af3f878b82c7813f79a010e092e1334d02a48",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "7a15eaa554c83abe6d6556e24d59986f4cfe5bbd52dd64cf58c3bed805ebcf33",
+        "status": "e427da0376ba96126bea7327edcc022d84d9eb8dd65212b6eefd73e20af9c270",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "NestedGuardedModelSetContent",
+      "success": false
+    },
+    "NumericKeyLiteralMappingContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7546,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flags": {
+          "1": true
+        }
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flags": {
+          "1": true
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "8a1a72ef27e5a62aa314258dc8329eef9e3f3a9fc27a1bdc037f724b9deb2583",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "d601ee336c9bf23d534a048d2360ce72f328a65200edcaeaa6108e077961500d",
+        "status": "9cf2c43d6404c50db09ac357a106410eab8deb7f9327ef02d60f55a649700a4d",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "NumericKeyLiteralMappingContent",
+      "success": false
+    },
+    "NumericLiteralDefaultContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7569,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": true,
+        "marker": "generated"
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "a9f50e0e6e0064ae832fb71a05e7233f8cd3a1045d32753ae4408bd91aad3873",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "e6831bad51be14167b6efd5edfe213ea29c4a37e267f3e338f1bb2267567e650",
+        "status": "cdb39b92c07c66f52ef12a17f781509d3ce547e374ce6fbb6f0349c756133a14",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "NumericLiteralDefaultContent",
+      "success": false
+    },
+    "NumericSerialization": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7502,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": true
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "e05aefea7720d69230cbf1e2ff0b95c3e7367f5bf1c9f2c66d7ae6a0e0e93b28",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "3cc52cb10b4f85a2026571dbd35a3d6d8f868310b184b5269dda53639b6b3017",
+        "status": "46e85cd21144c028f75fbeb7d5d978dd0e29c3e19ac17f1f74b36321a1c8c7dc",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "NumericSerialization",
+      "success": false
+    },
+    "OmitNumericLiteralContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7607,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": true,
+        "values": [
+          "keep"
+        ]
+      },
+      "provider_omit_callbacks": [],
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true,
+        "values": [
+          "skip",
+          "keep"
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "b7f82a3b5c252fc03777a53245a2f8ea6ef105a221a18073a4e07a6a1673e937",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "70c2f1216d598f29911c172116c31b1382614857eac62fc5c7c275b779f9c47c",
+        "status": "0ec2afe3842af115532df63e39754ff3c5306949431f9f8be8fecb377f703896",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "OmitNumericLiteralContent",
+      "success": false
+    },
+    "OmitStringLiteralContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15752,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": "ready",
+        "values": [
+          "keep"
+        ]
+      },
+      "provider_omit_callbacks": [
+        "skip",
+        "keep"
+      ],
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": "ready",
+        "values": [
+          "skip",
+          "keep"
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "7af517b085fc2c10a192bddc529d5b6e5ef5e6dcd0ecd0cf523fa234b2ed0a41",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "d4b5b9a54c3f2c6287a16d16fc4ee07d33a767cb25183f02d014b825be04ba34",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "f7b7495e193bfcefedf7d877b4184a6d5810e73f0fcec53b0d874df2dbd4e0e8",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "9c930170910b5eafc126e994ac01eb6e19f9cdfa3860e4f2836e2bc1247d3f42",
+        "status": "aa08170118d60747b0356c234e06e16c55ca5f13acfb8f7adbd105a3406e9a86",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "runner_double_calls": 1,
+      "schema": "OmitStringLiteralContent",
+      "success": true
+    },
+    "ScalarBooleanUnionContent_bool": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15600,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "cb64723495a4aebeaf4eebd8428c18ae82f3c04d270a6f83fbff6a9254d44785",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "53e2ad9166203df2e2f98f8a9277ed07353ef8aaeb09cdfabeccee5244fd8b70",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "ef9faa6872144e948739f5e228b15241a24eef384857baae87995e0985d18e13",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "ef4fc91857c382e017fdf7c1450ac43397e3c7ef2d342b35da21b74882df2166",
+        "status": "52273d8abea1c83e2e1f8880350a8955e96e71f781a3b516b1b6662e8cdff2f9",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "flag": true
+      },
+      "returned_type": "bool",
+      "runner_double_calls": 1,
+      "schema": "ScalarBooleanUnionContent",
+      "success": true
+    },
+    "ScalarBooleanUnionContent_int": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15593,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": 1
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "fe4d41f9b2c5cbd2ba68ab0817d8169057397a13e29f6caac6d36c8be649d812",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "9673f8cca2aeee9b2309469e202ddc7ac36ce2759822e5370bab90eb6e1cb1bc",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "f78bfb876219a3558c8e0a154becfe56608c01e7391c7543e0458f4cd79d791b",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "ef4fc91857c382e017fdf7c1450ac43397e3c7ef2d342b35da21b74882df2166",
+        "status": "2624817bce874d8e91bc6c896ee07cfe65615a2d0081398bbafc42d3d93959e6",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "flag": 1
+      },
+      "returned_type": "int",
+      "runner_double_calls": 1,
+      "schema": "ScalarBooleanUnionContent",
+      "success": true
+    },
+    "ScalarIntegerUnionContent_float": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15599,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "value": 3.0
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "bdb7b54ee977f21ead14f614c15c9dfd12fe0c06bb4c23eea0b3e3db1c0f7ed1",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "ad4517a831d9b4b6de5ff86b5d70173c797d02d0097f5573096ee8005ac4ddec",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "ea8ee81566311e8f18064561b70b317277f38626559adc0ab3517ffb04d746cf",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "aef8e93a2bf30c253fac9ca4c30d7d0d771ec133348105c2ad4e2293bbbaf000",
+        "status": "a43fb9e6362504bd327043640678667d8ecc91ced0c80cd57fc899bf02a29c98",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "value": 3.0
+      },
+      "returned_type": "float",
+      "runner_double_calls": 1,
+      "schema": "ScalarIntegerUnionContent",
+      "success": true
+    },
+    "ScalarIntegerUnionContent_int": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15597,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "value": 3
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "5700773306e67dac628296043a4c1680f472e1c4706b072e445e5d3cbabf9862",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "9ee396ad1d43eb3b4d9f4f40d2f83711c242d09b8155852634a71f07fe503f9a",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "df7d236df301563a713f76fb80cb9b6a5b38d3383791de18a69732bec764362e",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "aef8e93a2bf30c253fac9ca4c30d7d0d771ec133348105c2ad4e2293bbbaf000",
+        "status": "ccef734a075e34500f875007b4205c0910c1c2a9cc705bebb9f14c026834d874",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "value": 3
+      },
+      "returned_type": "int",
+      "runner_double_calls": 1,
+      "schema": "ScalarIntegerUnionContent",
+      "success": true
+    },
+    "StringLifecycle": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15715,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "lifecycle": [
+        "before",
+        "default",
+        "post_init",
+        "after:json"
+      ],
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "flag": "ready",
+        "marker": "generated",
+        "number": 3
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": "ready",
+        "number": "3"
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "8689e4828f43f26ba93303295f4051901fa90db10a04c254d169003079f6819d",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "53f0e0ca3ce0e8586214197b16ea424f197e02180483d9cd263c5116f86dbf56",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "453f96f8a8f9f6089d4d35c37aa95b6cc9fa5055271a54ac1878db667270eea8",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "fb9102dd85443ab3c367d5bf80fecd3afce30db9b81efc77a6f61849a233ea90",
+        "status": "b266ed106f2283bcb59c51caee9b3e5bbe4a2154b3dea4565610a3069d1f3698",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "runner_double_calls": 1,
+      "schema": "StringLifecycle",
+      "success": true
+    },
+    "UnsupportedDecimalLiteralContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7568,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "value": "1"
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "value": 1
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "8b0639c5fd687ff849b31366c5b87209c10179f5db0ca888625b42e9a572b567",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "e07000ad795d99a69b5196aaf3485cdb692972231cf84bbee610554563de9ac9",
+        "status": "fb1fcfc1e37d1fff616b92225c0c3dd1c704b4fcfa8a73941369a710acfd2be0",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "UnsupportedDecimalLiteralContent",
+      "success": false
+    },
+    "non_UTC_rejection": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 15724,
+      "backend_double_calls": 1,
+      "error_code": "ValueError",
+      "generation_succeeded": false,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "recorded_at": "2026-09-19T10:00:00+01:00",
+        "values": [
+          "alpha",
+          "beta"
+        ],
+        "visibility": "authoring"
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "6ffce5ed61d45c5e7a75eb6f59dd02846c22ae5189983166b91ea61d786249d1",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "78acf9e94640eaa64bddfa5dbb0a2f18936294a39629655c2d399a05219b2bd8",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "99f986c9793cdf7f988931746c649ae41dc6da1ed7d3994cc815be56d9824bc1",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "8d68c53d1ae584346fb9fab4e6dc55de0ea5f30eb7c433e768449db98d5d3473",
+        "status": "ca7d769dbb6652f94a3b2d783b966679fcd32d394f83c77585d55f11eddd35e3",
+        "usage": "52557b7b324ea65f458f5957ef688ce2f3a840f1b9139dbedbd08735811d9371"
+      },
+      "runner_double_calls": 1,
+      "schema": "EnumLiteralContent",
+      "success": false
+    },
+    "string_enum_tuple_UTC": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15970,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "recorded_at": "2026-09-19T10:00:00Z",
+        "values": [
+          "alpha",
+          "beta"
+        ],
+        "visibility": "authoring"
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "8a8c0ebec5e6d58b061dbcbb72f6cfb037a047571f2c1a6ec40f9b645f60a04c",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "de544518583f7bd9f7b1b55396668db1e71d0d550fe38d7d58a36c4ffdc12bd6",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "8409d2834e926a064c055fd968ac5be8eb5955e56c096e7517953af94d443e5b",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "8d68c53d1ae584346fb9fab4e6dc55de0ea5f30eb7c433e768449db98d5d3473",
+        "status": "767fa70edbcc354975c9458169a6ed8a763589a0f38f524f64fbd86a6bdc26aa",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "runner_double_calls": 1,
+      "schema": "EnumLiteralContent",
+      "success": true
+    },
+    "structural_28_UnionLiteralContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 16009,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "5985a5f1d26b27a481e421670097780d0b3aea0d055a554a6b9b9a98ad7af84d",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "52c02b9be9f847e91087e6895fe1f02c6e9d42b10874347f9a758b10a4b5a71d",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "7fb82eb349537460d258701a8b0720158be876c118562b087740cd0f06939e0c",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "8544428ed4b1ba4bc5dd3a36177fe1195e03a556c57fe686336d37daf343d4c5",
+        "status": "7ed2f93b9138b5b0473aab7c31dac9665709983d4851accbf19842c45c32feb5",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "runner_double_calls": 1,
+      "schema": "UnionLiteralContent",
+      "success": true
+    },
+    "structural_29_UnionLiteralContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 16014,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "mode": {
+          "flag": false
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "bc20458619e4a9f1e9d4168ee075b92866514d3a0f8c21c65718dc4a68dbff51",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "901f452f5d807a5dcd82981bab005c400be7cb8ff0f00ab7c563f075487d451d",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e3b7374b43d5ca317025f234364427232689183fdf63b1a98842b09a7aa75096",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "8544428ed4b1ba4bc5dd3a36177fe1195e03a556c57fe686336d37daf343d4c5",
+        "status": "eb3605b1070bda8f848e70f0dded1ca7b1436eea9efae2e8098a9016683d3e43",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "mode": {
+          "flag": false
+        }
+      },
+      "runner_double_calls": 1,
+      "schema": "UnionLiteralContent",
+      "success": true
+    },
+    "structural_30_UnionLiteralContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 15750,
+      "backend_double_calls": 1,
+      "error_code": "ValueError",
+      "generation_succeeded": false,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "mode": {
+          "flag": 1
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "dc39e33da360769471b609382a42c8a7346dcbaf60e4776789146666b54fffe2",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "4c39197dda8a46011e2d83e78d6a6c0054698f37159d844a2467106498da70b1",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "51545b31107a7ef9023590ed2fc48c48a753b0cdabaf3176ed3bbf19cc519807",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "8544428ed4b1ba4bc5dd3a36177fe1195e03a556c57fe686336d37daf343d4c5",
+        "status": "53c2c478381cda1c7da0ec3c8bffe8d9e45f530360e5379b0070be4e869120c9",
+        "usage": "52557b7b324ea65f458f5957ef688ce2f3a840f1b9139dbedbd08735811d9371"
+      },
+      "runner_double_calls": 1,
+      "schema": "UnionLiteralContent",
+      "success": false
+    },
+    "structural_31_PatternedLiteralContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15650,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flags": {
+          "k_one": true
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "5ae5c1bc37ee5740f648067abfdfced0e9f2711b5e12d709fe4d1a4231f470b9",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "fa45e74c6fa0e46f88dc5ba14ff83803f95ac4d67a5337bd24569f39b55ba1af",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "5d35ff3a5d64a1426e2ba1365450eb159bd0624c93aa561b0b87af0be2aef968",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "0b668e6436cf43c85adde992b4fd86839b9f09c12c609140be06c53bd560085d",
+        "status": "81df11f52acff5f2ff9af63257999151427b063fd0eeb90a2fb434a9df79696b",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "flags": {
+          "k_one": true
+        }
+      },
+      "runner_double_calls": 1,
+      "schema": "PatternedLiteralContent",
+      "success": true
+    },
+    "structural_32_PatternedLiteralContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 15391,
+      "backend_double_calls": 1,
+      "error_code": "ValueError",
+      "generation_succeeded": false,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flags": {
+          "k_one": 1
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "39d09f700afc4c57aae92fe696768b6900e6a989d6861507029c4addcc38b476",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "fb5a8f56b40ba9336c121685ce9d96eecf916c57f5473cf82329e1e08d84e737",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "6675fe77130f90515a6521d176f9c823b94b6798796000c01a9a1eb69b496538",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "0b668e6436cf43c85adde992b4fd86839b9f09c12c609140be06c53bd560085d",
+        "status": "13dba7f1fe075d31210b9bda2adc5e17a25061bd5d4b61e5f2e3983906cf78c9",
+        "usage": "52557b7b324ea65f458f5957ef688ce2f3a840f1b9139dbedbd08735811d9371"
+      },
+      "runner_double_calls": 1,
+      "schema": "PatternedLiteralContent",
+      "success": false
+    },
+    "structural_33_PatternedLiteralContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 15392,
+      "backend_double_calls": 1,
+      "error_code": "ValueError",
+      "generation_succeeded": false,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flags": {
+          "bad": true
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "9da378364ff7271cb6845a51590cffdaa8f48b8fb47a2c75d297e5774698a04a",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "d9a8f4473fdcda2eabcde655ca646b3f1996a7dca8706607dfd739a81863c21a",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "66faa17f2895217ce85cce2d66631408b01cd635fcdfa7071b078b0b38090d0e",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "0b668e6436cf43c85adde992b4fd86839b9f09c12c609140be06c53bd560085d",
+        "status": "02ffa72ecd9c9ac258e2e295837ce84216b4e82b9c3745832e0c5985ae02053a",
+        "usage": "52557b7b324ea65f458f5957ef688ce2f3a840f1b9139dbedbd08735811d9371"
+      },
+      "runner_double_calls": 1,
+      "schema": "PatternedLiteralContent",
+      "success": false
+    },
+    "structural_34_NestedScalarUnionContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15649,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "values": [
+          1,
+          true
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "f02bfc62c3c4bc48bf4ee3379916958f92a619e1b02faa0ac4ddd8f21f99fbbe",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "93c9ec4de33f5936c169ea06611ed25e60d8d382691b0e4a45f5a74c5cb3c6a2",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "a0dd28d53cf502dec3afa5d795d47a53d7a76ff883f958ebf6d301d510fcf6eb",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "22ea53b179bd057a8466bedea02bfd35b92687d816be73327c038a7cd7394c27",
+        "status": "62e1afc4da8326451d6c8e246706ef42610ff840b3ac6923a3867389859cbb87",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "values": [
+          1,
+          true
+        ]
+      },
+      "runner_double_calls": 1,
+      "schema": "NestedScalarUnionContent",
+      "success": true
+    },
+    "structural_35_RecursiveLiteral": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15851,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "children": [
+          {
+            "children": [],
+            "flag": true
+          }
+        ],
+        "flag": true
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "a28e2aa215d062f0db05915fe3cc6f2bbffa3158711503f1d64c57a770539040",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "5109f027b4ecdb6acca7f661d3f3e5106352c8147ea447a3f0048f037594d6f8",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "c8e0b3d962fa8f476500d654839721e2fc180bc947dfb3ba8f0704cb20e94b75",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "520ad4b07d845a2921e593aba2cfd9ed9eb05f768c3a35ddf8f84dde3d5e12f0",
+        "status": "66761db0989431fbbc267fc85c4f425f80ce46a034bf33da1e4cdb488cbf351b",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "children": [
+          {
+            "children": [],
+            "flag": true
+          }
+        ],
+        "flag": true
+      },
+      "runner_double_calls": 1,
+      "schema": "RecursiveLiteral",
+      "success": true
+    },
+    "structural_36_RecursiveLiteral": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 15592,
+      "backend_double_calls": 1,
+      "error_code": "ValueError",
+      "generation_succeeded": false,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "children": [
+          {
+            "children": [],
+            "flag": 1
+          }
+        ],
+        "flag": true
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "619921627445dd94aee22c21e4e8e17a861112211c3eb31fe3eac728675d9f1e",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "8e6c4a383872bcfd065c5af0bf9c38fb8cae4fb7f977d19ffbd1385755ac8741",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "5606a28efb1bab6aef5ce16e11b76f68654c17ac5604f72d5430516bd9aebd98",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "520ad4b07d845a2921e593aba2cfd9ed9eb05f768c3a35ddf8f84dde3d5e12f0",
+        "status": "53a6f782bef2ebfad42369ea41acaae818bfb1c3c317325e243d2731e5c4eeec",
+        "usage": "52557b7b324ea65f458f5957ef688ce2f3a840f1b9139dbedbd08735811d9371"
+      },
+      "runner_double_calls": 1,
+      "schema": "RecursiveLiteral",
+      "success": false
+    },
+    "structural_37_ExtraIgnoreNestedContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15832,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true,
+        "item": {
+          "x": 1,
+          "y": 2
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "8976f9e051323dde94e0b474a6d1538530e82ec0de359c688eddc4c241a299e8",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "931068d565a219294a7d77915cc2e632f2f07668166add7445311c759f41c585",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "fa2ebb2053fa5763467db8657074033aa3f55b04765dec303131415ec241d8ea",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "e239c2f3f80f0029674283028302e71a54c36481b8b03dbf87e1a37978ab8ca7",
+        "status": "a5954503ccfc04dd7ff182c056cc5411c5c2394b60fc2825fc2b98b20856389e",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "flag": true,
+        "item": {
+          "x": 1
+        }
+      },
+      "runner_double_calls": 1,
+      "schema": "ExtraIgnoreNestedContent",
+      "success": true
+    },
+    "structural_38_ExtraForbidNestedContent": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 15839,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true,
+        "item": {
+          "x": 1
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "27f759d26abd91fbb83708cc9e65d8671a2d9bfd11f5d5ce4045189c9e6689f4",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "ec13989bd24f277e51629bc958a4bc6826353665caf6739fc7f54f8349fb47fe",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "5d016c3f6783422ef50e7564a4c6a1d41fb9725c57439b1a54ab6ffc50c40267",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "ff56efe0483de91dae0ce698aaea4fe23b9e269c043b2b7537703259c753f5fd",
+        "status": "a0dc75c35962544d15cf8fe461d8e10807035979c7fed950b7fd0e8e3e26f3f6",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "returned_content": {
+        "flag": true,
+        "item": {
+          "x": 1
+        }
+      },
+      "runner_double_calls": 1,
+      "schema": "ExtraForbidNestedContent",
+      "success": true
+    },
+    "structural_39_ExtraForbidNestedContent": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 15609,
+      "backend_double_calls": 1,
+      "error_code": "ValueError",
+      "generation_succeeded": false,
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "flag": true,
+        "item": {
+          "x": 1,
+          "y": 2
+        }
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "8eb8819d29a16dc19ab1b2676bad8141e22ae5b5b4f3c7a9de70fb80bb352fd4",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "04412907ced752e968e543040ca95fb1fd0abd769f7b9273a711853ed72e448a",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "0a6fd2940a803382d0cad7c6bccb8266ff796fb311f3b314ac3111c508eb8e63",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "ff56efe0483de91dae0ce698aaea4fe23b9e269c043b2b7537703259c753f5fd",
+        "status": "fec7306dcae83b3035cc7a2193ef9c3cc241aa92b5e0e6228679f2a084329ca4",
+        "usage": "52557b7b324ea65f458f5957ef688ce2f3a840f1b9139dbedbd08735811d9371"
+      },
+      "runner_double_calls": 1,
+      "schema": "ExtraForbidNestedContent",
+      "success": false
+    },
+    "synthetic_fixture_transport_RequirementContract": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 28482,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "allowed_changes": {
+          "additional_artifact_types": [],
+          "dependencies": "forbidden",
+          "dependency_artifacts": [],
+          "forbidden_paths": [
+            ".git/"
+          ],
+          "source_roots": [
+            "src/"
+          ]
+        },
+        "ambiguities": [],
+        "capability": "Suggestions",
+        "compatibility_obligations": [],
+        "costs": [
+          {
+            "category": "construction",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Not measured in this unit diagnostic",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          }
+        ],
+        "entry_points": [
+          "CLI"
+        ],
+        "episode_limits": {
+          "cpu_seconds": 15.0,
+          "disk_bytes": 4096,
+          "input_tokens": 100,
+          "memory_bytes": 1024,
+          "output_bytes": 1024,
+          "output_tokens": 100,
+          "pids": 10,
+          "tool_calls": 10,
+          "wall_seconds": 30.0
+        },
+        "kind": "RequirementContract",
+        "provenance": {
+          "created_at": "2026-09-19T00:00:00Z",
+          "evidence": [
+            {
+              "artifacts": [
+                {
+                  "encoding": "bytes",
+                  "kind": "source",
+                  "schema_version": 1,
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "visibility": "private"
+                }
+              ],
+              "command": [
+                "pytest"
+              ],
+              "exit_status": 0,
+              "producer": "pytest",
+              "recorded_at": "2026-09-19T00:00:00Z",
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "scope": "unit_diagnostic"
+            }
+          ],
+          "inputs": [],
+          "producer": "unit fixture",
+          "producer_version": "1"
+        },
+        "provenance_label": "historical_request",
+        "public_checks": [],
+        "requirements": [
+          {
+            "evidence": [
+              {
+                "locator": "issue body",
+                "provenance_label": "historical_request",
+                "quote": "Add suggestions",
+                "source": {
+                  "encoding": "bytes",
+                  "kind": "source",
+                  "schema_version": 1,
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "visibility": "private"
+                }
+              }
+            ],
+            "mandatory": true,
+            "observable": "CLI error output",
+            "requirement_id": "R1",
+            "statement": "Add suggestions"
+          }
+        ],
+        "schema_version": 1,
+        "visibility": "private",
+        "visible_request": "Add command suggestions"
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "allowed_changes": {
+          "additional_artifact_types": [],
+          "dependencies": "forbidden",
+          "dependency_artifacts": [],
+          "forbidden_paths": [
+            ".git/"
+          ],
+          "source_roots": [
+            "src/"
+          ]
+        },
+        "ambiguities": [],
+        "capability": "Suggestions",
+        "compatibility_obligations": [],
+        "costs": [
+          {
+            "category": "construction",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Not measured in this unit diagnostic",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          }
+        ],
+        "entry_points": [
+          "CLI"
+        ],
+        "episode_limits": {
+          "cpu_seconds": 15.0,
+          "disk_bytes": 4096,
+          "input_tokens": 100,
+          "memory_bytes": 1024,
+          "output_bytes": 1024,
+          "output_tokens": 100,
+          "pids": 10,
+          "tool_calls": 10,
+          "wall_seconds": 30.0
+        },
+        "kind": "RequirementContract",
+        "provenance": {
+          "created_at": "2026-09-19T00:00:00Z",
+          "evidence": [
+            {
+              "artifacts": [
+                {
+                  "encoding": "bytes",
+                  "kind": "source",
+                  "schema_version": 1,
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "visibility": "private"
+                }
+              ],
+              "command": [
+                "pytest"
+              ],
+              "exit_status": 0,
+              "producer": "pytest",
+              "recorded_at": "2026-09-19T00:00:00Z",
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "scope": "unit_diagnostic"
+            }
+          ],
+          "inputs": [],
+          "producer": "unit fixture",
+          "producer_version": "1"
+        },
+        "provenance_label": "historical_request",
+        "public_checks": [],
+        "requirements": [
+          {
+            "evidence": [
+              {
+                "locator": "issue body",
+                "provenance_label": "historical_request",
+                "quote": "Add suggestions",
+                "source": {
+                  "encoding": "bytes",
+                  "kind": "source",
+                  "schema_version": 1,
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "visibility": "private"
+                }
+              }
+            ],
+            "mandatory": true,
+            "observable": "CLI error output",
+            "requirement_id": "R1",
+            "statement": "Add suggestions"
+          }
+        ],
+        "schema_version": 1,
+        "visibility": "private",
+        "visible_request": "Add command suggestions"
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "f3a80ec9813eea7800bcd019e72bf6d8dbff45bdb623d12316b76820f3ee21c2",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "d7a9f9899f2ae167da54f09bb89b801582a3e63fe5bd530fb69bc2c2f5bade5e",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "01255b4063e0ae042175f1e2e7ab482876b8f195e309938124a71040c868065e",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "ba71adaff7137ec03ccbbe081673f132038f24fc8880133f30c0e12216c8b4de",
+        "status": "9b2378bcec37149a2986688956c82b16ab7864cef313345e18e406644a8ee66b",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "runner_double_calls": 1,
+      "schema": "RequirementContract",
+      "success": true
+    },
+    "synthetic_fixture_transport_ScenarioPlan": {
+      "accepted_response_usage": true,
+      "archive_payload_bytes": 26174,
+      "backend_double_calls": 1,
+      "error_code": null,
+      "generation_succeeded": true,
+      "ordinary_JSON_accepted": true,
+      "ordinary_JSON_content": {
+        "contract": {
+          "encoding": "json",
+          "kind": "RequirementContract",
+          "schema_version": 1,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "visibility": "private"
+        },
+        "costs": [
+          {
+            "category": "construction",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Not measured in this unit diagnostic",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          }
+        ],
+        "kind": "ScenarioPlan",
+        "mandatory_requirement_ids": [
+          "R1"
+        ],
+        "provenance": {
+          "created_at": "2026-09-19T00:00:00Z",
+          "evidence": [
+            {
+              "artifacts": [
+                {
+                  "encoding": "bytes",
+                  "kind": "source",
+                  "schema_version": 1,
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "visibility": "private"
+                }
+              ],
+              "command": [
+                "pytest"
+              ],
+              "exit_status": 0,
+              "producer": "pytest",
+              "recorded_at": "2026-09-19T00:00:00Z",
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "scope": "unit_diagnostic"
+            }
+          ],
+          "inputs": [],
+          "producer": "unit fixture",
+          "producer_version": "1"
+        },
+        "scenarios": [
+          {
+            "actions": [
+              "invoke typo"
+            ],
+            "expected_relation": "suggests command",
+            "input_domain": "one edit typo",
+            "observations": [
+              "stderr"
+            ],
+            "oracle_origin": {
+              "locator": "issue body",
+              "provenance_label": "historical_request",
+              "quote": "Add suggestions",
+              "source": {
+                "encoding": "bytes",
+                "kind": "source",
+                "schema_version": 1,
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "visibility": "private"
+              }
+            },
+            "preconditions": [
+              "command exists"
+            ],
+            "requirement_ids": [
+              "R1"
+            ],
+            "reset_needs": [],
+            "scenario_id": "S1"
+          }
+        ],
+        "schema_version": 1,
+        "seed_policy": {
+          "algorithm": "python-random-v1",
+          "same_cases_within_group": true,
+          "seeds": [
+            13
+          ]
+        },
+        "visibility": "private"
+      },
+      "publication_complete": true,
+      "publication_replayed": false,
+      "raw_content": {
+        "contract": {
+          "encoding": "json",
+          "kind": "RequirementContract",
+          "schema_version": 1,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "visibility": "private"
+        },
+        "costs": [
+          {
+            "category": "construction",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Not measured in this unit diagnostic",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          }
+        ],
+        "kind": "ScenarioPlan",
+        "mandatory_requirement_ids": [
+          "R1"
+        ],
+        "provenance": {
+          "created_at": "2026-09-19T00:00:00Z",
+          "evidence": [
+            {
+              "artifacts": [
+                {
+                  "encoding": "bytes",
+                  "kind": "source",
+                  "schema_version": 1,
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "visibility": "private"
+                }
+              ],
+              "command": [
+                "pytest"
+              ],
+              "exit_status": 0,
+              "producer": "pytest",
+              "recorded_at": "2026-09-19T00:00:00Z",
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "scope": "unit_diagnostic"
+            }
+          ],
+          "inputs": [],
+          "producer": "unit fixture",
+          "producer_version": "1"
+        },
+        "scenarios": [
+          {
+            "actions": [
+              "invoke typo"
+            ],
+            "expected_relation": "suggests command",
+            "input_domain": "one edit typo",
+            "observations": [
+              "stderr"
+            ],
+            "oracle_origin": {
+              "locator": "issue body",
+              "provenance_label": "historical_request",
+              "quote": "Add suggestions",
+              "source": {
+                "encoding": "bytes",
+                "kind": "source",
+                "schema_version": 1,
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "visibility": "private"
+              }
+            },
+            "preconditions": [
+              "command exists"
+            ],
+            "requirement_ids": [
+              "R1"
+            ],
+            "reset_needs": [],
+            "scenario_id": "S1"
+          }
+        ],
+        "schema_version": 1,
+        "seed_policy": {
+          "algorithm": "python-random-v1",
+          "same_cases_within_group": true,
+          "seeds": [
+            13
+          ]
+        },
+        "visibility": "private"
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "93aef346dbc012d592a5162f65487aba93c0372bcb9eb51dede3a8a793072205",
+        "cost": "35e2a3b3dc6ac59a0d93c16e5d350d11da13e46d102b317d61da7df2a7ce553c",
+        "events": "629c36dc840145b4be055666acd36bc338f59e75c14e655490eeb6c1625790e8",
+        "options": "cac1f458018ea547782c7ecbb07faab6b37729be6293a5af2ee32970c2dec75e",
+        "provenance": "b5ddbaf90512ccdfbcee8ef27aa49b54f4e95c712e67acac0bd635cf5b24b62d",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "b092bbef0df801b41a2ee38ed649f4f1164ea8012f622f24836ae0175900e26d",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "4ec73e7ff98ebfaf2800e3c50362f7d0bbd964dc022346b81d65cd0fd5feb1d7",
+        "status": "3c2e5193f28d530aa1ec8cfdd964c18b6ddca176916d6a4ac7fa37c48e57c01b",
+        "usage": "fc238f77e3d75b3f389897286017906725061826e0f8b98d636b684fff2a6ad5"
+      },
+      "runner_double_calls": 1,
+      "schema": "ScenarioPlan",
+      "success": true
+    },
+    "unsupported_schema_publication_recovery": {
+      "accepted_response_usage": false,
+      "archive_payload_bytes": 7688,
+      "backend_double_calls": 0,
+      "error_code": "GenerationSchemaUnsupportedError",
+      "generation_succeeded": false,
+      "publication_complete": true,
+      "publication_replayed": true,
+      "raw_content": {
+        "flag": true,
+        "values": [
+          "skip",
+          "keep"
+        ]
+      },
+      "resolved_archive_count": 11,
+      "resolved_archive_sha256": {
+        "attempt": "443686caa0f145636e5ccd8a0cf155e5721abdae146667543485a9516c514605",
+        "cost": "68d80c9bafb363e084cab39ab3044bdcddbaec17055b50bed9634a6846e65b59",
+        "events": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "options": "af3bd6794137fd3df6082d840d7a3d6fc7062d4b6c03a99cba25ad44e145fbb1",
+        "provenance": "ae800b87b7a9d93b21a987555e3f14e659c0f6c20c346f33438638cc8ab8aa6f",
+        "request": "a5714b2ef4e8c3f94ba649faa0b0a2ea3db3123726499761ebdc770849101c88",
+        "response": "e8edb9b57f0d47baa980f96448134bc20eb2c7c2f6ff0d4bdeb431b41a2c0bd9",
+        "retrieval": "3811e3c1e60dfb07dc11bafec895d9603ec46798c9141ffbbef3c930d1941215",
+        "schema": "70c2f1216d598f29911c172116c31b1382614857eac62fc5c7c275b779f9c47c",
+        "status": "ea1307d49bc7c8d97599498de5f09e94df41831acc213f1c3991826cfe3b818a",
+        "usage": "579278b1c9425141c3041d2a3021e5029bc867a2c980a684347d20537f6a4b31"
+      },
+      "runner_double_calls": 0,
+      "schema": "OmitNumericLiteralContent",
+      "success": false
+    }
+  },
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review-round5/reproduce-round5.py"
+  ],
+  "finished_at_UTC": "2026-09-19T18:21:41.594149+00:00",
+  "generation_source_sha256": {
+    "src/feature_rl/generation/__init__.py": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc",
+    "src/feature_rl/generation/protocol.py": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+    "src/feature_rl/generation/provider.py": "dec64bb8b8ed0983faf426664a875fb5bea408f3108c0d5a5abf30b0bb5314e9",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+  },
+  "model_loads": 0,
+  "native_inference_calls": 0,
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "reviewed_revision": "e14f67983db678813afcfeb191532e691b0b20e3",
+  "scope": "trusted schema/provider doubles and real temporary ArtifactStore only; fixture tasks/tokens/costs are not qualification evidence",
+  "started_at_UTC": "2026-09-19T18:21:41.254278+00:00"
+}

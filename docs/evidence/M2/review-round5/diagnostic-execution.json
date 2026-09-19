@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "-B",
+    "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/review-round5/reproduce-round5.py"
+  ],
+  "environment_overrides": {
+    "PYTHONPATH": "src:tests"
+  },
+  "exit_status": 0,
+  "finished_at_utc": "2026-09-19T18:21:41.613723+00:00",
+  "started_at_utc": "2026-09-19T18:21:41.112349+00:00",
+  "stderr": "docs/evidence/M2/review-round5/round5-diagnostics.stderr",
+  "stderr_bytes": 0,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout": "docs/evidence/M2/review-round5/round5-diagnostics.json",
+  "stdout_bytes": 88475,
+  "stdout_sha256": "8dbed980288d979f7f52aab16104f193d469ea056b2caf88eb58b2f1090e641a"
+}
