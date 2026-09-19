@@ -1,0 +1,89 @@
+{
+  "cases": {
+    "admitted_public_check_rejected": {
+      "exact_public_check_in_contract": true,
+      "has_recovery": false,
+      "message": "scenario evidence set differs from the frozen contract inputs",
+      "provider_calls": 0,
+      "resolver_accepted_all_sources": true,
+      "type": "ValueError"
+    },
+    "contract_recovered_cost_mismatch": {
+      "accepted": true,
+      "archived_cpu_seconds": 1.0,
+      "archived_wall_seconds": 1.5,
+      "artifact_cpu_seconds": 0.0,
+      "artifact_wall_seconds": 0.0
+    },
+    "contract_recovered_request_mismatch": {
+      "accepted": true,
+      "archived_request_hash": "80a4d9af81d889efb490cd19dce8b26cae724c55221e268f9049f52801be3f42",
+      "archived_request_matches_resumed": false,
+      "journal_request_hash": "ad041ae70954c36b118b28d7f4c0f0b448f384ed18acc8c20291c6a1ef36e03f",
+      "original_recovery_preserved": true,
+      "provider_fixture_runner_calls": 1,
+      "recovered_archive_count": 11,
+      "recovery_provider_calls": 0
+    },
+    "failed_generation_pending_publication_lost": {
+      "has_recovery": false,
+      "inner_archives": [
+        "attempt",
+        "request"
+      ],
+      "inner_has_recovery": true,
+      "inner_publication_complete": false,
+      "inner_recovery_payload_count": 10,
+      "message": "initial_authoring exhausted its declared candidate attempts",
+      "provider_fixture_runner_calls": 1,
+      "returned_has_inner_error": false,
+      "type": "AuthoringExhausted"
+    },
+    "scenario_recovered_cost_mismatch": {
+      "accepted": true,
+      "archived_cpu_seconds": 1.0,
+      "archived_wall_seconds": 1.5,
+      "artifact_cpu_seconds": 0.0,
+      "artifact_wall_seconds": 0.0
+    },
+    "scenario_recovered_request_mismatch": {
+      "accepted": true,
+      "archived_request_hash": "fb1bf3d7da51e2bfe378c42963e63d2c40cd1dd8d4a620f2eafa718740c5ba65",
+      "archived_request_matches_resumed": false,
+      "journal_request_hash": "520a6ca90ce77de9716a5332a214d92c492ba535d7945f025fdb33430a6099a8",
+      "original_recovery_preserved": true,
+      "provider_fixture_runner_calls": 1,
+      "recovered_archive_count": 11,
+      "recovery_provider_calls": 0
+    }
+  },
+  "docker_calls": 0,
+  "native_calls": 0,
+  "product": "7b8974637e9ffc5bab79f9590b90c7021228d473",
+  "production_or_private_reads": 0,
+  "recorded_at": "2026-09-19T21:30:42.321688+00:00",
+  "scope": "unit_diagnostic",
+  "source_sha256": {
+    "src/feature_rl/generation/__init__.py": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "9848c32f6ca6ebebe76c95315c8d25c75bdac8738c8a11df58a574977dcb1133",
+    "src/feature_rl/generation/protocol.py": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+    "src/feature_rl/generation/provider.py": "e92167243a32d81f8a0ed0b57c7a3bf23344b85e303a9aff302d70eee7776d84",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e",
+    "src/feature_rl/requirements/__init__.py": "ffca652a5a03a0692b4d9cab10b268a27903c5c1a68267f004b3a9b1d4746e63",
+    "src/feature_rl/requirements/discovery.py": "c2ef6dc0e77125db54c82b096f180f0f2b5c19b1db63e7dd8a6ffc06af5c7822",
+    "src/feature_rl/requirements/evidence.py": "403ba0389f6fe5323b9fd44c9d300c205640d6dcb75698e31bf2b0051a4f3191",
+    "src/feature_rl/requirements/finalize.py": "1b08686ec211e7ce73fdab03b7a70a6aa983d657737f42ceb91abdb135fad9e9",
+    "src/feature_rl/requirements/models.py": "efc9e2e99b7d7389cadd141fb1147a84301dcf944aa90658361820c7fa8e6e80",
+    "src/feature_rl/requirements/retrieval.py": "c182ada1a86c20e809f1748742e2a28dba01c37c460b73fe25bf887bae13f03e",
+    "src/feature_rl/requirements/service.py": "c60d1a0ab30ae6f9f132b931d7eea95b6316eeb1cbae06b0b75aee42cb0ad036",
+    "src/feature_rl/scenarios/__init__.py": "7e626e2df7ac1c0b83eeea02065d3b628395a9df06dcc1c2c4a6c56192ac339b",
+    "src/feature_rl/scenarios/finalize.py": "5112baba9588b33a6248ad36ff37d67073249cf298ad88879af1b4c51e6f2a3a",
+    "src/feature_rl/scenarios/models.py": "85b5ccb5e9c6e88aac18a18d99fb3bf5bac0288dce233824542a2f82d0dc5f69",
+    "src/feature_rl/scenarios/service.py": "ada3121635dc0a442bceb1451c94ba6478e56bf9dc6001982f2d8c7811a858c5",
+    "tests/test_authoring.py": "347f92064031d1e150aebc1ebfa17fd23c9c0a0b29c08c9142ab84927d8b1bb6",
+    "tests/test_generation.py": "bf776dc629afa6f1c3ac52e049e163d9117d6aaff5f3b666fbfc31f82fff1bba"
+  },
+  "tokenizer_calls": 0
+}

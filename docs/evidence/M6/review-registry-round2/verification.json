@@ -1,0 +1,65 @@
+{
+  "scope": "M6 registry round 2 source and recorded-regression verification only; no test rerun or feature execution",
+  "recorded_at": "2026-09-19T21:40:01.824191+00:00",
+  "base": "9497b636548545d9fd54a1f06f1432134dc14cd6",
+  "target": "fa6a1b884365a8f89d37beaf6bc180b945d088fa",
+  "changed_files_match_target_and_final_receipt": {
+    "src/feature_rl/registry/state.py": {
+      "bytes": 15387,
+      "sha256": "8fd219b90f584a7b90791fa05f9902b7ea80be1180201db3fc56975ec6a91609"
+    },
+    "src/feature_rl/registry/storage.py": {
+      "bytes": 16028,
+      "sha256": "0785bf743819f8d5b8c2a42255bc18c9d82b69c9faa772d00ca97a2325a46aba"
+    },
+    "tests/test_registry.py": {
+      "bytes": 20448,
+      "sha256": "9be3c6d20e3241e352f8b47321ef081cf581266d40692fa14fbd7d16e5b40112"
+    }
+  },
+  "recorded_ten_source_before_after_maps_equal": true,
+  "red_changed_product_hashes_match_base": true,
+  "red_test_hash_matches_final_test_hash": true,
+  "committed_evidence_files_verified": {
+    "docs/evidence/M6/registry-fix1/verification.json": {
+      "bytes": 3061,
+      "sha256": "4685155b5f31de8d19bb60c2b8387a5d392fbf5dd42ca4a2cb85e3966e1fa07e"
+    },
+    "docs/evidence/M6/registry-fix1/red.json": {
+      "bytes": 2280,
+      "sha256": "779690b17d77798fcb243576d5b4689b09e69e40771d9473d11241fc68a70176"
+    },
+    "docs/evidence/M6/registry-fix1/red.txt": {
+      "bytes": 6628,
+      "sha256": "ffd38573ee70640224f9c6b4e7b3f5da86e225aa7e5d1b0d1dd9a4b81223fa34"
+    },
+    "docs/evidence/M6/registry-fix1/focused-green.txt": {
+      "bytes": 99,
+      "sha256": "4fe999daf9be5022ca438e72a1237fb459f8ec8b39e774e11384295350e55911"
+    },
+    "docs/evidence/M6/registry-fix1/evidence-green.txt": {
+      "bytes": 113,
+      "sha256": "4217fdb66b3b7673291174203b90da03698376f83717d105a27892f9701805b3"
+    }
+  },
+  "owner_recorded_final_execution": {
+    "command": [
+      "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_registry.py",
+      "tests/test_registry_durability.py"
+    ],
+    "environment": {
+      "PYTHONPATH": "src"
+    },
+    "started_at": "2026-09-19T21:34:09.279751+00:00",
+    "ended_at": "2026-09-19T21:34:15.979648+00:00",
+    "elapsed_seconds": 6.699782500043511,
+    "exit_status": 0
+  },
+  "owner_recorded_test_result": "36 passed in 6.51s",
+  "reviewer_executed_tests": false,
+  "no_new_concrete_concern_requiring_diagnostic": true
+}
