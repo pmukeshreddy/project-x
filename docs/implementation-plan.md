@@ -42,7 +42,7 @@ Coordinator `/root` owns this plan, `docs/progress.md`, dispatch briefs, interfa
 | --- | --- | --- | --- |
 | M0 | `m0_contracts` | `src/feature_rl/contracts`, `src/feature_rl/artifacts`, package root/configuration, `tests/test_contracts*`, `tests/test_artifacts*` | none |
 | M1 | `m1_sources` | `src/feature_rl/intake`, `history`, `splits`, corresponding tests | M0 |
-| M2 | `m2_authoring` | `src/feature_rl/generation`, `requirements`, `scenarios`, corresponding tests | M0/M1, M3 for execution discovery |
+| M2 | `m2_authoring_recovery` (explicit capacity-failure transfer; prior `m2_authoring`) | `src/feature_rl/generation`, `requirements`, `scenarios`, corresponding tests | M0/M1, M3 for execution discovery |
 | M3 | `m3_runtime` | `src/feature_rl/environments`, corresponding tests | M0/M1/M2 provider slice |
 | M4 | `m4_grading` | `src/feature_rl/verifiers`, `submission`, `grading`, corresponding tests | M0/M2/M3 |
 | M5 | `m5_qualification` | `src/feature_rl/qualification`, corresponding tests | M0/M4 |

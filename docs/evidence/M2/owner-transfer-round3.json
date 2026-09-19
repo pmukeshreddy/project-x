@@ -1,0 +1,27 @@
+{
+  "observed_at": "2026-09-19T15:21:49.294587+00:00",
+  "head": "4b9fd63138e7b9f1e981225a6c2b5215dc248b75",
+  "old_owner": "/root/m2_authoring",
+  "replacement_owner": "/root/m2_authoring_recovery",
+  "reason": "Two consecutive turn failures reported: Selected model is at capacity. Please try a different model. A same-owner recovery followup was attempted and failed again.",
+  "assignment_base": "b516c63799539c00ba711c07254de885a4a4310d",
+  "last_committed_product": "3f859ca991c8965fda48e9d95588e9be12b0fdab",
+  "working_files": {
+    "docs/interfaces-M2.md": "29982b0478436489ac9c1fc3ab17453713c419c284a5b0b84720d9200e423a78",
+    "docs/reports/M2-provider.md": "540f0a23cfa9df335326cd58bbceaab77281d24a32d6ba97b98b48ba8d7d39cd",
+    "src/feature_rl/generation/__init__.py": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+    "src/feature_rl/generation/models.py": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc",
+    "src/feature_rl/generation/protocol.py": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+    "src/feature_rl/generation/provider.py": "22829d5daec2eed4d8fec942ba1c03a6bda33002b56b086616b007e37292762e",
+    "tests/test_generation.py": "7a5d5a3505a90151245a290282d339f6f67e98b237291906684baeebe9e69b13"
+  },
+  "diff_file": "docs/evidence/M2/owner-transfer-round3.diff",
+  "diff_sha256": "2ec8d04a14d8db27909a54729e5497b949b47f3e0218efef4a7aa337a04fb33a",
+  "verification_claim": "Snapshot only. No tests or native inference run by this transfer. Partial report references an as-yet absent round3 receipt; replacement must finish verification before claiming completion.",
+  "unrelated_untracked_files_preserved": [
+    ".DS_Store",
+    "docs/.DS_Store",
+    "src/.DS_Store",
+    "tests/.DS_Store"
+  ]
+}

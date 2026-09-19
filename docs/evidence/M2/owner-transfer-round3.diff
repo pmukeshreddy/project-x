@@ -1,0 +1,643 @@
+diff --git a/docs/interfaces-M2.md b/docs/interfaces-M2.md
+index abddc06..f56e1a0 100644
+--- a/docs/interfaces-M2.md
++++ b/docs/interfaces-M2.md
+@@ -36,13 +36,13 @@ The provider receives only a write-only archive callback. It cannot retrieve art
+ 
+ Protocol v3 defines an exact strict schema for every identity, input, memory-control, model-loaded, token, completion, and input-rejection event. Every event repeats the protocol/request/response/prompt identity. The identity event binds the model revision, config/tokenizer/weight hashes, manifest hashes, exact dependency versions, seed, prompt hash, staged-worker hash, offline flags, and remote-code setting. Boolean and integer Literal fields have pre-conversion validators, so equality-compatible JSON numbers such as `1`, `0`, or `3.0` cannot become `true`, `false`, or protocol version `3`. Extra fields, missing fields, wrong exact types, contradictory identities, positive/nonfinite selected-model logprobs, duplicate JSON keys, tool events, event-order drift, inconsistent usage, nonzero exits, cleanup failure, and resource termination all raise `GenerationProviderError`.
+ 
+-Envelope content is re-serialized and validated through Pydantic's strict JSON transport. Before that conversion, the provider walks the generated schema's nested references, object/array members, and Literal constants/enums to preserve exact raw JSON scalar types. This preserves strict M0-style tuples, enums, UTC timestamps, and correct Literal values while rejecting numeric equivalents such as `1` for `Literal[True]` or `3.0` for `Literal[3]`.
++Envelope content is re-serialized and validated through Pydantic's strict JSON transport. For schemas containing Literals, the provider first builds a side-effect-free validator from the pinned Pydantic core schema: it keeps the same unions, patterned mappings, references, objects, tuples, and containers, replaces model construction with inert validation models, removes user callbacks/default-factory execution, and wraps every Literal node with an exact raw-type check. The ordinary pinned validator then produces the caller's model. This makes the exact check follow valid union alternatives and patterned values while preserving M0-style tuples, enums, and UTC timestamps. Numeric equivalents such as `1` for `Literal[True]` or `3.0` for `Literal[3]` reject. A Literal schema containing a plain custom validator, custom model initializer, dataclass, or call core form is explicitly unsupported and fails with an attributable `GenerationSchemaUnsupportedError` before backend verification or execution.
+ 
+ `GenerationResult` contains the caller-schema-validated `content`, exact `GenerationUsage`, partial `CostRecord`, and `GenerationCallRecord`. Usage includes the exact fully templated input token IDs, every emitted token ID, the selected token's pre-sampler model log-softmax score, and `sampling_policy="greedy_argmax"`. Pinned `mlx_lm.generate_step` applies argmax to those model scores; the scores are not log probabilities under the deterministic behavior distribution. `behavior_logprobs` is therefore explicitly null. A downstream training record must not substitute these model scores for behavior logprobs or invent behavior probabilities by retokenizing. A call at the emitted-token limit is marked truncated and rejected even when its bytes parse as valid JSON. These records make an authored sample attributable; they do not by themselves establish training suitability or a learning result.
+ 
+ ## Stage and context boundary
+ 
+-Every `AuthoringContext` carries a fixed `context_id`, explicit role, immutable source reference, locator, text, and provenance label. Request, response, prompt, context, and allowed-requirement IDs must be fixed before inference; placeholders and duplicate IDs reject.
++Every `AuthoringContext` carries a fixed `context_id`, explicit role, immutable source reference, locator, text, and provenance label. Request, response, and prompt IDs use the M2-local ASCII identifier grammar with a 128-character maximum; the same bound applies to event, attempt, and call-record identities. The public provider boundary revalidates an already typed `GenerationRequest`, so unchecked `model_copy` or `model_construct` updates cannot bypass the limit. Request, response, prompt, context, and allowed-requirement IDs must be fixed before inference; placeholders and duplicate IDs reject.
+ 
+ | Stage | Admitted explicit context | Forbidden context |
+ |---|---|---|
+@@ -75,7 +75,7 @@ The physical-footprint boundary is sampled and can overshoot between polls. It i
+ 
+ Before backend verification or subprocess execution, the provider creates UTC `GenerationAttemptMetadata` and publishes `generation-attempt`. It binds a random attempt ID, producer, protocol, request/prompt/response IDs, request and output-schema hashes, all generation source-file hashes, and configured model/config/manifest/dependency identities. If this registration fails, no worker runs.
+ 
+-If a validated request, output schema, or fully templated prompt exceeds the declared stdin byte cap, the provider does not archive that oversized value. It publishes bounded `generation-preflight`, `generation-cost`, and `generation-status` objects alongside the attempt. The preflight object contains the IDs, request/schema hashes, declared cap, observed component sizes, violated components, failure cause, and `execution_started=false`. The public exception remains `GenerationProviderError`; its record uses `GenerationInputLimitError` as the cause. A publication failure retains the same bounded payloads for replay without backend verification or execution.
++If a validated request, output schema, or fully templated prompt exceeds the declared stdin byte cap, the provider does not archive that oversized value. It publishes bounded `generation-preflight`, `generation-cost`, and `generation-status` objects alongside the attempt. The preflight object contains the bounded IDs, request/schema hashes, declared cap, observed component sizes, violated components, failure cause, and `execution_started=false`. The public exception remains `GenerationProviderError`; its record uses `GenerationInputLimitError` as the cause. A publication failure retains the same bounded payloads for replay without backend verification or execution. Requests with longer request/response/prompt identities are invalid at the M2 request boundary and cannot enter this archival path.
+ 
+ After execution, every successful or failed call publishes separate `generation-request`, `generation-response`, `generation-retrieval`, `generation-schema`, `generation-options`, `generation-provenance`, `generation-usage`, `generation-cost`, `generation-events`, and `generation-status` objects. The response receipt records exit status, termination, wall/CPU measurements, watchdog failures, sample count, maximum sampled and lifetime memory observations, any breach sample, stderr/stdout, and cleanup result. The raw JSONL event stream is retained byte-for-byte. The usage object always has `accepted_response_usage`; it is true only after both event and envelope/content validation. Every failure retains independently validated input/token observations and known cost counts while setting acceptance false.
+ 
+diff --git a/docs/reports/M2-provider.md b/docs/reports/M2-provider.md
+index aaa7da2..f358d5d 100644
+--- a/docs/reports/M2-provider.md
++++ b/docs/reports/M2-provider.md
+@@ -1,11 +1,11 @@
+ # M2 provider implementation report
+ 
+-The local authoring-provider slice is implemented under `src/feature_rl/generation`. Fix round 1 addressed the five findings in `docs/reviews/M2-provider.md`. Fix round 2 addresses both remaining P2 findings in `docs/reviews/M2-provider-round1.md`: protocol and nested output Literal values preserve their exact raw JSON types before conversion, and oversized validated inputs now produce a bounded attributable provider failure after attempt registration without backend verification or execution. Initial authoring remains limited to request/B/public checks. The later checker stage accepts a frozen contract and scenario plan plus explicit attributable B/public-check data without exposing H to the first draft.
++The local authoring-provider slice is implemented under `src/feature_rl/generation`. Fix rounds 1 and 2 addressed the earlier findings, and fix round 3 addresses both P2 findings in `docs/reviews/M2-provider-round2.md`. Exact output-Literal enforcement now derives from the pinned Pydantic core validation graph rather than an independent JSON-schema branch heuristic, so unions and patterned mapping values cannot select a different path during ordinary validation. M2 request/response/prompt identities are bounded to 128 ASCII characters across requests, events, attempts and call records, with public-boundary revalidation for unchecked model copies/construction. Initial authoring remains limited to request/B/public checks. The later checker stage accepts a frozen contract and scenario plan plus explicit attributable B/public-check data without exposing H to the first draft.
+ 
+-Risk-based tests use a complete authentic-shaped protocol-v3 success stream and one-field mutations across hashes, dependencies, seed, offline/request identity, measurements, text fragments, completion IDs, timing, and logprob domain. Fix-round 2 coverage adds every boolean/integer Literal event field, valid and invalid nested structured-content Literals, a successful bounded preflight rejection, and publication replay for that rejection without a runner call. Final verification passed 58 focused tests and all 213 repository tests.
++Risk-based tests use a complete authentic-shaped protocol-v3 success stream and one-field mutations across hashes, dependencies, seed, offline/request identity, measurements, text fragments, completion IDs, timing, and logprob domain. Fix-round 3 coverage adds valid and numeric-invalid union alternatives, patterned Literal mappings, an explicit unsupported-schema refusal before backend verification, genuine valid decoder baselines before event mutations, all three identity bounds, revalidation of copied/constructed requests, and maximum-length identities through preflight publication recovery. Exact final counts and hashes are recorded in the fix-round 3 verification receipt.
+ 
+-The earlier `provider-v2-verification.json` and `provider-v3-fixround1-verification.json` remain immutable. `docs/evidence/M2/provider-v3-fixround2-verification.json` separately binds current source/test hashes, exact commands, exit statuses, and raw-output hashes before commit and does not claim a committed product revision. Coordinator verification will add that binding after re-review.
++The earlier provider verification receipts remain immutable. The fix-round 3 receipt separately binds current source/test hashes, exact commands, exit statuses, and raw-output hashes before commit and does not claim a committed product revision. Coordinator verification will add that binding after re-review.
+ 
+-The preserved revision-1 production smoke and rejection receipts are unchanged and are not evidence for protocol v3. No inference occurred in either provider fix round. A separately declared coordinator run after review must bind and exercise the committed current protocol with an actual archived source.
++The preserved revision-1 production smoke and rejection receipts are unchanged and are not evidence for protocol v3. No inference occurred in any provider fix round. A separately declared coordinator run after review must bind and exercise the committed current protocol with an actual archived source.
+ 
+ This remains a partial M2 delivery. It does not author or freeze the real Click requirement contract, scenario plan, checker, reward, or experiment. Larger production envelopes remain explicitly unqualified on this host and require their own bounded measurement before a construction batch.
+diff --git a/src/feature_rl/generation/__init__.py b/src/feature_rl/generation/__init__.py
+index a0b047d..fa41539 100644
+--- a/src/feature_rl/generation/__init__.py
++++ b/src/feature_rl/generation/__init__.py
+@@ -2,6 +2,7 @@
+ 
+ from .models import (
+     AuthoringContext,
++    GENERATION_IDENTIFIER_MAX_LENGTH,
+     GenerationCallRecord,
+     GenerationAttemptMetadata,
+     GenerationLimits,
+@@ -34,6 +35,7 @@ __all__ = [
+     "BackendConfig",
+     "BoundedProcessRunner",
+     "GenerationLimits",
++    "GENERATION_IDENTIFIER_MAX_LENGTH",
+     "GenerationCallRecord",
+     "GenerationAttemptMetadata",
+     "GenerationProviderError",
+diff --git a/src/feature_rl/generation/models.py b/src/feature_rl/generation/models.py
+index eddf48a..ec2081a 100644
+--- a/src/feature_rl/generation/models.py
++++ b/src/feature_rl/generation/models.py
+@@ -19,6 +19,11 @@ from feature_rl.contracts import (
+     Visibility,
+ )
+ 
++GENERATION_IDENTIFIER_MAX_LENGTH = 128
++GenerationIdentifier = Annotated[
++    Identifier, Field(max_length=GENERATION_IDENTIFIER_MAX_LENGTH)
++]
++
+ 
+ class GenerationStage(str, Enum):
+     DISCOVERY = "discovery"
+@@ -69,9 +74,9 @@ def _fixed_identifier(value: str) -> bool:
+ 
+ 
+ class GenerationRequest(StrictModel):
+-    request_id: Identifier
+-    response_id: Identifier
+-    prompt_id: Identifier
++    request_id: GenerationIdentifier
++    response_id: GenerationIdentifier
++    prompt_id: GenerationIdentifier
+     stage: GenerationStage
+     system_prompt: Text
+     instruction: Text
+@@ -156,8 +161,8 @@ class GenerationUsage(StrictModel):
+ class GenerationCallRecord(StrictModel):
+     attempt_id: Identifier
+     recorded_at: UTCDateTime
+-    request_id: Identifier
+-    response_id: Identifier
++    request_id: GenerationIdentifier
++    response_id: GenerationIdentifier
+     success: bool
+     generation_succeeded: bool
+     publication_complete: bool
+@@ -170,9 +175,9 @@ class GenerationAttemptMetadata(StrictModel):
+     recorded_at: UTCDateTime
+     producer: Literal["feature_rl.generation.LocalGenerationProvider"]
+     protocol_version: Literal[3]
+-    request_id: Identifier
+-    response_id: Identifier
+-    prompt_id: Identifier
++    request_id: GenerationIdentifier
++    response_id: GenerationIdentifier
++    prompt_id: GenerationIdentifier
+     request_sha256: Digest
+     output_schema_sha256: Digest
+     source_sha256: dict[str, Digest]
+diff --git a/src/feature_rl/generation/protocol.py b/src/feature_rl/generation/protocol.py
+index 800b96a..6e503fe 100644
+--- a/src/feature_rl/generation/protocol.py
++++ b/src/feature_rl/generation/protocol.py
+@@ -6,7 +6,9 @@ from typing import Annotated, Literal
+ 
+ from pydantic import BeforeValidator, Field
+ 
+-from feature_rl.contracts import Digest, Identifier, NonnegativeFloat, NonnegativeInt, StrictModel
++from feature_rl.contracts import Digest, NonnegativeFloat, NonnegativeInt, StrictModel
++
++from .models import GenerationIdentifier
+ 
+ PROTOCOL_VERSION = 3
+ 
+@@ -29,9 +31,9 @@ ExactFalse = Annotated[Literal[False], BeforeValidator(_exact_literal(False))]
+ 
+ class EventIdentity(StrictModel):
+     protocol_version: ExactProtocolVersion
+-    request_id: Identifier
+-    response_id: Identifier
+-    prompt_id: Identifier
++    request_id: GenerationIdentifier
++    response_id: GenerationIdentifier
++    prompt_id: GenerationIdentifier
+ 
+ 
+ class IdentityValidated(EventIdentity):
+diff --git a/src/feature_rl/generation/provider.py b/src/feature_rl/generation/provider.py
+index cb8fa03..547d261 100644
+--- a/src/feature_rl/generation/provider.py
++++ b/src/feature_rl/generation/provider.py
+@@ -14,6 +14,7 @@ from pathlib import Path
+ from typing import Callable
+ 
+ from pydantic import ValidationError
++from pydantic_core import SchemaValidator, core_schema
+ 
+ from feature_rl.artifacts import canonical_json
+ from feature_rl.contracts import ArtifactRef, CostRecord, StrictModel, Visibility
+@@ -84,6 +85,10 @@ class GenerationInputLimitError(ValueError):
+     """A validated request cannot fit its declared serialized-input boundary."""
+ 
+ 
++class GenerationSchemaUnsupportedError(ValueError):
++    """The pinned exact-Literal prevalidator cannot preserve a schema form."""
++
++
+ @dataclass(frozen=True)
+ class _ArchivePayload:
+     name: str
+@@ -436,110 +441,93 @@ def _observed_usage(raw: bytes, request: GenerationRequest | None = None) -> dic
+     return observed
+ 
+ 
+-def _resolve_local_schema_ref(schema: dict, definitions: dict) -> dict:
+-    reference = schema.get("$ref")
+-    if not isinstance(reference, str):
+-        return schema
+-    prefix = "#/$defs/"
+-    if not reference.startswith(prefix) or reference[len(prefix):] not in definitions:
+-        raise ValueError("output schema contains an unsupported reference")
+-    return definitions[reference[len(prefix):]]
++def _contains_literal_schema(value: object) -> bool:
++    if isinstance(value, dict):
++        return value.get("type") == "literal" or any(
++            _contains_literal_schema(member) for member in value.values()
++        )
++    if isinstance(value, (list, tuple)):
++        return any(_contains_literal_schema(member) for member in value)
++    return False
+ 
+ 
+-def _raw_json_type_matches(value: object, schema: dict, definitions: dict) -> bool:
+-    schema = _resolve_local_schema_ref(schema, definitions)
+-    declared = schema.get("type")
+-    if isinstance(declared, list):
+-        return any(
+-            _raw_json_type_matches(value, {"type": member}, definitions)
+-            for member in declared
+-        )
+-    checks = {
+-        "null": lambda: value is None,
+-        "boolean": lambda: type(value) is bool,
+-        "integer": lambda: type(value) is int,
+-        "number": lambda: type(value) in {int, float},
+-        "string": lambda: type(value) is str,
+-        "array": lambda: type(value) is list,
+-        "object": lambda: type(value) is dict,
+-    }
+-    return declared not in checks or checks[declared]()
++def _exact_literal_value(value: object, expected: tuple[object, ...]) -> object:
++    equal_values = [candidate for candidate in expected if value == candidate]
++    if equal_values and not any(
++        type(value) is type(candidate) and value == candidate for candidate in equal_values
++    ):
++        raise ValueError("wrong literal JSON type")
++    return value
+ 
+ 
+-def _check_literal_json_types(
+-    value: object,
+-    schema: dict,
+-    definitions: dict,
+-    *,
+-    path: str = "$",
+-) -> None:
+-    """Reject equality-based Literal coercion before Pydantic converts JSON values."""
+-    schema = _resolve_local_schema_ref(schema, definitions)
+-    if "const" in schema:
+-        expected = schema["const"]
+-        if value == expected and type(value) is not type(expected):
+-            raise ValueError(f"model response has wrong literal JSON type at {path}")
+-    if isinstance(schema.get("enum"), list):
+-        equal = [expected for expected in schema["enum"] if value == expected]
+-        if equal and not any(type(value) is type(expected) for expected in equal):
+-            raise ValueError(f"model response has wrong literal JSON type at {path}")
++def _literal_precheck_schema(
++    value: object, dummy_models: dict[type, type]
++) -> object:
++    if isinstance(value, list):
++        return [_literal_precheck_schema(member, dummy_models) for member in value]
++    if isinstance(value, tuple):
++        return tuple(_literal_precheck_schema(member, dummy_models) for member in value)
++    if not isinstance(value, dict):
++        return value
++    kind = value.get("type")
++    if kind in {"function-before", "function-after", "function-wrap"}:
++        return _literal_precheck_schema(value["schema"], dummy_models)
++    if kind == "function-plain":
++        raise GenerationSchemaUnsupportedError(
++            "output schema with Literals cannot use a plain custom validator"
++        )
++    if kind in {"dataclass", "call"}:
++        raise GenerationSchemaUnsupportedError(
++            f"output schema with Literals cannot use core schema form {kind!r}"
++        )
++    if kind == "default":
++        return core_schema.with_default_schema(
++            _literal_precheck_schema(value["schema"], dummy_models), default=None
++        )
++    transformed = {
++        key: _literal_precheck_schema(member, dummy_models)
++        for key, member in value.items()
++    }
++    if kind == "literal":
++        expected = tuple(value["expected"])
++        return core_schema.no_info_before_validator_function(
++            lambda raw, expected=expected: _exact_literal_value(raw, expected),
++            transformed,
++        )
++    if kind == "model":
++        if value.get("custom_init"):
++            raise GenerationSchemaUnsupportedError(
++                "output schema with Literals cannot use a custom model initializer"
++            )
++        original = value["cls"]
++        if original not in dummy_models:
++            dummy_models[original] = type(f"ExactLiteral{original.__name__}", (), {})
++        transformed["cls"] = dummy_models[original]
++        transformed["metadata"] = {}
++        transformed.pop("post_init", None)
++        transformed.pop("generic_origin", None)
++    return transformed
+ 
+-    alternatives = schema.get("anyOf") or schema.get("oneOf")
+-    if isinstance(alternatives, list):
+-        applicable = [
+-            branch for branch in alternatives
+-            if isinstance(branch, dict) and _raw_json_type_matches(value, branch, definitions)
+-        ]
+-        if applicable:
+-            errors = []
+-            for branch in applicable:
+-                try:
+-                    _check_literal_json_types(value, branch, definitions, path=path)
+-                    break
+-                except ValueError as error:
+-                    errors.append(error)
+-            else:
+-                raise errors[0]
+-        else:
+-            for branch in alternatives:
+-                if isinstance(branch, dict):
+-                    _check_literal_json_types(value, branch, definitions, path=path)
+ 
+-    for branch in schema.get("allOf", ()):
+-        if isinstance(branch, dict):
+-            _check_literal_json_types(value, branch, definitions, path=path)
+-    if type(value) is dict:
+-        properties = schema.get("properties", {})
+-        if isinstance(properties, dict):
+-            for name, child_schema in properties.items():
+-                if name in value and isinstance(child_schema, dict):
+-                    _check_literal_json_types(
+-                        value[name], child_schema, definitions, path=f"{path}.{name}"
+-                    )
+-        additional = schema.get("additionalProperties")
+-        if isinstance(additional, dict):
+-            for name in value.keys() - properties.keys():
+-                _check_literal_json_types(
+-                    value[name], additional, definitions, path=f"{path}.{name}"
+-                )
+-    elif type(value) is list:
+-        prefix_items = schema.get("prefixItems", ())
+-        for index, child_schema in enumerate(prefix_items):
+-            if index < len(value) and isinstance(child_schema, dict):
+-                _check_literal_json_types(
+-                    value[index], child_schema, definitions, path=f"{path}[{index}]"
+-                )
+-        items = schema.get("items")
+-        if isinstance(items, dict):
+-            start = len(prefix_items) if isinstance(prefix_items, list) else 0
+-            for index in range(start, len(value)):
+-                _check_literal_json_types(
+-                    value[index], items, definitions, path=f"{path}[{index}]"
+-                )
++def _build_literal_prevalidator(schema: type[StrictModel]) -> SchemaValidator | None:
++    core = schema.__pydantic_core_schema__
++    if not _contains_literal_schema(core):
++        return None
++    try:
++        return SchemaValidator(_literal_precheck_schema(core, {}))
++    except GenerationSchemaUnsupportedError:
++        raise
++    except Exception as error:
++        raise GenerationSchemaUnsupportedError(
++            f"exact Literal validation cannot preserve this output schema: {error}"
++        ) from error
+ 
+ 
+ def _parse_envelope(
+-    output_text: str, request: GenerationRequest, schema: type[StrictModel]
++    output_text: str,
++    request: GenerationRequest,
++    schema: type[StrictModel],
++    literal_prevalidator: SchemaValidator | None = None,
+ ) -> StrictModel:
+     try:
+         envelope = _json_no_duplicates(output_text)
+@@ -559,12 +547,21 @@ def _parse_envelope(
+         raise ValueError("model response requirement provenance is malformed")
+     if not set(requirement_ids).issubset(request.allowed_requirement_ids):
+         raise ValueError("model response cites an unknown requirement ID")
+-    json_schema = schema.model_json_schema()
+-    _check_literal_json_types(
+-        envelope["content"], json_schema, json_schema.get("$defs", {})
+-    )
++    content_json = canonical_json(envelope["content"])
+     try:
+-        return schema.model_validate_json(canonical_json(envelope["content"]))
++        validator = (
++            literal_prevalidator
++            if literal_prevalidator is not None
++            else _build_literal_prevalidator(schema)
++        )
++        if validator is not None:
++            validator.validate_json(content_json)
++    except ValidationError as error:
++        raise ValueError(
++            "model response content violates exact literal JSON types"
++        ) from error
++    try:
++        return schema.model_validate_json(content_json)
+     except ValidationError as error:
+         raise ValueError("model response content violates its strict schema") from error
+ 
+@@ -586,6 +583,7 @@ class LocalGenerationProvider:
+     ) -> GenerationResult:
+         if not isinstance(request, GenerationRequest):
+             raise TypeError("request must be a validated GenerationRequest")
++        request = GenerationRequest.model_validate(request)
+         if not isinstance(output_schema, type) or not issubclass(output_schema, StrictModel):
+             raise TypeError("output schema must be a StrictModel subclass")
+         visibility = (
+@@ -882,7 +880,9 @@ class LocalGenerationProvider:
+         observed_usage = _observed_usage(b"", request)
+         content: StrictModel | None = None
+         error: Exception | None = None
++        literal_prevalidator: SchemaValidator | None = None
+         try:
++            literal_prevalidator = _build_literal_prevalidator(output_schema)
+             verified = self._backend.verify()
+             worker_input = canonical_json(
+                 {
+@@ -952,7 +952,9 @@ class LocalGenerationProvider:
+                 prompt_sha256=prompt_sha256,
+                 worker_source_sha256=worker_source_sha256,
+             )
+-            content = _parse_envelope(output_text, request, output_schema)
++            content = _parse_envelope(
++                output_text, request, output_schema, literal_prevalidator
++            )
+         except Exception as caught:  # Every failure is archived below before it escapes.
+             error = caught
+ 
+diff --git a/tests/test_generation.py b/tests/test_generation.py
+index 9797628..4f7a8b5 100644
+--- a/tests/test_generation.py
++++ b/tests/test_generation.py
+@@ -8,11 +8,11 @@ import os
+ import sys
+ from datetime import datetime, timezone
+ from pathlib import Path
+-from typing import Literal
++from typing import Annotated, Literal
+ from unittest.mock import patch
+ 
+ import pytest
+-from pydantic import ValidationError
++from pydantic import Field, PlainValidator, ValidationError
+ 
+ from feature_rl.artifacts import ArtifactStore
+ from feature_rl.contracts import ActorRole, ArtifactRef, StrictModel, Visibility
+@@ -173,6 +173,46 @@ def test_request_actual_serialization_is_strict_and_stable():
+         GenerationRequest.model_validate(decoded | {"unexpected": True})
+ 
+ 
++def test_generation_identity_lengths_and_public_boundary_revalidation():
++    values = request().model_dump()
++    for field in ("request_id", "response_id", "prompt_id"):
++        with pytest.raises(ValidationError):
++            GenerationRequest.model_validate(values | {field: "R" * 129})
++    with pytest.raises(ValidationError):
++        GenerationRequest.model_validate(values | {"request_id": "R" * 1_048_577})
++    maximum = GenerationRequest.model_validate(
++        values
++        | {
++            "request_id": "R" * 128,
++            "response_id": "S" * 128,
++            "prompt_id": "P" * 128,
++        }
++    )
++    assert len(maximum.request_id) == len(maximum.response_id) == len(maximum.prompt_id) == 128
++
++    runner = FakeRunner()
++    archive_calls = []
++    provider = LocalGenerationProvider(
++        backend=FakeBackend(),
++        archive=lambda *args: archive_calls.append(args),
++        runner=runner,
++    )
++    base = request()
++    constructed_baseline = GenerationRequest.model_construct(**base.__dict__)
++    assert GenerationRequest.model_validate(constructed_baseline) == base
++    bypassed_requests = (
++        base.model_copy(update={"request_id": "R" * 129}),
++        GenerationRequest.model_construct(
++            **(base.__dict__ | {"prompt_id": "P" * 129})
++        ),
++    )
++    for bypassed in bypassed_requests:
++        with pytest.raises(ValidationError):
++            provider.generate(bypassed, SmokeContent)
++    assert archive_calls == []
++    assert runner.calls == []
++
++
+ MODEL_FILES = (
+     "added_tokens.json",
+     "chat_template.jinja",
+@@ -382,6 +422,29 @@ class NestedLiteralContent(StrictModel):
+     leaf: LiteralLeaf
+ 
+ 
++class EnabledLiteral(StrictModel):
++    flag: Literal[True]
++
++
++class DisabledLiteral(StrictModel):
++    flag: Literal[False]
++
++
++class UnionLiteralContent(StrictModel):
++    mode: EnabledLiteral | DisabledLiteral
++
++
++class PatternedLiteralContent(StrictModel):
++    flags: dict[Annotated[str, Field(pattern=r"^k_")], Literal[True]]
++
++
++class UnsupportedPlainLiteralContent(StrictModel):
++    flag: Annotated[
++        Literal[True],
++        PlainValidator(lambda value: value, json_schema_input_type=Literal[True]),
++    ]
++
++
+ class FakeBackend:
+     python_executable = Path(sys.executable)
+     model_directory = Path("/explicit/model")
+@@ -409,6 +472,15 @@ class FakeBackend:
+         )
+ 
+ 
++class NeverVerifiedBackend(FakeBackend):
++    def __init__(self):
++        self.verify_calls = 0
++
++    def verify(self):
++        self.verify_calls += 1
++        raise AssertionError("schema refusal must precede backend verification")
++
++
+ def worker_events(*, event_override=None, truncated=False):
+     common = {
+         "protocol_version": 3,
+@@ -642,6 +714,69 @@ def test_provider_preserves_exact_nested_literal_json_types(tmp_path):
+             provider.generate(request(), NestedLiteralContent)
+ 
+ 
++@pytest.mark.parametrize(
++    ("schema", "valid_values", "invalid_value"),
++    [
++        (
++            UnionLiteralContent,
++            ({"mode": {"flag": True}}, {"mode": {"flag": False}}),
++            {"mode": {"flag": 1}},
++        ),
++        (
++            PatternedLiteralContent,
++            ({"flags": {"k_flag": True}},),
++            {"flags": {"k_flag": 1}},
++        ),
++    ],
++)
++def test_provider_exact_literal_validation_follows_actual_schema_paths(
++    tmp_path, schema, valid_values, invalid_value
++):
++    for index, content in enumerate(valid_values):
++        events = [json.loads(line) for line in worker_events().splitlines()]
++        envelope = json.loads(events[-1]["output_text"])
++        envelope["content"] = content
++        events[-1]["output_text"] = json.dumps(envelope)
++        result = LocalGenerationProvider(
++            backend=FakeBackend(),
++            archive=ArtifactStore(tmp_path / f"valid-{index}", ActorRole.AUTHOR).put_bytes,
++            runner=FakeRunner(
++                stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
++            ),
++        ).generate(request(), schema)
++        assert result.content.model_dump(mode="json") == content
++
++    events = [json.loads(line) for line in worker_events().splitlines()]
++    envelope = json.loads(events[-1]["output_text"])
++    envelope["content"] = invalid_value
++    events[-1]["output_text"] = json.dumps(envelope)
++    provider = LocalGenerationProvider(
++        backend=FakeBackend(),
++        archive=ArtifactStore(tmp_path / "invalid", ActorRole.AUTHOR).put_bytes,
++        runner=FakeRunner(
++            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
++        ),
++    )
++    with pytest.raises(GenerationProviderError, match="literal JSON type"):
++        provider.generate(request(), schema)
++
++
++def test_unsupported_literal_schema_refuses_before_backend_execution(tmp_path):
++    backend = NeverVerifiedBackend()
++    runner = FakeRunner()
++    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
++    provider = LocalGenerationProvider(
++        backend=backend, archive=store.put_bytes, runner=runner
++    )
++    with pytest.raises(GenerationProviderError, match="plain custom validator") as caught:
++        provider.generate(request(), UnsupportedPlainLiteralContent)
++    assert backend.verify_calls == 0
++    assert runner.calls == []
++    assert caught.value.record.success is False
++    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
++    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
++
++
+ @pytest.mark.parametrize(
+     ("event_index", "field", "wrong_value"),
+     [
+@@ -658,6 +793,9 @@ def test_event_protocol_rejects_numeric_equivalents_for_literals(
+     event_index, field, wrong_value
+ ):
+     events = [json.loads(line) for line in worker_events().splitlines()]
++    events[0]["prompt_sha256"] = "a" * 64
++    events[0]["worker_source_sha256"] = "b" * 64
++    assert _decode_event(json.dumps(events[event_index])).event == events[event_index]["event"]
+     events[event_index][field] = wrong_value
+     with pytest.raises(ValueError, match="protocol v3"):
+         _decode_event(json.dumps(events[event_index]))
+@@ -866,10 +1004,16 @@ def test_archive_failure_retains_outcome_and_replays_without_execution(tmp_path)
+     assert set(recovered.archives) == set(ARCHIVE_NAMES)
+ 
+ 
+-def oversized_request() -> GenerationRequest:
++def oversized_request(*, maximum_ids=False) -> GenerationRequest:
++    updates = {"instruction": "Attributable diagnostic instruction. " * 200}
++    if maximum_ids:
++        updates |= {
++            "request_id": "R" * 128,
++            "response_id": "S" * 128,
++            "prompt_id": "P" * 128,
++        }
+     return GenerationRequest.model_validate(
+-        request(generation_limits=limits(stdin_bytes=4096)).model_dump()
+-        | {"instruction": "Attributable diagnostic instruction. " * 200}
++        request(generation_limits=limits(stdin_bytes=4096)).model_dump() | updates
+     )
+ 
+ 
+@@ -929,7 +1073,7 @@ def test_oversized_preflight_publication_failure_replays_without_execution(tmp_p
+         backend=FakeBackend(), archive=fail_preflight_once, runner=runner
+     )
+     with pytest.raises(GenerationProviderError, match="archive publication failed") as caught:
+-        provider.generate(oversized_request(), SmokeContent)
++        provider.generate(oversized_request(maximum_ids=True), SmokeContent)
+     assert runner.calls == []
+     assert caught.value.record.archives.keys() == {"attempt"}
+     assert caught.value.recovery is not None
+@@ -942,3 +1086,4 @@ def test_oversized_preflight_publication_failure_replays_without_execution(tmp_p
+     assert recovered.publication_complete is True
+     assert recovered.error_code == "GenerationInputLimitError"
+     assert set(recovered.archives) == {"attempt", "preflight", "cost", "status"}
++    assert max(len(store.get_bytes(ref)) for ref in recovered.archives.values()) < 4096
