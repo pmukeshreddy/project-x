@@ -28,6 +28,7 @@ GenerationIdentifier = Annotated[
 class GenerationStage(str, Enum):
     DISCOVERY = "discovery"
     INITIAL_AUTHORING = "initial_authoring"
+    SCENARIO_PLANNING = "scenario_planning"
     CHECKER_GENERATION = "checker_generation"
 
 
@@ -110,6 +111,35 @@ class GenerationRequest(StrictModel):
                     raise ValueError("initial authoring cannot receive private or evaluation artifacts")
                 if item.source.kind in {"SourcePair", "reference", "reference-tree"}:
                     raise ValueError("reference implementation context is forbidden")
+        elif self.stage is GenerationStage.SCENARIO_PLANNING:
+            contracts = 0
+            for item in self.contexts:
+                if item.role == "contract":
+                    contracts += 1
+                    if (
+                        item.source.kind != "RequirementContract"
+                        or item.source.encoding != "json"
+                        or item.source.visibility is not Visibility.AUTHORING
+                    ):
+                        raise ValueError(
+                            "scenario planning requires an authoring RequirementContract artifact"
+                        )
+                    continue
+                if item.role not in {"request", "baseline", "public_check"}:
+                    raise ValueError("scenario planning context role is not allowlisted")
+                if item.source.visibility not in {Visibility.PUBLIC, Visibility.AUTHORING}:
+                    raise ValueError("scenario planning evidence must be public or authoring")
+                if item.source.kind in {
+                    "SourcePair",
+                    "reference",
+                    "reference-tree",
+                    "ScenarioPlan",
+                }:
+                    raise ValueError("scenario planning cannot receive reference or plan data")
+            if contracts != 1:
+                raise ValueError("scenario planning requires exactly one frozen contract")
+            if not self.allowed_requirement_ids:
+                raise ValueError("scenario planning requires fixed requirement IDs")
         else:
             for item in self.contexts:
                 expected_kind = {"contract": "RequirementContract", "scenario": "ScenarioPlan"}.get(

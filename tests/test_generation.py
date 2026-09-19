@@ -161,6 +161,53 @@ def test_checker_stage_accepts_only_explicit_contract_and_scenario_context():
         request(stage=GenerationStage.CHECKER_GENERATION, contexts=(context(role="baseline"),))
 
 
+def test_scenario_planning_requires_one_authoring_contract_and_admitted_evidence():
+    """The first plan is grounded in one frozen contract without admitting H or a plan."""
+    contract = context(
+        context_id="CONTRACT_1",
+        role="contract",
+        kind="RequirementContract",
+        visibility=Visibility.AUTHORING,
+    ).model_copy(update={"source": artifact("RequirementContract").model_copy(update={"encoding": "json"})})
+    built = request(
+        stage=GenerationStage.SCENARIO_PLANNING,
+        contexts=(context(), context(context_id="B_1", role="baseline"), contract),
+    )
+    assert tuple(item.role for item in built.contexts) == ("request", "baseline", "contract")
+
+    invalid_context_sets = (
+        (context(),),
+        (contract, contract.model_copy(update={"context_id": "CONTRACT_2"})),
+        (
+            contract.model_copy(
+                update={"source": artifact("ScenarioPlan").model_copy(update={"encoding": "json"})}
+            ),
+        ),
+        (
+            contract.model_copy(
+                update={
+                    "source": artifact(
+                        "RequirementContract", Visibility.PRIVATE
+                    ).model_copy(update={"encoding": "json"})
+                }
+            ),
+        ),
+        (
+            contract,
+            context(
+                context_id="PLAN_1",
+                role="scenario",
+                kind="ScenarioPlan",
+                visibility=Visibility.PRIVATE,
+            ),
+        ),
+        (contract, context(context_id="H_1", role="baseline", kind="reference-tree")),
+    )
+    for contexts in invalid_context_sets:
+        with pytest.raises(ValidationError):
+            request(stage=GenerationStage.SCENARIO_PLANNING, contexts=contexts)
+
+
 def test_request_rejects_duplicate_ids_placeholders_and_relaxed_resource_policy():
     """IDs must be fixed before inference and the qualified bounds cannot drift."""
     with pytest.raises(ValidationError):
