@@ -97,10 +97,10 @@ These are instance methods on configured services, not globals with hidden state
 ### Task 4: M3 construction and lifecycle
 
 - [x] Review/integrate M0 bounded artifact-read extension bf065ec; M3 must now consume explicit envelope/decoded caps and enforce aggregate staging limits in its product.
-- [ ] Implement pinned Docker recipes and controlled dependency acquisition; refuse unpinned images/artifacts. Historical build hooks execute inside disposable workers.
-- [ ] Implement actual isolated build/run/reset with PID/network/filesystem/resource boundaries, bounded output, deadlines, process cleanup, imported-package location and service readiness evidence.
-- [ ] Test host denial and malformed recipes; execute baseline health, timeout cleanup, network enforcement and fresh/interrupted reset checks through Docker if available. A missing daemon blocks these gates, never selects host execution.
-- [ ] Independent review; preserve exact blocked command if boundary unavailable.
+- [x] Implement pinned Docker recipe and controlled dependency acquisition for the declared local Click/no-service track; refuse unpinned images/artifacts. Historical build hooks execute inside disposable workers.
+- [x] Implement isolated build/run/reset with PID/network/filesystem/resource boundaries, bounded output, deadlines, process cleanup and imported-package location. Services remain explicitly unsupported by this initial recipe.
+- [x] Test host denial and malformed recipes; execute baseline health, timeout cleanup, network enforcement and fresh/interrupted reset checks through Docker. A missing daemon fails closed, never selects host execution.
+- [x] Independent round3 specification/quality PASS at2190af0 after two scoped race fixes. Root fresh integrated342tests passed atdcb442b; complete raw evidence in docs/evidence/M3/coordinator-integration-round3/.
 
 ### Task 5: M2 authoring/scenarios against baseline
 
