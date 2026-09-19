@@ -1,0 +1,82 @@
+{
+  "checks": [
+    {
+      "item": "src/feature_rl/generation/__init__.py",
+      "passed": true,
+      "sha256": "feab8f63dfd2344003792855341731be6d9125cf707822104b1b8316fcb7c278"
+    },
+    {
+      "item": "src/feature_rl/generation/_worker.py",
+      "passed": true,
+      "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed"
+    },
+    {
+      "item": "src/feature_rl/generation/backend.py",
+      "passed": true,
+      "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647"
+    },
+    {
+      "item": "src/feature_rl/generation/models.py",
+      "passed": true,
+      "sha256": "4ee0c21c3c8e8bb2abc9bb6e6c2b4b0229573733ce7fc61359affa9b22669305"
+    },
+    {
+      "item": "src/feature_rl/generation/protocol.py",
+      "passed": true,
+      "sha256": "c0a84ee32415a666edabc84a9644c2d56eb53b3c9c31df22321e3299f933fba1"
+    },
+    {
+      "item": "src/feature_rl/generation/provider.py",
+      "passed": true,
+      "sha256": "62cc3a3b36d0d8a84c520a5719d303603f7251d371f146288e32273d419053be"
+    },
+    {
+      "item": "src/feature_rl/generation/runner.py",
+      "passed": true,
+      "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+    },
+    {
+      "item": "tests/test_generation.py",
+      "passed": true,
+      "sha256": "869df7d5f6e6757c723602ced60448f9fcb0f45fa6c6b96695a4ae911a19328d"
+    },
+    {
+      "item": "focused exit status",
+      "passed": true
+    },
+    {
+      "item": "docs/evidence/M2/provider-v3-fixround1-focused-tests.stdout",
+      "passed": true,
+      "sha256": "21b48b32d9d2f27afe503a7f30afab0dc147595cacc58b732f987caa948eb9bd"
+    },
+    {
+      "item": "docs/evidence/M2/provider-v3-fixround1-focused-tests.stderr",
+      "passed": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "item": "full exit status",
+      "passed": true
+    },
+    {
+      "item": "docs/evidence/M2/provider-v3-fixround1-full-tests.stdout",
+      "passed": true,
+      "sha256": "53b0300231e0df74850d526f31be002bb75e498dac73d1043de286bc2f4f9b6e"
+    },
+    {
+      "item": "docs/evidence/M2/provider-v3-fixround1-full-tests.stderr",
+      "passed": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "command": [
+    ".venv/bin/python",
+    "docs/evidence/M2/coordinator-v3-binding.py"
+  ],
+  "owner_receipt_sha256": "4bd9b5d0c4d46b802513bfe3325e2bc9d50e60ae0ae12ba9ca34391e1f971dfa",
+  "passed": true,
+  "producer": "coordinator /root",
+  "recorded_at": "2026-09-19T11:02:01.534884+00:00",
+  "scope": "source and retained owner test-log binding only; no test or inference rerun",
+  "source_revision": "7239379ebf6921fd816b1bded9bb07a685b84c1a"
+}
