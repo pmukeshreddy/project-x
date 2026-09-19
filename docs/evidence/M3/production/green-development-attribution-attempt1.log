@@ -1,0 +1,430 @@
+.....................EEEEEE..                                            [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of test_saved_workspace_roundtrip_and_reset_keep_exact_source_identity _
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x106602580>
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1124/test_saved_workspace_roundtrip0')
+
+    @pytest.fixture
+    def runtime_fixture(engine,tmp_path):
+        from datetime import datetime,timezone
+        from feature_rl.artifacts import ArtifactStore
+        from feature_rl.contracts import ActorRole,Visibility,DependencyPin,EvidenceRecord
+        from feature_rl.environments import EnvironmentRuntime
+        from feature_rl.environments.runtime import WHEELS
+        import io,tarfile
+        store=ArtifactStore(tmp_path/'artifacts',ActorRole.CONTROLLER)
+        data=io.BytesIO()
+        with tarfile.open(fileobj=data,mode='w') as t:
+            for name,body in [('pyproject.toml',b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\nrequires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n'),('src/click/__init__.py',b'x=1\n')]:
+                item=tarfile.TarInfo(name);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        baseline=store.put_bytes(data.getvalue(),'source-archive',Visibility.AUTHORING)
+        pins=[]
+        for name,(version,filename,digest) in WHEELS.items():
+            body=Path('.feature-rl/research/M3/dependencies',filename).read_bytes()
+            ref=store.put_bytes(body,'dependency-wheel',Visibility.AUTHORING)
+            pins.append(DependencyPin(name=name,version=version,artifact=ref,sha256=digest))
+        evidence=EvidenceRecord(producer='trusted-test-fixture',command=('create synthetic inert source',),recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision='a'*40,scope='unit_diagnostic')
+        engine.qualify_boundary()
+        runtime=EnvironmentRuntime(store=store,engine=engine,revision='a'*40)
+>       prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/environments/runtime.py:105: in create_click_recipe
+    ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:166: in put_artifact
+    self._check_exposure(checked.visibility, payload)
+src/feature_rl/artifacts/store.py:174: in _check_exposure
+    _public_refs(payload, {'public','authoring'})
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'sha256': '0da23803951a37e4761b7e0f592c12dcc248b16f1e3cbab31fac85048f7fb560', 'kind': 'sandbox-qualification', 'schema_version': 1, 'visibility': 'private', ...}
+permitted = {'authoring', 'public'}
+
+    def _public_refs(value, permitted):
+        if isinstance(value, dict):
+            if {'sha256','kind','schema_version','visibility','encoding'} <= value.keys():
+                if value['visibility'] not in permitted:
+>                   raise ArtifactIntegrityError('artifact exposes a restricted reference')
+E                   feature_rl.artifacts.store.ArtifactIntegrityError: artifact exposes a restricted reference
+
+src/feature_rl/artifacts/store.py:106: ArtifactIntegrityError
+_ ERROR at setup of test_recipe_and_source_join_refuse_undeclared_network_and_reference _
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x1076d0e20>
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1124/test_recipe_and_source_join_re0')
+
+    @pytest.fixture
+    def runtime_fixture(engine,tmp_path):
+        from datetime import datetime,timezone
+        from feature_rl.artifacts import ArtifactStore
+        from feature_rl.contracts import ActorRole,Visibility,DependencyPin,EvidenceRecord
+        from feature_rl.environments import EnvironmentRuntime
+        from feature_rl.environments.runtime import WHEELS
+        import io,tarfile
+        store=ArtifactStore(tmp_path/'artifacts',ActorRole.CONTROLLER)
+        data=io.BytesIO()
+        with tarfile.open(fileobj=data,mode='w') as t:
+            for name,body in [('pyproject.toml',b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\nrequires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n'),('src/click/__init__.py',b'x=1\n')]:
+                item=tarfile.TarInfo(name);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        baseline=store.put_bytes(data.getvalue(),'source-archive',Visibility.AUTHORING)
+        pins=[]
+        for name,(version,filename,digest) in WHEELS.items():
+            body=Path('.feature-rl/research/M3/dependencies',filename).read_bytes()
+            ref=store.put_bytes(body,'dependency-wheel',Visibility.AUTHORING)
+            pins.append(DependencyPin(name=name,version=version,artifact=ref,sha256=digest))
+        evidence=EvidenceRecord(producer='trusted-test-fixture',command=('create synthetic inert source',),recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision='a'*40,scope='unit_diagnostic')
+        engine.qualify_boundary()
+        runtime=EnvironmentRuntime(store=store,engine=engine,revision='a'*40)
+>       prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/environments/runtime.py:105: in create_click_recipe
+    ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:166: in put_artifact
+    self._check_exposure(checked.visibility, payload)
+src/feature_rl/artifacts/store.py:174: in _check_exposure
+    _public_refs(payload, {'public','authoring'})
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'sha256': '22501c11bcf7104ac1118f7195a448e82da2937ecd9198cacb00ae4f6c8b0d32', 'kind': 'sandbox-qualification', 'schema_version': 1, 'visibility': 'private', ...}
+permitted = {'authoring', 'public'}
+
+    def _public_refs(value, permitted):
+        if isinstance(value, dict):
+            if {'sha256','kind','schema_version','visibility','encoding'} <= value.keys():
+                if value['visibility'] not in permitted:
+>                   raise ArtifactIntegrityError('artifact exposes a restricted reference')
+E                   feature_rl.artifacts.store.ArtifactIntegrityError: artifact exposes a restricted reference
+
+src/feature_rl/artifacts/store.py:106: ArtifactIntegrityError
+_ ERROR at setup of test_development_repairs_broken_source_without_build_and_imports_current_edit _
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x107191850>
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1124/test_development_repairs_broke0')
+
+    @pytest.fixture
+    def runtime_fixture(engine,tmp_path):
+        from datetime import datetime,timezone
+        from feature_rl.artifacts import ArtifactStore
+        from feature_rl.contracts import ActorRole,Visibility,DependencyPin,EvidenceRecord
+        from feature_rl.environments import EnvironmentRuntime
+        from feature_rl.environments.runtime import WHEELS
+        import io,tarfile
+        store=ArtifactStore(tmp_path/'artifacts',ActorRole.CONTROLLER)
+        data=io.BytesIO()
+        with tarfile.open(fileobj=data,mode='w') as t:
+            for name,body in [('pyproject.toml',b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\nrequires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n'),('src/click/__init__.py',b'x=1\n')]:
+                item=tarfile.TarInfo(name);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        baseline=store.put_bytes(data.getvalue(),'source-archive',Visibility.AUTHORING)
+        pins=[]
+        for name,(version,filename,digest) in WHEELS.items():
+            body=Path('.feature-rl/research/M3/dependencies',filename).read_bytes()
+            ref=store.put_bytes(body,'dependency-wheel',Visibility.AUTHORING)
+            pins.append(DependencyPin(name=name,version=version,artifact=ref,sha256=digest))
+        evidence=EvidenceRecord(producer='trusted-test-fixture',command=('create synthetic inert source',),recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision='a'*40,scope='unit_diagnostic')
+        engine.qualify_boundary()
+        runtime=EnvironmentRuntime(store=store,engine=engine,revision='a'*40)
+>       prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/environments/runtime.py:105: in create_click_recipe
+    ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:166: in put_artifact
+    self._check_exposure(checked.visibility, payload)
+src/feature_rl/artifacts/store.py:174: in _check_exposure
+    _public_refs(payload, {'public','authoring'})
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'sha256': 'b8bf0e86f2e4f9a2bdc5010656243e7e881b0909c18b846996993fae751c9bfc', 'kind': 'sandbox-qualification', 'schema_version': 1, 'visibility': 'private', ...}
+permitted = {'authoring', 'public'}
+
+    def _public_refs(value, permitted):
+        if isinstance(value, dict):
+            if {'sha256','kind','schema_version','visibility','encoding'} <= value.keys():
+                if value['visibility'] not in permitted:
+>                   raise ArtifactIntegrityError('artifact exposes a restricted reference')
+E                   feature_rl.artifacts.store.ArtifactIntegrityError: artifact exposes a restricted reference
+
+src/feature_rl/artifacts/store.py:106: ArtifactIntegrityError
+_ ERROR at setup of test_candidate_export_failure_is_attributed_and_preserves_saved_source[import shutil;shutil.rmtree('/workspace/source')] _
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x106e67550>
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1124/test_candidate_export_failure_0')
+
+    @pytest.fixture
+    def runtime_fixture(engine,tmp_path):
+        from datetime import datetime,timezone
+        from feature_rl.artifacts import ArtifactStore
+        from feature_rl.contracts import ActorRole,Visibility,DependencyPin,EvidenceRecord
+        from feature_rl.environments import EnvironmentRuntime
+        from feature_rl.environments.runtime import WHEELS
+        import io,tarfile
+        store=ArtifactStore(tmp_path/'artifacts',ActorRole.CONTROLLER)
+        data=io.BytesIO()
+        with tarfile.open(fileobj=data,mode='w') as t:
+            for name,body in [('pyproject.toml',b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\nrequires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n'),('src/click/__init__.py',b'x=1\n')]:
+                item=tarfile.TarInfo(name);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        baseline=store.put_bytes(data.getvalue(),'source-archive',Visibility.AUTHORING)
+        pins=[]
+        for name,(version,filename,digest) in WHEELS.items():
+            body=Path('.feature-rl/research/M3/dependencies',filename).read_bytes()
+            ref=store.put_bytes(body,'dependency-wheel',Visibility.AUTHORING)
+            pins.append(DependencyPin(name=name,version=version,artifact=ref,sha256=digest))
+        evidence=EvidenceRecord(producer='trusted-test-fixture',command=('create synthetic inert source',),recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision='a'*40,scope='unit_diagnostic')
+        engine.qualify_boundary()
+        runtime=EnvironmentRuntime(store=store,engine=engine,revision='a'*40)
+>       prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/environments/runtime.py:105: in create_click_recipe
+    ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:166: in put_artifact
+    self._check_exposure(checked.visibility, payload)
+src/feature_rl/artifacts/store.py:174: in _check_exposure
+    _public_refs(payload, {'public','authoring'})
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'sha256': 'f36d93c65fd1fa51f22826180843f515e166c4815c2d5c25c9ea68c8168f1f1f', 'kind': 'sandbox-qualification', 'schema_version': 1, 'visibility': 'private', ...}
+permitted = {'authoring', 'public'}
+
+    def _public_refs(value, permitted):
+        if isinstance(value, dict):
+            if {'sha256','kind','schema_version','visibility','encoding'} <= value.keys():
+                if value['visibility'] not in permitted:
+>                   raise ArtifactIntegrityError('artifact exposes a restricted reference')
+E                   feature_rl.artifacts.store.ArtifactIntegrityError: artifact exposes a restricted reference
+
+src/feature_rl/artifacts/store.py:106: ArtifactIntegrityError
+_ ERROR at setup of test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')] _
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x1076ed130>
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1124/test_candidate_export_failure_1')
+
+    @pytest.fixture
+    def runtime_fixture(engine,tmp_path):
+        from datetime import datetime,timezone
+        from feature_rl.artifacts import ArtifactStore
+        from feature_rl.contracts import ActorRole,Visibility,DependencyPin,EvidenceRecord
+        from feature_rl.environments import EnvironmentRuntime
+        from feature_rl.environments.runtime import WHEELS
+        import io,tarfile
+        store=ArtifactStore(tmp_path/'artifacts',ActorRole.CONTROLLER)
+        data=io.BytesIO()
+        with tarfile.open(fileobj=data,mode='w') as t:
+            for name,body in [('pyproject.toml',b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\nrequires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n'),('src/click/__init__.py',b'x=1\n')]:
+                item=tarfile.TarInfo(name);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        baseline=store.put_bytes(data.getvalue(),'source-archive',Visibility.AUTHORING)
+        pins=[]
+        for name,(version,filename,digest) in WHEELS.items():
+            body=Path('.feature-rl/research/M3/dependencies',filename).read_bytes()
+            ref=store.put_bytes(body,'dependency-wheel',Visibility.AUTHORING)
+            pins.append(DependencyPin(name=name,version=version,artifact=ref,sha256=digest))
+        evidence=EvidenceRecord(producer='trusted-test-fixture',command=('create synthetic inert source',),recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision='a'*40,scope='unit_diagnostic')
+        engine.qualify_boundary()
+        runtime=EnvironmentRuntime(store=store,engine=engine,revision='a'*40)
+>       prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/environments/runtime.py:105: in create_click_recipe
+    ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:166: in put_artifact
+    self._check_exposure(checked.visibility, payload)
+src/feature_rl/artifacts/store.py:174: in _check_exposure
+    _public_refs(payload, {'public','authoring'})
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'sha256': '0f5de9cae9c96d6b8f860f1576dd0bf13df9834a81984478ab2fbadd6722a14f', 'kind': 'sandbox-qualification', 'schema_version': 1, 'visibility': 'private', ...}
+permitted = {'authoring', 'public'}
+
+    def _public_refs(value, permitted):
+        if isinstance(value, dict):
+            if {'sha256','kind','schema_version','visibility','encoding'} <= value.keys():
+                if value['visibility'] not in permitted:
+>                   raise ArtifactIntegrityError('artifact exposes a restricted reference')
+E                   feature_rl.artifacts.store.ArtifactIntegrityError: artifact exposes a restricted reference
+
+src/feature_rl/artifacts/store.py:106: ArtifactIntegrityError
+_ ERROR at setup of test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))] _
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x1076ee300>
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1124/test_candidate_export_failure_2')
+
+    @pytest.fixture
+    def runtime_fixture(engine,tmp_path):
+        from datetime import datetime,timezone
+        from feature_rl.artifacts import ArtifactStore
+        from feature_rl.contracts import ActorRole,Visibility,DependencyPin,EvidenceRecord
+        from feature_rl.environments import EnvironmentRuntime
+        from feature_rl.environments.runtime import WHEELS
+        import io,tarfile
+        store=ArtifactStore(tmp_path/'artifacts',ActorRole.CONTROLLER)
+        data=io.BytesIO()
+        with tarfile.open(fileobj=data,mode='w') as t:
+            for name,body in [('pyproject.toml',b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\nrequires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n'),('src/click/__init__.py',b'x=1\n')]:
+                item=tarfile.TarInfo(name);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        baseline=store.put_bytes(data.getvalue(),'source-archive',Visibility.AUTHORING)
+        pins=[]
+        for name,(version,filename,digest) in WHEELS.items():
+            body=Path('.feature-rl/research/M3/dependencies',filename).read_bytes()
+            ref=store.put_bytes(body,'dependency-wheel',Visibility.AUTHORING)
+            pins.append(DependencyPin(name=name,version=version,artifact=ref,sha256=digest))
+        evidence=EvidenceRecord(producer='trusted-test-fixture',command=('create synthetic inert source',),recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision='a'*40,scope='unit_diagnostic')
+        engine.qualify_boundary()
+        runtime=EnvironmentRuntime(store=store,engine=engine,revision='a'*40)
+>       prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/environments/runtime.py:105: in create_click_recipe
+    ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:166: in put_artifact
+    self._check_exposure(checked.visibility, payload)
+src/feature_rl/artifacts/store.py:174: in _check_exposure
+    _public_refs(payload, {'public','authoring'})
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:107: in _public_refs
+    for member in value.values(): _public_refs(member, permitted)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/artifacts/store.py:109: in _public_refs
+    for member in value: _public_refs(member, permitted)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'sha256': '34deaa2cfcb3bb5972be5305e45d146f21a74096e4ed82cc99ada27c39efa758', 'kind': 'sandbox-qualification', 'schema_version': 1, 'visibility': 'private', ...}
+permitted = {'authoring', 'public'}
+
+    def _public_refs(value, permitted):
+        if isinstance(value, dict):
+            if {'sha256','kind','schema_version','visibility','encoding'} <= value.keys():
+                if value['visibility'] not in permitted:
+>                   raise ArtifactIntegrityError('artifact exposes a restricted reference')
+E                   feature_rl.artifacts.store.ArtifactIntegrityError: artifact exposes a restricted reference
+
+src/feature_rl/artifacts/store.py:106: ArtifactIntegrityError
+=========================== short test summary info ============================
+ERROR tests/test_environments_docker.py::test_saved_workspace_roundtrip_and_reset_keep_exact_source_identity
+ERROR tests/test_environments_docker.py::test_recipe_and_source_join_refuse_undeclared_network_and_reference
+ERROR tests/test_environments_docker.py::test_development_repairs_broken_source_without_build_and_imports_current_edit
+ERROR tests/test_environments_docker.py::test_candidate_export_failure_is_attributed_and_preserves_saved_source[import shutil;shutil.rmtree('/workspace/source')]
+ERROR tests/test_environments_docker.py::test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')]
+ERROR tests/test_environments_docker.py::test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))]
+23 passed, 6 errors in 13.62s

@@ -1,0 +1,96 @@
+FFFFF.                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_development_repairs_broken_source_without_build_and_imports_current_edit _
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x10ba56a50>, PreparedEnvironment(recipe=ArtifactRef(sh...1b923544', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+
+    def test_development_repairs_broken_source_without_build_and_imports_current_edit(runtime_fixture):
+        from feature_rl.environments import CommandSpec,ExecutionRequest
+        runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared)
+        code="import pathlib;p=pathlib.Path('/workspace/source/src/click/__init__.py');p.write_text('x=42\\n');import click;print(click.__file__);assert click.x==42"
+>       result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(argv=('python','-c',code),working_directory='/workspace',timeout_seconds=2.0)))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'EnvironmentRuntime' object has no attribute 'execute_development'
+
+tests/test_environments_docker.py:115: AttributeError
+_ test_candidate_export_failure_is_attributed_and_preserves_saved_source[import shutil;shutil.rmtree('/workspace/source')] _
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x10b3a3d90>, PreparedEnvironment(recipe=ArtifactRef(sh...1b923544', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+code = "import shutil;shutil.rmtree('/workspace/source')"
+
+    @pytest.mark.parametrize('code',[
+     "import shutil;shutil.rmtree('/workspace/source')",
+     "import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')",
+     "import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))",
+    ])
+    def test_candidate_export_failure_is_attributed_and_preserves_saved_source(runtime_fixture,code):
+        from feature_rl.environments import CommandSpec,ExecutionRequest
+        runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared);saved=runtime.workspace(handle)[3]
+>       result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(argv=('python','-c',code),working_directory='/workspace',timeout_seconds=3.0)))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'EnvironmentRuntime' object has no attribute 'execute_development'
+
+tests/test_environments_docker.py:131: AttributeError
+_ test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')] _
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x10bb38910>, PreparedEnvironment(recipe=ArtifactRef(sh...1b923544', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+code = "import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')"
+
+    @pytest.mark.parametrize('code',[
+     "import shutil;shutil.rmtree('/workspace/source')",
+     "import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')",
+     "import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))",
+    ])
+    def test_candidate_export_failure_is_attributed_and_preserves_saved_source(runtime_fixture,code):
+        from feature_rl.environments import CommandSpec,ExecutionRequest
+        runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared);saved=runtime.workspace(handle)[3]
+>       result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(argv=('python','-c',code),working_directory='/workspace',timeout_seconds=3.0)))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'EnvironmentRuntime' object has no attribute 'execute_development'
+
+tests/test_environments_docker.py:131: AttributeError
+_ test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))] _
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x10bb38b90>, PreparedEnvironment(recipe=ArtifactRef(sh...1b923544', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+code = "import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))"
+
+    @pytest.mark.parametrize('code',[
+     "import shutil;shutil.rmtree('/workspace/source')",
+     "import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')",
+     "import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))",
+    ])
+    def test_candidate_export_failure_is_attributed_and_preserves_saved_source(runtime_fixture,code):
+        from feature_rl.environments import CommandSpec,ExecutionRequest
+        runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared);saved=runtime.workspace(handle)[3]
+>       result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(argv=('python','-c',code),working_directory='/workspace',timeout_seconds=3.0)))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'EnvironmentRuntime' object has no attribute 'execute_development'
+
+tests/test_environments_docker.py:131: AttributeError
+__________ test_daemon_loss_during_cleanup_is_pending_then_recovered ___________
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x10b52b820>
+
+    def test_daemon_loss_during_cleanup_is_pending_then_recovered(engine):
+        from feature_rl.environments import CleanupUnverified
+        session=engine.session(binding={'test':'cleanup-recovery'},saved_source={});session.__enter__()
+        original=engine.base;engine.base=[*original[:3],'--host','unix:///tmp/feature-rl-definitely-missing.sock']
+        try:
+            with pytest.raises(CleanupUnverified):session.__exit__(None,None,None)
+            assert not session.cleanup_verified
+            assert engine.state.read('operation-'+session.record.operation_id+'.json')['phase']=='cleanup_pending'
+        finally:engine.base=original
+>       result=engine.recover_owned();assert session.record.operation_id in result
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 'd49e348d12a0433f9536cc2588abe2a4' in [{'operation_id': 'd49e348d12a0433f9536cc2588abe2a4', 'cleanup_verified': True, 'receipts': [{'argv': ['/usr/local/bin...ochamreddy/.docker/run/docker.sock', 'inspect', ...], 'exit_code': 1, 'reason': 'exited', 'observed_bytes': 91, ...}]}]
+E        +  where 'd49e348d12a0433f9536cc2588abe2a4' = Ownership(operation_id='d49e348d12a0433f9536cc2588abe2a4', owner_token='c1459404f6934dc185b355c4d6ef0d62', daemon_id='...ved_source={}, created_at='2026-09-19T19:21:17.705191+00:00', error='CleanupUnverified: daemon failure is not absence').operation_id
+E        +    where Ownership(operation_id='d49e348d12a0433f9536cc2588abe2a4', owner_token='c1459404f6934dc185b355c4d6ef0d62', daemon_id='...ved_source={}, created_at='2026-09-19T19:21:17.705191+00:00', error='CleanupUnverified: daemon failure is not absence') = <feature_rl.environments.docker.DockerSession object at 0x10bbb0050>.record
+
+tests/test_environments_docker.py:145: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_environments_docker.py::test_development_repairs_broken_source_without_build_and_imports_current_edit
+FAILED tests/test_environments_docker.py::test_candidate_export_failure_is_attributed_and_preserves_saved_source[import shutil;shutil.rmtree('/workspace/source')]
+FAILED tests/test_environments_docker.py::test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/escape').symlink_to('/etc/passwd')]
+FAILED tests/test_environments_docker.py::test_candidate_export_failure_is_attributed_and_preserves_saved_source[import pathlib;pathlib.Path('/workspace/source/src/huge').write_bytes(b'x'*(9*1024*1024))]
+FAILED tests/test_environments_docker.py::test_daemon_loss_during_cleanup_is_pending_then_recovered
+5 failed, 1 passed, 8 deselected in 6.81s

@@ -1,0 +1,22 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________ test_actual_denials_are_machine_checked ____________________
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x10785a510>
+
+    def test_actual_denials_are_machine_checked(engine):
+        result=engine.qualify_boundary()
+        assert result['qualified'] is True
+        assert result['cleanup_verified'] is True
+        assert result['observations']['uid']==65534
+        assert result['observations']['seccomp']==2
+        assert result['observations']['ipv4_errno']==101
+        assert result['observations']['ptrace_errno']==1
+>       assert result['observations']['memory_oom_delta']>=1
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'memory_oom_delta'
+
+tests/test_environments_docker.py:20: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_environments_docker.py::test_actual_denials_are_machine_checked
+1 failed, 5 deselected in 1.32s

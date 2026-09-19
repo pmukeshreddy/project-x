@@ -1,0 +1,31 @@
+..F..                                                                    [100%]
+=================================== FAILURES ===================================
+__________ test_export_freezes_descendants_and_preserves_tmpfs_source __________
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x108f1f390>
+
+    def test_export_freezes_descendants_and_preserves_tmpfs_source(engine):
+        from feature_rl.environments import CommandSpec,SourceArchive
+        with engine.session(binding={'test':'export'},saved_source={}) as session:
+            result=session.execute(CommandSpec(argv=('python','-I','-c',"import pathlib; p=pathlib.Path('/workspace/source/src');p.mkdir(parents=True);(p/'a.py').write_text('saved')"),working_directory='/workspace',timeout_seconds=2.0))
+            assert result.exit_code==0
+>           source=session.export_source()
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.environments.docker.DockerSession object at 0x108f1f250>
+
+    def export_source(self):
+        self.checked(['pause',self.name])
+        status,data=self.engine.http('GET','/containers/'+self.name+'/archive?path='+quote('/workspace/source',safe=''),deadline=min(self.deadline,time.monotonic()+self.policy.control_seconds),cap=self.policy.max_archive_bytes)
+        self.receipts.append({'docker_api':'GET archive /workspace/source','status':status,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+>       if status!=200:raise EnvironmentError('source export unavailable')
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       feature_rl.environments.models.EnvironmentError: source export unavailable
+
+src/feature_rl/environments/docker.py:282: EnvironmentError
+=========================== short test summary info ============================
+FAILED tests/test_environments_docker.py::test_export_freezes_descendants_and_preserves_tmpfs_source
+1 failed, 4 passed in 4.13s

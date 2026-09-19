@@ -1,0 +1,88 @@
+{
+  "utc": "2026-09-19T19:21:59.735680+00:00",
+  "base_digest": "python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333",
+  "derived_config_id": "sha256:59cff2cafc7819fee5cdef4ab8f76fa5ec574d16d78a2661953dfd1498aaf185",
+  "derived_inspect_id": "sha256:b28d3b1eeaa6251e82354fa61dc28a29afead9e2d7179436e77ca8ba612032fa",
+  "repo_digests": [
+    "feature-rl-m3-less@sha256:b28d3b1eeaa6251e82354fa61dc28a29afead9e2d7179436e77ca8ba612032fa"
+  ],
+  "base_layers": [
+    "sha256:055ab12bd547e17a0630037f06a186cf405e3f61bb03a614562ca8f5ab52a8be",
+    "sha256:733a4c39d1861944c067204437d1778fa99cbcf73c83140f645f62ee6a8e15ad",
+    "sha256:2fc9de9e22c9697d332b5e283383bb068fd5d065894d475e9c9b71defab56827",
+    "sha256:5597d068c1fb2900df94dc2534718621de518ba9f0f7ec0b6271e4a1fa91b3d9"
+  ],
+  "derived_layers": [
+    "sha256:055ab12bd547e17a0630037f06a186cf405e3f61bb03a614562ca8f5ab52a8be",
+    "sha256:733a4c39d1861944c067204437d1778fa99cbcf73c83140f645f62ee6a8e15ad",
+    "sha256:2fc9de9e22c9697d332b5e283383bb068fd5d065894d475e9c9b71defab56827",
+    "sha256:5597d068c1fb2900df94dc2534718621de518ba9f0f7ec0b6271e4a1fa91b3d9",
+    "sha256:5d564398061c4112661ca70cc09dfe2ab1d89c478e6ba7096f9a96ca8118d284",
+    "sha256:4c3c0b9aa3f9c0f78567656882c52011ccb01b6f6a35dffb8792e4f31a585576"
+  ],
+  "base_prefix_verified": true,
+  "base_platform": {
+    "os": "linux",
+    "architecture": "arm64"
+  },
+  "derived_platform": {
+    "os": "linux",
+    "architecture": "arm64"
+  },
+  "derived_config": {
+    "Hostname": "",
+    "Domainname": "",
+    "User": "",
+    "AttachStdin": false,
+    "AttachStdout": false,
+    "AttachStderr": false,
+    "Tty": false,
+    "OpenStdin": false,
+    "StdinOnce": false,
+    "Env": [
+      "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "LANG=C.UTF-8",
+      "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+      "PYTHON_VERSION=3.12.14",
+      "PYTHON_SHA256=5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c40060668e548a"
+    ],
+    "Cmd": [
+      "python3"
+    ],
+    "Image": "",
+    "Volumes": null,
+    "WorkingDir": "",
+    "Entrypoint": null,
+    "OnBuild": null,
+    "Labels": {
+      "feature-rl.repair": "debian-less-590-2.1~deb12u2-arm64"
+    }
+  },
+  "base_inspect_sha256": "37a9169212b770dd484fd936446ffa1339a61398ca79d1c26ea61df7604420d2",
+  "derived_inspect_sha256": "ab8be1291fd5f735d1bfe97459ffce72f06e66814e49d6d2d2e9a022300d2ea8",
+  "command": [
+    "docker",
+    "build",
+    "--network",
+    "none",
+    "--pull=false",
+    "--platform",
+    "linux/arm64",
+    "--provenance=false",
+    "--iidfile",
+    ".feature-rl/research/M3/production/less-repair/image-id",
+    "--tag",
+    "feature-rl-m3-less:590-2.1-deb12u2",
+    ".feature-rl/research/M3/production/less-repair"
+  ],
+  "exit_status": 0,
+  "cost": {
+    "wall_seconds": 0.367661375,
+    "cpu_seconds": null,
+    "gpu_seconds": 0,
+    "usd": 0,
+    "measurement": "partial"
+  },
+  "base_inspect_id": "sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333",
+  "identity_correction": "Original base_config_id label was inferred incorrectly from Docker inspect Id; renamed base_inspect_id. Derived config ID is independently emitted by build output."
+}

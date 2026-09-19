@@ -1,0 +1,35 @@
+F.F                                                                      [100%]
+=================================== FAILURES ===================================
+________________ test_memory_oom_is_reported_from_kernel_events ________________
+
+engine = <feature_rl.environments.docker.DockerEngine object at 0x10b3af8c0>
+
+    def test_memory_oom_is_reported_from_kernel_events(engine):
+        from feature_rl.environments import CommandSpec
+        with engine.session(binding={'test':'oom-attribution'},saved_source={}) as s:
+            r=s.execute(CommandSpec(argv=('python','-I','-c','a=bytearray(256*1024*1024)'),working_directory='/workspace',timeout_seconds=3.0))
+>           assert r.reason=='memory_limit' and s.memory_oom_events>=1
+E           AssertionError: assert ('exited' == 'memory_limit'
+E             
+E             - memory_limit
+E             + exited)
+
+tests/test_environments_docker.py:210: AssertionError
+_________ test_forbidden_dependency_policy_cannot_allow_manifest_edits _________
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x10b59f620>, PreparedEnvironment(recipe=ArtifactRef(sh...8205acac', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+
+    def test_forbidden_dependency_policy_cannot_allow_manifest_edits(runtime_fixture):
+        from feature_rl.environments import PolicyRejected
+        from feature_rl.contracts import AllowedChanges
+        runtime,prepared=runtime_fixture
+        policy=AllowedChanges(source_roots=('pyproject.toml',),forbidden_paths=(),dependencies='forbidden',dependency_artifacts=(),additional_artifact_types=())
+>       with pytest.raises(PolicyRejected):runtime.open_workspace(prepared,allowed_changes=policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PolicyRejected
+
+tests/test_environments_docker.py:228: Failed
+=========================== short test summary info ============================
+FAILED tests/test_environments_docker.py::test_memory_oom_is_reported_from_kernel_events
+FAILED tests/test_environments_docker.py::test_forbidden_dependency_policy_cannot_allow_manifest_edits
+2 failed, 1 passed, 18 deselected in 4.34s

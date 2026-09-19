@@ -1,0 +1,19 @@
+{
+  "status": 404,
+  "response": "{\"message\":\"Could not find the file /workspace/source in container 9f20d367d97101c7c0ec32f1937ec8f66467705f748d5bdf05bfd42fa49f62eb\"}\n",
+  "operation": {
+    "operation_id": "b03d59a3f65b460aa02bfa7e72c852b1",
+    "owner_token": "8c8c19ab24f9499fa306d6fc232595b8",
+    "daemon_id": "b503a7b6-5a5c-4c1d-adc4-0e80bc8c5610",
+    "container_name": "feature-rl-m3-b03d59a3f65b460aa02bfa7e72c852b1",
+    "container_id": "9f20d367d97101c7c0ec32f1937ec8f66467705f748d5bdf05bfd42fa49f62eb",
+    "phase": "running",
+    "binding": {
+      "purpose": "tmpfs-export-diagnosis"
+    },
+    "saved_source": {},
+    "created_at": "2026-09-19T18:59:52.393311+00:00",
+    "error": null
+  },
+  "cleanup": true
+}

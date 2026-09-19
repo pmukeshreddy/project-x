@@ -1,0 +1,14 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_forged_in_memory_archive_cannot_serialize_unsafe_paths __________
+
+    def test_forged_in_memory_archive_cannot_serialize_unsafe_paths():
+        from feature_rl.environments import SourceArchive,SourceFile,SourceRejected
+>       with pytest.raises(SourceRejected):SourceArchive({'../escape':SourceFile(b'x',False)}).to_tar()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SourceRejected
+
+tests/test_environments.py:97: Failed
+=========================== short test summary info ============================
+FAILED tests/test_environments.py::test_forged_in_memory_archive_cannot_serialize_unsafe_paths
+1 failed, 16 deselected in 0.07s

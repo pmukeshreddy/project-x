@@ -1,0 +1,22 @@
+Package: less
+Version: 590-2.1~deb12u2
+Architecture: arm64
+Maintainer: Milan Kupcevic <milan@debian.org>
+Installed-Size: 424
+Depends: libc6 (>= 2.34), libtinfo6 (>= 6)
+Section: text
+Priority: important
+Multi-Arch: foreign
+Homepage: http://www.greenwoodsoftware.com/less/
+Description: pager program similar to more
+ This package provides "less", a file pager (that is, a memory-efficient
+ utility for displaying text one screenful at a time). Less has many
+ more features than the basic pager "more". As part of the GNU project,
+ it is widely regarded as the standard pager on UNIX-derived systems.
+ .
+ Also provided are "lessecho", a simple utility for ensuring arguments
+ with spaces are correctly quoted; "lesskey", a tool for modifying the
+ standard (vi-like) keybindings; and "lesspipe", a filter for specific
+ types of input, such as .doc or .txt.gz files.
+
+{'sha256': '2dd8d7734f5b43961b1d7243198ffaf1037539b122f2e266fccc9621104ed33b', 'size': 215000}

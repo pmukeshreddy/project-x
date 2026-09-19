@@ -1,0 +1,91 @@
+B-import completed 0 saved unchanged cleanup True
+{"click": "/workspace/site/click/__init__.py", "flit_core": "/workspace/deps/flit_core/__init__.py", "pip_version": "25.0.1", "pytest": "/workspace/deps/pytest/__init__.py", "scratch_present": false, "sys_path": ["/workspace/site", "/workspace/deps", "/usr/local/lib/python312.zip", "/usr/local/lib/python3.12", "/usr/local/lib/python3.12/lib-dynload", "/usr/local/lib/python3.12/site-packages"]}
+ 
+B-regression-1 command_failed 1 saved unchanged cleanup True
+es.py::test_path_type[bytes-a/b/c.txt] PASSED              [ 89%]
+tests/test_types.py::test_path_type[Path-expect3] PASSED                 [ 89%]
+tests/test_types.py::test_path_resolve_symlink PASSED                    [ 89%]
+tests/test_types.py::test_path_surrogates PASSED                         [ 89%]
+tests/test_types.py::test_file_surrogates[type0] PASSED                  [ 90%]
+tests/test_types.py::test_file_surrogates[type1] PASSED                  [ 90%]
+tests/test_types.py::test_file_error_surrogates PASSED                   [ 90%]
+tests/test_types.py::test_invalid_path_with_esc_sequence PASSED          [ 90%]
+tests/test_types.py::test_choice_get_invalid_choice_message PASSED       [ 90%]
+tests/test_utils.py::test_unset_sentinel PASSED                          [ 90%]
+tests/test_utils.py::test_echo PASSED                                    [ 90%]
+tests/test_utils.py::test_echo_custom_file PASSED                        [ 90%]
+tests/test_utils.py::test_echo_no_streams PASSED                         [ 90%]
+tests/test_utils.py::test_styling[styles0-\x1b[30mx y\x1b[0m] PASSED     [ 90%]
+tests/test_utils.py::test_styling[styles1-\x1b[31mx y\x1b[0m] PASSED     [ 90%]
+tests/test_utils.py::test_styling[styles2-\x1b[32mx y\x1b[0m] PASSED     [ 90%]
+tests/test_utils.py::test_styling[styles3-\x1b[33mx y\x1b[0m] PASSED     [ 90%]
+tests/test_utils.py::test_styling[styles4-\x1b[34mx y\x1b[0m] PASSED     [ 90%]
+tests/test_utils.py::test_styling[styles5-\x1b[35mx y\x1b[0m] PASSED     [ 90%]
+tests/test_utils.py::test_styling[styles6-\x1b[36mx y\x1b[0m] PASSED     [ 91%]
+tests/test_utils.py::test_styling[styles7-\x1b[37mx y\x1b[0m] PASSED     [ 91%]
+tests/test_utils.py::test_styling[styles8-\x1b[40mx y\x1b[0m] PASSED     [ 91%]
+tests/test_utils.py::test_styling[styles9-\x1b[41mx y\x1b[0m] PASSED     [ 91%]
+tests/test_utils.py::test_styling[styles10-\x1b[42mx y\x1b[0m] PASSED    [ 91%]
+tests/test_utils.py::test_styling[styles11-\x1b[43mx y\x1b[0m] PASSED    [ 91%]
+tests/test_utils.py::test_styling[styles12-\x1b[44mx y\x1b[0m] PASSED    [ 91%]
+tests/test_utils.py::test_styling[styles13-\x1b[45mx y\x1b[0m] PASSED    [ 91%]
+tests/test_utils.py::test_styling[styles14-\x1b[46mx y\x1b[0m] PASSED    [ 91%]
+tests/test_utils.py::test_styling[styles15-\x1b[47mx y\x1b[0m] PASSED    [ 91%]
+tests/test_utils.py::test_styling[styles16-\x1b[48;5;91mx y\x1b[0m] PASSED [ 91%]
+tests/test_utils.py::test_styling[styles17-\x1b[48;2;135;0;175mx y\x1b[0m] PASSED [ 91%]
+tests/test_utils.py::test_styling[styles18-\x1b[1mx y\x1b[0m] PASSED     [ 91%]
+tests/test_utils.py::test_styling[styles19-\x1b[2mx y\x1b[0m] PASSED     [ 91%]
+tests/test_utils.py::test_styling[styles20-\x1b[4mx y\x1b[0m] PASSED     [ 91%]
+tests/test_utils.py::test_styling[styles21-\x1b[53mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles22-\x1b[3mx y\x1b[0m] PASSED     [ 92%]
+tests/test_utils.py::test_styling[styles23-\x1b[5mx y\x1b[0m] PASSED     [ 92%]
+tests/test_utils.py::test_styling[styles24-\x1b[7mx y\x1b[0m] PASSED     [ 92%]
+tests/test_utils.py::test_styling[styles25-\x1b[9mx y\x1b[0m] PASSED     [ 92%]
+tests/test_utils.py::test_styling[styles26-\x1b[22mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles27-\x1b[22mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles28-\x1b[24mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles29-\x1b[55mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles30-\x1b[23mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles31-\x1b[25mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles32-\x1b[27mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles33-\x1b[29mx y\x1b[0m] PASSED    [ 92%]
+tests/test_utils.py::test_styling[styles34-\x1b[30mx y] PASSED           [ 92%]
+tests/test_utils.py::test_unstyle_other_ansi[\x1b[?25lx y\x1b[?25h-x y] PASSED [ 92%]
+tests/test_utils.py::test_filename_formatting PASSED                     [ 92%]
+tests/test_utils.py::test_prompts PASSED                                 [ 93%]
+tests/test_utils.py::test_confirm_repeat PASSED                          [ 93%]
+tests/test_utils.py::test_prompts_abort PASSED                           [ 93%]
+tests/test_utils.py::test_full_prompt_passed_to_readline[prompt] PASSED  [ 93%]
+tests/test_utils.py::test_full_prompt_passed_to_readline[prompt-hidden] PASSED [ 93%]
+tests/test_utils.py::test_full_prompt_passed_to_readline[prompt-custom-suffix] PASSED [ 93%]
+tests/test_utils.py::test_full_prompt_passed_to_readline[confirm] PASSED [ 93%]
+tests/test_utils.py::test_prompts_eof PASSED                             [ 93%]
+tests/test_utils.py::test_echo_via_pager[test0-cat] PASSED               [ 93%]
+tests/test_utils.py::test_echo_via_pager[test0-cat ] PASSED              [ 93%]
+tests/test_utils.py::test_echo_via_pager[test0- cat ] PASSED             [ 93%]
+tests/test_utils.py::test_echo_via_pager[test0-less] 
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-equal length, no dot]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-sentence < max]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-sentence < max]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-paragraph < max]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-paragraph < max]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-truncate]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-truncate]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-length includes suffix]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-length includes suffix]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-ignore dot in word]
+ERROR tests/test_utils.py::test_make_default_short_help[no-wrap mark-ignore dot in word]
+= 1 failed, 1394 passed, 23 skipped, 30000 deselected, 1 xfailed, 189 errors in 12.74s =
+ Exception ignored in: <_io.FileIO name=14 mode='rb+' closefd=True>
+ResourceWarning: unclosed file <_io.TextIOWrapper name="<_io.FileIO name=14 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>
+
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M3/production/run_click.py", line 57, in <module>
+    r=run('B-regression-1',b,bb,pytest=True);assert r.reason=='completed' and r.exit_code==0 and r.cleanup_verified
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M3/production/run_click.py", line 57, in <module>
+    r=run('B-regression-1',b,bb,pytest=True);assert r.reason=='completed' and r.exit_code==0 and r.cleanup_verified
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

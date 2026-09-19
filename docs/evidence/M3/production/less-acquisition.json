@@ -1,0 +1,181 @@
+{
+  "started_at": "2026-09-19T19:20:09.409631+00:00",
+  "downloads": [
+    {
+      "url": "https://packages.debian.org/bookworm/arm64/less/download",
+      "resolved_url": "https://packages.debian.org/bookworm/arm64/less/download",
+      "status": 200,
+      "bytes": 12793,
+      "sha256": "a0ffef707fb057b9d80feacb7309bb4570f17a71bc6d5046d713d538297d7db7",
+      "utc": "2026-09-19T19:20:09.785184+00:00"
+    },
+    {
+      "url": "https://packages.debian.org/bookworm/arm64/less",
+      "resolved_url": "https://packages.debian.org/bookworm/arm64/less",
+      "status": 200,
+      "bytes": 12506,
+      "sha256": "2e8fe5a2d0b24dd392ecad83dcf0c117978aef2a7c2aa311711ead72e8853947",
+      "utc": "2026-09-19T19:20:10.455859+00:00"
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/l/less/less_590-2.1~deb12u2_arm64.deb",
+      "resolved_url": "https://deb.debian.org/debian/pool/main/l/less/less_590-2.1~deb12u2_arm64.deb",
+      "status": 200,
+      "bytes": 128172,
+      "sha256": "eb430d92921f98b163031ee3ac81a96110d1f20bd84f67faab06dad50c75d744",
+      "utc": "2026-09-19T19:20:10.564577+00:00"
+    }
+  ],
+  "cost": {
+    "usd": 0,
+    "remote_compute": false
+  },
+  "control": "Package: less\nVersion: 590-2.1~deb12u2\nArchitecture: arm64\nMaintainer: Milan Kupcevic <milan@debian.org>\nInstalled-Size: 424\nDepends: libc6 (>= 2.34), libtinfo6 (>= 6)\nSection: text\nPriority: important\nMulti-Arch: foreign\nHomepage: http://www.greenwoodsoftware.com/less/\nDescription: pager program similar to more\n This package provides \"less\", a file pager (that is, a memory-efficient\n utility for displaying text one screenful at a time). Less has many\n more features than the basic pager \"more\". As part of the GNU project,\n it is widely regarded as the standard pager on UNIX-derived systems.\n .\n Also provided are \"lessecho\", a simple utility for ensuring arguments\n with spaces are correctly quoted; \"lesskey\", a tool for modifying the\n standard (vi-like) keybindings; and \"lesspipe\", a filter for specific\n types of input, such as .doc or .txt.gz files.\n",
+  "package_files": [
+    {
+      "path": ".",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/bin",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/bin/less",
+      "size": 215000,
+      "type": "0"
+    },
+    {
+      "path": "./usr/bin/lessecho",
+      "size": 67688,
+      "type": "0"
+    },
+    {
+      "path": "./usr/bin/lesskey",
+      "size": 69104,
+      "type": "0"
+    },
+    {
+      "path": "./usr/bin/lesspipe",
+      "size": 9047,
+      "type": "0"
+    },
+    {
+      "path": "./usr/lib",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/lib/mime",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/lib/mime/packages",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/lib/mime/packages/less",
+      "size": 90,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/share/doc",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/share/doc/less",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/share/doc/less/LESSOPEN",
+      "size": 2117,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/doc/less/NEWS.gz",
+      "size": 11046,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/doc/less/README.Debian",
+      "size": 394,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/doc/less/changelog.Debian.gz",
+      "size": 1598,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/doc/less/copyright",
+      "size": 4579,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/man",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/share/man/man1",
+      "size": 0,
+      "type": "5"
+    },
+    {
+      "path": "./usr/share/man/man1/less.1.gz",
+      "size": 22947,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/man/man1/lessecho.1.gz",
+      "size": 707,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/man/man1/lesskey.1.gz",
+      "size": 3537,
+      "type": "0"
+    },
+    {
+      "path": "./usr/share/man/man1/lesspipe.1.gz",
+      "size": 1926,
+      "type": "0"
+    },
+    {
+      "path": "./usr/bin/lessfile",
+      "size": 0,
+      "type": "2"
+    },
+    {
+      "path": "./usr/share/man/man1/lessfile.1.gz",
+      "size": 0,
+      "type": "2"
+    }
+  ],
+  "less": {
+    "sha256": "2dd8d7734f5b43961b1d7243198ffaf1037539b122f2e266fccc9621104ed33b",
+    "size": 215000
+  },
+  "copyright": {
+    "sha256": "e769e64d04abc3d772e5f397d2848d193c1e2015ff4ca92d7b73dfec8ca791a5",
+    "size": 4579
+  },
+  "dockerfile": "FROM python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333\nCOPY --chmod=0755 less /usr/bin/less\nCOPY --chmod=0644 copyright /usr/share/doc/feature-rl-less/copyright\nLABEL feature-rl.repair=\"debian-less-590-2.1~deb12u2-arm64\"\n",
+  "finished_at": "2026-09-19T19:20:10.585871+00:00"
+}

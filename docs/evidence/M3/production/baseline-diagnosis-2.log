@@ -1,0 +1,564 @@
+{"less": null, "tmp": [4096, 4096, 2048, 2048, 2048, 1003170, 1003169, 1003169, 4110, 255], "workspace": [4096, 4096, 30464, 27642, 27642, 1003170, 1002407, 1002407, 4110, 255]}
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.0.2, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: /tmp/pytest-cache
+rootdir: /workspace/source
+configfile: pyproject.toml
+collecting ... collected 1 item
+
+tests/test_utils.py::test_echo_via_pager[test0-less] 
+
+self = <MultiCapture out=<FDCapture 1 oldfd=11 _state='started' tmpfile=<_io.TextIOWrapper name='<_io.FileIO [closed]>' mode=...io.FileIO name=14 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> in_=None _state='started' _in_suspended=False>
+
+    def readouterr(self) -> CaptureResult[AnyStr]:
+>       out = self.out.snap() if self.out else ""
+              ^^^^^^^^^^^^^^^
+
+../deps/_pytest/capture.py:706: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <FDCapture 1 oldfd=11 _state='started' tmpfile=<_io.TextIOWrapper name='<_io.FileIO [closed]>' mode='r+' encoding='utf-8'>>
+
+    def snap(self) -> str:
+        self._assert_state("snap", ("started", "suspended"))
+>       self.tmpfile.seek(0)
+E       ValueError: I/O operation on closed file.
+
+../deps/_pytest/capture.py:591: ValueError
+
+During handling of the above exception, another exception occurred:
+
+self = <contextlib._GeneratorContextManager object at 0xffffb94930e0>
+typ = <class 'ValueError'>, value = ValueError('I/O operation on closed file.')
+traceback = <traceback object at 0xffffb91ccf80>
+
+    def __exit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+                next(self.gen)
+            except StopIteration:
+                return False
+            else:
+                try:
+                    raise RuntimeError("generator didn't stop")
+                finally:
+                    self.gen.close()
+        else:
+            if value is None:
+                # Need to force instantiation so we can reliably
+                # tell if we get the same exception back
+                value = typ()
+            try:
+>               self.gen.throw(value)
+E               ValueError: I/O operation on closed file.
+
+/usr/local/lib/python3.12/contextlib.py:158: ValueError
+---------------- generated xml file: /workspace/diagnostic.xml -----------------
+=========================== short test summary info ============================
+FAILED tests/test_utils.py::test_echo_via_pager[test0-less] - ValueError: I/O...
+ERROR tests/test_utils.py::test_echo_via_pager[test0-less] - ValueError: I/O ...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 2 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+========================== 1 failed, 1 error in 0.31s ==========================
+JUNIT <?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="1" skipped="0" tests="1" time="0.310" timestamp="2026-09-19T19:18:30.314176+00:00" hostname="bce38face7d4"><testcase classname="tests.test_utils" name="test_echo_via_pager[test0-less]" time="0.010"><failure message="ValueError: I/O operation on closed file.">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0xffffb949b2c0&gt;
+capfd = &lt;_pytest.capture.CaptureFixture object at 0xffffb949b140&gt;
+pager_cmd = 'less'
+test = EchoViaPagerTest(description='Plain string argument', test_input=&lt;function &lt;lambda&gt; at 0xffffb8e639c0&gt;, expected_pager='just text\n', expected_stdout='', expected_stderr='', expected_error=None)
+tmp_path = PosixPath('/tmp/pytest/test_echo_via_pager_test0_less0')
+
+    @pytest.mark.skipif(WIN, reason="Different behavior on windows.")
+    @pytest.mark.parametrize(
+        "pager_cmd", ["cat", "cat ", " cat ", "less", " less", " less "]
+    )
+    @pytest.mark.parametrize(
+        "test",
+        [
+            # We need to pass a parameter function instead of a plain param
+            # as pytest.mark.parametrize will reuse the parameters causing the
+            # generators to be used up so they will not yield anymore
+            EchoViaPagerTest(
+                description="Plain string argument",
+                test_input=lambda: "just text",
+                expected_pager="just text\n",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=None,
+            ),
+            EchoViaPagerTest(
+                description="Iterable argument",
+                test_input=lambda: ["itera", "ble"],
+                expected_pager="iterable\n",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=None,
+            ),
+            EchoViaPagerTest(
+                description="Generator function argument",
+                test_input=lambda: _test_gen_func,
+                expected_pager="abcabc\n",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=None,
+            ),
+            EchoViaPagerTest(
+                description="String generator argument",
+                test_input=lambda: _test_gen_func(),
+                expected_pager="abcabc\n",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=None,
+            ),
+            EchoViaPagerTest(
+                description="Number generator expression argument",
+                test_input=lambda: (c for c in range(6)),
+                expected_pager="012345\n",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=None,
+            ),
+            EchoViaPagerTest(
+                description="Exception in generator function argument",
+                test_input=lambda: _test_gen_func_fails,
+                # Because generator throws early on, the pager did not have
+                # a chance yet to write the file.
+                expected_pager="",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=RuntimeError,
+            ),
+            EchoViaPagerTest(
+                description="Exception in generator argument",
+                test_input=lambda: _test_gen_func_fails,
+                # Because generator throws early on, the pager did not have a
+                # chance yet to write the file.
+                expected_pager="",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=RuntimeError,
+            ),
+            EchoViaPagerTest(
+                description="Keyboard interrupt should not terminate the pager",
+                test_input=lambda: _test_simulate_keyboard_interrupt(),
+                # Due to the keyboard interrupt during pager execution, click program
+                # should abort, but the pager should stay open.
+                # This allows users to cancel the program and search in the pager
+                # output, before they decide to terminate the pager.
+                expected_pager="output_before_keyboard_interrupt",
+                expected_stdout="",
+                expected_stderr="",
+                expected_error=KeyboardInterrupt,
+            ),
+            EchoViaPagerTest(
+                description="Writing to stdout during generator execution",
+                test_input=lambda: _test_gen_func_echo(),
+                expected_pager="testtest\n",
+                expected_stdout="hello\n",
+                expected_stderr="",
+                expected_error=None,
+            ),
+            EchoViaPagerTest(
+                description="Writing to stderr during generator execution",
+                test_input=lambda: _test_gen_func_echo(file=sys.stderr),
+                expected_pager="testtest\n",
+                expected_stdout="",
+                expected_stderr="hello\n",
+                expected_error=None,
+            ),
+        ],
+    )
+    def test_echo_via_pager(monkeypatch, capfd, pager_cmd, test, tmp_path):
+        monkeypatch.setitem(os.environ, "PAGER", pager_cmd)
+        monkeypatch.setattr(click._termui_impl, "isatty", lambda x: True)
+    
+        test_input = test.test_input()
+        expected_pager = test.expected_pager
+        expected_stdout = test.expected_stdout
+        expected_stderr = test.expected_stderr
+        expected_error = test.expected_error
+    
+        check_raise = pytest.raises(expected_error) if expected_error else nullcontext()
+    
+        pager_out_tmp = tmp_path / "pager_out.txt"
+        with pager_out_tmp.open("w") as f:
+            force_subprocess_stdout = patch.object(
+                subprocess,
+                "Popen",
+                partial(subprocess.Popen, stdout=f),
+            )
+            with force_subprocess_stdout:
+                with check_raise:
+                    click.echo_via_pager(test_input)
+    
+&gt;       out, err = capfd.readouterr()
+                   ^^^^^^^^^^^^^^^^^^
+
+tests/test_utils.py:434: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_pytest.capture.CaptureFixture object at 0xffffb949b140&gt;
+
+    def readouterr(self) -&gt; CaptureResult[AnyStr]:
+        """Read and return the captured output so far, resetting the internal
+        buffer.
+    
+        :returns:
+            The captured content as a namedtuple with ``out`` and ``err``
+            string attributes.
+        """
+        captured_out, captured_err = self._captured_out, self._captured_err
+        if self._capture is not None:
+&gt;           out, err = self._capture.readouterr()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../deps/_pytest/capture.py:963: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;MultiCapture out=&lt;FDCapture 1 oldfd=11 _state='started' tmpfile=&lt;_io.TextIOWrapper name='&lt;_io.FileIO [closed]&gt;' mode=...io.FileIO name=14 mode='rb+' closefd=True&gt;" mode='r+' encoding='utf-8'&gt;&gt; in_=None _state='started' _in_suspended=False&gt;
+
+    def readouterr(self) -&gt; CaptureResult[AnyStr]:
+&gt;       out = self.out.snap() if self.out else ""
+              ^^^^^^^^^^^^^^^
+
+../deps/_pytest/capture.py:706: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;FDCapture 1 oldfd=11 _state='started' tmpfile=&lt;_io.TextIOWrapper name='&lt;_io.FileIO [closed]&gt;' mode='r+' encoding='utf-8'&gt;&gt;
+
+    def snap(self) -&gt; str:
+        self._assert_state("snap", ("started", "suspended"))
+&gt;       self.tmpfile.seek(0)
+E       ValueError: I/O operation on closed file.
+
+../deps/_pytest/capture.py:591: ValueError
+
+During handling of the above exception, another exception occurred:
+
+self = &lt;contextlib._GeneratorContextManager object at 0xffffb94930e0&gt;
+typ = &lt;class 'ValueError'&gt;, value = ValueError('I/O operation on closed file.')
+traceback = &lt;traceback object at 0xffffb91ccf80&gt;
+
+    def __exit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+                next(self.gen)
+            except StopIteration:
+                return False
+            else:
+                try:
+                    raise RuntimeError("generator didn't stop")
+                finally:
+                    self.gen.close()
+        else:
+            if value is None:
+                # Need to force instantiation so we can reliably
+                # tell if we get the same exception back
+                value = typ()
+            try:
+&gt;               self.gen.throw(value)
+E               ValueError: I/O operation on closed file.
+
+/usr/local/lib/python3.12/contextlib.py:158: ValueError</failure></testcase><testcase classname="tests.test_utils" name="test_echo_via_pager[test0-less]" time="0.000"><error message="failed on teardown with &quot;ValueError: I/O operation on closed file.&quot;">self = &lt;CaptureManager _method='fd' _global_capturing=&lt;MultiCapture out=&lt;FDCapture 1 oldfd=5 _state='started' tmpfile=&lt;_io.Te...-8'&gt;&gt; _state='started' _in_suspended=False&gt; _capture_fixture=&lt;_pytest.capture.CaptureFixture object at 0xffffb949b140&gt;&gt;
+when = 'teardown', item = &lt;Function test_echo_via_pager[test0-less]&gt;
+
+    @contextlib.contextmanager
+    def item_capture(self, when: str, item: Item) -&gt; Generator[None]:
+        self.resume_global_capture()
+        self.activate_fixture()
+        try:
+&gt;           yield
+
+../deps/_pytest/capture.py:862: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;CaptureManager _method='fd' _global_capturing=&lt;MultiCapture out=&lt;FDCapture 1 oldfd=5 _state='started' tmpfile=&lt;_io.Te...-8'&gt;&gt; _state='started' _in_suspended=False&gt; _capture_fixture=&lt;_pytest.capture.CaptureFixture object at 0xffffb949b140&gt;&gt;
+item = &lt;Function test_echo_via_pager[test0-less]&gt;
+
+    @hookimpl(wrapper=True)
+    def pytest_runtest_teardown(self, item: Item) -&gt; Generator[None]:
+        with self.item_capture("teardown", item):
+&gt;           return (yield)
+                    ^^^^^
+
+../deps/_pytest/capture.py:905: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+item = &lt;Function test_echo_via_pager[test0-less]&gt;, nextitem = None
+
+    def pytest_runtest_teardown(item: Item, nextitem: Item | None) -&gt; None:
+        _update_current_test_var(item, "teardown")
+&gt;       item.session._setupstate.teardown_exact(nextitem)
+
+../deps/_pytest/runner.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_pytest.runner.SetupState object at 0xffffba5f7800&gt;, nextitem = None
+
+    def teardown_exact(self, nextitem: Item | None) -&gt; None:
+        """Teardown the current stack up until reaching nodes that nextitem
+        also descends from.
+    
+        When nextitem is None (meaning we're at the last item), the entire
+        stack is torn down.
+        """
+        needed_collectors = (nextitem and nextitem.listchain()) or []
+        exceptions: list[BaseException] = []
+        while self.stack:
+            if list(self.stack.keys()) == needed_collectors[: len(self.stack)]:
+                break
+            node, (finalizers, _) = self.stack.popitem()
+            these_exceptions = []
+            while finalizers:
+                fin = finalizers.pop()
+                try:
+                    fin()
+                except TEST_OUTCOME as e:
+                    these_exceptions.append(e)
+    
+            if len(these_exceptions) == 1:
+                exceptions.extend(these_exceptions)
+            elif these_exceptions:
+                msg = f"errors while tearing down {node!r}"
+                exceptions.append(BaseExceptionGroup(msg, these_exceptions[::-1]))
+    
+        if len(exceptions) == 1:
+&gt;           raise exceptions[0]
+
+../deps/_pytest/runner.py:566: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_pytest.runner.SetupState object at 0xffffba5f7800&gt;, nextitem = None
+
+    def teardown_exact(self, nextitem: Item | None) -&gt; None:
+        """Teardown the current stack up until reaching nodes that nextitem
+        also descends from.
+    
+        When nextitem is None (meaning we're at the last item), the entire
+        stack is torn down.
+        """
+        needed_collectors = (nextitem and nextitem.listchain()) or []
+        exceptions: list[BaseException] = []
+        while self.stack:
+            if list(self.stack.keys()) == needed_collectors[: len(self.stack)]:
+                break
+            node, (finalizers, _) = self.stack.popitem()
+            these_exceptions = []
+            while finalizers:
+                fin = finalizers.pop()
+                try:
+&gt;                   fin()
+
+../deps/_pytest/runner.py:555: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;FixtureDef argname='capfd' scope='function' baseid=''&gt;
+request = &lt;SubRequest 'capfd' for &lt;Function test_echo_via_pager[test0-less]&gt;&gt;
+
+    def finish(self, request: SubRequest) -&gt; None:
+        exceptions: list[BaseException] = []
+        while self._finalizers:
+            fin = self._finalizers.pop()
+            try:
+                fin()
+            except BaseException as e:
+                exceptions.append(e)
+        node = request.node
+        node.ihook.pytest_fixture_post_finalizer(fixturedef=self, request=request)
+        # Even if finalization fails, we invalidate the cached fixture
+        # value and remove all finalizers because they may be bound methods
+        # which will keep instances alive.
+        self.cached_result = None
+        self._finalizers.clear()
+        if len(exceptions) == 1:
+&gt;           raise exceptions[0]
+
+../deps/_pytest/fixtures.py:1053: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;FixtureDef argname='capfd' scope='function' baseid=''&gt;
+request = &lt;SubRequest 'capfd' for &lt;Function test_echo_via_pager[test0-less]&gt;&gt;
+
+    def finish(self, request: SubRequest) -&gt; None:
+        exceptions: list[BaseException] = []
+        while self._finalizers:
+            fin = self._finalizers.pop()
+            try:
+&gt;               fin()
+
+../deps/_pytest/fixtures.py:1042: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+fixturefunc = &lt;function capfd at 0xffffb989f1a0&gt;
+it = &lt;generator object capfd at 0xffffb8eab300&gt;
+
+    def _teardown_yield_fixture(fixturefunc, it) -&gt; None:
+        """Execute the teardown of a fixture function by advancing the iterator
+        after the yield and ensure the iteration ends (if not it means there is
+        more than one yield in the function)."""
+        try:
+&gt;           next(it)
+
+../deps/_pytest/fixtures.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+request = &lt;SubRequest 'capfd' for &lt;Function test_echo_via_pager[test0-less]&gt;&gt;
+
+    @fixture
+    def capfd(request: SubRequest) -&gt; Generator[CaptureFixture[str]]:
+        r"""Enable text capturing of writes to file descriptors ``1`` and ``2``.
+    
+        The captured output is made available via ``capfd.readouterr()`` method
+        calls, which return a ``(out, err)`` namedtuple.
+        ``out`` and ``err`` will be ``text`` objects.
+    
+        Returns an instance of :class:`CaptureFixture[str] &lt;pytest.CaptureFixture&gt;`.
+    
+        Example:
+    
+        .. code-block:: python
+    
+            def test_system_echo(capfd):
+                os.system('echo "hello"')
+                captured = capfd.readouterr()
+                assert captured.out == "hello\n"
+        """
+        capman: CaptureManager = request.config.pluginmanager.getplugin("capturemanager")
+        capture_fixture = CaptureFixture(FDCapture, request, _ispytest=True)
+        capman.set_fixture(capture_fixture)
+        capture_fixture._start()
+        yield capture_fixture
+&gt;       capture_fixture.close()
+
+../deps/_pytest/capture.py:1114: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;_pytest.capture.CaptureFixture object at 0xffffb949b140&gt;
+
+    def close(self) -&gt; None:
+        if self._capture is not None:
+&gt;           out, err = self._capture.pop_outerr_to_orig()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../deps/_pytest/capture.py:947: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;MultiCapture out=&lt;FDCapture 1 oldfd=11 _state='started' tmpfile=&lt;_io.TextIOWrapper name='&lt;_io.FileIO [closed]&gt;' mode=...io.FileIO name=14 mode='rb+' closefd=True&gt;" mode='r+' encoding='utf-8'&gt;&gt; in_=None _state='started' _in_suspended=False&gt;
+
+    def pop_outerr_to_orig(self) -&gt; tuple[AnyStr, AnyStr]:
+        """Pop current snapshot out/err capture and flush to orig streams."""
+&gt;       out, err = self.readouterr()
+                   ^^^^^^^^^^^^^^^^^
+
+../deps/_pytest/capture.py:659: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;MultiCapture out=&lt;FDCapture 1 oldfd=11 _state='started' tmpfile=&lt;_io.TextIOWrapper name='&lt;_io.FileIO [closed]&gt;' mode=...io.FileIO name=14 mode='rb+' closefd=True&gt;" mode='r+' encoding='utf-8'&gt;&gt; in_=None _state='started' _in_suspended=False&gt;
+
+    def readouterr(self) -&gt; CaptureResult[AnyStr]:
+&gt;       out = self.out.snap() if self.out else ""
+              ^^^^^^^^^^^^^^^
+
+../deps/_pytest/capture.py:706: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;FDCapture 1 oldfd=11 _state='started' tmpfile=&lt;_io.TextIOWrapper name='&lt;_io.FileIO [closed]&gt;' mode='r+' encoding='utf-8'&gt;&gt;
+
+    def snap(self) -&gt; str:
+        self._assert_state("snap", ("started", "suspended"))
+&gt;       self.tmpfile.seek(0)
+E       ValueError: I/O operation on closed file.
+
+../deps/_pytest/capture.py:591: ValueError
+
+During handling of the above exception, another exception occurred:
+
+self = &lt;contextlib._GeneratorContextManager object at 0xffffb9498560&gt;
+typ = &lt;class 'ValueError'&gt;, value = ValueError('I/O operation on closed file.')
+traceback = &lt;traceback object at 0xffffb8eeb300&gt;
+
+    def __exit__(self, typ, value, traceback):
+        if typ is None:
+            try:
+                next(self.gen)
+            except StopIteration:
+                return False
+            else:
+                try:
+                    raise RuntimeError("generator didn't stop")
+                finally:
+                    self.gen.close()
+        else:
+            if value is None:
+                # Need to force instantiation so we can reliably
+                # tell if we get the same exception back
+                value = typ()
+            try:
+&gt;               self.gen.throw(value)
+E               ValueError: I/O operation on closed file.
+
+/usr/local/lib/python3.12/contextlib.py:158: ValueError</error></testcase></testsuite></testsuites>
+RESOURCE [4096, 4096, 2048, 2043, 2043, 1003170, 1003157, 1003157, 4110, 255] low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+oom_group_kill 0
+
+
+Traceback (most recent call last):
+  File "/workspace/source/tests/test_utils.py", line 432, in test_echo_via_pager
+    click.echo_via_pager(test_input)
+ResourceWarning: unclosed file <_io.TextIOWrapper name=12 encoding='utf-8'>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/workspace/deps/pytest/__main__.py", line 9, in <module>
+    raise SystemExit(pytest.console_main())
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/deps/_pytest/config/__init__.py", line 223, in console_main
+    code = main()
+           ^^^^^^
+  File "/workspace/deps/_pytest/config/__init__.py", line 199, in main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/deps/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/deps/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/deps/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/workspace/deps/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/deps/_pytest/main.py", line 365, in pytest_cmdline_main
+    return wrap_session(config, _main)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/deps/_pytest/main.py", line 360, in wrap_session
+    config._ensure_unconfigure()
+  File "/workspace/deps/_pytest/config/__init__.py", line 1171, in _ensure_unconfigure
+    self._cleanup_stack.close()
+  File "/usr/local/lib/python3.12/contextlib.py", line 618, in close
+    self.__exit__(None, None, None)
+  File "/usr/local/lib/python3.12/contextlib.py", line 610, in __exit__
+    raise exc_details[1]
+  File "/usr/local/lib/python3.12/contextlib.py", line 595, in __exit__
+    if cb(*exc_details):
+       ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/contextlib.py", line 478, in _exit_wrapper
+    callback(*args, **kwds)
+  File "/workspace/deps/_pytest/unraisableexception.py", line 95, in cleanup
+    collect_unraisable(config)
+  File "/workspace/deps/_pytest/unraisableexception.py", line 79, in collect_unraisable
+    raise errors[0]
+  File "/workspace/deps/_pytest/unraisableexception.py", line 67, in collect_unraisable
+    warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+pytest.PytestUnraisableExceptionWarning: Exception ignored in: <_io.FileIO name=12 mode='rb+' closefd=True>
+Enable tracemalloc to get traceback where the object was allocated.
+See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+Exception ignored in: <_io.FileIO name=14 mode='rb+' closefd=True>
+ResourceWarning: unclosed file <_io.TextIOWrapper name="<_io.FileIO name=14 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>
+
+command_failed True

@@ -1,0 +1,35 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_____ test_saved_workspace_roundtrip_and_reset_keep_exact_source_identity ______
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x10b40a900>, PreparedEnvironment(recipe=ArtifactRef(sh...1b923544', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+
+    def test_saved_workspace_roundtrip_and_reset_keep_exact_source_identity(runtime_fixture):
+        runtime,prepared=runtime_fixture
+        handle=runtime.open_workspace(prepared)
+>       value,actual,recipe,saved,source=runtime.workspace(handle)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environments_docker.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.environments.runtime.EnvironmentRuntime object at 0x10b40a900>
+handle = WorkspaceHandle(workspace_id='aff8f262c42d4c44bf7ba6c2352249ca')
+
+    def workspace(self,handle):
+        handle=WorkspaceHandle.model_validate(handle);value=self.engine.state.read('workspace-'+handle.workspace_id+'.json')
+        if value['workspace_id']!=handle.workspace_id or value['closed']:raise PolicyRejected('workspace is closed/mismatched')
+>       prepared=PreparedEnvironment.model_validate(value['prepared']);recipe=self.recipe(prepared)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 2 validation errors for PreparedEnvironment
+E       recipe.visibility
+E         Input should be an instance of Visibility [type=is_instance_of, input_value='authoring', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/is_instance_of
+E       policy.visibility
+E         Input should be an instance of Visibility [type=is_instance_of, input_value='authoring', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/is_instance_of
+
+src/feature_rl/environments/runtime.py:130: ValidationError
+=========================== short test summary info ============================
+FAILED tests/test_environments_docker.py::test_saved_workspace_roundtrip_and_reset_keep_exact_source_identity
+1 failed, 1 passed, 6 deselected in 2.62s

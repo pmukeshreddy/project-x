@@ -1,0 +1,59 @@
+............F.F                                                          [100%]
+=================================== FAILURES ===================================
+_________ test_admitted_long_paths_survive_canonical_archive_roundtrip _________
+
+    def test_admitted_long_paths_survive_canonical_archive_roundtrip():
+        from feature_rl.environments import SourceArchive,SandboxPolicy
+        name='src/'+'x'*180+'.py'
+        result=SourceArchive.read(archive([(name,b'valid','file')]),SandboxPolicy())
+>       assert SourceArchive.read(result.to_tar(),SandboxPolicy()).files[name].data==b'valid'
+                                  ^^^^^^^^^^^^^^^
+
+tests/test_environments.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/environments/archive.py:66: in to_tar
+    tar.addfile(item,io.BytesIO(entry.data))
+/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/tarfile.py:2286: in addfile
+    buf = tarinfo.tobuf(self.format, self.encoding, self.errors)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/tarfile.py:1032: in tobuf
+    return self.create_ustar_header(info, encoding, errors)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/tarfile.py:1049: in create_ustar_header
+    info["prefix"], info["name"] = self._posix_split_name(info["name"], encoding, errors)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <TarInfo 'src/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.py' at 0x106f79f00>
+name = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.py'
+encoding = 'utf-8', errors = 'surrogateescape'
+
+    def _posix_split_name(self, name, encoding, errors):
+        """Split a name longer than 100 chars into a prefix
+           and a name part.
+        """
+        components = name.split("/")
+        for i in range(1, len(components)):
+            prefix = "/".join(components[:i])
+            name = "/".join(components[i:])
+            if len(prefix.encode(encoding, errors)) <= LENGTH_PREFIX and \
+                    len(name.encode(encoding, errors)) <= LENGTH_NAME:
+                break
+        else:
+>           raise ValueError("name is too long")
+E           ValueError: name is too long
+
+/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/tarfile.py:1143: ValueError
+_______ test_runtime_refuses_unqualified_engine_before_source_execution ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1117/test_runtime_refuses_unqualifi0')
+
+    def test_runtime_refuses_unqualified_engine_before_source_execution(tmp_path):
+>       from feature_rl.environments import EnvironmentRuntime,PolicyRejected
+E       ImportError: cannot import name 'EnvironmentRuntime' from 'feature_rl.environments' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/environments/__init__.py)
+
+tests/test_environments.py:73: ImportError
+=========================== short test summary info ============================
+FAILED tests/test_environments.py::test_admitted_long_paths_survive_canonical_archive_roundtrip
+FAILED tests/test_environments.py::test_runtime_refuses_unqualified_engine_before_source_execution
+2 failed, 13 passed in 0.11s

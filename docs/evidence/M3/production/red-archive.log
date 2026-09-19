@@ -1,0 +1,156 @@
+FFFFFFFFFFFF                                                             [100%]
+=================================== FAILURES ===================================
+_____________ test_archive_canonicalizes_data_without_executing_it _____________
+
+    def test_archive_canonicalizes_data_without_executing_it():
+>       from feature_rl.environments import SourceArchive, SandboxPolicy
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:21: ImportError
+_______ test_archive_rejects_escape_links_and_history[../outside-file-x] _______
+
+name = '../outside', kind = 'file', data = b'x'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+______ test_archive_rejects_escape_links_and_history[/etc/passwd-file-x] _______
+
+name = '/etc/passwd', kind = 'file', data = b'x'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+______ test_archive_rejects_escape_links_and_history[src/../../x-file-x] _______
+
+name = 'src/../../x', kind = 'file', data = b'x'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+______ test_archive_rejects_escape_links_and_history[src\\escape-file-x] _______
+
+name = 'src\\escape', kind = 'file', data = b'x'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+______ test_archive_rejects_escape_links_and_history[.git/config-file-x] _______
+
+name = '.git/config', kind = 'file', data = b'x'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+_ test_archive_rejects_escape_links_and_history[src/__pycache__/a.pyc-file-x] __
+
+name = 'src/__pycache__/a.pyc', kind = 'file', data = b'x'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+_ test_archive_rejects_escape_links_and_history[src/link-symlink-/etc/passwd] __
+
+name = 'src/link', kind = 'symlink', data = b'/etc/passwd'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+__ test_archive_rejects_escape_links_and_history[src/link-hardlink-src/a.py] ___
+
+name = 'src/link', kind = 'hardlink', data = b'src/a.py'
+
+    @pytest.mark.parametrize('name,kind,data',[
+        ('../outside','file',b'x'),('/etc/passwd','file',b'x'),('src/../../x','file',b'x'),
+        ('src\\escape','file',b'x'),('.git/config','file',b'x'),('src/__pycache__/a.pyc','file',b'x'),
+        ('src/link','symlink',b'/etc/passwd'),('src/link','hardlink',b'src/a.py'),
+    ])
+    def test_archive_rejects_escape_links_and_history(name,kind,data):
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:34: ImportError
+___________ test_archive_rejects_duplicate_paths_and_expanded_limit ____________
+
+    def test_archive_rejects_duplicate_paths_and_expanded_limit():
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:39: ImportError
+_____ test_saved_source_cannot_modify_build_manifest_outside_allowed_roots _____
+
+    def test_saved_source_cannot_modify_build_manifest_outside_allowed_roots():
+>       from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
+E       ImportError: cannot import name 'SourceArchive' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:45: ImportError
+______________ test_policy_rejects_nonfinite_and_unbounded_inputs ______________
+
+    def test_policy_rejects_nonfinite_and_unbounded_inputs():
+>       from feature_rl.environments import SandboxPolicy
+E       ImportError: cannot import name 'SandboxPolicy' from 'feature_rl.environments' (unknown location)
+
+tests/test_environments.py:54: ImportError
+=========================== short test summary info ============================
+FAILED tests/test_environments.py::test_archive_canonicalizes_data_without_executing_it
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[../outside-file-x]
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[/etc/passwd-file-x]
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[src/../../x-file-x]
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[src\\escape-file-x]
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[.git/config-file-x]
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[src/__pycache__/a.pyc-file-x]
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[src/link-symlink-/etc/passwd]
+FAILED tests/test_environments.py::test_archive_rejects_escape_links_and_history[src/link-hardlink-src/a.py]
+FAILED tests/test_environments.py::test_archive_rejects_duplicate_paths_and_expanded_limit
+FAILED tests/test_environments.py::test_saved_source_cannot_modify_build_manifest_outside_allowed_roots
+FAILED tests/test_environments.py::test_policy_rejects_nonfinite_and_unbounded_inputs
+12 failed in 0.02s

@@ -1,0 +1,14 @@
+{
+  "ID": "b503a7b6-5a5c-4c1d-adc4-0e80bc8c5610",
+  "ServerVersion": "27.4.0",
+  "Architecture": "aarch64",
+  "NCPU": 10,
+  "MemTotal": 8217968640,
+  "SecurityOptions": [
+    "name=seccomp,profile=unconfined",
+    "name=cgroupns"
+  ],
+  "Driver": "overlayfs",
+  "utc": "2026-09-19T18:51:27.899562+00:00",
+  "host_disk_free_bytes": 22386868224
+}
