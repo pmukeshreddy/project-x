@@ -1,0 +1,83 @@
+{
+  "scope": "coordinator current-source provider and bounded-read integration; synthetic nontraining native invocation",
+  "recorded_at": "2026-09-19T18:49:24.671413+00:00",
+  "coordinator_revision": "999d1af5f3295b94a9fb81450b9e203aa5b2ab16",
+  "generation_product_revision": "e14f67983db678813afcfeb191532e691b0b20e3",
+  "artifact_product_revision": "bf065ec738f29f13cf0cc783b53353adcbe6fab8",
+  "full_suite": {
+    "passed_tests": 299,
+    "exit_status": 0,
+    "pytest_seconds": 17.09,
+    "command_wall_seconds": 17.27993041696027
+  },
+  "native": {
+    "passed_checks": 25,
+    "worker_calls": 1,
+    "input_tokens": 450,
+    "output_tokens": 92,
+    "finish_reason": "stop",
+    "cost": {
+      "category": "authoring",
+      "cpu_seconds": 3.920883,
+      "gpu_seconds": null,
+      "human_minutes": null,
+      "input_tokens": 450,
+      "measurement": "partial",
+      "note": "Local execution: wall/CPU and validated observed token counts are measured when present; GPU time, energy, human time and currency cost are unknown. No remote API was used.",
+      "output_tokens": 92,
+      "usd": null,
+      "wall_seconds": 6.399907249957323
+    },
+    "maximum_sampled_footprint_bytes": 3139029728,
+    "maximum_reported_lifetime_footprint_bytes": 3173337824,
+    "memory_samples": 263,
+    "cleanup_verified": true,
+    "attempt_id": "gen-a5be08de86c54c448bb4b99de159b88b",
+    "attempt_ref": {
+      "encoding": "bytes",
+      "kind": "generation-attempt",
+      "schema_version": 1,
+      "sha256": "831584f511721fb51fdaa8b3dcb2fb351328cdc18cf4a25c4ebba5a886c4a2b2",
+      "visibility": "authoring"
+    },
+    "all_archive_count": 11,
+    "claim_consumed": true,
+    "nontraining": true
+  },
+  "bindings": {
+    "docs/evidence/M2/coordinator-provider-gate.json": {
+      "bytes": 2976,
+      "sha256": "42219b8d6e2ba522e3ee892e68b44b1e78ab75d8f18e6443bb9e5b6604e12722"
+    },
+    "docs/evidence/M2/coordinator-provider-gate-full-tests.stdout": {
+      "bytes": 421,
+      "sha256": "1254e39563b292d73a275f48d2fa0323bfea7bf9270023326a4f66db1fae5db8"
+    },
+    "docs/evidence/M2/coordinator-provider-gate-full-tests.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "docs/evidence/M2/coordinator-provider-gate-native.stdout": {
+      "bytes": 123234,
+      "sha256": "9b86b0c8df517a5abfb4ff66bb8e32624a01dea2bdffe94abcb7d4de290d9261"
+    },
+    "docs/evidence/M2/coordinator-provider-gate-native.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "src/feature_rl/artifacts/__init__.py": {
+      "bytes": 372,
+      "sha256": "48d4ae3705e12efa11cdce3d9844679060b6c617500592c15e74f13a7e0878cf"
+    },
+    "src/feature_rl/artifacts/store.py": {
+      "bytes": 14254,
+      "sha256": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c"
+    }
+  },
+  "limitations": [
+    "Exactly one current-version native smoke, no retry; previous receipts preserved.",
+    "Actual usage450/92 is within declared2048/128 budgets; larger envelopes remain unqualified.",
+    "Memory sampling permits transient overshoot; no exact5GiB peak bound claimed.",
+    "No actual feature contract/runtime/checker/reward, solver episode or training result follows."
+  ]
+}

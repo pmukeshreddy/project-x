@@ -87,14 +87,14 @@ These are instance methods on configured services, not globals with hidden state
 
 ### Task 3: M2 configured provider slice
 
-- [x] Implement a real explicitly configured provider with pinned model/prompt/options, request/response/cost archive, strict structured output and bounded failures. Reviewed provider producte14f679; current native integration still pending below.
-- [ ] Test malformed output, missing provenance, response truncation, configuration absence and budget exhaustion; real provider smoke only when configured and authorized.
+- [x] Implement a real explicitly configured provider with pinned model/prompt/options, request/response/cost archive, strict structured output and bounded failures. Reviewed provider producte14f679; current native integration passed; see docs/progress.md.
+- [x] Test malformed output, provenance, truncation, configuration and budgets; reviewed/integrated299-test suite plus one protocolv3 native smoke450/92tokens,25checks PASS. Larger envelopes unqualified.
 - [x] Publish provider interfaces for M3; discovery remains Task5 and M2 partial.
-- [x] Independent provider code review: round5 specification/quality PASS; root current-source full/native gate remains pending.
+- [x] Independent provider code review: round5 specification/quality PASS; root current-source full/native gate passed (299tests/one450-input92-output native call).
 
 ### Task 4: M3 construction and lifecycle
 
-- [ ] Integrate M0 bounded artifact-read extension identified by the M3 production-interface handoff, after independent review; enforce explicit envelope, decoded and aggregate staging caps through the public store API.
+- [x] Review/integrate M0 bounded artifact-read extension bf065ec; M3 must now consume explicit envelope/decoded caps and enforce aggregate staging limits in its product.
 - [ ] Implement pinned Docker recipes and controlled dependency acquisition; refuse unpinned images/artifacts. Historical build hooks execute inside disposable workers.
 - [ ] Implement actual isolated build/run/reset with PID/network/filesystem/resource boundaries, bounded output, deadlines, process cleanup, imported-package location and service readiness evidence.
 - [ ] Test host denial and malformed recipes; execute baseline health, timeout cleanup, network enforcement and fresh/interrupted reset checks through Docker if available. A missing daemon blocks these gates, never selects host execution.

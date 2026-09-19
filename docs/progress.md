@@ -14,7 +14,7 @@ Workspace `/Users/mukeshreddypochamreddy/Desktop/project x`, branch `implementat
 
 Skills already applied/read: using-superpowers, brainstorming (approved supplied spec), writing-plans, worktrees, subagent-driven-development, TDD, requesting/receiving review, systematic-debugging, verification-before-completion, openai-docs. User's continuous execution and same-owner requirements take priority over skill approval/escalation suggestions. Current replacement M2 owner uses sol/high under skill model-selection guidance. No goal-tool goal was created. Tool execution must omit sandbox_permissions; approval policy never. Keep commentary current, waits no more than60s. Collaboration tools are direct calls.
 
-Project checks: `PYTHONPATH=src .venv/bin/python -m pytest -q`. CPython3.13.7/macOS26.3/AppleM4 arm64/16GiB. Mac hides editable .pth; explicit PYTHONPATH required, normal built-wheel import independently verified. Package Python>=3.11. Current owner234 tests are not a fresh root suite; root's last full suite was155 at M1 integration.
+Project checks: `PYTHONPATH=src .venv/bin/python -m pytest -q`. CPython3.13.7/macOS26.3/AppleM4 arm64/16GiB. Mac hides editable .pth; explicit PYTHONPATH required, normal built-wheel import independently verified. Package Python>=3.11. Latest root full suite:299passed in17.09s at2026-09-19T18:47UTC, current reviewed M0/M2 integration.
 
 Historical/candidate/generated source, adapters and build hooks execute only inside M3 Docker workers. Controller/host never imports them. Initial model draft gets request+B/public evidence only; freeze before privileged H review. No learner H/private cases/histories/future Git/solution caches. Ordinary limits grade saved source; candidate failure may be valid0, infra/corrupt trajectory null/nontraining. Human attestation cannot be supplied by an agent. Max2 repairs/stage and4/candidate; engineering provider fixes are not candidate attempts (none yet).
 
@@ -24,8 +24,8 @@ Historical/candidate/generated source, adapters and build hooks execute only ins
 | --- | --- | --- |
 | M0 | `/root/m0_contracts` | Bounded reads bf065ec independentlyPASS; root integration/M3 adoption next |
 | M1 | `/root/m1_sources` | Reviewed/integrated reconstruction scope; Click task provisional |
-| M2 | `/root/m2_authoring_recovery` | Provider e14f679 independent round5 PASS; root suite/native pending, authoring later |
-| M3 | `/root/m3_runtime` | Preparation reviewed; production interface handoff complete; waits M2 + M0 bounded reads |
+| M2 | `/root/m2_authoring_recovery` | Provider e14f679 reviewed/integrated with current native check; authoring/scenarios pending M3 |
+| M3 | `/root/m3_runtime` | Production runtime authorized next; provider and bounded-read gates cleared |
 | M4 | Unassigned (`m4_grading` planned) | Brief ready; no product |
 | M5 | `/root/m5_qualification` | Signature mechanism preflight only; no product |
 | M6 | `/root/m6_factory` | Durability preflight only; no product |
@@ -33,6 +33,12 @@ Historical/candidate/generated source, adapters and build hooks execute only ins
 | M8 | `/root/m8_evaluation` | External-corpus metadata audit only; no evaluation product |
 
 Reviews: M0 slices PASS (`review_m0`), M1 round2 PASS (`review_m1`), M3 preparation PASS (`review_m3_preparation`); future product slices require their own independent verdicts. Current reviewer `/root/review_m2_provider` FINAL round4 FAIL. Dormant-agent send_message can produce pending_init/thread-limit occupancy; recover through a bounded availability followup asking FINAL, as already done for M3. Do not simulate delegation or repeatedly spawn at capacity.
+
+## Current checkpoint — M3 production handoff
+
+**Provider and bounded-read integration PASSED.** Root ran the prepared wrapper once at integrationHEAD999d1af5f3295b94a9fb81450b9e203aa5b2ab16. Fresh299tests passed17.09s (outer17.280s), then exactlyone current-source native call exit0 at2026-09-19T18:47:36.503399UTC.25/25 native checks, actual450input/92emitted inclEOS, nonceC3-0abee75a/BLUE/tuple preserved,11archives resolved, source binding/HOME/cache/process cleanup verified. Provider wall6.399907s/CPU3.920883s,263memorysamples,maxsample3139029728B/reportedlifetime3173337824B; unknownGPU/money/human remainnull, greedy/nontraining. No model/native retries. Both claim files now exist permanently and the one coordinator budget is USED. DO NOT rerun the wrapper or native claim. `docs/evidence/M2/coordinator-provider-gate.json`, separate stdout/stderr and compact `coordinator-provider-integration.json` bind results, reviews and exact M2e14f679/M0bf065ec source. Previous pending-native statements below are historical and superseded. Actual usage is450/92 within2048/128 declared caps; larger envelopes remain unqualified and sampled-memory limitation remains.
+
+Next: dispatch actual M3 to existingowner `/root/m3_runtime`, read `docs/briefs/M3.md`, preparation review and production-interface handoff. Require real implementation, hardened trusted-probe gate before historical execution, then actual Bhealth/Himports/fresh/reset/source-export evidence. M0 exact bounded read APIs are reviewed and available. No more M2 provider repair work; same M2 owner resumes real authoring only after reviewed actual M3. No actual feature/solver/training result exists yet.
 
 ## Active M2 handoff and next coordinator gate
 

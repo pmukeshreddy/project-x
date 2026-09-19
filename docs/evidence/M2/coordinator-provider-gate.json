@@ -1,0 +1,58 @@
+{
+  "commands": [
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "ended_at": "2026-09-19T18:47:36.407321+00:00",
+      "exit_status": 0,
+      "name": "full-tests",
+      "started_at": "2026-09-19T18:47:19.127462+00:00",
+      "stderr": "docs/evidence/M2/coordinator-provider-gate-full-tests.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/coordinator-provider-gate-full-tests.stdout",
+      "stdout_sha256": "1254e39563b292d73a275f48d2fa0323bfea7bf9270023326a4f66db1fae5db8",
+      "wall_seconds": 17.27993041696027
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "docs/evidence/M2/coordinator-v3-native.py",
+        "--product-revision",
+        "e14f67983db678813afcfeb191532e691b0b20e3",
+        "--review-report",
+        "docs/reviews/M2-provider-round5.md"
+      ],
+      "ended_at": "2026-09-19T18:47:43.973098+00:00",
+      "exit_status": 0,
+      "name": "native",
+      "started_at": "2026-09-19T18:47:36.407845+00:00",
+      "stderr": "docs/evidence/M2/coordinator-provider-gate-native.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/coordinator-provider-gate-native.stdout",
+      "stdout_sha256": "9b86b0c8df517a5abfb4ff66bb8e32624a01dea2bdffe94abcb7d4de290d9261",
+      "wall_seconds": 7.5653131660074
+    }
+  ],
+  "coordinator_revision": "999d1af5f3295b94a9fb81450b9e203aa5b2ab16",
+  "driver_sha256": "5e8534a1474b48cecb3a092910b78e480445b52685eef5e8fd94bb078fc70ae5",
+  "ended_at": "2026-09-19T18:47:43.973564+00:00",
+  "passed": true,
+  "product_revision": "e14f67983db678813afcfeb191532e691b0b20e3",
+  "review_report": "docs/reviews/M2-provider-round5.md",
+  "review_sha256": "5ffc098b852f65ca682696b4d4582e91e4bc34dc0358feb894a044948d3bc5fc",
+  "scope": "coordinator integration; unit diagnostics then synthetic nontraining native check",
+  "source_sha256": {
+    "src/feature_rl/generation/__init__.py": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc",
+    "src/feature_rl/generation/protocol.py": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+    "src/feature_rl/generation/provider.py": "dec64bb8b8ed0983faf426664a875fb5bea408f3108c0d5a5abf30b0bb5314e9",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+  },
+  "started_at": "2026-09-19T18:47:19.127107+00:00"
+}
