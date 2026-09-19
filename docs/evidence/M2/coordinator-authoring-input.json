@@ -1,0 +1,85 @@
+{
+  "purpose": "B-only authoring setup references, not a feature contract or generation result",
+  "created_at": "2026-09-19T20:39:28.736771+00:00",
+  "coordinator_revision": "4b6c91ca91c21fa7c2178f5e369c3b4a2c259ec6",
+  "source_receipt_sha256": "deca99ae7076bef8636a8b755832ad6a8df2ab9b91503f1bf9e0a6cadb0b2ea7",
+  "authoring_view": {
+    "baseline": {
+      "encoding": "bytes",
+      "kind": "source-archive",
+      "schema_version": 1,
+      "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+      "visibility": "authoring"
+    },
+    "license_text": {
+      "encoding": "bytes",
+      "kind": "source-response",
+      "schema_version": 1,
+      "sha256": "b84ace5d4d01f55ab2db4e25ffddb9239104176e99a73e4799dcadbd8e612ab9",
+      "visibility": "authoring"
+    },
+    "request_evidence": {
+      "encoding": "bytes",
+      "kind": "authoring-request",
+      "schema_version": 1,
+      "sha256": "d8d8a97861a597c7bfe181dfd3bbd6dbf72b7854ee13d555add1b1e07f0d2c61",
+      "visibility": "authoring"
+    }
+  },
+  "source_store": ".feature-rl/research/M1/production-store",
+  "source_store_role": "author",
+  "dependency_wheels": [
+    {
+      "name": "pytest",
+      "version": "9.0.2",
+      "filename": "pytest-9.0.2-py3-none-any.whl",
+      "sha256": "711ffd45bf766d5264d487b917733b453d917afd2b0ad65223959f59089f875b",
+      "local_path": ".feature-rl/research/M3/dependencies/pytest-9.0.2-py3-none-any.whl"
+    },
+    {
+      "name": "iniconfig",
+      "version": "2.3.0",
+      "filename": "iniconfig-2.3.0-py3-none-any.whl",
+      "sha256": "f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12",
+      "local_path": ".feature-rl/research/M3/dependencies/iniconfig-2.3.0-py3-none-any.whl"
+    },
+    {
+      "name": "packaging",
+      "version": "26.0",
+      "filename": "packaging-26.0-py3-none-any.whl",
+      "sha256": "b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529",
+      "local_path": ".feature-rl/research/M3/dependencies/packaging-26.0-py3-none-any.whl"
+    },
+    {
+      "name": "pluggy",
+      "version": "1.6.0",
+      "filename": "pluggy-1.6.0-py3-none-any.whl",
+      "sha256": "e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746",
+      "local_path": ".feature-rl/research/M3/dependencies/pluggy-1.6.0-py3-none-any.whl"
+    },
+    {
+      "name": "pygments",
+      "version": "2.20.0",
+      "filename": "pygments-2.20.0-py3-none-any.whl",
+      "sha256": "81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176",
+      "local_path": ".feature-rl/research/M3/dependencies/pygments-2.20.0-py3-none-any.whl"
+    },
+    {
+      "name": "flit-core",
+      "version": "3.11.0",
+      "filename": "flit_core-3.11.0-py3-none-any.whl",
+      "sha256": "fe464c086f630f106c0fc5001ee377980f45938f03f8f0d03da08a4841748541",
+      "local_path": ".feature-rl/research/M3/dependencies/flit_core-3.11.0-py3-none-any.whl"
+    }
+  ],
+  "runtime_interface": "docs/interfaces-M3.md",
+  "socket_path": "/Users/mukeshreddypochamreddy/.docker/run/docker.sock",
+  "retrieval_preparation": "docs/evidence/M2/authoring-envelope-preparation.md",
+  "prohibited_reads": [
+    "M3 production/review private execution records",
+    "SourcePair",
+    "reference archives",
+    "PR implementation diff/tests",
+    "repository history"
+  ]
+}
