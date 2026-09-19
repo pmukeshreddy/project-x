@@ -73,10 +73,10 @@ These are instance methods on configured services, not globals with hidden state
 
 ### Task 1: M0 contracts and storage
 
-- [ ] Write risk-based acceptance tests for all mandatory artifacts, malformed fields, nonfinite numbers, missing evidence, cross-reference mistakes, atomic duplicate writes and tampering.
-- [ ] Implement strict models, canonical content identities, role/visibility access and atomic immutable artifact storage; no arbitrary deserialization. Use concrete required values and examples, not empty dictionaries standing in for schemas.
-- [ ] Run tests, preserve commands/results, commit only owned paths, publish exact `docs/interfaces.md` with downstream examples.
-- [ ] Independent spec/quality review, owner fixes, scoped re-review, coordinator integration check.
+- [x] Write risk-based acceptance tests for all mandatory artifacts, malformed fields, nonfinite numbers, missing evidence, cross-reference mistakes, atomic duplicate writes and tampering.
+- [x] Implement strict models, canonical content identities, role/visibility access and atomic immutable artifact storage; no arbitrary deserialization. Use concrete required values and examples, not empty dictionaries standing in for schemas.
+- [x] Run tests, preserve commands/results, commit only owned paths, publish exact `docs/interfaces.md` with downstream examples.
+- [x] Independent spec/quality review, owner fixes, scoped re-review, coordinator integration check. Original completion `cb53f99`; approved provenance extension `e16493b`; evidence and independent reviews in `docs/progress.md`.
 
 ### Task 2: M1 intake, reconstruction and partitioning
 
