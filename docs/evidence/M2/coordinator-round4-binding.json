@@ -1,0 +1,95 @@
+{
+  "scope": "static owner-receipt identity binding, not new tests or native execution",
+  "recorded_at": "2026-09-19T16:06:16.166438+00:00",
+  "product_revision": "44e9dcf1079a186a8a0432fa51333d1d07f6422f",
+  "owner_receipt": "docs/evidence/M2/provider-v3-fixround4-verification.json",
+  "owner_receipt_sha256": "86f42ea5c194a9f064b1a7ec129f20ac857d73202d2c1fa4e27eb262668c2b82",
+  "method": "Read each inventoried source/document and each stdout log; compare SHA-256 and length to owner receipt and full bytes to git show PRODUCT:path. All comparisons are mechanical.",
+  "checks": [
+    {
+      "path": "docs/interfaces-M2.md",
+      "sha256": "7e66e903dea63ca283908809f93a6ed0460f0c697187c547b3555f2e2b2d1824",
+      "bytes": 13636,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "docs/reports/M2-provider.md",
+      "sha256": "c62c88a7b31dd684dddb4d2225bd23f1f6550b94aae3713062fcff4723c0dcbb",
+      "bytes": 3175,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "src/feature_rl/generation/__init__.py",
+      "sha256": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+      "bytes": 1405,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "src/feature_rl/generation/_worker.py",
+      "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+      "bytes": 11650,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "src/feature_rl/generation/backend.py",
+      "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+      "bytes": 11173,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "src/feature_rl/generation/models.py",
+      "sha256": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc",
+      "bytes": 7960,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "src/feature_rl/generation/protocol.py",
+      "sha256": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+      "bytes": 3857,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "src/feature_rl/generation/provider.py",
+      "sha256": "d1f1e3ab1e7f2b6407a4223b5c442ff35d76cc7cc99b94b20239028222287719",
+      "bytes": 54456,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "src/feature_rl/generation/runner.py",
+      "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e",
+      "bytes": 9828,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "tests/test_generation.py",
+      "sha256": "6cac3fd6f37d2db50c4165fbad4cec49ddcd528ce2c1cef2dd455c2a6239aec6",
+      "bytes": 58312,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround4-focused-tests.stdout",
+      "sha256": "2ca52e24fdc7f7880799f6461170f4ea6503fd1641d236bd670cfa89dad1d740",
+      "bytes": 179,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround4-full-tests.stdout",
+      "sha256": "141b97d364b899e2a5cf19be1a0625db078dd541d632e415fb2c1b79b2cda535",
+      "bytes": 341,
+      "matches_owner_receipt": true,
+      "matches_product_commit": true
+    }
+  ],
+  "passed": true
+}
