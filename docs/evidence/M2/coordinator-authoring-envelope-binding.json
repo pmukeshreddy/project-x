@@ -1,0 +1,209 @@
+{
+  "checks": [
+    {
+      "name": "owner_receipt_identity",
+      "passed": true
+    },
+    {
+      "name": "file_binding:docs/evidence/M2/authoring-envelope-preparation.md",
+      "passed": true
+    },
+    {
+      "name": "file_binding:docs/evidence/M2/authoring-envelope/measure.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:docs/evidence/M1/real-intake-v2-attempt-2.json",
+      "passed": true
+    },
+    {
+      "name": "file_binding:src/feature_rl/artifacts/__init__.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:src/feature_rl/artifacts/store.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:src/feature_rl/contracts/models.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:src/feature_rl/generation/backend.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:src/feature_rl/generation/models.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:src/feature_rl/generation/provider.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:src/feature_rl/intake/github.py",
+      "passed": true
+    },
+    {
+      "name": "file_binding:docs/evidence/M2/authoring-envelope/measurement.stdout.json",
+      "passed": true
+    },
+    {
+      "name": "file_binding:docs/evidence/M2/authoring-envelope/measurement.stderr",
+      "passed": true
+    },
+    {
+      "name": "raw_output_equals_receipt",
+      "passed": true
+    },
+    {
+      "name": "recorded_exit_zero",
+      "passed": true
+    },
+    {
+      "name": "recorded_utc_order",
+      "passed": true
+    },
+    {
+      "name": "model_manifest_binding",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:added_tokens.json",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:chat_template.jinja",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:config.json",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:generation_config.json",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:merges.txt",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:model.safetensors.index.json",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:special_tokens_map.json",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:tokenizer.json",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:tokenizer_config.json",
+      "passed": true
+    },
+    {
+      "name": "tokenizer_asset_binding:vocab.json",
+      "passed": true
+    },
+    {
+      "name": "authoring_input_binding:baseline",
+      "passed": true
+    },
+    {
+      "name": "authoring_input_binding:license_text",
+      "passed": true
+    },
+    {
+      "name": "authoring_input_binding:request_evidence",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:context_binding:REQUEST",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:context_binding:B_CORE_GROUP",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:context_binding:B_OPTION_ERROR",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:context_binding:B_OPTION_TEST",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:context_binding:B_COMMAND_REGRESSION",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:context_binding:B_GROUP_DOC",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:context_binding:LICENSE",
+      "passed": true
+    },
+    {
+      "name": "sizing_template_with_license:chat_overhead",
+      "passed": true
+    },
+    {
+      "name": "production_shaped_template_without_license:context_binding:REQUEST",
+      "passed": true
+    },
+    {
+      "name": "production_shaped_template_without_license:context_binding:B_CORE_GROUP",
+      "passed": true
+    },
+    {
+      "name": "production_shaped_template_without_license:context_binding:B_OPTION_ERROR",
+      "passed": true
+    },
+    {
+      "name": "production_shaped_template_without_license:context_binding:B_OPTION_TEST",
+      "passed": true
+    },
+    {
+      "name": "production_shaped_template_without_license:context_binding:B_COMMAND_REGRESSION",
+      "passed": true
+    },
+    {
+      "name": "production_shaped_template_without_license:context_binding:B_GROUP_DOC",
+      "passed": true
+    },
+    {
+      "name": "production_shaped_template_without_license:chat_overhead",
+      "passed": true
+    },
+    {
+      "name": "measured_template_counts",
+      "passed": true
+    },
+    {
+      "name": "production_template_excludes_license",
+      "passed": true
+    }
+  ],
+  "checks_passed": 47,
+  "command": [
+    "PYTHONPATH=src",
+    ".venv/bin/python",
+    "docs/evidence/M2/coordinator-authoring-envelope-binding.py"
+  ],
+  "driver_sha256": "4f85bbe6575de9e04be9703ec83317efdf529261c4dbed32c4ad1d4f109da2b9",
+  "exit_status": 0,
+  "finished_at_utc": "2026-09-19T19:10:31.364958+00:00",
+  "limitations": [
+    "Token counts are verified as the retained measurement's output, not independently recomputed.",
+    "Neither template is the final semantic-proposal request; actual post-discovery sizing and native capacity remain open."
+  ],
+  "owner_receipt_sha256": "9f0fdbce03342b760fab77a217d568397ba9456eae8d32bafb7c879d7e5ea133",
+  "purpose": "Coordinator verification of retained sizing evidence; no tokenization, model load, inference, application execution, Docker or network calls in this check.",
+  "started_at_utc": "2026-09-19T19:10:31.343663+00:00",
+  "workspace_revision": "87129a09804b8320102154964d6c1138b1a112a5"
+}

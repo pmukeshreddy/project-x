@@ -27,9 +27,9 @@ Historical/candidate/generated application source, adapters/build hooks execute 
 | --- | --- | --- |
 | M0 | `/root/m0_contracts` | Core/provenancev2/optional MLX/bounded reads reviewed and integrated |
 | M1 | `/root/m1_sources` | Conservative history reconstruction reviewed/integrated; Click candidate provisional |
-| M2 | `/root/m2_authoring_recovery` | Provider reviewed/current-native integrated; bounded authoring-envelope preparation ACTIVE, no product/inference |
+| M2 | `/root/m2_authoring_recovery` | Provider reviewed/current-native integrated; bounded authoring-envelope preparation complete with reproducible receipts |
 | M3 | `/root/m3_runtime` | **ACTIVE exclusive product implementer**, actual runtime/build/lifecycle |
-| M4 | Unassigned (`m4_grading` planned) | Brief ready; no product |
+| M4 | `/root/m4_grading` | ACTIVE bounded read-only comparison/interface preparation; no product |
 | M5 | `/root/m5_qualification` | Signature preflight only; no product |
 | M6 | `/root/m6_factory` | Durability preflight only; no product |
 | M7 | `/root/m7_learning` | Pinned stack source audit only; no runner/training product |
@@ -101,3 +101,7 @@ Next after M3 reviewed: sameM2 real B-onlydiscovery/modeldraftfreeze→separatep
 **External CUDA gate blocked:** no Linux NVIDIA host/budget; userexplicitlyconfirmednone. Finishrunnablecode/futurecommand; nofakeoptimizer/results. **Human gate external:** first prepare concreteactualcontract/controlpackage, then requestactualhumanreview; modelscannotapprove. Blindalternativeisindependentwork. **Empirical status:** no actual featurecontract/scenario/checker/qualification/reward/solverepisode/optimizerupdate/heldoutcomparison yet. Current provider smoke and research prove only their stated scoped gates. Continue all independent local work.
 
 M2 envelope note committeda66534bcc5bc995aa28ca7102213eb436f359152; owner reports minimal sizing template7669tokens, request5280B/B1546240B149files/license1475B, futureinput/outputranges estimated. Root requested exact command/UTC/output/input+schema+prompt/tokenizer identities and actual license roles in durable receipt (new authoring-envelope/ scope; one tokenizer-only repeat allowed if original outputs insufficient, no model/inference). Original note preserved. `docs/decisions/M2-proposal-finalization.md` resolves controller-owned metadata, shared-type proposal derivation, license outside prompt and joined scenario-ID equality; no schema/provider-role extension or actual draft approved.
+
+M2 receipt handoff COMPLETE at9e8434c33b0959648aae99b86cd17329a45af09e. `docs/evidence/M2/authoring-envelope/measure.py` ran once tokenizer-only19:04:31.710192–19:04:32.677037UTC exit0, rawstdout+stderr retained. Historical sizingwithlicense7669tokens; production-shapedwithoutlicense7249tokens. The latter is17743Brequest/8347BfullM0schema/26102Bprompt; still not final derived semantic proposal or post-discovery envelope. Licensebaseline role explicitly diagnostic-only. ReceiptSHA9f0fdbce03342b760fab77a217d568397ba9456eae8d32bafb7c879d7e5ea133. Root `coordinator-authoring-envelope-binding.py` ran47checksPASS: receipt/file/raw/source/span/10tokenizerasset/3authoringpayload bindings, no retokenization/native/applicationexecution. RootreceiptSHA943b200e749bb4f5570706d74fd552910aac6cb3f086badd0da9ae914c21234d. Larger capacity gate remains open; do not rerun consumed measurement merely for confirmation.
+
+M4 bounded preparation dispatched `/root/m4_grading` astra/high with fresh scoped context; `docs/briefs/M4-preparation.md` at87129a0. Read-only actual M0/M2 boundary analysis (grounded prose→typed non-executable controller comparisons and untrusted generated adapter), exact joins and required M3 capabilities. May only write/commit `docs/evidence/M4/interface-preparation.md`, no product/H/Docker/model/network. Same owner later implements actual M4 after reviewed upstream; M3 remains exclusive product writer.
