@@ -38,7 +38,7 @@ assert store.get_bytes(log_ref) == b"actual captured stdout\n"
 # candidate = store.get_artifact(artifact_ref)
 ```
 
-Exact methods: `put_artifact(artifact: ArtifactModel) -> ArtifactRef`, `get_artifact(ref: ArtifactRef) -> ArtifactModel`, `put_bytes(data: bytes, kind: str, visibility: Visibility) -> ArtifactRef`, `get_bytes(ref: ArtifactRef) -> bytes`.
+Exact methods: `put_artifact(artifact: ArtifactModel) -> ArtifactRef`, `get_artifact(ref: ArtifactRef, *, max_envelope_bytes: int | None = None) -> ArtifactModel`, `put_bytes(data: bytes, kind: str, visibility: Visibility) -> ArtifactRef`, `get_bytes(ref: ArtifactRef, *, max_envelope_bytes: int | None = None, max_payload_bytes: int | None = None) -> bytes`.
 
 `ArtifactRef` requires `sha256` (64 lowercase hex), `kind` (safe identifier), `schema_version` (strict integer 1 or 2, checked against the kind on typed reads and typed operation links), `visibility` and `encoding` (`json` or `bytes`). No path is accepted in a ref. Known typed artifact names cannot be stored as raw bytes. Byte kinds are descriptive safe identifiers such as `source-archive`, `command-log` and `attestation`.
 
@@ -46,7 +46,7 @@ An object is `<sha256>.json` containing exactly `kind`, `schema_version`, `visib
 
 Writes use an exclusive temporary file, file fsync, atomic create-if-absent hardlink publication, and directory fsync. Duplicate writes compare exact serialized bytes; corruption is never overwritten. Descriptor-relative paths and `O_NOFOLLOW` reject symlink roots/ancestors/objects and nonregular objects. Root paths must be symlink-free (resolve a trusted platform alias before constructing a store). A crash may leave `.pending-*` files; readers ignore them and retries publish safely. Automatic cleanup is deliberately not a reader side effect. The store never modifies a committed object in place; a hardlinked object's bytes are still digest-checked on every read.
 
-Errors: `AccessDenied`, `ArtifactIntegrityError`, `ArtifactNotFound` all extend `ArtifactError`. Invalid model construction raises Pydantic `ValidationError`; OS durability/space errors propagate and cannot become success. This implementation targets POSIX filesystems with directory descriptors, hardlinks and fsync, as used by the local controller.
+Errors: `AccessDenied`, `ArtifactIntegrityError`, `ArtifactNotFound`, `ArtifactSizeLimitError` all extend `ArtifactError`. Invalid model construction raises Pydantic `ValidationError`; OS durability/space errors propagate and cannot become success. This implementation targets POSIX filesystems with directory descriptors, hardlinks and fsync, as used by the local controller.
 
 ## Visibility and role policy
 
@@ -113,3 +113,22 @@ This host marks editable `.pth` files hidden, and Python 3.13 ignores them. Use 
 `SourceSnapshot`, nested in CandidateRecord, now requires `redirect_chain: tuple[Text, ...] | None` in Python (nonempty array or null in JSON). A known chain must begin with `url`; its last URL identifies the final response URL. A known request without a redirect is `(url,)`. Null means redirect evidence is unavailable and is never equivalent to no redirects. M1 enforces acquisition URL policy and propagates actually captured hop evidence; the shared model does not synthesize hops. The synthetic examples with unavailable historical evidence use explicit null and reconstructed provenance.
 
 `ARTIFACT_SCHEMA_VERSIONS` publishes the current kind/version map. The store writes the model's declared schema version into its envelope/reference. Raw-byte objects remain version 1. ArtifactRef can represent version 1 or 2 for preserved receipts, but current typed reads and required typed links reject v1 CandidateRecord/SourcePair with an unsupported-version error. Other artifact kinds remain version 1. Old stored bytes, references and evidence are preserved; there is no automatic migration or inferred default. M1 must inspect original evidence, revalidate provenance/redirect status and publish new v2 records and dependent references. Changing a reference's version alone cannot upgrade its digest-bound envelope. Old dependent manifests pointing to v1 source/candidate records also require reconstruction before current admission.
+
+
+## Explicit bounded store reads (M3 handoff)
+
+The two read methods accept optional keyword-only caps without changing artifact identities, schema versions or existing uncapped calls:
+
+```python
+recipe = store.get_artifact(recipe_ref, max_envelope_bytes=1_000_000)
+source = store.get_bytes(source_ref, max_envelope_bytes=14_000_000,
+                         max_payload_bytes=10_000_000)
+```
+
+These numbers are illustrative caller policy, not default limits. `max_envelope_bytes` caps the entire stored UTF-8 JSON envelope, including metadata and base64 text, before JSON parsing. The opened path must still be a regular file; its fstat size is checked before reading, then chunked reads obtain at most the cap plus one detection byte to reject growth after stat. The serialized cap is inclusive. Python parsing, canonicalization, buffering and model construction have additional memory overhead; this is not an exact resident-memory ceiling.
+
+`max_payload_bytes` caps the decoded opaque bytes returned by get_bytes. Base64 length and padding determine the decoded size before base64 decoding; oversized payloads never reach that decoder. Standard alphabet validation and canonical re-encoding still reject malformed data. Empty payloads accept a zero payload cap, and exact boundaries accept all canonical padding cases. A payload cap alone does **not** bound the envelope read, JSON allocation or already-created encoded string; callers needing both protections must supply both caps.
+
+Each cap accepts None (no cap) or an exact nonnegative Python int. Boolean, floating-point and string arguments raise TypeError; negative integers raise ValueError. An exceeded cap raises public `ArtifactSizeLimitError` with `limit_name` (`max_envelope_bytes` or `max_payload_bytes`), `limit` and `observed_bytes`. Treat observed_bytes as a lower bound: growth detection records cap+1, not necessarily total file size. Oversize rejection may precede digest/content validation; it never returns unverified bytes. Authorization, safe descriptor-relative paths, metadata/hash/canonical checks, typed validation and exposure checks remain mandatory on successful reads.
+
+Duplicate-write comparisons use the new bounded reader with the expected envelope size. A larger existing object remains an ArtifactIntegrityError for corruption/collision and is never overwritten. M3 must separately enforce aggregate staged bytes, archive expansion, file counts and resource limits; the store only applies the explicitly supplied per-object caps. Independent review and M3 consumption are still required before declaring the downstream allocation gap closed.

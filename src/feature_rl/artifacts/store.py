@@ -37,6 +37,24 @@ class ArtifactNotFound(ArtifactError):
     """No committed immutable object exists for this reference."""
 
 
+class ArtifactSizeLimitError(ArtifactError):
+    """A caller's byte cap was exceeded; observed_bytes may be a lower bound."""
+
+    def __init__(self, limit_name: str, limit: int, observed_bytes: int):
+        self.limit_name = limit_name
+        self.limit = limit
+        self.observed_bytes = observed_bytes
+        super().__init__(f'{limit_name}={limit} exceeded: observed at least {observed_bytes} bytes')
+
+
+def _validate_limit(name: str, value: int | None) -> None:
+    if value is not None:
+        if type(value) is not int:
+            raise TypeError(f'{name} must be an integer or None')
+        if value < 0:
+            raise ValueError(f'{name} must be nonnegative')
+
+
 ACCESS = {
     ActorRole.SOLVER: frozenset({Visibility.PUBLIC}),
     ActorRole.AUTHOR: frozenset({Visibility.PUBLIC, Visibility.AUTHORING}),
@@ -179,7 +197,10 @@ class ArtifactStore:
                     # link is atomic create-if-absent, unlike replacing another writer.
                     os.link(temp, name, src_dir_fd=directory, dst_dir_fd=directory, follow_symlinks=False)
                 except FileExistsError:
-                    existing = self._read_file(directory, name)
+                    try:
+                        existing = self._read_file(directory, name, max_envelope_bytes=len(data))
+                    except ArtifactSizeLimitError as exc:
+                        raise ArtifactIntegrityError('existing object differs: corruption or collision') from exc
                     if existing != data:
                         raise ArtifactIntegrityError('existing object differs: corruption or collision')
                 os.fsync(directory)
@@ -189,7 +210,7 @@ class ArtifactStore:
         return ref
 
     @staticmethod
-    def _read_file(directory, name):
+    def _read_file(directory, name, *, max_envelope_bytes=None):
         try:
             fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
         except FileNotFoundError as exc:
@@ -200,13 +221,27 @@ class ArtifactStore:
             metadata = os.fstat(stream.fileno())
             if not stat.S_ISREG(metadata.st_mode):
                 raise ArtifactIntegrityError('object is not a regular file')
-            return stream.read()
+            if max_envelope_bytes is None:
+                return stream.read()
+            if metadata.st_size > max_envelope_bytes:
+                raise ArtifactSizeLimitError('max_envelope_bytes', max_envelope_bytes, metadata.st_size)
+            # File size can change after fstat. Read at most cap + one detection byte,
+            # in small requests so even a huge caller cap never drives a huge allocation.
+            data = bytearray()
+            while len(data) <= max_envelope_bytes:
+                chunk = stream.read(min(65536, max_envelope_bytes + 1 - len(data)))
+                if not chunk:
+                    break
+                data.extend(chunk)
+                if len(data) > max_envelope_bytes:
+                    raise ArtifactSizeLimitError('max_envelope_bytes', max_envelope_bytes, len(data))
+            return bytes(data)
 
-    def _get(self, ref):
+    def _get(self, ref, *, max_envelope_bytes=None):
         ref = _validate_ref(ref)
         self._authorize(ref.visibility)
         with self._directory() as directory:
-            data = self._read_file(directory, ref.sha256 + '.json')
+            data = self._read_file(directory, ref.sha256 + '.json', max_envelope_bytes=max_envelope_bytes)
         if hashlib.sha256(data).hexdigest() != ref.sha256:
             raise ArtifactIntegrityError('content digest mismatch')
         envelope = _decode(data)
@@ -219,14 +254,27 @@ class ArtifactStore:
             raise ArtifactIntegrityError('invalid schema version')
         return envelope['payload']
 
-    def get_bytes(self, ref: ArtifactRef) -> bytes:
+    def get_bytes(self, ref: ArtifactRef, *, max_envelope_bytes: int | None = None,
+                  max_payload_bytes: int | None = None) -> bytes:
+        """Read opaque bytes with independent serialized-envelope and decoded caps."""
+        _validate_limit('max_envelope_bytes', max_envelope_bytes)
+        _validate_limit('max_payload_bytes', max_payload_bytes)
         ref = _validate_ref(ref)
         if ref.encoding != 'bytes' or ref.kind in ARTIFACT_TYPES:
             raise ArtifactIntegrityError('reference is not an opaque byte object')
         if ref.schema_version != 1:
             raise ArtifactIntegrityError('unsupported bytes schema version')
-        payload = self._get(ref)
+        payload = self._get(ref, max_envelope_bytes=max_envelope_bytes)
         try:
+            if type(payload) is not str or not payload.isascii() or len(payload) % 4:
+                raise ValueError('invalid base64 shape')
+            padding = 2 if payload.endswith('==') else 1 if payload.endswith('=') else 0
+            first_padding = payload.find('=')
+            if first_padding != (-1 if padding == 0 else len(payload) - padding):
+                raise ValueError('invalid base64 padding')
+            decoded_size = len(payload) // 4 * 3 - padding
+            if max_payload_bytes is not None and decoded_size > max_payload_bytes:
+                raise ArtifactSizeLimitError('max_payload_bytes', max_payload_bytes, decoded_size)
             data = base64.b64decode(payload, validate=True)
             if base64.b64encode(data).decode('ascii') != payload:
                 raise ValueError('noncanonical base64')
@@ -234,13 +282,15 @@ class ArtifactStore:
         except (ValueError, TypeError) as exc:
             raise ArtifactIntegrityError('invalid byte encoding') from exc
 
-    def get_artifact(self, ref: ArtifactRef) -> ArtifactModel:
+    def get_artifact(self, ref: ArtifactRef, *, max_envelope_bytes: int | None = None) -> ArtifactModel:
+        """Read a typed model after enforcing an optional serialized-envelope cap."""
+        _validate_limit('max_envelope_bytes', max_envelope_bytes)
         ref = _validate_ref(ref)
         if ref.encoding != 'json' or ref.kind not in ARTIFACT_TYPES:
             raise ArtifactIntegrityError('reference is not a known typed artifact')
         if ref.schema_version != ARTIFACT_SCHEMA_VERSIONS[ref.kind]:
             raise ArtifactIntegrityError('unsupported artifact schema version; revalidate and republish')
-        payload = self._get(ref)
+        payload = self._get(ref, max_envelope_bytes=max_envelope_bytes)
         try:
             artifact = ARTIFACT_TYPES[ref.kind].model_validate_json(canonical_json(payload))
         except (ValueError, TypeError) as exc:

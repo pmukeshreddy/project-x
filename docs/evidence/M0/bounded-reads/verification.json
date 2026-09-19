@@ -1,0 +1,72 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_artifacts_bounded.py",
+      "tests/test_artifacts.py",
+      "tests/test_contracts.py",
+      "tests/test_contracts_examples.py"
+    ],
+    "utc": "2026-09-19T18:32:25.336360+00:00",
+    "revision": "a8400aa359dc22fa30516ef8a291bd8fa8cb00c8",
+    "working_tree": "M0 bounded artifact reads",
+    "source_sha256": {
+      "src/feature_rl/artifacts/store.py": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c",
+      "src/feature_rl/artifacts/__init__.py": "48d4ae3705e12efa11cdce3d9844679060b6c617500592c15e74f13a7e0878cf",
+      "tests/test_artifacts_bounded.py": "c260170b36f013b6aba5b527d705d5e20b123836120d16848dc22a230403d9bd",
+      "tests/test_artifacts.py": "92a08251ad6fed5ffd48a2e587ca448e2967ff5722ee1beb8710c3245a6e1edf",
+      "docs/interfaces.md": "1b9b0a30b5ca5a2bbf16affb02ad15a91940ff588a074a0b00f08b3a793f467d"
+    },
+    "exit_status": 0,
+    "stdout": "........................................................................ [ 42%]\n........................................................................ [ 84%]\n..........................                                               [100%]\n170 passed in 0.50s\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-q"
+    ],
+    "utc": "2026-09-19T18:41:39.490639+00:00",
+    "revision": "a8400aa359dc22fa30516ef8a291bd8fa8cb00c8",
+    "working_tree": "M0 bounded artifact reads",
+    "source_sha256": {
+      "src/feature_rl/artifacts/store.py": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c",
+      "src/feature_rl/artifacts/__init__.py": "48d4ae3705e12efa11cdce3d9844679060b6c617500592c15e74f13a7e0878cf",
+      "tests/test_artifacts_bounded.py": "c260170b36f013b6aba5b527d705d5e20b123836120d16848dc22a230403d9bd",
+      "tests/test_artifacts.py": "92a08251ad6fed5ffd48a2e587ca448e2967ff5722ee1beb8710c3245a6e1edf",
+      "docs/interfaces.md": "1b9b0a30b5ca5a2bbf16affb02ad15a91940ff588a074a0b00f08b3a793f467d"
+    },
+    "exit_status": 0,
+    "stdout": "........................................................................ [ 24%]\n........................................................................ [ 48%]\n........................................................................ [ 72%]\n........................................................................ [ 96%]\n...........                                                              [100%]\n299 passed in 21.92s\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "--",
+      "src/feature_rl/artifacts",
+      "tests/test_artifacts_bounded.py",
+      "docs/interfaces.md"
+    ],
+    "utc": "2026-09-19T18:41:39.502300+00:00",
+    "revision": "a8400aa359dc22fa30516ef8a291bd8fa8cb00c8",
+    "working_tree": "M0 bounded artifact reads",
+    "source_sha256": {
+      "src/feature_rl/artifacts/store.py": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c",
+      "src/feature_rl/artifacts/__init__.py": "48d4ae3705e12efa11cdce3d9844679060b6c617500592c15e74f13a7e0878cf",
+      "tests/test_artifacts_bounded.py": "c260170b36f013b6aba5b527d705d5e20b123836120d16848dc22a230403d9bd",
+      "tests/test_artifacts.py": "92a08251ad6fed5ffd48a2e587ca448e2967ff5722ee1beb8710c3245a6e1edf",
+      "docs/interfaces.md": "1b9b0a30b5ca5a2bbf16affb02ad15a91940ff588a074a0b00f08b3a793f467d"
+    },
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]
