@@ -1,0 +1,31 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 435, in <module>
+    main()
+    ~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 431, in main
+    {"contract": contract, "scenario": scenario}[args.stage]()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 292, in contract
+    setup, refs, payloads = load_inputs(store)
+                            ~~~~~~~~~~~^^^^^^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 106, in load_inputs
+    refs = {name: ref(value) for name, value in setup["authoring_view"].items()}
+                  ~~~^^^^^^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 80, in ref
+    return ArtifactRef.model_validate(value)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/lib/python3.13/site-packages/pydantic/main.py", line 732, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ArtifactRef
+visibility
+  Input should be an instance of Visibility [type=is_instance_of, input_value='authoring', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/is_instance_of

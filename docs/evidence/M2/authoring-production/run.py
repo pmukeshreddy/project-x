@@ -77,7 +77,7 @@ def write_json(path: Path, value: object) -> None:
 
 
 def ref(value: object) -> ArtifactRef:
-    return ArtifactRef.model_validate(value)
+    return ArtifactRef.model_validate_json(canonical_json(value))
 
 
 def fixed_cost(category: str, note: str) -> CostRecord:
