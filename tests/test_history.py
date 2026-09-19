@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import subprocess
+import os
 from pathlib import Path
+import time
 
 import pytest
 
@@ -336,3 +338,76 @@ def test_incomplete_promisor_repository_fails_without_fetching(tmp_path):
 
     after = tuple(sorted(path.name for path in remote.iterdir()))
     assert after == before
+
+
+@pytest.mark.parametrize("exit_status", [0, 7])
+def test_git_runner_cleans_descendants_after_leader_exit(tmp_path, exit_status):
+    """Catches treating a reaped command leader as proof its process group ended."""
+    from feature_rl.history import GitHistory, UnrecoverableHistory
+
+    repo = init_repo(tmp_path)
+    commit(repo, "root.txt", "root\n")
+    child_pid = tmp_path / "child.pid"
+    helper = tmp_path / "background-child"
+    helper.write_text(
+        "#!/bin/sh\n"
+        "sleep 30 </dev/null >/dev/null 2>&1 &\n"
+        "echo $! > \"$1\"\n"
+        "exit \"$2\"\n"
+    )
+    helper.chmod(0o755)
+    history = GitHistory(repo / ".git")
+    history._argv = lambda *_args: (str(helper), str(child_pid), str(exit_status))
+
+    if exit_status:
+        with pytest.raises(UnrecoverableHistory):
+            history._run_bytes("diagnostic")
+    else:
+        assert history._run_bytes("diagnostic") == b""
+
+    pid = int(child_pid.read_text())
+    deadline = time.monotonic() + 1
+    while time.monotonic() < deadline:
+        status = subprocess.run(
+            ("/bin/ps", "-o", "stat=", "-p", str(pid)),
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+        if not status or status.startswith("Z"):
+            break
+        time.sleep(0.01)
+    else:
+        os.kill(pid, 9)
+        pytest.fail("Git command descendant survived process-group cleanup")
+
+
+def test_git_runner_cleans_descendants_on_timeout(tmp_path):
+    """Catches timeout cleanup killing only the foreground process."""
+    from feature_rl.history import GitHistory, HistoryError
+
+    repo = init_repo(tmp_path)
+    commit(repo, "root.txt", "root\n")
+    child_pid = tmp_path / "timeout-child.pid"
+    helper = tmp_path / "blocked-with-child"
+    helper.write_text(
+        "#!/bin/sh\n"
+        "sleep 30 </dev/null >/dev/null 2>&1 &\n"
+        "echo $! > \"$1\"\n"
+        "sleep 30\n"
+    )
+    helper.chmod(0o755)
+    history = GitHistory(repo / ".git", timeout_seconds=0.2)
+    history._argv = lambda *_args: (str(helper), str(child_pid))
+
+    with pytest.raises(HistoryError, match="timed out"):
+        history._run_bytes("diagnostic")
+
+    pid = int(child_pid.read_text())
+    status = subprocess.run(
+        ("/bin/ps", "-o", "stat=", "-p", str(pid)),
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    assert not status or status.startswith("Z")

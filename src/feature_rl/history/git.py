@@ -98,16 +98,59 @@ class GitHistory:
         }
 
     @staticmethod
-    def _kill(process: subprocess.Popen[bytes]) -> None:
-        if process.poll() is not None:
-            return
+    def _group_members(group_id: int) -> tuple[tuple[int, str], ...]:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except PermissionError:
-            process.kill()
-        except ProcessLookupError:
-            return
-        process.wait()
+            result = subprocess.run(
+                ("/bin/ps", "-axo", "pid=,pgid=,stat="),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                check=True,
+                timeout=0.5,
+                env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"},
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise HistoryError("could not verify Git process-group cleanup") from exc
+        members = []
+        for line in result.stdout.decode("ascii", "strict").splitlines():
+            fields = line.split(None, 2)
+            if len(fields) == 3 and int(fields[1]) == group_id:
+                members.append((int(fields[0]), fields[2]))
+        return tuple(members)
+
+    @classmethod
+    def _kill(cls, process: subprocess.Popen[bytes]) -> None:
+        group_id = process.pid
+        deadline = time.monotonic() + 1.0
+        while True:
+            try:
+                os.killpg(group_id, signal.SIGKILL)
+            except PermissionError:
+                for member, state in cls._group_members(group_id):
+                    if not state.startswith("Z"):
+                        try:
+                            os.kill(member, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+            except ProcessLookupError:
+                pass
+            if process.poll() is None:
+                process.kill()
+            try:
+                process.wait(timeout=0.05)
+            except subprocess.TimeoutExpired:
+                pass
+            live = tuple(
+                member
+                for member, state in cls._group_members(group_id)
+                if not state.startswith("Z")
+            )
+            if not live:
+                return
+            if time.monotonic() >= deadline:
+                raise HistoryError(
+                    f"Git process group still has live descendants: {live!r}"
+                )
+            time.sleep(0.01)
 
     def _run_bytes(self, *args: str, max_bytes: int = 16_000_000) -> bytes:
         if type(max_bytes) is not int or max_bytes <= 0:
