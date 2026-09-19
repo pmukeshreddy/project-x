@@ -1,0 +1,283 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review-round4/reproduce-round4-restoration.py"
+  ],
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_sha256": {
+    "src/feature_rl/generation/__init__.py": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc",
+    "src/feature_rl/generation/protocol.py": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+    "src/feature_rl/generation/provider.py": "d1f1e3ab1e7f2b6407a4223b5c442ff35d76cc7cc99b94b20239028222287719",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+  },
+  "recorded_at": "2026-09-19T16:17:01.327562+00:00",
+  "remaining_R3_omit_callback": {
+    "accepted": false,
+    "accepted_response_usage": false,
+    "all_archive_refs_resolved": true,
+    "backend_verification_calls": 1,
+    "error": "model response content violates exact literal JSON types",
+    "error_code": "ValueError",
+    "ordinary_JSON_baseline_accepted": true,
+    "ordinary_JSON_callback_inputs": [
+      "skip",
+      "keep"
+    ],
+    "ordinary_JSON_result": {
+      "flag": true,
+      "values": [
+        "keep"
+      ]
+    },
+    "provider_callback_inputs": [],
+    "raw_content": {
+      "flag": true,
+      "values": [
+        "skip",
+        "keep"
+      ]
+    },
+    "record_success": false,
+    "schema_name": "OmitContent",
+    "schema_preflight_accepted": true,
+    "synthetic_runner_calls": 1
+  },
+  "reviewed_revision": "44e9dcf1079a186a8a0432fa51333d1d07f6422f",
+  "scope": "unit_diagnostic; trusted schemas, backend/runner doubles and real ArtifactStore; no subprocess/model/inference",
+  "set_restoration": {
+    "ModelFrozenSet_constraint_bypass": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "backend_verification_calls": 1,
+      "generated_JSON_schema": {
+        "$defs": {
+          "Leaf": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": true,
+                "title": "Flag",
+                "type": "boolean"
+              },
+              "label": {
+                "title": "Label",
+                "type": "string"
+              }
+            },
+            "required": [
+              "flag",
+              "label"
+            ],
+            "title": "Leaf",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "items": {
+              "$ref": "#/$defs/Leaf"
+            },
+            "minItems": 2,
+            "title": "Values",
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "title": "ModelFrozenSet",
+        "type": "object"
+      },
+      "inert_container_length": 2,
+      "minimum_required_items": 2,
+      "ordinary_JSON_baseline_accepted": false,
+      "ordinary_JSON_baseline_error": "1 validation error for ModelFrozenSet\nvalues\n  Frozenset should have at least 2 items after validation, not 1 [type=too_short, input_value=[{'flag': True, 'label': ... True, 'label': 'same'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "ordinary_revalidation_accepts_returned_model": false,
+      "ordinary_revalidation_error": "1 validation error for ModelFrozenSet\nvalues\n  Frozenset should have at least 2 items after validation, not 1 [type=too_short, input_value=frozenset({Leaf(label='same', flag=True)}), input_type=frozenset]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "same"
+          },
+          {
+            "flag": true,
+            "label": "same"
+          }
+        ]
+      },
+      "record_success": true,
+      "returned_container_length": 1,
+      "returned_container_type": "frozenset",
+      "returned_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "same"
+          }
+        ]
+      },
+      "schema_name": "ModelFrozenSet",
+      "synthetic_runner_calls": 1
+    },
+    "ModelFrozenSet_valid_control": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "backend_verification_calls": 1,
+      "ordinary_revalidation_accepts_returned_model": true,
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "second"
+          }
+        ]
+      },
+      "record_success": true,
+      "returned_container_length": 2,
+      "returned_container_type": "frozenset",
+      "returned_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "second"
+          }
+        ]
+      },
+      "schema_name": "ModelFrozenSet",
+      "synthetic_runner_calls": 1
+    },
+    "ModelSet_constraint_bypass": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "backend_verification_calls": 1,
+      "generated_JSON_schema": {
+        "$defs": {
+          "Leaf": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": true,
+                "title": "Flag",
+                "type": "boolean"
+              },
+              "label": {
+                "title": "Label",
+                "type": "string"
+              }
+            },
+            "required": [
+              "flag",
+              "label"
+            ],
+            "title": "Leaf",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "items": {
+              "$ref": "#/$defs/Leaf"
+            },
+            "minItems": 2,
+            "title": "Values",
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "title": "ModelSet",
+        "type": "object"
+      },
+      "inert_container_length": 2,
+      "minimum_required_items": 2,
+      "ordinary_JSON_baseline_accepted": false,
+      "ordinary_JSON_baseline_error": "1 validation error for ModelSet\nvalues\n  Set should have at least 2 items after validation, not 1 [type=too_short, input_value=[{'flag': True, 'label': ... True, 'label': 'same'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "ordinary_revalidation_accepts_returned_model": false,
+      "ordinary_revalidation_error": "1 validation error for ModelSet\nvalues\n  Set should have at least 2 items after validation, not 1 [type=too_short, input_value={Leaf(label='same', flag=True)}, input_type=set]\n    For further information visit https://errors.pydantic.dev/2.13/v/too_short",
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "same"
+          },
+          {
+            "flag": true,
+            "label": "same"
+          }
+        ]
+      },
+      "record_success": true,
+      "returned_container_length": 1,
+      "returned_container_type": "set",
+      "returned_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "same"
+          }
+        ]
+      },
+      "schema_name": "ModelSet",
+      "synthetic_runner_calls": 1
+    },
+    "ModelSet_valid_control": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "backend_verification_calls": 1,
+      "ordinary_revalidation_accepts_returned_model": true,
+      "raw_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "second"
+          }
+        ]
+      },
+      "record_success": true,
+      "returned_container_length": 2,
+      "returned_container_type": "set",
+      "returned_content": {
+        "values": [
+          {
+            "flag": true,
+            "label": "first"
+          },
+          {
+            "flag": true,
+            "label": "second"
+          }
+        ]
+      },
+      "schema_name": "ModelSet",
+      "synthetic_runner_calls": 1
+    }
+  }
+}

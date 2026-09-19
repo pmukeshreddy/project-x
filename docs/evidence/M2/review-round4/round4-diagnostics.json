@@ -1,0 +1,1137 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review-round4/reproduce-round4.py"
+  ],
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_sha256": {
+    "src/feature_rl/generation/__init__.py": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc",
+    "src/feature_rl/generation/protocol.py": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+    "src/feature_rl/generation/provider.py": "d1f1e3ab1e7f2b6407a4223b5c442ff35d76cc7cc99b94b20239028222287719",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+  },
+  "recorded_at": "2026-09-19T16:13:39.269948+00:00",
+  "remaining_R3_after_chain": {
+    "accepted": false,
+    "accepted_response_usage": false,
+    "all_archive_refs_resolved": true,
+    "archive_names": [
+      "attempt",
+      "cost",
+      "events",
+      "options",
+      "provenance",
+      "request",
+      "response",
+      "retrieval",
+      "schema",
+      "status",
+      "usage"
+    ],
+    "backend_verification_calls": 1,
+    "chain_core_forms": [
+      "function-after(str -> int)",
+      "int"
+    ],
+    "error": "model response content violates exact literal JSON types",
+    "error_code": "ValueError",
+    "generated_JSON_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "flag": {
+          "const": true,
+          "title": "Flag",
+          "type": "boolean"
+        },
+        "number": {
+          "title": "Number",
+          "type": "string"
+        }
+      },
+      "required": [
+        "flag",
+        "number"
+      ],
+      "title": "AfterChainContent",
+      "type": "object"
+    },
+    "known_cost": {
+      "category": "authoring",
+      "cpu_seconds": 1.0,
+      "gpu_seconds": null,
+      "human_minutes": null,
+      "input_tokens": 41,
+      "measurement": "partial",
+      "note": "Local execution: wall/CPU and validated observed token counts are measured when present; GPU time, energy, human time and currency cost are unknown. No remote API was used.",
+      "output_tokens": 1,
+      "usd": null,
+      "wall_seconds": 1.5
+    },
+    "ordinary_JSON_baseline_accepted": true,
+    "ordinary_JSON_typed_content": {
+      "fields": {
+        "flag": {
+          "type": "bool",
+          "value": true
+        },
+        "number": {
+          "type": "int",
+          "value": 3
+        }
+      },
+      "model": "AfterChainContent"
+    },
+    "raw_content": {
+      "flag": true,
+      "number": "3"
+    },
+    "record_success": false,
+    "requires_revalidation": true,
+    "schema_name": "AfterChainContent",
+    "schema_preflight_accepted": true,
+    "synthetic_runner_calls": 1
+  },
+  "reviewed_revision": "44e9dcf1079a186a8a0432fa51333d1d07f6422f",
+  "scope": "unit_diagnostic; backend/runner doubles, trusted schema fixtures and real ArtifactStore; no subprocess/model/inference",
+  "supported_cases": {
+    "JSON_callback_mode": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "flag": true
+      },
+      "raw_content": {
+        "flag": true
+      },
+      "record_success": true,
+      "schema_name": "JsonModeLiteralContent",
+      "serialized_content": "{\"flag\":true}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "flag": {
+            "type": "bool",
+            "value": true
+          }
+        },
+        "model": "JsonModeLiteralContent"
+      }
+    },
+    "boolean_model_union_false": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "mode": {
+          "flag": false
+        }
+      },
+      "raw_content": {
+        "mode": {
+          "flag": false
+        }
+      },
+      "record_success": true,
+      "schema_name": "UnionLiteralContent",
+      "serialized_content": "{\"mode\":{\"flag\":false}}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "mode": {
+            "fields": {
+              "flag": {
+                "type": "bool",
+                "value": false
+              }
+            },
+            "model": "DisabledLiteral"
+          }
+        },
+        "model": "UnionLiteralContent"
+      }
+    },
+    "boolean_model_union_true": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "raw_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "record_success": true,
+      "schema_name": "UnionLiteralContent",
+      "serialized_content": "{\"mode\":{\"flag\":true}}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "mode": {
+            "fields": {
+              "flag": {
+                "type": "bool",
+                "value": true
+              }
+            },
+            "model": "EnabledLiteral"
+          }
+        },
+        "model": "UnionLiteralContent"
+      }
+    },
+    "enum_tuple_UTC_transport": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "recorded_at": "2026-09-19T10:00:00Z",
+        "values": [
+          "alpha"
+        ],
+        "visibility": "authoring"
+      },
+      "raw_content": {
+        "recorded_at": "2026-09-19T10:00:00Z",
+        "values": [
+          "alpha"
+        ],
+        "visibility": "authoring"
+      },
+      "record_success": true,
+      "schema_name": "EnumLiteralContent",
+      "serialized_content": "{\"visibility\":\"authoring\",\"values\":[\"alpha\"],\"recorded_at\":\"2026-09-19T10:00:00Z\"}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "recorded_at": {
+            "type": "datetime",
+            "value": "2026-09-19T10:00:00+00:00"
+          },
+          "values": {
+            "items": [
+              {
+                "type": "str",
+                "value": "alpha"
+              }
+            ],
+            "type": "tuple"
+          },
+          "visibility": {
+            "type": "Visibility",
+            "value": "authoring"
+          }
+        },
+        "model": "EnumLiteralContent"
+      }
+    },
+    "invalid_EnumLiteralContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "error": "model response content violates exact literal JSON types",
+      "error_code": "ValueError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": 1.0,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": 41,
+        "measurement": "partial",
+        "note": "Local execution: wall/CPU and validated observed token counts are measured when present; GPU time, energy, human time and currency cost are unknown. No remote API was used.",
+        "output_tokens": 1,
+        "usd": null,
+        "wall_seconds": 1.5
+      },
+      "raw_content": {
+        "recorded_at": "2026-09-19T10:00:00+01:00",
+        "values": [
+          "alpha"
+        ],
+        "visibility": "authoring"
+      },
+      "record_success": false,
+      "schema_name": "EnumLiteralContent",
+      "synthetic_runner_calls": 1
+    },
+    "invalid_PatternedLiteralContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "error": "model response content violates exact literal JSON types",
+      "error_code": "ValueError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": 1.0,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": 41,
+        "measurement": "partial",
+        "note": "Local execution: wall/CPU and validated observed token counts are measured when present; GPU time, energy, human time and currency cost are unknown. No remote API was used.",
+        "output_tokens": 1,
+        "usd": null,
+        "wall_seconds": 1.5
+      },
+      "raw_content": {
+        "flags": {
+          "k_flag": 1
+        }
+      },
+      "record_success": false,
+      "schema_name": "PatternedLiteralContent",
+      "synthetic_runner_calls": 1
+    },
+    "invalid_UnionLiteralContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "error": "model response content violates exact literal JSON types",
+      "error_code": "ValueError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": 1.0,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": 41,
+        "measurement": "partial",
+        "note": "Local execution: wall/CPU and validated observed token counts are measured when present; GPU time, energy, human time and currency cost are unknown. No remote API was used.",
+        "output_tokens": 1,
+        "usd": null,
+        "wall_seconds": 1.5
+      },
+      "raw_content": {
+        "mode": {
+          "flag": 1
+        }
+      },
+      "record_success": false,
+      "schema_name": "UnionLiteralContent",
+      "synthetic_runner_calls": 1
+    },
+    "mixed_model_union_integer": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "mode": {
+          "flag": 1
+        }
+      },
+      "raw_content": {
+        "mode": {
+          "flag": 1
+        }
+      },
+      "record_success": true,
+      "schema_name": "MixedLiteralContent",
+      "serialized_content": "{\"mode\":{\"flag\":1}}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "mode": {
+            "fields": {
+              "flag": {
+                "type": "int",
+                "value": 1
+              }
+            },
+            "model": "NumberAlternative"
+          }
+        },
+        "model": "MixedLiteralContent"
+      }
+    },
+    "nested_root_model": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "flag": true
+      },
+      "raw_content": {
+        "flag": true
+      },
+      "record_success": true,
+      "schema_name": "NestedRootContent",
+      "serialized_content": "{\"flag\":true}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "flag": {
+            "fields": {
+              "root": {
+                "type": "bool",
+                "value": true
+              }
+            },
+            "model": "FlagRoot"
+          }
+        },
+        "model": "NestedRootContent"
+      }
+    },
+    "nested_scalar_tuple": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "values": [
+          1,
+          true,
+          2
+        ]
+      },
+      "raw_content": {
+        "values": [
+          1,
+          true,
+          2
+        ]
+      },
+      "record_success": true,
+      "schema_name": "NestedScalarUnionContent",
+      "serialized_content": "{\"values\":[1,true,2]}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "values": {
+            "items": [
+              {
+                "type": "int",
+                "value": 1
+              },
+              {
+                "type": "bool",
+                "value": true
+              },
+              {
+                "type": "int",
+                "value": 2
+              }
+            ],
+            "type": "tuple"
+          }
+        },
+        "model": "NestedScalarUnionContent"
+      }
+    },
+    "patterned_mapping": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "flags": {
+          "k_flag": true
+        }
+      },
+      "raw_content": {
+        "flags": {
+          "k_flag": true
+        }
+      },
+      "record_success": true,
+      "schema_name": "PatternedLiteralContent",
+      "serialized_content": "{\"flags\":{\"k_flag\":true}}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "flags": {
+            "items": {
+              "k_flag": {
+                "type": "bool",
+                "value": true
+              }
+            },
+            "type": "dict"
+          }
+        },
+        "model": "PatternedLiteralContent"
+      }
+    },
+    "scalar_boolean_as_bool": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "flag": true
+      },
+      "raw_content": {
+        "flag": true
+      },
+      "record_success": true,
+      "schema_name": "ScalarBooleanUnionContent",
+      "serialized_content": "{\"flag\":true}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "flag": {
+            "type": "bool",
+            "value": true
+          }
+        },
+        "model": "ScalarBooleanUnionContent"
+      }
+    },
+    "scalar_boolean_as_int": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "flag": 1
+      },
+      "raw_content": {
+        "flag": 1
+      },
+      "record_success": true,
+      "schema_name": "ScalarBooleanUnionContent",
+      "serialized_content": "{\"flag\":1}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "flag": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        "model": "ScalarBooleanUnionContent"
+      }
+    },
+    "scalar_integer_as_float": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "value": 3.0
+      },
+      "raw_content": {
+        "value": 3.0
+      },
+      "record_success": true,
+      "schema_name": "ScalarIntegerUnionContent",
+      "serialized_content": "{\"value\":3.0}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "value": {
+            "type": "float",
+            "value": 3.0
+          }
+        },
+        "model": "ScalarIntegerUnionContent"
+      }
+    },
+    "scalar_integer_as_int": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "value": 3
+      },
+      "raw_content": {
+        "value": 3
+      },
+      "record_success": true,
+      "schema_name": "ScalarIntegerUnionContent",
+      "serialized_content": "{\"value\":3}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "value": {
+            "type": "int",
+            "value": 3
+          }
+        },
+        "model": "ScalarIntegerUnionContent"
+      }
+    },
+    "simple_lifecycle_runs_once_in_JSON_mode": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 1,
+      "content": {
+        "flag": true,
+        "marker": "generated"
+      },
+      "lifecycle": [
+        "default",
+        "post_init",
+        "after:json"
+      ],
+      "raw_content": {
+        "flag": true
+      },
+      "record_success": true,
+      "schema_name": "LifecycleContent",
+      "serialized_content": "{\"flag\":true,\"marker\":\"generated\"}",
+      "synthetic_runner_calls": 1,
+      "typed_content": {
+        "fields": {
+          "flag": {
+            "type": "bool",
+            "value": true
+          },
+          "marker": {
+            "type": "str",
+            "value": "generated"
+          }
+        },
+        "model": "LifecycleContent"
+      }
+    },
+    "synthetic_M0_RequirementContract_transport": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "record_success": true,
+      "schema_name": "RequirementContract"
+    },
+    "synthetic_M0_ScenarioPlan_transport": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "record_success": true,
+      "schema_name": "ScenarioPlan"
+    }
+  },
+  "unsupported_cases": {
+    "BeforeFieldContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 0,
+      "error": "output schema with Literals cannot preserve callback or lifecycle semantics for before/wrap validators",
+      "error_code": "GenerationSchemaUnsupportedError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Generation did not start; all execution and monetary costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "ordinary_JSON_baseline_accepted": true,
+      "ordinary_JSON_result_type": "BeforeFieldContent",
+      "raw_content": {
+        "flag": true,
+        "number": "3"
+      },
+      "record_success": false,
+      "schema_name": "BeforeFieldContent",
+      "synthetic_runner_calls": 0
+    },
+    "CallbackUnionContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 0,
+      "error": "output schema with Literals cannot preserve callback or lifecycle semantics: custom validator in a union alternative",
+      "error_code": "GenerationSchemaUnsupportedError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Generation did not start; all execution and monetary costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "ordinary_JSON_baseline_accepted": true,
+      "ordinary_JSON_result_type": "CallbackUnionContent",
+      "raw_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "record_success": false,
+      "schema_name": "CallbackUnionContent",
+      "synthetic_runner_calls": 0
+    },
+    "PostInitUnionContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 0,
+      "error": "output schema with Literals cannot preserve callback or lifecycle semantics: custom validator in a union alternative",
+      "error_code": "GenerationSchemaUnsupportedError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Generation did not start; all execution and monetary costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "ordinary_JSON_baseline_accepted": true,
+      "ordinary_JSON_result_type": "PostInitUnionContent",
+      "raw_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "record_success": false,
+      "schema_name": "PostInitUnionContent",
+      "synthetic_runner_calls": 0
+    },
+    "ReferencedBeforeContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 0,
+      "error": "output schema with Literals cannot preserve callback or lifecycle semantics for before/wrap validators",
+      "error_code": "GenerationSchemaUnsupportedError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Generation did not start; all execution and monetary costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "ordinary_JSON_baseline_accepted": true,
+      "ordinary_JSON_result_type": "ReferencedBeforeContent",
+      "raw_content": {
+        "first": {
+          "number": "3"
+        },
+        "flag": true,
+        "second": {
+          "number": "4"
+        }
+      },
+      "record_success": false,
+      "schema_name": "ReferencedBeforeContent",
+      "synthetic_runner_calls": 0
+    },
+    "UnsupportedPlainLiteralContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 0,
+      "error": "output schema with Literals cannot use a plain custom validator",
+      "error_code": "GenerationSchemaUnsupportedError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Generation did not start; all execution and monetary costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "ordinary_JSON_baseline_accepted": true,
+      "ordinary_JSON_result_type": "UnsupportedPlainLiteralContent",
+      "raw_content": {
+        "flag": true
+      },
+      "record_success": false,
+      "schema_name": "UnsupportedPlainLiteralContent",
+      "synthetic_runner_calls": 0
+    },
+    "WrapFieldContent": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 0,
+      "error": "output schema with Literals cannot preserve callback or lifecycle semantics for before/wrap validators",
+      "error_code": "GenerationSchemaUnsupportedError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Generation did not start; all execution and monetary costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "ordinary_JSON_baseline_accepted": true,
+      "ordinary_JSON_result_type": "WrapFieldContent",
+      "raw_content": {
+        "flag": true,
+        "number": "3"
+      },
+      "record_success": false,
+      "schema_name": "WrapFieldContent",
+      "synthetic_runner_calls": 0
+    },
+    "unsupported_schema_publication_replay": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "archive_names": [
+        "attempt",
+        "cost",
+        "events",
+        "options",
+        "provenance",
+        "request",
+        "response",
+        "retrieval",
+        "schema",
+        "status",
+        "usage"
+      ],
+      "backend_verification_calls": 0,
+      "before_replay_archive_names": [
+        "attempt",
+        "request",
+        "response",
+        "retrieval"
+      ],
+      "error": "archive publication failed: reviewer injected unsupported-schema publication failure",
+      "error_code": "ArchivePublicationError",
+      "known_cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Generation did not start; all execution and monetary costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "raw_content": {
+        "flag": true,
+        "number": "3"
+      },
+      "record_success": false,
+      "recovered_error_code": "GenerationSchemaUnsupportedError",
+      "schema_name": "BeforeFieldContent",
+      "synthetic_runner_calls": 0
+    }
+  }
+}

@@ -17,7 +17,7 @@ Read this file, the active brief, actual upstream interface/code, latest report/
 | --- | --- | --- | --- |
 | M0 | `/root/m0_contracts` | Core, provenance v2 and optional MLX dependencies independently approved | Own shared contract/config fixes when requested |
 | M1 | `/root/m1_sources` | Reviewed and integrated for documented reconstruction scope | Own downstream fixes; Click task still provisional |
-| M2 | `/root/m2_authoring_recovery` (transferred from `/root/m2_authoring`) | Product44e9dcf committed;79 provider/234 full owner tests; round4 independent re-review active | Re-review, current-version native verification, later runtime-backed authoring/scenarios |
+| M2 | `/root/m2_authoring_recovery` (transferred from `/root/m2_authoring`) | Product44e9dcf; round4 review FAIL for R3/R4; same-owner round5 fix next | Sound capability boundary, re-review, native gate, later authoring |
 | M3 | `/root/m3_runtime` | Trusted Docker research and inert dependency preparation complete; no product | Reviewed M2 provider then actual lifecycle/B health |
 | M4 | Unassigned | Brief ready, no product | Reviewed M2 authoring and M3 runtime |
 | M5 | `/root/m5_qualification` | Human-signature mechanism preflight complete75ed88a; no product | Reviewed actual grading/controls; human review remains external |
@@ -27,7 +27,9 @@ Read this file, the active brief, actual upstream interface/code, latest report/
 
 Independent reviewers retained: `/root/review_m0` (M0 all slices PASS), `/root/review_m1` (M1 round2 PASS), `/root/review_m3_preparation` (preparation scope PASS, `docs/reviews/M3-preparation.md`, no P0/P1 findings). M3's brief requires its concrete production reuse gates; no new Docker execution or runtime/product approval followed from this review. Preflight `/root/execution_preflight` complete. New slices require actual independent review, not owner assertion.
 
-## Active handoff: M2 generation provider — round4 independent re-review
+## Active handoff: M2 generation provider — round5 correction
+
+**Latest checkpoint:** independent round4 report is final, specification FAIL / quality CHANGES REQUIRED for R3 callback dependencies and new R4 set/frozenset constraint bypass; R1/R2 closed. `docs/reviews/M2-provider-round4.md` and both diagnostic runs under `docs/evidence/M2/review-round4/` are preserved. Same owner will implement the narrower boundary in `docs/briefs/M2-provider-round5.md` and `docs/decisions/M2-literal-validation.md`. This supersedes older statements below that the report is pending. No product or native verification has run since44e9dcf. Retain same available owner under the user execution rule; an additional review gate protects against unsound corrections.
 
 **Current product and gate:** `44e9dcf1079a186a8a0432fa51333d1d07f6422f`, current owner `/root/m2_authoring_recovery` FINAL complete for round4 fix scope only. Final79 provider /234 full tests exit0 at2026-09-19T16:03:08.632333–16:03:28.203867UTC; zero native/remote calls. `provider-v3-fixround4-verification.json` binds final source/test/doc/log bytes; root mechanically checked12 identities against committed product, all match (`coordinator-round4-binding.json`). Pure supported core schemas return the exact selected value without second validation; non-union after/default/post-init semantics use original strict JSON once; before/wrap/plain/custom-init/dataclass/call/unknown forms and union/lifecycle combinations explicitly refuse before backend verification. Existing enum/tuple/UTC, valid scalar/model/patterned/nested alternatives, M0 requirement/scenario transport and R2 remain covered.
 
