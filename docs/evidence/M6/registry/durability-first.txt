@@ -1,0 +1,48 @@
+...............FFF...............                                        [100%]
+=================================== FAILURES ===================================
+___________ test_old_claim_replay_cannot_authorize_another_dispatch ____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1155/test_old_claim_replay_cannot_a0')
+
+    def test_old_claim_replay_cannot_authorize_another_dispatch(tmp_path):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        job = reg.enqueue(spec)
+        claim = reg.claim(job.job_id, owner='worker', claim_key='once')
+        reg.abandon(claim, reason='observed interruption', evidence=(source,))
+>       with pytest.raises(m.StaleClaim):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE StaleClaim
+
+tests/test_registry.py:242: Failed
+_______ test_active_claim_replay_is_blocked_after_dependency_quarantine ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1155/test_active_claim_replay_is_bl0')
+
+    def test_active_claim_replay_is_blocked_after_dependency_quarantine(tmp_path):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        job = reg.enqueue(spec)
+        reg.claim(job.job_id, owner='worker', claim_key='once')
+        reg.quarantine(source, notice_id='q', reason='concrete new defect', evidence=(config,))
+>       with pytest.raises(m.QuarantinedError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE QuarantinedError
+
+tests/test_registry.py:251: Failed
+______________ test_missing_lock_and_hardlinked_database_rejected ______________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1155/test_missing_lock_and_hardlink0')
+
+    def test_missing_lock_and_hardlinked_database_rejected(tmp_path):
+        m, store, reg, source, config, spec = setup(tmp_path)
+        reg.enqueue(spec)
+        (reg.root / 'registry.lock').unlink()
+>       with pytest.raises(m.RegistryError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE RegistryError
+
+tests/test_registry.py:259: Failed
+=========================== short test summary info ============================
+FAILED tests/test_registry.py::test_old_claim_replay_cannot_authorize_another_dispatch
+FAILED tests/test_registry.py::test_active_claim_replay_is_blocked_after_dependency_quarantine
+FAILED tests/test_registry.py::test_missing_lock_and_hardlinked_database_rejected
+3 failed, 30 passed in 4.36s

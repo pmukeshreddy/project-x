@@ -1,0 +1,165 @@
+{
+  "argv": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_registry.py",
+    "tests/test_registry_durability.py"
+  ],
+  "environment_override": {
+    "PYTHONPATH": "src"
+  },
+  "exit_status": 0,
+  "finished_at": "2026-09-19T20:59:10.337932+00:00",
+  "head_observed": "e1c52ec15c3fc374aa314c8e9845aea4f38b3735",
+  "history": [
+    {
+      "log": "red-core.txt",
+      "note": "Pytest reported 15 missing-core failures, then the first shell observer used zsh reserved variable status. The corrected observer/log below records its exit.",
+      "pytest_exit": null,
+      "shell_exit": 1
+    },
+    {
+      "exit_status": 1,
+      "log": "red-core-observer2.txt",
+      "outcome": "15 expected missing-core failures"
+    },
+    {
+      "exit_status": 0,
+      "log": "first-core.txt",
+      "outcome": "15 passed"
+    },
+    {
+      "exit_status": 1,
+      "log": "durability-first.txt",
+      "outcome": "3 reproduced claim/lock failures, 30 passed"
+    },
+    {
+      "exit_status": 0,
+      "log": "focused-green.txt",
+      "outcome": "33 passed"
+    }
+  ],
+  "log": {
+    "docs/evidence/M6/registry/final-focused.txt": {
+      "bytes": 99,
+      "sha256": "24afa18229c007db164bc57d8b9cbb238bfb85d8ddb20baa4e7613e0f294fc96"
+    }
+  },
+  "platform": "macOS-26.3-arm64-arm-64bit-Mach-O",
+  "previous_logs": {
+    "docs/evidence/M6/registry/durability-first.txt": {
+      "bytes": 2626,
+      "sha256": "214ee5450113f48a70812f44f369278a8f273f1a6615314919b74ce5b08fb61a"
+    },
+    "docs/evidence/M6/registry/final-focused.txt": {
+      "bytes": 99,
+      "sha256": "24afa18229c007db164bc57d8b9cbb238bfb85d8ddb20baa4e7613e0f294fc96"
+    },
+    "docs/evidence/M6/registry/first-core.txt": {
+      "bytes": 99,
+      "sha256": "881ff6cebb78e2dfbea7bffc8724da323c9649e1b6601197a9b3ec7e534a1125"
+    },
+    "docs/evidence/M6/registry/focused-green.txt": {
+      "bytes": 99,
+      "sha256": "bc6f3d50e3351f489ac516a1e4fea1cb3287fc3bdd8cb57fcf2df99609c7d555"
+    },
+    "docs/evidence/M6/registry/red-core-observer2.txt": {
+      "bytes": 20428,
+      "sha256": "8ea31dea4edeeb5e77801d93bef19a1e2ff2320f3a86762591b5b8f8c6dd5ce3"
+    },
+    "docs/evidence/M6/registry/red-core.txt": {
+      "bytes": 20428,
+      "sha256": "831932291bb4bdfaa91d046d63fe2b8ea6a309f3bb5404baafdfa5fdd4eed8bb"
+    }
+  },
+  "python": "3.13.7 (main, Aug 14 2025, 11:12:11) [Clang 17.0.0 (clang-1700.3.19.1)]",
+  "scope": "M6_REGISTRY_TRUSTED_SYNTHETIC_LOCAL_TESTS_NO_FEATURE_EXECUTION",
+  "source_after": {
+    "src/feature_rl/registry/__init__.py": {
+      "bytes": 984,
+      "sha256": "c9b303f231a63377f881c70c3a0d58cf4fd778d12c039aa0ccf28d0d448c443a"
+    },
+    "src/feature_rl/registry/core.py": {
+      "bytes": 13497,
+      "sha256": "625dc5dee237befe7db5f15dc5c9b3e2c0134cd0cd9e46e5a338310f03d6736b"
+    },
+    "src/feature_rl/registry/models.py": {
+      "bytes": 5517,
+      "sha256": "c138bad378120deadb1da24e8451ef9261140551058d5efd73fa386c832fe545"
+    },
+    "src/feature_rl/registry/state.py": {
+      "bytes": 15092,
+      "sha256": "0e6c8a3ff745f4a6f5e6289170f6e8d185831dab6f7bbe01e5605e7081cef186"
+    },
+    "src/feature_rl/registry/storage.py": {
+      "bytes": 15833,
+      "sha256": "2cf64d5e70bb614d99c6678a62e949a5302921e97ab88ff7aa3f0c5fb5f8938d"
+    },
+    "tests/test_registry.py": {
+      "bytes": 14681,
+      "sha256": "0a2f38d4cadeb5d4e8def67514f1ecb13002c7c8fff897a995bc3174c51e2795"
+    },
+    "tests/test_registry_durability.py": {
+      "bytes": 6416,
+      "sha256": "d1954202a18eb75fdd592b094f066f3d27a448134beb564b2627de9abb612d34"
+    }
+  },
+  "source_before": {
+    "src/feature_rl/registry/__init__.py": {
+      "bytes": 984,
+      "sha256": "c9b303f231a63377f881c70c3a0d58cf4fd778d12c039aa0ccf28d0d448c443a"
+    },
+    "src/feature_rl/registry/core.py": {
+      "bytes": 13497,
+      "sha256": "625dc5dee237befe7db5f15dc5c9b3e2c0134cd0cd9e46e5a338310f03d6736b"
+    },
+    "src/feature_rl/registry/models.py": {
+      "bytes": 5517,
+      "sha256": "c138bad378120deadb1da24e8451ef9261140551058d5efd73fa386c832fe545"
+    },
+    "src/feature_rl/registry/state.py": {
+      "bytes": 15092,
+      "sha256": "0e6c8a3ff745f4a6f5e6289170f6e8d185831dab6f7bbe01e5605e7081cef186"
+    },
+    "src/feature_rl/registry/storage.py": {
+      "bytes": 15833,
+      "sha256": "2cf64d5e70bb614d99c6678a62e949a5302921e97ab88ff7aa3f0c5fb5f8938d"
+    },
+    "tests/test_registry.py": {
+      "bytes": 14681,
+      "sha256": "0a2f38d4cadeb5d4e8def67514f1ecb13002c7c8fff897a995bc3174c51e2795"
+    },
+    "tests/test_registry_durability.py": {
+      "bytes": 6416,
+      "sha256": "d1954202a18eb75fdd592b094f066f3d27a448134beb564b2627de9abb612d34"
+    }
+  },
+  "source_unchanged": true,
+  "sqlite": "3.50.4",
+  "started_at": "2026-09-19T20:59:05.818211+00:00",
+  "upstream_inputs": {
+    "docs/briefs/M6-registry-core.md": {
+      "bytes": 4501,
+      "sha256": "ad504a1a8dd120b98da9861381800129902692f5d697737855b3a5c6d5645ae3"
+    },
+    "docs/decisions/code-completion-scope.md": {
+      "bytes": 2736,
+      "sha256": "e2b917f58027ba7129264b30f1177b897cfef68e8a2ac1c0fe2d963423b6c20d"
+    },
+    "docs/decisions/independent-code-slices.md": {
+      "bytes": 1725,
+      "sha256": "7fa9d7c919f6919733345e039a6aa42297f4f59f01d9f9eb125a390eb6f49efc"
+    },
+    "src/feature_rl/artifacts/store.py": {
+      "bytes": 14254,
+      "sha256": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c"
+    },
+    "src/feature_rl/contracts/models.py": {
+      "bytes": 31198,
+      "sha256": "e2103bd90901c58e2ce88fa0dad7e6dc87b1181c807ea1482f26d3713a54f3bd"
+    }
+  },
+  "wall_seconds": 4.5181634170003235
+}

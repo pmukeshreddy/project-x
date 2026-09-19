@@ -1,0 +1,387 @@
+FFFFFFFFFFFFFFF                                                          [100%]
+=================================== FAILURES ===================================
+_________ test_registration_revalidates_actual_bytes_and_ref_metadata __________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_registration_revalidates_0')
+
+    def test_registration_revalidates_actual_bytes_and_ref_metadata(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+____________________ test_artifact_caps_and_symlink_refusal ____________________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_artifact_caps_and_symlink0')
+
+    def test_artifact_caps_and_symlink_refusal(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path, max_artifact_envelope_bytes=1024, max_artifact_payload_bytes=512)
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_registry.py:67: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+____________ test_immutable_dependencies_and_transitive_quarantine _____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_immutable_dependencies_an0')
+
+    def test_immutable_dependencies_and_transitive_quarantine(tmp_path):
+>       m, store, reg, a, b, spec = setup(tmp_path)
+                                    ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:81: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+____________ test_content_job_identity_queue_backpressure_and_drift ____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_content_job_identity_queu0')
+
+    def test_content_job_identity_queue_backpressure_and_drift(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path, max_active_jobs=1)
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_registry.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+________ test_claim_replay_competition_abandon_retry_and_attempt_limit _________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_claim_replay_competition_0')
+
+    def test_claim_replay_competition_abandon_retry_and_attempt_limit(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:119: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+________ test_upstream_snapshot_replay_late_cost_and_global_attribution ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_upstream_snapshot_replay_0')
+
+    def test_upstream_snapshot_replay_late_cost_and_global_attribution(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:141: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+______ test_completion_requires_existing_exact_costs_and_immutable_result ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_completion_requires_exist0')
+
+    def test_completion_requires_existing_exact_costs_and_immutable_result(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:165: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+_____________ test_abandoned_upstream_receipts_remain_reconcilable _____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_abandoned_upstream_receip0')
+
+    def test_abandoned_upstream_receipts_remain_reconcilable(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:179: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+________ test_unexpected_state_files_links_and_hardlinks_refused[extra] ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_unexpected_state_files_li0')
+entry = 'extra'
+
+    @pytest.mark.parametrize('entry', ['extra', 'index.sqlite3', 'events.jsonl', 'registry.lock'])
+    def test_unexpected_state_files_links_and_hardlinks_refused(tmp_path, entry):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:191: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+____ test_unexpected_state_files_links_and_hardlinks_refused[index.sqlite3] ____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_unexpected_state_files_li1')
+entry = 'index.sqlite3'
+
+    @pytest.mark.parametrize('entry', ['extra', 'index.sqlite3', 'events.jsonl', 'registry.lock'])
+    def test_unexpected_state_files_links_and_hardlinks_refused(tmp_path, entry):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:191: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+____ test_unexpected_state_files_links_and_hardlinks_refused[events.jsonl] _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_unexpected_state_files_li2')
+entry = 'events.jsonl'
+
+    @pytest.mark.parametrize('entry', ['extra', 'index.sqlite3', 'events.jsonl', 'registry.lock'])
+    def test_unexpected_state_files_links_and_hardlinks_refused(tmp_path, entry):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:191: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+____ test_unexpected_state_files_links_and_hardlinks_refused[registry.lock] ____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_unexpected_state_files_li3')
+entry = 'registry.lock'
+
+    @pytest.mark.parametrize('entry', ['extra', 'index.sqlite3', 'events.jsonl', 'registry.lock'])
+    def test_unexpected_state_files_links_and_hardlinks_refused(tmp_path, entry):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:191: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+______________ test_state_root_symlink_and_changed_limits_refused ______________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_state_root_symlink_and_ch0')
+
+    def test_state_root_symlink_and_changed_limits_refused(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:205: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+_________ test_events_and_closure_limits_fail_before_unbounded_growth __________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_events_and_closure_limits0')
+
+    def test_events_and_closure_limits_fail_before_unbounded_growth(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path, max_events=2)
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_registry.py:215: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+_______ test_job_outputs_extend_quarantine_trace_without_task_admission ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1149/test_job_outputs_extend_quaran0')
+
+    def test_job_outputs_extend_quarantine_trace_without_task_admission(tmp_path):
+>       m, store, reg, source, config, spec = setup(tmp_path)
+                                              ^^^^^^^^^^^^^^^
+
+tests/test_registry.py:224: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_registry.py:22: in setup
+    m = api()
+        ^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       assert importlib.util.find_spec('feature_rl.registry') is not None, 'M6 registry core is missing'
+E       AssertionError: M6 registry core is missing
+E       assert None is not None
+E        +  where None = <function find_spec at 0x104beede0>('feature_rl.registry')
+E        +    where <function find_spec at 0x104beede0> = <module 'importlib.util' (frozen)>.find_spec
+E        +      where <module 'importlib.util' (frozen)> = importlib.util
+
+tests/test_registry.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_registry.py::test_registration_revalidates_actual_bytes_and_ref_metadata
+FAILED tests/test_registry.py::test_artifact_caps_and_symlink_refusal - Asser...
+FAILED tests/test_registry.py::test_immutable_dependencies_and_transitive_quarantine
+FAILED tests/test_registry.py::test_content_job_identity_queue_backpressure_and_drift
+FAILED tests/test_registry.py::test_claim_replay_competition_abandon_retry_and_attempt_limit
+FAILED tests/test_registry.py::test_upstream_snapshot_replay_late_cost_and_global_attribution
+FAILED tests/test_registry.py::test_completion_requires_existing_exact_costs_and_immutable_result
+FAILED tests/test_registry.py::test_abandoned_upstream_receipts_remain_reconcilable
+FAILED tests/test_registry.py::test_unexpected_state_files_links_and_hardlinks_refused[extra]
+FAILED tests/test_registry.py::test_unexpected_state_files_links_and_hardlinks_refused[index.sqlite3]
+FAILED tests/test_registry.py::test_unexpected_state_files_links_and_hardlinks_refused[events.jsonl]
+FAILED tests/test_registry.py::test_unexpected_state_files_links_and_hardlinks_refused[registry.lock]
+FAILED tests/test_registry.py::test_state_root_symlink_and_changed_limits_refused
+FAILED tests/test_registry.py::test_events_and_closure_limits_fail_before_unbounded_growth
+FAILED tests/test_registry.py::test_job_outputs_extend_quarantine_trace_without_task_admission
+15 failed in 0.15s
