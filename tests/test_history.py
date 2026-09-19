@@ -443,17 +443,24 @@ def test_git_runner_cleans_descendants_on_timeout(tmp_path, monkeypatch):
         if tuple(args[0])[0] != str(helper):
             return process
         startup_deadline = time.monotonic() + 2
-        while not child_pid.exists():
+        child = None
+        while child is None:
+            try:
+                pid_text = child_pid.read_text().strip()
+                candidate = int(pid_text) if pid_text.isdecimal() else 0
+                if candidate > 0:
+                    os.kill(candidate, 0)
+                    child = candidate
+                    break
+            except (FileNotFoundError, ProcessLookupError):
+                pass
+            except OSError as error:
+                cleanup_setup(process)
+                pytest.fail(f"could not verify timeout helper child: {error}")
             if process.poll() is not None or time.monotonic() >= startup_deadline:
                 cleanup_setup(process)
-                pytest.fail("timeout helper did not start its background child")
+                pytest.fail("timeout helper did not start a live background child")
             time.sleep(0.005)
-        child = int(child_pid.read_text())
-        try:
-            os.kill(child, 0)
-        except ProcessLookupError:
-            cleanup_setup(process)
-            pytest.fail("timeout helper child exited before the deadline test")
         observed_child = True
         return process
 
