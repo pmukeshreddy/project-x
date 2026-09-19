@@ -12,6 +12,8 @@ M2's scenario service resolves the exact frozen contract and derives the complet
 
 All earlier provider-slice native budgets are consumed. A separately declared, bounded nontraining larger-envelope measurement must precede authoring beyond the small observed profile. Existing wall/CPU/memory/input/output enforcement remains intact; a failed measurement is a recorded capacity failure, never permission to silently widen limits or substitute a backend. The coordinator can declare a new local measurement budget under existing user authorization once the exact proposal and discovery inputs are available. No routine permission request is needed for already authorized local work, and no paid or remote allocation is implied.
 
+The later `docs/decisions/M2-authoring-execution-budget.md` supplies that allocation and supersedes the separate disposable measurement suggestion: the first real structured attempt doubles as the larger-envelope measurement at frozen bounds. `docs/decisions/code-completion-scope.md` separates successful experimental construction from completion of the code.
+
 ## Scenario-generation stage boundary
 
 Current inspected provider code at the M3 handoff has only `discovery`, `initial_authoring` and `checker_generation`. The first two refuse contract contexts; the checker stage requires both an existing contract and an existing scenario plan. Therefore it cannot yet express creation of the first plan from a frozen contract. This is a concrete M2-owned interface gap for the authoring slice, not an M0 schema gap.
