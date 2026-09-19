@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-09-19",
+  "scope": "Primary-source metadata used for the SWE-Bench++ arm-C feasibility decision",
+  "raw_response_root": ".feature-rl/research/M8 (ignored; not solver-visible)",
+  "retrieval_method": "credential-free HTTPS with curl --fail-with-body, a 30 second deadline, and a 1 MiB response cap",
+  "payloads_downloaded": false,
+  "excluded": [
+    "dataset rows",
+    "patch and test-patch contents",
+    "model prompts and trajectories",
+    "container images",
+    "repository clones"
+  ],
+  "responses": [
+    {"source":"arXiv API","url":"https://export.arxiv.org/api/query?id_list=2512.17419","retrieved_at":"2026-09-19T08:30:59Z","bytes":3499,"sha256":"5789e0ea43924c9695481b41474625a0a2d4c5eb960837c9ecf0615f66a62771"},
+    {"source":"GitHub repository API","url":"https://api.github.com/repos/TuringEnterprises/SWE-Bench-plus-plus","retrieved_at":"2026-09-19T08:30:42Z","bytes":7801,"sha256":"77a14c1206d9c09fe325e2b55f536a75a3ed8590e0bfa5b3ade420c500d9a69d"},
+    {"source":"GitHub main commit API","url":"https://api.github.com/repos/TuringEnterprises/SWE-Bench-plus-plus/commits/main","retrieved_at":"2026-09-19T08:30:43Z","bytes":7378,"sha256":"b634c4e415a93653a3ccd7910b162b04080668f52ee9994e752a67bd133a55c7"},
+    {"source":"GitHub releases API","url":"https://api.github.com/repos/TuringEnterprises/SWE-Bench-plus-plus/releases?per_page=100","retrieved_at":"2026-09-19T08:30:43Z","bytes":5,"sha256":"2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"},
+    {"source":"GitHub tags API","url":"https://api.github.com/repos/TuringEnterprises/SWE-Bench-plus-plus/tags?per_page=100","retrieved_at":"2026-09-19T08:30:43Z","bytes":5,"sha256":"2ba33ca0557f1bb5b7ba88d67f9d0093c7185a36ec51fe2b7bd9372d3e001d6d"},
+    {"source":"GitHub harness license (initial main snapshot)","url":"https://raw.githubusercontent.com/TuringEnterprises/SWE-Bench-plus-plus/main/LICENSE","retrieved_at":"2026-09-19T08:30:43Z","bytes":1214,"sha256":"bba4dadf6749baa352e8f9758211f21bea362fef5b90996d1f3d50c3f7432ce8","binding":"timestamped main-branch observation"},
+    {"source":"GitHub evaluation guide (initial main snapshot)","url":"https://raw.githubusercontent.com/TuringEnterprises/SWE-Bench-plus-plus/main/README.md","retrieved_at":"2026-09-19T08:30:44Z","bytes":11319,"sha256":"7baa5c99631cc0cafa02b3552ea7ca9604dd4c88a8e1d4d90af699bd583445f7","binding":"timestamped main-branch observation"},
+    {"source":"GitHub harness license (pinned)","url":"https://raw.githubusercontent.com/TuringEnterprises/SWE-Bench-plus-plus/f938edd189049806fef7a76fdf01f0da55baa565/LICENSE","retrieved_at":"2026-09-19T08:38:51Z","bytes":1214,"sha256":"bba4dadf6749baa352e8f9758211f21bea362fef5b90996d1f3d50c3f7432ce8","binding":"immutable Git commit f938edd189049806fef7a76fdf01f0da55baa565"},
+    {"source":"GitHub evaluation guide (pinned)","url":"https://raw.githubusercontent.com/TuringEnterprises/SWE-Bench-plus-plus/f938edd189049806fef7a76fdf01f0da55baa565/README.md","retrieved_at":"2026-09-19T08:38:51Z","bytes":11319,"sha256":"7baa5c99631cc0cafa02b3552ea7ca9604dd4c88a8e1d4d90af699bd583445f7","binding":"immutable Git commit f938edd189049806fef7a76fdf01f0da55baa565"},
+    {"source":"GitHub pinned tree API","url":"https://api.github.com/repos/TuringEnterprises/SWE-Bench-plus-plus/git/trees/f938edd189049806fef7a76fdf01f0da55baa565?recursive=1","retrieved_at":"2026-09-19T08:32:16Z","bytes":17580,"sha256":"f5031c253fa1a9d171318188437c9ef89583f55981c703c5021071d26d2f06ed"},
+    {"source":"Hugging Face dataset API","url":"https://huggingface.co/api/datasets/TuringEnterprises/SWE-Bench-plus-plus","retrieved_at":"2026-09-19T08:30:44Z","bytes":2848,"sha256":"4717b87b5631fea7fea99f3b3cd013a31645af576c24cd931aec8a53d4e4fe1f"},
+    {"source":"Hugging Face datasets-server info API","url":"https://datasets-server.huggingface.co/info?dataset=TuringEnterprises%2FSWE-Bench-plus-plus","retrieved_at":"2026-09-19T08:30:44Z","bytes":1112,"sha256":"fdd4b04ee1d9325d0e59d2b40b4e71c5068e7fd4d17e097963f3e871cf20b614","binding":"timestamped live response; exact dataset revision not proven"},
+    {"source":"Hugging Face datasets-server splits API","url":"https://datasets-server.huggingface.co/splits?dataset=TuringEnterprises%2FSWE-Bench-plus-plus","retrieved_at":"2026-09-19T08:30:44Z","bytes":123,"sha256":"fde74529d8be6db2034d666c574db3364ea67ff6235682a9b409c9906223e11c","binding":"timestamped live response; exact dataset revision not proven"},
+    {"source":"Hugging Face dataset card (initial main snapshot)","url":"https://huggingface.co/datasets/TuringEnterprises/SWE-Bench-plus-plus/resolve/main/README.md","retrieved_at":"2026-09-19T08:30:45Z","bytes":12040,"sha256":"22e1f35e9f77c573296fd694e96a1da7b8d6e18ee4b79b1ca27e01f6ecc6bdd3","binding":"timestamped main-branch observation"},
+    {"source":"Hugging Face dataset card (pinned)","url":"https://huggingface.co/datasets/TuringEnterprises/SWE-Bench-plus-plus/resolve/da364537055b9bb5091783af78a02b6a3bc0e130/README.md","retrieved_at":"2026-09-19T08:38:52Z","bytes":12040,"sha256":"22e1f35e9f77c573296fd694e96a1da7b8d6e18ee4b79b1ca27e01f6ecc6bdd3","binding":"immutable Hugging Face dataset revision da364537055b9bb5091783af78a02b6a3bc0e130"}
+  ]
+}
