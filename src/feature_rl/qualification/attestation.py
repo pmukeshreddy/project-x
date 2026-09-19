@@ -33,16 +33,19 @@ Identity=Annotated[str,Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$')]
 def protected_bytes(path,cap):
     """Open only root-owned paths outside the controller/model write authority."""
     path=Path(path)
+    if os.geteuid()==0:
+        raise QualificationRejected('unverified_human_review','a root controller cannot establish enrollment outside its own write authority')
     if not path.is_absolute() or '..' in path.parts:
         raise QualificationRejected('unverified_human_review','externally administered absolute trust path required')
-    fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY)
+    fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY);current=Path('/')
     try:
         for index,part in enumerate(path.parts[1:]):
+            current=current/part
             final=index==len(path.parts)-2
             nxt=os.open(part,os.O_RDONLY|os.O_NOFOLLOW|(0 if final else os.O_DIRECTORY),dir_fd=fd)
             os.close(fd);fd=nxt
             info=os.fstat(fd)
-            if info.st_uid!=0 or info.st_mode&0o022 or (not final and not stat.S_ISDIR(info.st_mode)):
+            if info.st_uid!=0 or info.st_mode&0o022 or os.access(current,os.W_OK) or (not final and not stat.S_ISDIR(info.st_mode)):
                 raise QualificationRejected('unverified_human_review','externally administered root-owned non-writable trust path required')
         info=os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_size>cap:

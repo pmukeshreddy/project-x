@@ -1,0 +1,1 @@
+{"grade_ledgers": 9, "label": "Read-only validation of prior TEST-only execution; no new Docker, control, human or approval evidence", "registry_events_unchanged": true, "replay_and_raw_input_output_rejections": 30, "reset_ledgers": 3, "status": "PASS"}

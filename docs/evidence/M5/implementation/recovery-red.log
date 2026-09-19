@@ -1,0 +1,78 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_completed_cost_snapshot_publication_retry_preserves_exact_selected_result _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1221/test_completed_cost_snapshot_p0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1077a63f0>
+
+    def test_completed_cost_snapshot_publication_retry_preserves_exact_selected_result(tmp_path,monkeypatch):
+        q=service(tmp_path);task=task_fixture(q.store)
+        job=q._job(task,'unit-publication');claim=q._claim(job)
+        ref=put_record(q.store,{'diagnostic':'no task approval'},'unit-diagnostic')
+        subject=q.store.get_artifact(task)
+        result=c.OperationResult(operation='qualify',disposition=c.Disposition.PROVISIONAL,artifacts=(ref,),
+            evidence=subject.provenance.evidence,costs=subject.costs,reason='Synthetic non-admission result')
+        original=q.registry.complete;calls=[]
+        def committed_then_failed(*args,**kwargs):
+            selected=original(*args,**kwargs);calls.append(selected)
+            raise OSError('synthetic lost acknowledgement after durable Registry completion')
+        monkeypatch.setattr(q.registry,'complete',committed_then_failed)
+>       with pytest.raises(QualificationPublicationFailed) as failure:q._complete(claim,result)
+                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_recovery.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/qualification/service.py:62: in _complete
+    return self.registry.complete(claim,normalized,observations=(observation.observation_id,)).result
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (Claim(job_id='e7e008e37026cfa4f12211a0d2828201b9527a3fd8f61f671142b0e83903de98', attempt_id='713e7cef442121c8af430264...channel unknown. Original records retained in upstream Registry results.'),), reason='Synthetic non-admission result'))
+kwargs = {'observations': ('8ec336412670a90fbb6a9ac683b153cfc6065461083143a9902bb0faaf7284f0',)}
+
+    def committed_then_failed(*args,**kwargs):
+        selected=original(*args,**kwargs);calls.append(selected)
+>       raise OSError('synthetic lost acknowledgement after durable Registry completion')
+E       OSError: synthetic lost acknowledgement after durable Registry completion
+
+tests/test_qualification_recovery.py:20: OSError
+________ test_frozen_final_report_retries_exact_bytes_after_cas_failure ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1221/test_frozen_final_report_retri0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1077a6650>
+
+    def test_frozen_final_report_retries_exact_bytes_after_cas_failure(tmp_path,monkeypatch):
+        q=service(tmp_path);task=task_fixture(q.store)
+        original=q.store.put_artifact;retained=[]
+        def fail_report(value):
+            if isinstance(value,c.QualificationReport):
+                retained.append(value)
+                raise OSError('synthetic report storage outage after independent checks')
+            return original(value)
+        monkeypatch.setattr(q.store,'put_artifact',fail_report)
+>       with pytest.raises(QualificationPublicationFailed) as failure:q.qualify(task)
+                                                                      ^^^^^^^^^^^^^^^
+
+tests/test_qualification_recovery.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/qualification/service.py:70: in qualify
+    return self._execute(task_version,claim)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/qualification/service.py:164: in _execute
+    report_ref=self.store.put_artifact(report)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = QualificationReport(kind='QualificationReport', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, provenan...verified_human_review: external authenticated human review is required'), repair_attempts=0, policy_version='pilot-v1')
+
+    def fail_report(value):
+        if isinstance(value,c.QualificationReport):
+            retained.append(value)
+>           raise OSError('synthetic report storage outage after independent checks')
+E           OSError: synthetic report storage outage after independent checks
+
+tests/test_qualification_recovery.py:37: OSError
+=========================== short test summary info ============================
+FAILED tests/test_qualification_recovery.py::test_completed_cost_snapshot_publication_retry_preserves_exact_selected_result
+FAILED tests/test_qualification_recovery.py::test_frozen_final_report_retries_exact_bytes_after_cas_failure
+2 failed, 1 passed in 0.71s

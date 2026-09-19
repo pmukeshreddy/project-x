@@ -15,10 +15,11 @@ from feature_rl.registry import Registry, JobSpec, CostObservation, RegistryErro
 from feature_rl.verifiers import load_verifier
 from feature_rl.verifiers.loader import read_local, read_bytes
 from .models import (QualificationRejected, QualificationPolicy, RepairHistory, ReviewRequest,
-    RunBinding, ResetReceipt, ReferenceProjection, QualificationPublicationFailed, QualificationRecoveryRequired)
+    RunBinding, ResetReceipt, ReferenceProjection, QualificationPublicationFailed, QualificationRecoveryRequired,
+    CompletionPending, FrozenPublication, GradePending, RunCompletionPending)
 from .projection import derive_reference
 from .controls import assess_outcome, validate_control_plan, validate_repairs
-from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade
+from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade, validate_reset
 
 
 class QualificationService:
@@ -38,7 +39,9 @@ class QualificationService:
         self.configuration=put_record(store,{'version':'m5-configuration-v1','policy':self.policy_ref.model_dump(mode='json'),
             'grading_revision':grader.revision,'runtime_revision':grader.runtime.revision,
             'builder_revision':builder.revision if builder is not None else None},'m5-qualification-configuration')
-        self.registry.register(self.policy_ref,dependencies=tuple(r for r in (self.policy.repair_history,) if r is not None))
+        policy_inputs=tuple(dict.fromkeys((*tuple(r for r in (self.policy.repair_history,) if r is not None),
+            *(r for d in self.policy.controls for e in (*d.evidence,*d.independence_evidence) for r in e.artifacts))))
+        self.registry.register(self.policy_ref,dependencies=policy_inputs)
         self.registry.register(self.configuration,dependencies=(self.policy_ref,))
 
     def _job(self,task,invocation,*,configuration=None,inputs=None,operation='qualify'):
@@ -51,15 +54,95 @@ class QualificationService:
         return self.registry.claim(job.job_id,owner='feature_rl.qualification',claim_key=uuid.uuid4().hex)
 
     def _complete(self,claim,result):
-        original=put_record(self.store,{'version':'m5-operation-costs-v1','claim':claim.model_dump(mode='json'),
-            'operation':result.operation,'outputs':[ref.model_dump(mode='json') for ref in result.artifacts],
-            'costs':[value.model_dump(mode='json') for value in result.costs]},'m5-operation-costs')
-        self.registry.register(original,dependencies=result.artifacts)
-        normalized=c.OperationResult(operation=result.operation,disposition=result.disposition,
-            artifacts=(*result.artifacts,original),evidence=result.evidence,costs=collapse_costs(result.costs),reason=result.reason)
-        observation=self.registry.reconcile(claim,CostObservation(source='m5-operation',upstream_attempt_id=claim.attempt_id,
-            revision=1,receipts=normalized.artifacts,costs=normalized.costs))
-        return self.registry.complete(claim,normalized,observations=(observation.observation_id,)).result
+        try:
+            original=put_record(self.store,{'version':'m5-operation-costs-v1','claim':claim.model_dump(mode='json'),
+                'operation':result.operation,'outputs':[ref.model_dump(mode='json') for ref in result.artifacts],
+                'costs':[value.model_dump(mode='json') for value in result.costs]},'m5-operation-costs')
+            self.registry.register(original,dependencies=result.artifacts)
+            snapshots=[x for x in self.registry.accounting(claim.job_id).observations if x.attempt_id==claim.attempt_id]
+            if any(x.observation.source!='m5-operation' for x in snapshots):
+                raise QualificationRecoveryRequired('unexpected accounting source needs supervisor reconciliation',claim)
+            latest=max(snapshots,key=lambda x:x.observation.revision) if snapshots else None
+            intent_refs=tuple(r for x in snapshots for r in x.observation.receipts if r.kind=='m5-operation-intent')
+            artifacts=tuple(dict.fromkeys((*result.artifacts,original,*intent_refs)))
+            normalized=c.OperationResult(operation=result.operation,disposition=result.disposition,
+                artifacts=artifacts,evidence=result.evidence,costs=collapse_costs(result.costs),reason=result.reason)
+            selected=self.registry.job(claim.job_id)
+            if selected.state=='completed':
+                if selected.result!=normalized:raise QualificationRecoveryRequired('completed result differs from retained publication',claim)
+                return selected.result
+            if latest and latest.observation.receipts==artifacts and latest.observation.costs==normalized.costs:
+                observation=latest
+            else:
+                observation=self.registry.reconcile(claim,CostObservation(source='m5-operation',upstream_attempt_id=claim.attempt_id,
+                    revision=latest.observation.revision+1 if latest else 1,receipts=artifacts,costs=normalized.costs))
+            return self.registry.complete(claim,normalized,observations=(observation.observation_id,)).result
+        except QualificationRecoveryRequired:raise
+        except Exception as exc:
+            raise QualificationPublicationFailed('retain exact result and costs for publication-only recovery',
+                pending=CompletionPending(claim,result),claim=claim) from exc
+
+    def _intent(self,claim):
+        """Durably expose unknown attempted work before any runtime invocation."""
+        try:
+            snapshots=[x for x in self.registry.accounting(claim.job_id).observations if x.attempt_id==claim.attempt_id]
+            refs={r for x in snapshots for r in x.observation.receipts if r.kind=='m5-operation-intent'}
+            if refs:
+                if len(refs)!=1:raise QualificationRecoveryRequired('attempt has conflicting execution intents',claim)
+                value=__import__('json').loads(read_bytes(self.store,next(iter(refs)),65536,'m5-operation-intent',True))
+                if value['claim']!=claim.model_dump(mode='json'):raise QualificationRecoveryRequired('intent claim mismatch',claim)
+                return datetime.fromisoformat(value['started_at'])
+            if snapshots:raise QualificationRecoveryRequired('old attempt lacks a durable pre-execution intent',claim)
+            started=datetime.now(timezone.utc)
+            ref=put_record(self.store,{'version':'m5-operation-intent-v1','claim':claim.model_dump(mode='json'),
+                'started_at':started.isoformat()},'m5-operation-intent')
+            self.registry.reconcile(claim,CostObservation(source='m5-operation',upstream_attempt_id=claim.attempt_id,
+                revision=1,receipts=(ref,),costs=(unknown_cost(note='Attempt dispatched; incurred costs remain unknown until reconciled'),)))
+            return started
+        except QualificationRecoveryRequired:raise
+        except Exception as exc:raise QualificationRecoveryRequired('execution intent publication ambiguous; recover Registry before dispatch',claim) from exc
+
+    def retry_publication(self,error):
+        if not isinstance(error,QualificationPublicationFailed):raise TypeError('M5 retained publication failure required')
+        pending=error.pending
+        if isinstance(pending,RunCompletionPending):
+            try:self.retry_publication(pending.completion)
+            except QualificationPublicationFailed as exc:
+                raise QualificationPublicationFailed('retain grade completion and parent across repeated storage failure',
+                    pending=RunCompletionPending(pending.parent_claim,exc),claim=pending.parent_claim) from exc
+            return self.recover(pending.parent_claim)
+        if isinstance(pending,CompletionPending):
+            if pending.result.operation=='qualify' and pending.result.disposition==c.Disposition.SUCCESS:
+                from .admission import validate_pending_admission
+                validate_pending_admission(self,pending.result)
+            selected=self._complete(pending.claim,pending.result)
+            if selected.operation=='qualify' and selected.artifacts[0].kind=='QualificationReport':
+                report=self.store.get_artifact(selected.artifacts[0],max_envelope_bytes=4*1024*1024)
+                if report.provenance.producer=='feature_rl.qualification':
+                    self._quarantine_defect(report.task,report.provenance.inputs[-1],pending.claim.job_id,report.rejection_reasons)
+            return selected
+        if isinstance(pending,GradePending):
+            try:result=self.grader.retry_publication(pending.pending)
+            except GradePublicationFailed as exc:
+                raise QualificationPublicationFailed('retain remaining M4 publication without another execution',pending=GradePending(
+                    pending.parent_claim,pending.grade_claim,exc,pending.reset_ref,pending.reset_costs),claim=pending.parent_claim) from exc
+            if pending.reset_ref is not None:
+                result=c.OperationResult(operation='grade',disposition=result.disposition,artifacts=(*result.artifacts,pending.reset_ref),
+                    evidence=result.evidence,costs=(*pending.reset_costs,*result.costs),reason=result.reason)
+            try:self._complete(pending.grade_claim,result)
+            except QualificationPublicationFailed as exc:
+                raise QualificationPublicationFailed('retain published grade and parent continuation',
+                    pending=RunCompletionPending(pending.parent_claim,exc),claim=pending.parent_claim) from exc
+            return self.recover(pending.parent_claim)
+        if isinstance(pending,FrozenPublication):
+            try:
+                if pending.purpose=='qualification':return self._publish_qualification(pending.claim,pending.payload)
+                from .admission import publish_verification,publish_admission
+                if pending.purpose=='human_verification':return publish_verification(self,pending.claim,pending.payload)
+                if pending.purpose=='admission':return publish_admission(self,pending.claim,pending.payload)
+            except QualificationPublicationFailed:raise
+            except Exception as exc:raise error from exc
+        raise TypeError('unknown M5 publication payload')
 
     def qualify(self,task_version):
         task_version=c.ArtifactRef.model_validate(task_version)
@@ -86,7 +169,7 @@ class QualificationService:
         history=read_local(self.store,policy.repair_history,RepairHistory,'m5-repair-history',1024*1024)
         job=self.registry.job(policy.repair_history_job)
         pair=self.store.get_artifact(checked.task.source_pair,max_envelope_bytes=1024*1024)
-        if job.state!='completed' or job.result is None or policy.repair_history not in job.result.artifacts or job.spec.implementation!=policy.factory_revision or policy.repair_history_job not in self.registry.trace(pair.candidate).jobs:
+        if job.state!='completed' or job.result is None or policy.repair_history not in job.result.artifacts or job.spec.implementation!=policy.factory_revision or job.spec.operation!='construct' or pair.candidate not in job.spec.inputs or policy.repair_history_job not in self.registry.trace(pair.candidate).jobs:
             raise QualificationRejected('invalid_evidence','repair history is not selected by the configured M6 candidate operation')
         for ref in history.journal_refs:self.registry.assert_usable(ref)
         count=validate_repairs(history,pair.candidate,checked.recipe.neutral_repairs)
@@ -94,14 +177,18 @@ class QualificationService:
 
     def _execute(self,task_version,claim):
         checked=None;projection_ref=None;bindings=[];assessments={};costs=[];issues=[];count=None
-        start=time.monotonic();seen=set();calls=0
+        started=self._intent(claim);seen=set();calls=0;signatures={}
         def run(name,submission,seed,mode,targets,reset=False):
             nonlocal calls
             calls+=1
-            if calls>self.policy.max_grade_calls or time.monotonic()-start>=self.policy.max_wall_seconds:
+            if calls>self.policy.max_grade_calls or (datetime.now(timezone.utc)-started).total_seconds()>=self.policy.max_wall_seconds:
                 raise QualificationRejected('budget_exhausted','declared qualification grade-call/wall budget reached')
-            binding,result,receipt=self._run(checked,projection_ref,submission,seed,name,mode,targets,claim.job_id,reset,seen)
+            binding,result,receipt=self._run(checked,projection_ref,submission,seed,name,mode,targets,claim,reset,seen)
             bindings.append(binding);costs.extend(result.costs)
+            if name.startswith(('fresh_','reset_')):
+                signature=tuple((item.status,tuple(a.passed for a in item.assertions)) for item in receipt.cases)
+                if seed in signatures and signatures[seed]!=signature:issues.append('flaky_task: repeated reference inputs produced different outcomes')
+                signatures[seed]=signature
             outcome=assess_outcome(checked,receipt,mode,targets)
             if not outcome.passed:issues.append(outcome.code+': '+name+': '+outcome.detail)
             gate=c.RunAssessment(name=name,subject=task_version,disposition=c.Disposition.SUCCESS if outcome.passed else c.Disposition.REJECTED,
@@ -140,64 +227,94 @@ class QualificationService:
             for index,seed in enumerate(self.policy.reset_seeds):run('reset_'+str(index),projection.submission,seed,'positive',(),True)
         except QualificationRejected as exc:issues.append(exc.code+': '+exc.detail)
         except (ArtifactError,ValueError,EnvironmentError) as exc:issues.append('environment_failure: '+type(exc).__name__+': '+str(exc)[:1200])
-        except GradePublicationFailed as exc:
-            pending=QualificationPublicationFailed('grade publication must recover without execution retry',pending=exc,claim=claim)
-            raise pending from exc
-        issues.append('unverified_human_review: external authenticated human review is required')
         frozen_time=datetime.now(timezone.utc)
-        summary=put_record(self.store,{'version':'m5-qualification-summary-v1','task':task_version.model_dump(mode='json'),
-            'policy':self.policy_ref.model_dump(mode='json'),'projection':projection_ref.model_dump(mode='json') if projection_ref else None,
-            'bindings':[ref.model_dump(mode='json') for ref in bindings],'issues':sorted(set(issues)),
-            'repair_count':count,'qualification_job':claim.job_id},'m5-qualification-summary')
-        dependencies=tuple(dict.fromkeys((task_version,self.policy_ref,*bindings,*([projection_ref] if projection_ref else []))))
-        self.registry.register(summary,dependencies=dependencies)
-        ev=evidence(summary,self.revision,('QualificationService.qualify',task_version.sha256),scope='real_integration' if bindings else 'source_inspection')
-        report=c.QualificationReport(kind='QualificationReport',schema_version=1,visibility=c.Visibility.PRIVATE,
-            provenance=c.Provenance(producer='feature_rl.qualification',producer_version=self.revision,created_at=frozen_time,
-                inputs=(task_version,self.policy_ref,summary),evidence=(ev,)),costs=collapse_costs((*costs,unknown_cost())),
-            task=task_version,disposition=c.Disposition.PROVISIONAL,baseline_health=assessments.get('baseline_health'),
-            baseline_absence=assessments.get('baseline_absence'),reference_run=assessments.get('fresh_0'),
-            controls=tuple(v for name,v in assessments.items() if name.startswith('control_')),
-            fresh_runs=tuple(v for name,v in assessments.items() if name.startswith('fresh_')),
-            interrupted_reset_runs=tuple(v for name,v in assessments.items() if name.startswith('reset_')),
-            human_reviews=(),rejection_reasons=tuple(sorted(set(issues))),repair_attempts=count or 0,policy_version=self.policy.policy_id)
-        report_ref=self.store.put_artifact(report)
-        outputs=[report_ref,summary]
-        if len(set(issues))==1 and count is not None:
-            request=ReviewRequest(task=task_version,report=report_ref,policy=self.policy_ref,challenge=uuid.uuid4().hex+uuid.uuid4().hex,
-                issued_at=frozen_time,expires_at=frozen_time+timedelta(seconds=self.policy.review_seconds),qualification_job=claim.job_id)
-            request_ref=put_record(self.store,request,'m5-review-request')
-            self.registry.register(request_ref,dependencies=(task_version,report_ref,self.policy_ref))
-            outputs.append(request_ref)
-        result=c.OperationResult(operation='qualify',disposition=c.Disposition.PROVISIONAL,artifacts=tuple(outputs),
-            evidence=(ev,),costs=report.costs,reason='; '.join(sorted(set(issues))))
-        return self._complete(claim,result)
+        elapsed=(frozen_time-started).total_seconds()
+        if elapsed<0 or elapsed>self.policy.max_wall_seconds:issues.append('budget_exhausted: qualification wall budget exceeded or clock moved backwards')
+        issues.append('unverified_human_review: external authenticated human review is required')
+        frozen={'task':task_version,'projection':projection_ref,'bindings':tuple(bindings),'assessments':assessments,
+            'costs':tuple(costs),'issues':tuple(sorted(set(issues))),'count':count,'recorded_at':frozen_time,
+            'wall_seconds':max(0.0,elapsed),'challenge':uuid.uuid4().hex+uuid.uuid4().hex}
+        return self._publish_qualification(claim,frozen)
 
-    def _run(self,checked,projection_ref,submission,seed,name,mode,targets,qualification_job,reset,seen):
+    def _publish_qualification(self,claim,frozen):
+        try:
+            from .models import QualificationSummary
+            from .controls import disposition_for
+            task_version=frozen['task'];projection_ref=frozen['projection'];bindings=frozen['bindings']
+            assessments=frozen['assessments'];issues=frozen['issues'];count=frozen['count'];frozen_time=frozen['recorded_at']
+            summary=put_record(self.store,QualificationSummary(task=task_version,policy=self.policy_ref,projection=projection_ref,
+                bindings=bindings,issues=issues,repair_count=count,qualification_job=claim.job_id,
+                wall_seconds=frozen['wall_seconds']),'m5-qualification-summary')
+            dependencies=tuple(dict.fromkeys((task_version,self.policy_ref,*bindings,*([projection_ref] if projection_ref else []))))
+            self.registry.register(summary,dependencies=dependencies)
+            ev=evidence(summary,self.revision,('QualificationService.qualify',task_version.sha256),scope='real_integration' if bindings else 'source_inspection').model_copy(update={'recorded_at':frozen_time})
+            disposition=disposition_for(issues)
+            report=c.QualificationReport(kind='QualificationReport',schema_version=1,visibility=c.Visibility.PRIVATE,
+                provenance=c.Provenance(producer='feature_rl.qualification',producer_version=self.revision,created_at=frozen_time,
+                    inputs=(task_version,self.policy_ref,summary),evidence=(ev,)),costs=collapse_costs((*frozen['costs'],unknown_cost())),
+                task=task_version,disposition=disposition,baseline_health=assessments.get('baseline_health'),
+                baseline_absence=assessments.get('baseline_absence'),reference_run=assessments.get('fresh_0'),
+                controls=tuple(v for name,v in assessments.items() if name.startswith('control_')),
+                fresh_runs=tuple(v for name,v in assessments.items() if name.startswith('fresh_')),
+                interrupted_reset_runs=tuple(v for name,v in assessments.items() if name.startswith('reset_')),
+                human_reviews=(),rejection_reasons=issues,repair_attempts=count or 0,policy_version=self.policy.policy_id)
+            report_ref=self.store.put_artifact(report)
+            outputs=[report_ref,summary]
+            if issues==('unverified_human_review: external authenticated human review is required',) and count is not None:
+                request=ReviewRequest(task=task_version,report=report_ref,policy=self.policy_ref,challenge=frozen['challenge'],
+                    issued_at=frozen_time,expires_at=frozen_time+timedelta(seconds=self.policy.review_seconds),qualification_job=claim.job_id)
+                request_ref=put_record(self.store,request,'m5-review-request')
+                self.registry.register(request_ref,dependencies=(task_version,report_ref,self.policy_ref))
+                outputs.append(request_ref)
+            result=c.OperationResult(operation='qualify',disposition=disposition,artifacts=tuple(outputs),
+                evidence=(ev,),costs=report.costs,reason='; '.join(issues))
+            selected=self._complete(claim,result)
+            self._quarantine_defect(task_version,summary,claim.job_id,issues)
+            return selected
+        except QualificationPublicationFailed:raise
+        except Exception as exc:
+            raise QualificationPublicationFailed('retain frozen qualification package without new controls, challenge or timestamps',
+                pending=FrozenPublication(claim,frozen,'qualification'),claim=claim) from exc
+
+    def _quarantine_defect(self,task,summary,job_id,issues):
+        defects=tuple(issue for issue in issues if issue.split(':',1)[0] in {'false_acceptance','false_rejection','oracle_disagreement','flaky_task'})
+        if defects:self.registry.quarantine(task,notice_id='m5:'+job_id,reason='; '.join(defects)[:4096],evidence=(summary,))
+
+    def affected_versions(self,task_version):
+        """Current registry trace, including active defect notices and dependents."""
+        return self.registry.trace(task_version)
+
+    def _run(self,checked,projection_ref,submission,seed,name,mode,targets,parent_claim,reset,seen):
         config=put_record(self.store,{'version':'m5-run-configuration-v1','configuration':self.configuration.model_dump(mode='json'),
             'projection':projection_ref.model_dump(mode='json'),'submission':submission.model_dump(mode='json'),
             'seed':seed,'name':name,'mode':mode,'targets':list(targets),'reset':reset},'m5-run-configuration')
         self.registry.register(config,dependencies=(self.configuration,projection_ref,submission))
-        job=self._job(checked.task_ref,'m5-run:'+qualification_job+':'+name,configuration=config,operation='grade')
+        job=self._job(checked.task_ref,'m5-run:'+parent_claim.job_id+':'+name,configuration=config,operation='grade')
         if job.state=='completed':result=job.result
         else:
             claim=self._claim(job)
+            self._intent(claim)
             reset_ref=None;extra_costs=()
-            if reset:reset_ref,extra_costs=self._reset(checked,projection_ref,submission)
-            result=self.grader.grade(checked.task_ref,submission,seed)
+            try:
+                if reset:reset_ref,extra_costs=self._reset(checked,projection_ref,submission)
+                result=self.grader.grade(checked.task_ref,submission,seed)
+            except GradePublicationFailed as exc:
+                raise QualificationPublicationFailed('grade publication must recover without execution retry',pending=GradePending(
+                    parent_claim,claim,exc,reset_ref,extra_costs),claim=parent_claim) from exc
+            except Exception as exc:
+                raise QualificationRecoveryRequired('runtime/reset attempt outcome is incomplete; reconcile retained M3/Registry evidence before any retry',claim) from exc
             if reset_ref is not None:
                 result=c.OperationResult(operation='grade',disposition=result.disposition,artifacts=(*result.artifacts,reset_ref),
                     evidence=result.evidence,costs=(*extra_costs,*result.costs),reason=result.reason)
-            result=self._complete(claim,result)
+            try:result=self._complete(claim,result)
+            except QualificationPublicationFailed as exc:
+                raise QualificationPublicationFailed('retain selected grade completion and parent continuation',
+                    pending=RunCompletionPending(parent_claim,exc),claim=parent_claim) from exc
         receipt,ids=validate_grade(self.store,checked,submission,seed,result,self.grader,seen=seen)
         reset_refs=[ref for ref in result.artifacts if ref.kind=='m5-reset']
         if reset and len(reset_refs)!=1:raise QualificationRejected('invalid_evidence','reset grade lacks exact reset receipt')
         if reset:
-            reset_receipt=read_local(self.store,reset_refs[0],ResetReceipt,'m5-reset')
-            if reset_receipt.task!=checked.task_ref or reset_receipt.projection!=projection_ref or not reset_receipt.cleanup_verified or reset_receipt.initial_source!=reset_receipt.reset_source or reset_receipt.generation_after<=reset_receipt.generation_before:
-                raise QualificationRejected('invalid_evidence','reset/source/generation binding invalid')
-            if reset_receipt.interruption_operation in seen:raise QualificationRejected('invalid_evidence','replayed interruption receipt')
-            seen.add(reset_receipt.interruption_operation)
+            validate_reset(self.store,checked,projection_ref,reset_refs[0],self.grader,seen=seen)
         binding=RunBinding(name=name,task=checked.task_ref,projection=projection_ref,submission=submission,seed=seed,
             grade=result.artifacts[0],mode=mode,targets=targets,operation_ids=ids,grade_job=job.job_id,reset=reset_refs[0] if reset_refs else None)
         ref=put_record(self.store,binding,'m5-run-binding')

@@ -81,3 +81,44 @@ def test_repair_budget_rejects_duplicate_no_change_wrong_candidate_and_exact_cap
                 history.model_copy(update={'attempts':(first,second,second.model_copy(update={'before':ref('3'),'after':ref('4')}))})]:
         with pytest.raises(QualificationRejected):validate_repairs(bad,ref('a'),())
     assert validate_repairs(history.model_copy(update={'complete':False}),ref('a'),()) is None
+
+
+@pytest.mark.parametrize('code,expected',[
+    ('false_acceptance',c.Disposition.REJECTED),('false_rejection',c.Disposition.REJECTED),
+    ('oracle_disagreement',c.Disposition.REJECTED),('ambiguous_requirement',c.Disposition.REJECTED),
+    ('budget_exhausted',c.Disposition.REJECTED),('flaky_task',c.Disposition.INVALID),
+    ('environment_failure',c.Disposition.INFRASTRUCTURE),('unsupported_semantics',c.Disposition.UNSUPPORTED),
+    ('unrecoverable_history',c.Disposition.BLOCKED),('unverified_human_review',c.Disposition.PROVISIONAL)])
+def test_observed_failures_do_not_become_provisional_because_human_review_is_also_missing(code,expected):
+    from feature_rl.qualification.controls import disposition_for
+    assert disposition_for((code+': diagnostic', 'unverified_human_review: missing'))==expected
+
+
+def test_missing_review_does_not_quarantine_but_known_defect_tracks_dependents(tmp_path):
+    from test_qualification_service import service
+    from m5_fixtures import task_fixture
+    from feature_rl.registry import QuarantinedError
+    q=service(tmp_path);task=task_fixture(q.store);result=q.qualify(task)
+    summary=result.artifacts[1]
+    q._quarantine_defect(task,summary,'a'*64,('unverified_human_review: missing',))
+    assert not q.affected_versions(task).notices
+    q._quarantine_defect(task,summary,'a'*64,('false_acceptance: explicit synthetic quarantine diagnostic, no actual control claim',))
+    trace=q.affected_versions(task)
+    assert trace.notices[0].active and result.artifacts[0] in trace.artifacts
+    with pytest.raises(QuarantinedError):q.registry.assert_usable(result.artifacts[0])
+    with pytest.raises(QuarantinedError):q.qualify(task)
+
+
+def test_control_plan_requires_every_missing_category_attack_and_mandatory_omission(tmp_path):
+    from test_qualification_service import service
+    from m5_fixtures import task_fixture
+    from feature_rl.verifiers import load_verifier
+    from feature_rl.qualification import validate_control_plan
+    from feature_rl.qualification.controls import ATTACKS
+    q=service(tmp_path);checked=load_verifier(q.store,task_fixture(q.store))
+    missing,targets=validate_control_plan(checked,q.policy)
+    assert targets==('echo',)
+    for category in ('omission','plausible_wrong','hardcoded','regression','adversarial','alternative_positive'):
+        assert 'missing control category: '+category in missing
+    for attack in ATTACKS:assert 'missing adversarial attack: '+attack in missing
+    assert 'missing targeted omission: echo' in missing

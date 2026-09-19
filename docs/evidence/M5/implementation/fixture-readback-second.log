@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/tests/run_m5_fixture_readback.py", line 62, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/tests/run_m5_fixture_readback.py", line 33, in main
+    grade,ids=validate_grade(store,checked,binding.submission,binding.seed,result,grader,seen=seen)
+              ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/evidence.py", line 107, in validate_grade
+    _assert_case_observation(checked,actual,case,comparison,value,owner)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/evidence.py", line 126, in _assert_case_observation
+    raise QualificationRejected('invalid_evidence','case command or private input bytes mismatch')
+feature_rl.qualification.models.QualificationRejected: invalid_evidence: case command or private input bytes mismatch

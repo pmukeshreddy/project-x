@@ -1,0 +1,210 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "tests/test_qualification_projection.py",
+        "tests/test_qualification_controls.py",
+        "tests/test_qualification_service.py",
+        "tests/test_qualification_attestation.py",
+        "tests/test_qualification_admission.py",
+        "tests/test_qualification_recovery.py",
+        "-q"
+      ],
+      "exit_status": 0,
+      "log": "docs/evidence/M5/implementation/final-focused.log",
+      "reported": "69 passed in 8.02s"
+    },
+    {
+      "argv": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "tests/run_m5_fixture_readback.py"
+      ],
+      "log": "docs/evidence/M5/implementation/fixture-readback-green.log",
+      "reported": "PASS: 9 prior grade ledgers, 3 reset ledgers, 30 rejection probes, unchanged Registry events; no Docker"
+    }
+  ],
+  "files": {
+    "docs/evidence/M5/implementation/admission-first-green.log": {
+      "bytes": 99,
+      "sha256": "44a74005b890c973c5a2bcebccddb00b9672bc22df1fd91547dc481a06dc84e7"
+    },
+    "docs/evidence/M5/implementation/admission-red.log": {
+      "bytes": 15867,
+      "sha256": "679f31f8e4c8bc80dca2168a1a5d9ce8347ef7872e6aca30c84a52a3afda88a9"
+    },
+    "docs/evidence/M5/implementation/attestation-green.log": {
+      "bytes": 99,
+      "sha256": "9b1781e2b9299adb3e2d7e29ce949b681ed28362fa62c1ba6941ac870d80cac8"
+    },
+    "docs/evidence/M5/implementation/attestation-red.log": {
+      "bytes": 6295,
+      "sha256": "95316efc0406df1bed4647eb4e1476c55f5560f92ed5ca33cba73a65c93cbffa"
+    },
+    "docs/evidence/M5/implementation/checkpoint-green.log": {
+      "bytes": 99,
+      "sha256": "d10f4e1687469d72520413ffecc1ea460cd9b35d4ca9f63b4e1486bf22b167bb"
+    },
+    "docs/evidence/M5/implementation/combined-first.log": {
+      "bytes": 99,
+      "sha256": "0b1bdb6ec79f5eeffe4e771f985077a92ab6bdbd292cbb5666c18118c7a45016"
+    },
+    "docs/evidence/M5/implementation/combined-second.log": {
+      "bytes": 99,
+      "sha256": "3743f2e25a608eb78378c0c8b3d35d9a47c41d4338fab3b9a9a42760a8af64d5"
+    },
+    "docs/evidence/M5/implementation/controls-green.log": {
+      "bytes": 13872,
+      "sha256": "fc1c27879961da952c4408653f2eb0733b912564490cc9c2744e6efee1c7e766"
+    },
+    "docs/evidence/M5/implementation/controls-green2.log": {
+      "bytes": 99,
+      "sha256": "4a3740b682df952dc3a0434b69721ae92a3136c299026f88a1c92d557ac4da46"
+    },
+    "docs/evidence/M5/implementation/controls-red.log": {
+      "bytes": 8509,
+      "sha256": "3d5fb6229958fd8c2ff6a3c68cd610552b474394e2edd4ad54591e39f7713974"
+    },
+    "docs/evidence/M5/implementation/final-focused.log": {
+      "bytes": 99,
+      "sha256": "52624bf22d9607c6a976142166cdd9da8b3ba2a8e0546c500b0e65a2292e8b8c"
+    },
+    "docs/evidence/M5/implementation/fixture-readback-first.log": {
+      "bytes": 1173,
+      "sha256": "85172649c2e2d41e68eb63ca9db07f3f5f4ce14506a265b508023f5c02f31d9d"
+    },
+    "docs/evidence/M5/implementation/fixture-readback-green.log": {
+      "bytes": 254,
+      "sha256": "c396c828210de15806a01ec18f52ca30fac18b7a093008adae22600051f5769c"
+    },
+    "docs/evidence/M5/implementation/fixture-readback-second.log": {
+      "bytes": 1152,
+      "sha256": "a5a567e57d8a1ae9541579c2d8a2752d6731687a2859576e84d83f2c129da2a9"
+    },
+    "docs/evidence/M5/implementation/history-join-red.log": {
+      "bytes": 9968,
+      "sha256": "5cce7d298d81c9aaa4664ab45fba437ce86fe000292f50acb6b1338857ee9151"
+    },
+    "docs/evidence/M5/implementation/history-join-red2.log": {
+      "bytes": 10416,
+      "sha256": "97e9053782565b9f283e2311ab6a83e6bcf19a28dfe015a7d0024a928097f17d"
+    },
+    "docs/evidence/M5/implementation/history-join-red3.log": {
+      "bytes": 5077,
+      "sha256": "117cf08d7bf62264717fefa46e4aa880792350edf08bb95346fc4e483687cbed"
+    },
+    "docs/evidence/M5/implementation/projection-green.log": {
+      "bytes": 99,
+      "sha256": "b4834b2a0cf9b73c5500a820c4a8d03446e726232b921601195e95808beb1768"
+    },
+    "docs/evidence/M5/implementation/projection-red.log": {
+      "bytes": 9048,
+      "sha256": "9e046edd679a0552670f6b78c91bb5f10bbe77179bbb34c9df72bc65cc3a80dc"
+    },
+    "docs/evidence/M5/implementation/recovery-red.log": {
+      "bytes": 5134,
+      "sha256": "00b6e89f4b84ad3da93630e3250c3dd60c1ff7ee6131632774ebb118149355d5"
+    },
+    "docs/evidence/M5/implementation/service-green.log": {
+      "bytes": 99,
+      "sha256": "6a19d15b11ff8406ce910c7fd93cc6d648be7a82697919c16e936f206b8c02a8"
+    },
+    "docs/evidence/M5/implementation/service-red.log": {
+      "bytes": 3856,
+      "sha256": "380703080e50f977e4ab4485b755e2b6df38513b4f64543acd14d614d5b19db9"
+    },
+    "docs/interfaces-M5.md": {
+      "bytes": 10065,
+      "sha256": "04febcdd789e92013776ee6d0126548c0220f30598e21a2dd7c3d9ad5d315a8b"
+    },
+    "docs/reports/M5.md": {
+      "bytes": 3773,
+      "sha256": "34a4d34559a3f6f260dbe697dbc9b4c1e68958af75e28c821de7dd538fee8092"
+    },
+    "src/feature_rl/qualification/__init__.py": {
+      "bytes": 714,
+      "sha256": "757e368d50b313cdfc50349acfb2bbdeca0e5e6c127e659d5deafb6c98524690"
+    },
+    "src/feature_rl/qualification/admission.py": {
+      "bytes": 28180,
+      "sha256": "467b7e02d323dcb0122a96283cf512279340803470bc76e9c47142fa6b6f5892"
+    },
+    "src/feature_rl/qualification/attestation.py": {
+      "bytes": 12951,
+      "sha256": "ac0975c047ad96305bd4a68452a09009a0704b79518a3824ba3d708b12ebde52"
+    },
+    "src/feature_rl/qualification/controls.py": {
+      "bytes": 9325,
+      "sha256": "314da02792fb8c1749202c5528275db2272ca174d4a5a9572f2591fa245a5378"
+    },
+    "src/feature_rl/qualification/evidence.py": {
+      "bytes": 15910,
+      "sha256": "b4de27b4bc45a3aa5d18e3868a467460b1b963e78acfbb9706a79b8ef00497f7"
+    },
+    "src/feature_rl/qualification/models.py": {
+      "bytes": 7812,
+      "sha256": "c9b4b69260e922cb0d3a7d06d3cba3c0e01d5365b7b4fec92032006b550a6c69"
+    },
+    "src/feature_rl/qualification/projection.py": {
+      "bytes": 5311,
+      "sha256": "c7d2d20c74d75baf452349d05eddfa4b214b67b57934398043be0a5878d9b177"
+    },
+    "src/feature_rl/qualification/service.py": {
+      "bytes": 29923,
+      "sha256": "752a025de901bc991d2b2f225a63fcfcd8f1b90fba2352998c6f20c8faa68c2f"
+    },
+    "tests/m5_fixtures.py": {
+      "bytes": 3254,
+      "sha256": "f44192d775c8b42f1978a735e92bfd4eeb1c80e78f71f3ea1bcf174d73d567c8"
+    },
+    "tests/run_m5_fixture_readback.py": {
+      "bytes": 3915,
+      "sha256": "eda6c8e7466d1405cf5baa09a0de6b953424919862b6dcb0d366893084eacd59"
+    },
+    "tests/test_qualification_admission.py": {
+      "bytes": 3241,
+      "sha256": "a3f4b615964d5e9b32ee863df4cefa89ec37713b2a36a879ff3db6ad8f404480"
+    },
+    "tests/test_qualification_attestation.py": {
+      "bytes": 3576,
+      "sha256": "d9e4dd3a07b768d0d8519f55e0fb10e868dbdd6aa24d7a49bb2cdc9ba902c744"
+    },
+    "tests/test_qualification_controls.py": {
+      "bytes": 7939,
+      "sha256": "a94657ca3b2d44e637f65bfd87315967f2d1a51a333a7003ea8bb28c78c5aaec"
+    },
+    "tests/test_qualification_projection.py": {
+      "bytes": 4600,
+      "sha256": "d559dd7452663076fdd7ff3b679a9c0d72009d02c95b253b2aa203d1efcc9694"
+    },
+    "tests/test_qualification_recovery.py": {
+      "bytes": 2838,
+      "sha256": "557ea3ab2f45970d3bb2c51be417ad38f0142ed5739d9de387644bbb3d60c1e5"
+    },
+    "tests/test_qualification_service.py": {
+      "bytes": 3614,
+      "sha256": "99429d078f394db062647c3bd0fea3a6908255182f85bef8309ef697558e1dd4"
+    }
+  },
+  "implementation_status": "implemented; independent review pending; no externally approved qualification executed",
+  "limitations": [
+    "No real human enrollment or approved attestation was created or used.",
+    "Positive externally enrolled human admission has not been exercised.",
+    "Native diagnostic messages are model-origin NO_TASK_APPROVAL; ignored private keys were not committed.",
+    "M6 complete authentic repair history, full controls and independent alternative remain missing for the TEST fixture.",
+    "Raw failed command logs preserve original formatting and are not edited to satisfy whitespace lint."
+  ],
+  "observed_precommit_head": "f8e9882be632fc10fc65a3764983b423c8d7a0eb",
+  "prior_runtime_checkpoint": "b343b8cb9ab39f000bfe639618c01f529ab06755",
+  "retained_M6_fixture_receipt": {
+    "path": "docs/evidence/M6/fixture-runtime/receipt.json",
+    "sha256": "485d97f51eca4fa93279be1743f24717f80bcd786391d67b9b3390a3131e6de4"
+  },
+  "version": "m5-final-handoff-bindings-v1"
+}

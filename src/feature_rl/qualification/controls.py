@@ -7,6 +7,17 @@ ATTACKS={'forged_verdict','evaluator_detection','hardcoded_inputs','skipped_exec
          'protocol_manipulation','excessive_output','dependency_shadowing','path_link','retained_state'}
 
 
+def disposition_for(issues):
+    """Missing evidence is provisional; observed defects retain their failure type."""
+    codes={issue.split(':',1)[0] for issue in issues}
+    if codes&{'false_acceptance','false_rejection','oracle_disagreement','ambiguous_requirement','budget_exhausted'}:return Disposition.REJECTED
+    if codes&{'flaky_task','invalid_evidence'}:return Disposition.INVALID
+    if 'environment_failure' in codes:return Disposition.INFRASTRUCTURE
+    if 'unsupported_semantics' in codes:return Disposition.UNSUPPORTED
+    if 'unrecoverable_history' in codes:return Disposition.BLOCKED
+    return Disposition.PROVISIONAL
+
+
 def assess_outcome(checked, receipt, mode, targets):
     def outcome(passed,code,detail):return GateOutcome(passed=passed,code=code,detail=detail)
     if not receipt.cleanup_verified or receipt.disposition in {Disposition.INFRASTRUCTURE,Disposition.INVALID,Disposition.UNSUPPORTED} or receipt.reward is None:

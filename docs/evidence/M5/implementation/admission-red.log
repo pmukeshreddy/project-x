@@ -1,0 +1,209 @@
+FFFFFFFFFFFFFFF.                                                         [100%]
+=================================== FAILURES ===================================
+______ test_frozen_comparison_allows_only_documented_admission_additions _______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_frozen_comparison_allows_0')
+
+    def test_frozen_comparison_allows_only_documented_admission_additions(tmp_path):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:17: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[kind] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i0')
+field = 'kind'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[schema_version] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i1')
+field = 'schema_version'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[visibility] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i2')
+field = 'visibility'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[task] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i3')
+field = 'task'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[baseline_health] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i4')
+field = 'baseline_health'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[baseline_absence] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i5')
+field = 'baseline_absence'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[reference_run] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i6')
+field = 'reference_run'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[controls] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i7')
+field = 'controls'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[fresh_runs] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i8')
+field = 'fresh_runs'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[interrupted_reset_runs] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i9')
+field = 'interrupted_reset_runs'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[repair_attempts] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i10')
+field = 'repair_attempts'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_ test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[policy_version] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_every_reviewed_field_is_i11')
+field = 'policy_version'
+
+    @pytest.mark.parametrize('field',[
+        'kind','schema_version','visibility','task','baseline_health','baseline_absence',
+        'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
+    def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
+>       from feature_rl.qualification.admission import assert_frozen_evidence
+E       ImportError: cannot import name 'assert_frozen_evidence' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:30: ImportError
+_______ test_lifecycle_comparison_excludes_only_state_and_qualification ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_lifecycle_comparison_excl0')
+
+    def test_lifecycle_comparison_excludes_only_state_and_qualification(tmp_path):
+>       from feature_rl.qualification.admission import assert_lifecycle_subject
+E       ImportError: cannot import name 'assert_lifecycle_subject' from 'feature_rl.qualification.admission' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/admission.py)
+
+tests/test_qualification_admission.py:40: ImportError
+________ test_missing_human_verifier_and_callback_injection_fail_closed ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1215/test_missing_human_verifier_an0')
+
+    def test_missing_human_verifier_and_callback_injection_fail_closed(tmp_path):
+        q,task,report=package(tmp_path)
+        class FakeHuman:
+            def verify(self,*args,**kwargs):raise AssertionError('untrusted verifier callback must never execute')
+        q.attestation_verifier=FakeHuman()
+>       with pytest.raises(QualificationRejected,match='external SSHHumanVerifier'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'external SSHHumanVerifier'
+E         Actual message: 'unverified_human_review: No externally authenticated HUMAN evidence has been verified'
+
+tests/test_qualification_admission.py:57: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_qualification_admission.py::test_frozen_comparison_allows_only_documented_admission_additions
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[kind]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[schema_version]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[visibility]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[task]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[baseline_health]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[baseline_absence]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[reference_run]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[controls]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[fresh_runs]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[interrupted_reset_runs]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[repair_attempts]
+FAILED tests/test_qualification_admission.py::test_every_reviewed_field_is_immutable_even_when_reports_look_provisional[policy_version]
+FAILED tests/test_qualification_admission.py::test_lifecycle_comparison_excludes_only_state_and_qualification
+FAILED tests/test_qualification_admission.py::test_missing_human_verifier_and_callback_injection_fail_closed
+15 failed, 1 passed in 0.69s

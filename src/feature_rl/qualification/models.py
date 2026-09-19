@@ -144,6 +144,54 @@ class ResetReceipt(StrictModel):
     cleanup_verified: bool
     recorded_at: UTCDateTime
 
+class QualificationSummary(StrictModel):
+    version: Literal['m5-qualification-summary-v1']='m5-qualification-summary-v1'
+    task: ArtifactRef
+    policy: ArtifactRef
+    projection: ArtifactRef | None
+    bindings: Annotated[tuple[ArtifactRef,...],Field(max_length=256)]
+    issues: Annotated[tuple[str,...],Field(max_length=1024)]
+    repair_count: Annotated[int,Field(ge=0,le=4)] | None
+    qualification_job: Digest
+    wall_seconds: Annotated[float,Field(ge=0)] | None=None
+
+class VerifiedAttestation(StrictModel):
+    version: Literal['m5-verified-attestation-v1']='m5-verified-attestation-v1'
+    request: ArtifactRef
+    attestation: ArtifactRef
+    payload: ArtifactRef
+    verification: ArtifactRef
+    consumed_at: UTCDateTime
+    verification_job: Digest
+    admission_job: Digest
+
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class CompletionPending:
+    claim: object
+    result: object
+
+@dataclass(frozen=True)
+class GradePending:
+    parent_claim: object
+    grade_claim: object
+    pending: object
+    reset_ref: ArtifactRef | None
+    reset_costs: tuple
+
+@dataclass(frozen=True)
+class RunCompletionPending:
+    parent_claim: object
+    completion: object
+
+@dataclass(frozen=True)
+class FrozenPublication:
+    """Retained bytes/costs after work, before CAS or Registry publication."""
+    claim: object
+    payload: object
+    purpose: Literal['qualification','human_verification','admission']
+
 class QualificationPublicationFailed(Exception):
     """Exact operation payload retained; no execution retry is authorized."""
     def __init__(self, message, *, pending, claim=None):
