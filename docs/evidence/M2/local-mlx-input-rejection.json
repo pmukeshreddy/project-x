@@ -1,0 +1,46 @@
+{
+  "bounds": {
+    "combined_output_cap_bytes": 1048576,
+    "deadline_seconds": 30.0,
+    "physical_footprint_cap_bytes": 4294967296,
+    "poll_seconds": 0.02
+  },
+  "command": [
+    ".feature-rl/research/M2/venv/bin/python",
+    ".feature-rl/research/M2/local_mlx_probe.py",
+    "--mode",
+    "reject-input",
+    "--max-input-tokens",
+    "2048",
+    "--max-output-tokens",
+    "16"
+  ],
+  "execution": {
+    "breach_sample": null,
+    "combined_retained_bytes": 630,
+    "exit_status": 0,
+    "max_usage": {
+      "lifetime_max_physical_footprint_bytes": 323044120,
+      "physical_footprint_bytes": 316752664,
+      "resident_bytes": 335593472,
+      "wired_bytes": 0
+    },
+    "memory_samples": 114,
+    "process_group_cleanup_verified": true,
+    "stderr_bytes": 0,
+    "stdout_bytes": 630,
+    "termination": "process_exit",
+    "wall_seconds": 2.459031749982387
+  },
+  "selected_environment": {
+    "HF_HOME": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/hf",
+    "HF_HUB_CACHE": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/hf/hub",
+    "HF_HUB_OFFLINE": "1",
+    "HF_XET_CACHE": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/hf/xet",
+    "TOKENIZERS_PARALLELISM": "false",
+    "TRANSFORMERS_CACHE": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/transformers",
+    "TRANSFORMERS_OFFLINE": "1"
+  },
+  "stderr": "",
+  "stdout": "{\"architecture\": \"Qwen3ForCausalLM\", \"config_sha256\": \"574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849\", \"event\": \"identity_validated\", \"local_files_only\": true, \"model_id\": \"mlx-community/Qwen3-4B-Instruct-2507-4bit\", \"model_sha256\": \"2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f\", \"model_sha256_verified\": true, \"model_type\": \"qwen3\", \"remote_code\": false, \"revision\": \"50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b\"}\n{\"actual_input_tokens\": 4105, \"elapsed_seconds\": 2.371818833053112, \"event\": \"input_rejected\", \"inference_started\": false, \"max_input_tokens\": 2048, \"model_load_started\": false}\n"
+}

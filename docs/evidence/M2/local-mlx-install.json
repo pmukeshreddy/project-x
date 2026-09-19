@@ -1,0 +1,82 @@
+{
+  "build_hooks_run": false,
+  "dependency_download_bytes": 96889626,
+  "dependency_download_cap_bytes": 500000000,
+  "direct_packages": {
+    "mlx": {
+      "bytes": 619417,
+      "filename": "mlx-0.32.2-cp313-cp313-macosx_26_0_arm64.whl",
+      "name": "mlx",
+      "sha256": "df8c75e509de868fca148dfeb38d92ce956eed386569c87caeb72bd16d2d6962",
+      "url": "https://files.pythonhosted.org/packages/38/96/9db8e27f384d83d3816ec7392c7a2b375979c14509d7f345d1fa3d05cac8/mlx-0.32.2-cp313-cp313-macosx_26_0_arm64.whl",
+      "version": "0.32.2"
+    },
+    "mlx-lm": {
+      "bytes": 408890,
+      "filename": "mlx_lm-0.31.3-py3-none-any.whl",
+      "name": "mlx-lm",
+      "sha256": "758cfddf1180053b7613db76fad3d246a331a2a905808e1164a275621fc983b8",
+      "url": "https://files.pythonhosted.org/packages/90/02/9a67b8e4f87e3e2e5cd7b1ad79304b93c09a0db6af34bee75e6551c06c60/mlx_lm-0.31.3-py3-none-any.whl",
+      "version": "0.31.3"
+    },
+    "mlx-metal": {
+      "bytes": 64367860,
+      "filename": "mlx_metal-0.32.2-py3-none-macosx_26_0_arm64.whl",
+      "name": "mlx-metal",
+      "sha256": "e6abeac9ac5265830c9c1541b6f96e9be37a85c2446763a46ad466c63a3837ab",
+      "url": "https://files.pythonhosted.org/packages/dd/cd/4e50bf325100e7165e13d025f264362bf0009196269f9eaf87f2c6e738a2/mlx_metal-0.32.2-py3-none-macosx_26_0_arm64.whl",
+      "version": "0.32.2"
+    }
+  },
+  "install_exit_status": 0,
+  "install_stderr_bytes": 0,
+  "install_stdout_bytes": 6095,
+  "installed_freeze": [
+    "Jinja2==3.1.6",
+    "MarkupSafe==3.0.3",
+    "PyYAML==6.0.3",
+    "Pygments==2.21.0",
+    "annotated-doc==0.0.5",
+    "anyio==4.15.1",
+    "certifi==2026.7.22",
+    "click==8.5.0",
+    "filelock==4.0.1",
+    "fsspec==2026.9.0",
+    "h11==0.16.0",
+    "hf-xet==1.6.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "huggingface_hub==1.32.0",
+    "idna==3.20",
+    "markdown-it-py==4.2.0",
+    "mdurl==0.1.2",
+    "mlx-lm==0.31.3",
+    "mlx-metal==0.32.2",
+    "mlx==0.32.2",
+    "numpy==2.5.3",
+    "packaging==26.3",
+    "pip==25.2",
+    "protobuf==7.36.2",
+    "regex==2026.9.10",
+    "rich==15.0.0",
+    "safetensors==0.8.0",
+    "sentencepiece==0.2.2",
+    "shellingham==1.5.4",
+    "tokenizers==0.23.2",
+    "tqdm==4.70.1",
+    "transformers==5.17.0",
+    "typer==0.27.2",
+    "typing_extensions==4.16.0"
+  ],
+  "network_disabled_during_install": true,
+  "pip_check": "No broken requirements found.",
+  "platform": "macOS 26.3 arm64 Apple M4",
+  "preparation_incident": {
+    "description": "The initial pip --dry-run used the task-private venv but PIP_CACHE_DIR was not set; pip may have reused or populated its ordinary cache. It installed no package and changed no pip configuration. All subsequent acquisition/install commands used task-private paths.",
+    "ordinary_cache_entries_removed": false
+  },
+  "python": "3.13.7",
+  "venv": ".feature-rl/research/M2/venv",
+  "wheel_count": 34,
+  "wheel_only": true
+}

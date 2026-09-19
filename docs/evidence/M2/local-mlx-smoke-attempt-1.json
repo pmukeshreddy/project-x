@@ -1,0 +1,46 @@
+{
+  "bounds": {
+    "combined_output_cap_bytes": 1048576,
+    "deadline_seconds": 120.0,
+    "physical_footprint_cap_bytes": 4294967296,
+    "poll_seconds": 0.02
+  },
+  "command": [
+    ".feature-rl/research/M2/venv/bin/python",
+    ".feature-rl/research/M2/local_mlx_probe.py",
+    "--mode",
+    "smoke",
+    "--max-input-tokens",
+    "2048",
+    "--max-output-tokens",
+    "16"
+  ],
+  "execution": {
+    "breach_sample": null,
+    "combined_retained_bytes": 5010,
+    "exit_status": 0,
+    "max_usage": {
+      "lifetime_max_physical_footprint_bytes": 2726381992,
+      "physical_footprint_bytes": 2721450408,
+      "resident_bytes": 1887830016,
+      "wired_bytes": 0
+    },
+    "memory_samples": 222,
+    "process_group_cleanup_verified": true,
+    "stderr_bytes": 0,
+    "stdout_bytes": 5010,
+    "termination": "process_exit",
+    "wall_seconds": 4.523988417116925
+  },
+  "selected_environment": {
+    "HF_HOME": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/hf",
+    "HF_HUB_CACHE": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/hf/hub",
+    "HF_HUB_OFFLINE": "1",
+    "HF_XET_CACHE": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/hf/xet",
+    "TOKENIZERS_PARALLELISM": "false",
+    "TRANSFORMERS_CACHE": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M2/cache/transformers",
+    "TRANSFORMERS_OFFLINE": "1"
+  },
+  "stderr": "",
+  "stdout": "{\"architecture\": \"Qwen3ForCausalLM\", \"config_sha256\": \"574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849\", \"event\": \"identity_validated\", \"local_files_only\": true, \"model_id\": \"mlx-community/Qwen3-4B-Instruct-2507-4bit\", \"model_sha256\": \"2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f\", \"model_sha256_verified\": true, \"model_type\": \"qwen3\", \"remote_code\": false, \"revision\": \"50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b\"}\n{\"actual_input_tokens\": 26, \"event\": \"input_accepted\", \"max_input_tokens\": 2048}\n{\"event\": \"memory_controls_set\", \"external_watchdog_required\": true, \"mlx_cache_limit_bytes\": 0, \"mlx_memory_guideline_bytes\": 3758096384, \"mlx_wired_limit_bytes\": 3758096384, \"previous_cache_limit_bytes\": 16320875724, \"previous_memory_limit_bytes\": 16320875724, \"previous_wired_limit_bytes\": 0}\n{\"active_memory_bytes\": 2264693768, \"cache_memory_bytes\": 0, \"event\": \"model_loaded\", \"load_seconds\": 0.4342714580707252, \"peak_memory_bytes\": 2264693768}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 1, \"text_so_far\": \"BLUE\", \"token_id\": 64330}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 2, \"text_so_far\": \"BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 3, \"text_so_far\": \"BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 4, \"text_so_far\": \"BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 5, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 6, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 7, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 8, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 9, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 10, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 11, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 12, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 13, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 14, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 15, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2305618210, \"cache_memory_bytes\": 0, \"event\": \"token\", \"peak_memory_bytes\": 2392554830, \"position\": 16, \"text_so_far\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"token_id\": 55892}\n{\"active_memory_bytes\": 2289889462, \"cache_memory_bytes\": 0, \"event\": \"completed\", \"finish_reason\": \"length\", \"fresh_process\": true, \"fresh_prompt_cache\": true, \"inference_seconds\": 1.6482391671743244, \"input_tokens\": 26, \"max_output_tokens\": 16, \"model_id\": \"mlx-community/Qwen3-4B-Instruct-2507-4bit\", \"output_text\": \"BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE BLUE\", \"output_tokens\": 16, \"peak_memory_bytes\": 2392554830, \"revision\": \"50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b\", \"total_seconds\": 4.395190084120259, \"truncated\": true, \"versions\": {\"mlx\": \"0.32.2\", \"mlx-lm\": \"0.31.3\", \"mlx-metal\": \"0.32.2\", \"safetensors\": \"0.8.0\", \"tokenizers\": \"0.23.2\", \"transformers\": \"5.17.0\"}}\n"
+}

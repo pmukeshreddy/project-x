@@ -1,0 +1,44 @@
+[
+  {
+    "bytes": 11343,
+    "path": "model-base-LICENSE.txt",
+    "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+    "url": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/resolve/cdbee75f17c01a7cc42f958dc650907174af0554/LICENSE"
+  },
+  {
+    "bytes": 73689,
+    "path": "mlx-lm-v0.31.3-generate.py",
+    "sha256": "270778ad53eaca55a8533d82e6752660fe5d2605c4aa0879b48a50a91f69345f",
+    "url": "https://raw.githubusercontent.com/ml-explore/mlx-lm/ed1fca4cef15a824c5f1702c80f70b4cffc8e4dd/mlx_lm/generate.py"
+  },
+  {
+    "bytes": 32417,
+    "path": "mlx-lm-v0.31.3-utils.py",
+    "sha256": "ba0371e9c88d52b34d71271945c2394005fbcb2bfb2ee9f6f82d627a33b72422",
+    "url": "https://raw.githubusercontent.com/ml-explore/mlx-lm/ed1fca4cef15a824c5f1702c80f70b4cffc8e4dd/mlx_lm/utils.py"
+  },
+  {
+    "bytes": 2368,
+    "path": "mlx-lm-v0.31.3-setup.py",
+    "sha256": "d8049945cbe187386dab23122a2aa3c2a035aecc5a004033dd22f26064bca729",
+    "url": "https://raw.githubusercontent.com/ml-explore/mlx-lm/ed1fca4cef15a824c5f1702c80f70b4cffc8e4dd/setup.py"
+  },
+  {
+    "bytes": 3464,
+    "path": "mlx-v0.32.2-memory.cpp",
+    "sha256": "1ad1ae0df7a4159fa110561e3aa0119248bb2d9ac5d96bc70a848ca1b2e1efae",
+    "url": "https://raw.githubusercontent.com/ml-explore/mlx/1f8e74e3f12f31365464a6867c6579f0e9b29d85/python/src/memory.cpp"
+  },
+  {
+    "bytes": 2188,
+    "path": "mlx-v0.32.2-memory.h",
+    "sha256": "56240c3ac74e4bdb4d67125b6556409fd12aa013572e32fe14015afee66a6d45",
+    "url": "https://raw.githubusercontent.com/ml-explore/mlx/1f8e74e3f12f31365464a6867c6579f0e9b29d85/mlx/memory.h"
+  },
+  {
+    "bytes": 2241,
+    "path": "mlx-v0.32.2-test-memory.py",
+    "sha256": "6fac50de1be40fe4a5c926174ca8121e2e9fb413a609dbc9585bea79d6989266",
+    "url": "https://raw.githubusercontent.com/ml-explore/mlx/1f8e74e3f12f31365464a6867c6579f0e9b29d85/python/tests/test_memory.py"
+  }
+]

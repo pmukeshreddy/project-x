@@ -1,0 +1,37 @@
+{
+  "bounds": {
+    "combined_output_cap_bytes": 1048576,
+    "deadline_seconds": 10.0,
+    "physical_footprint_cap_bytes": 67108864,
+    "poll_seconds": 0.005
+  },
+  "command": [
+    ".feature-rl/research/M2/venv/bin/python",
+    ".feature-rl/research/M2/watchdog_canary.py"
+  ],
+  "execution": {
+    "breach_sample": {
+      "lifetime_max_physical_footprint_bytes": 74465760,
+      "physical_footprint_bytes": 74465760,
+      "resident_bytes": 82083840,
+      "wired_bytes": 0
+    },
+    "combined_retained_bytes": 431,
+    "exit_status": -9,
+    "max_usage": {
+      "lifetime_max_physical_footprint_bytes": 74465760,
+      "physical_footprint_bytes": 74465760,
+      "resident_bytes": 82083840,
+      "wired_bytes": 0
+    },
+    "memory_samples": 38,
+    "process_group_cleanup_verified": true,
+    "stderr_bytes": 0,
+    "stdout_bytes": 431,
+    "termination": "memory_cap",
+    "wall_seconds": 0.21055299998261034
+  },
+  "selected_environment": {},
+  "stderr": "",
+  "stdout": "{\"event\": \"allocated\", \"bytes\": 8388608, \"chunk\": 1}\n{\"event\": \"allocated\", \"bytes\": 16777216, \"chunk\": 2}\n{\"event\": \"allocated\", \"bytes\": 25165824, \"chunk\": 3}\n{\"event\": \"allocated\", \"bytes\": 33554432, \"chunk\": 4}\n{\"event\": \"allocated\", \"bytes\": 41943040, \"chunk\": 5}\n{\"event\": \"allocated\", \"bytes\": 50331648, \"chunk\": 6}\n{\"event\": \"allocated\", \"bytes\": 58720256, \"chunk\": 7}\n{\"event\": \"allocated\", \"bytes\": 67108864, \"chunk\": 8}\n"
+}
