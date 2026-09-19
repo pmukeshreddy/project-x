@@ -1,0 +1,359 @@
+{
+  "authoring_view": {
+    "baseline": {
+      "payload_bytes": 1546240,
+      "payload_sha256": "9de5108a0e639b8e502117d4fbe955cb2dd2cb38319fc853fde3c222c16eb595",
+      "reference": {
+        "encoding": "bytes",
+        "kind": "source-archive",
+        "schema_version": 1,
+        "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+        "visibility": "authoring"
+      }
+    },
+    "license_text": {
+      "payload_bytes": 1475,
+      "payload_sha256": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d",
+      "reference": {
+        "encoding": "bytes",
+        "kind": "source-response",
+        "schema_version": 1,
+        "sha256": "b84ace5d4d01f55ab2db4e25ffddb9239104176e99a73e4799dcadbd8e612ab9",
+        "visibility": "authoring"
+      }
+    },
+    "request_evidence": {
+      "payload_bytes": 5280,
+      "payload_sha256": "e6cdb9e364da214bc7b1f0eaeea6a766338c749e9282c340976c02523c85f6ef",
+      "reference": {
+        "encoding": "bytes",
+        "kind": "authoring-request",
+        "schema_version": 1,
+        "sha256": "d8d8a97861a597c7bfe181dfd3bbd6dbf72b7854ee13d555add1b1e07f0d2c61",
+        "visibility": "authoring"
+      }
+    }
+  },
+  "baseline_archive_inventory": {
+    "file_count": 149,
+    "uncompressed_file_bytes": 1408900
+  },
+  "downloads": 0,
+  "inference_calls": 0,
+  "model_identity": {
+    "manifest_actual_total_bytes": 2278969697,
+    "manifest_sha256": "697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0",
+    "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+    "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+    "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "tokenizers_version": "0.23.2",
+    "transformers_version": "5.17.0"
+  },
+  "model_weights_read": false,
+  "network_calls": 0,
+  "production_shaped_template_without_license": {
+    "contexts": [
+      {
+        "context_id": "REQUEST",
+        "locator": "authoring-request:issue-and-cutoff-comments",
+        "provenance_label": "reconstructed_specification",
+        "role": "request",
+        "source": {
+          "encoding": "bytes",
+          "kind": "authoring-request",
+          "schema_version": 1,
+          "sha256": "d8d8a97861a597c7bfe181dfd3bbd6dbf72b7854ee13d555add1b1e07f0d2c61",
+          "visibility": "authoring"
+        },
+        "text_bytes": 5280,
+        "text_sha256": "e6cdb9e364da214bc7b1f0eaeea6a766338c749e9282c340976c02523c85f6ef",
+        "text_tokens_without_template": 1906
+      },
+      {
+        "context_id": "B_CORE_GROUP",
+        "locator": "src/click/core.py:1532-1560,1878-1965",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 5436,
+        "text_sha256": "f02cf5065d2cf04de0b6e324526721140cb5afd2a419636489419b1c3c107541",
+        "text_tokens_without_template": 1159
+      },
+      {
+        "context_id": "B_OPTION_ERROR",
+        "locator": "src/click/exceptions.py:212-243",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 1022,
+        "text_sha256": "507bdca1c9300b609c8a9bcf2c4052b41ca81336d7257ee3613b5da8e32980c3",
+        "text_tokens_without_template": 230
+      },
+      {
+        "context_id": "B_OPTION_TEST",
+        "locator": "tests/test_options.py:136-160",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 771,
+        "text_sha256": "abc5b443c9abd64611d4f92b126f4ee98019d5685a44d9ff523be4112a7cfadc",
+        "text_tokens_without_template": 186
+      },
+      {
+        "context_id": "B_COMMAND_REGRESSION",
+        "locator": "tests/test_commands.py:8-41",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 849,
+        "text_sha256": "ebd75e2e877ed5b6317c2afae9265dd4301425e01bdde345a839b9f88b745c9a",
+        "text_tokens_without_template": 212
+      },
+      {
+        "context_id": "B_GROUP_DOC",
+        "locator": "docs/commands-and-groups.md:72-100",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 621,
+        "text_sha256": "d10b13b38b14ed7460739a9a6a312abf1ee4552972fa2cbbd6604fd1c5198f3a",
+        "text_tokens_without_template": 144
+      }
+    ],
+    "generation_request": {
+      "bytes": 17743,
+      "sha256": "ca2d064b70122c8b71795ed13f5113d40d9494d9f012e653f565c21362eac61b"
+    },
+    "license_handling": "License remains deterministic eligibility/provenance input outside the model prompt; no license-role extension is proposed for Click.",
+    "measurement_only": true,
+    "output_schema": {
+      "bytes": 8347,
+      "model": "RequirementContract",
+      "sha256": "ba71adaff7137ec03ccbbe081673f132038f24fc8880133f30c0e12216c8b4de"
+    },
+    "provider_prompt": {
+      "bytes": 26102,
+      "sha256": "3d379628fd02340466bf9911a071e4c61567363a11ec81eff8e982fdcdf14887",
+      "tokens_without_chat_template": 7241
+    },
+    "templated_input": {
+      "chat_template_overhead_tokens": 8,
+      "token_ids_sha256": "8333774ce183e9ef8c96a47eaed83f0ff871521510c8ac9f606014ee7d6f930d",
+      "tokens": 7249
+    }
+  },
+  "recorded_at_utc": "2026-09-19T19:04:32.569541+00:00",
+  "schema_version": 1,
+  "scope": "offline tokenizer-only reproduction; authoring-view bytes and inert B spans; no model load, inference, network, download, Click import or Click execution",
+  "sizing_template_with_license": {
+    "contexts": [
+      {
+        "context_id": "REQUEST",
+        "locator": "authoring-request:issue-and-cutoff-comments",
+        "provenance_label": "reconstructed_specification",
+        "role": "request",
+        "source": {
+          "encoding": "bytes",
+          "kind": "authoring-request",
+          "schema_version": 1,
+          "sha256": "d8d8a97861a597c7bfe181dfd3bbd6dbf72b7854ee13d555add1b1e07f0d2c61",
+          "visibility": "authoring"
+        },
+        "text_bytes": 5280,
+        "text_sha256": "e6cdb9e364da214bc7b1f0eaeea6a766338c749e9282c340976c02523c85f6ef",
+        "text_tokens_without_template": 1906
+      },
+      {
+        "context_id": "B_CORE_GROUP",
+        "locator": "src/click/core.py:1532-1560,1878-1965",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 5436,
+        "text_sha256": "f02cf5065d2cf04de0b6e324526721140cb5afd2a419636489419b1c3c107541",
+        "text_tokens_without_template": 1159
+      },
+      {
+        "context_id": "B_OPTION_ERROR",
+        "locator": "src/click/exceptions.py:212-243",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 1022,
+        "text_sha256": "507bdca1c9300b609c8a9bcf2c4052b41ca81336d7257ee3613b5da8e32980c3",
+        "text_tokens_without_template": 230
+      },
+      {
+        "context_id": "B_OPTION_TEST",
+        "locator": "tests/test_options.py:136-160",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 771,
+        "text_sha256": "abc5b443c9abd64611d4f92b126f4ee98019d5685a44d9ff523be4112a7cfadc",
+        "text_tokens_without_template": 186
+      },
+      {
+        "context_id": "B_COMMAND_REGRESSION",
+        "locator": "tests/test_commands.py:8-41",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 849,
+        "text_sha256": "ebd75e2e877ed5b6317c2afae9265dd4301425e01bdde345a839b9f88b745c9a",
+        "text_tokens_without_template": 212
+      },
+      {
+        "context_id": "B_GROUP_DOC",
+        "locator": "docs/commands-and-groups.md:72-100",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-archive",
+          "schema_version": 1,
+          "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+          "visibility": "authoring"
+        },
+        "text_bytes": 621,
+        "text_sha256": "d10b13b38b14ed7460739a9a6a312abf1ee4552972fa2cbbd6604fd1c5198f3a",
+        "text_tokens_without_template": 144
+      },
+      {
+        "context_id": "LICENSE",
+        "locator": "LICENSE.txt:1-end",
+        "provenance_label": "existing_obligation",
+        "role": "baseline",
+        "source": {
+          "encoding": "bytes",
+          "kind": "source-response",
+          "schema_version": 1,
+          "sha256": "b84ace5d4d01f55ab2db4e25ffddb9239104176e99a73e4799dcadbd8e612ab9",
+          "visibility": "authoring"
+        },
+        "text_bytes": 1475,
+        "text_sha256": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d",
+        "text_tokens_without_template": 297
+      }
+    ],
+    "generation_request": {
+      "bytes": 19547,
+      "sha256": "abb092a633584328699e5569fb7bff95a9c604dec3ece802aa2199d012eba326"
+    },
+    "license_context_role": "baseline",
+    "license_role_semantics": "Existing allowlisted role used only to reproduce the original sizing template; this is not a production semantic-role decision.",
+    "measurement_only": true,
+    "output_schema": {
+      "bytes": 8347,
+      "model": "RequirementContract",
+      "sha256": "ba71adaff7137ec03ccbbe081673f132038f24fc8880133f30c0e12216c8b4de"
+    },
+    "provider_prompt": {
+      "bytes": 27916,
+      "sha256": "9d42bee1bdc221de77c4d3ac91bd4854b4a64baa1054cfe04183f6c2596da854",
+      "tokens_without_chat_template": 7661
+    },
+    "templated_input": {
+      "chat_template_overhead_tokens": 8,
+      "token_ids_sha256": "e806bbd8e725926fc623fb4419db092ee4e22ad5bb51d8bc0983de12121cee1e",
+      "tokens": 7669
+    }
+  },
+  "verified_tokenizer_assets": {
+    "added_tokens.json": {
+      "bytes": 707,
+      "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+    },
+    "chat_template.jinja": {
+      "bytes": 4040,
+      "sha256": "40c21f34cf67d8c760ef72f8ad3ae5afad514299d4b06e91dd9a8d705af7b541"
+    },
+    "config.json": {
+      "bytes": 938,
+      "sha256": "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849"
+    },
+    "generation_config.json": {
+      "bytes": 238,
+      "sha256": "835fffe355c9438e7a25be099b3fccaa98350b83451f9fd2d99512e74f1ade48"
+    },
+    "merges.txt": {
+      "bytes": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    "model.safetensors.index.json": {
+      "bytes": 63964,
+      "sha256": "388d811b8b7c2608dd04cce1bcb04a8bf715d19b42790894e6d3427ff429a777"
+    },
+    "special_tokens_map.json": {
+      "bytes": 613,
+      "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+    },
+    "tokenizer.json": {
+      "bytes": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+    },
+    "tokenizer_config.json": {
+      "bytes": 5440,
+      "sha256": "4397cc477eb6d79715ccd2000accd6b3531928f30029665832fa1b255f24d2b9"
+    },
+    "vocab.json": {
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  },
+  "workspace_revision": "a3a99fa2ec2dbf56db046b7de2b533a5706f5d19"
+}
