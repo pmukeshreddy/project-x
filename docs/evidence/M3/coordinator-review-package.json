@@ -1,0 +1,25 @@
+{
+  "assigned_base": "8f97f83b4d59db73c43f1a7a0507d35f5b1edaeb",
+  "product_revision": "a9fec98ce2fec8cd8bc30c245a1100156532e847",
+  "owned_product_paths": [
+    "src/feature_rl/environments",
+    "tests/test_environments.py",
+    "tests/test_environments_docker.py",
+    "docs/interfaces-M3.md",
+    "docs/reports/M3.md"
+  ],
+  "packages": [
+    {
+      "path": ".superpowers/sdd/implementation-plan/review-8f97f83..a9fec98-M3-product.diff",
+      "bytes": 134096,
+      "sha256": "90c18b4657a40f11c40d1c5579fb889027471c9ff3c681840f746c4c400a482e"
+    },
+    {
+      "path": ".superpowers/sdd/implementation-plan/review-8f97f83..a9fec98.diff",
+      "bytes": 1630619,
+      "sha256": "f4360e344ac6cb76df23c4da995225bcdb36209002d34a615a7129fbcf023b26"
+    }
+  ],
+  "evidence_index": "docs/evidence/M3/production/index.json",
+  "note": "Complete range includes unrelated coordinator/M2 preparation; owned product package contains all M3 product/tests/report/API, evidence reviewed separately."
+}
