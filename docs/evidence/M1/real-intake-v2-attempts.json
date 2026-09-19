@@ -1,0 +1,53 @@
+{
+  "attempts": [
+    {
+      "attempt": "invalid-revision",
+      "recorded_at": "2026-09-19T08:52:13Z",
+      "started_at": null,
+      "ended_at_from_file_mtime": "2026-09-19T08:52:40Z",
+      "tool_wall_seconds": 1.639274,
+      "exit_status": 0,
+      "factory_revision": "dec8118c78fef675143942c1dc84880ee330306e",
+      "stdout_sha256": "d2e5bef8c03070ad299e9c972d1f21f6ef107b3e1ab6095d3123d743605f4883",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "invalid: factory_revision is not the tested Git object ID",
+      "timing_note": "UTC start/end were not captured by a wrapper; only tool wall time and output file mtime are available"
+    },
+    {
+      "attempt": "valid-pre-receipt-1",
+      "recorded_at": "2026-09-19T08:53:03Z",
+      "started_at": null,
+      "ended_at_from_file_mtime": "2026-09-19T08:53:11Z",
+      "tool_wall_seconds": 1.634154583,
+      "exit_status": 0,
+      "factory_revision": "dec81182a507a9e41dd80e38f2eba91c10564fc7",
+      "stdout_sha256": "c46030780dd1bed48792ede417bb676cc787fbaf211bf1d75f57523461c100f0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "valid but superseded by fully timed attempt 1",
+      "timing_note": "UTC start/end were not captured by a wrapper; only tool wall time and output file mtime are available"
+    },
+    {
+      "attempt": "valid-pre-receipt-2",
+      "recorded_at": "2026-09-19T08:53:03Z",
+      "started_at": null,
+      "ended_at_from_file_mtime": "2026-09-19T08:53:19Z",
+      "tool_wall_seconds": 1.636301917,
+      "exit_status": 0,
+      "factory_revision": "dec81182a507a9e41dd80e38f2eba91c10564fc7",
+      "stdout_sha256": "c46030780dd1bed48792ede417bb676cc787fbaf211bf1d75f57523461c100f0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "valid but superseded by fully timed attempt 2",
+      "timing_note": "UTC start/end were not captured by a wrapper; only tool wall time and output file mtime are available"
+    },
+    {
+      "attempt": "accepted-1",
+      "receipt": "docs/evidence/M1/real-intake-v2-attempt-1-receipt.json",
+      "disposition": "accepted"
+    },
+    {
+      "attempt": "accepted-2",
+      "receipt": "docs/evidence/M1/real-intake-v2-attempt-2-receipt.json",
+      "disposition": "accepted retry"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+command: git diff --cached --check
+exit_status: 0
+stdout: <empty>
+
+command: cmp docs/evidence/M1/git-object-inventory-before-v2.json docs/evidence/M1/git-object-inventory-after-v2.json
+exit_status: 0
+stdout: <empty>
+
+command: cmp docs/evidence/M1/real-intake-v2-attempt-1.json docs/evidence/M1/real-intake-v2-attempt-2.json
+exit_status: 0
+stdout: <empty>

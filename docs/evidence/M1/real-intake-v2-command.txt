@@ -1,0 +1,10 @@
+accepted_command: PYTHONPATH=src .venv/bin/python docs/evidence/M1/run_real_intake.py --workspace . --factory-revision dec81182a507a9e41dd80e38f2eba91c10564fc7 --recorded-at 2026-09-19T08:53:03Z
+accepted_attempt_1_exit_status: 0
+accepted_attempt_2_exit_status: 0
+accepted_stdout_sha256: c46030780dd1bed48792ede417bb676cc787fbaf211bf1d75f57523461c100f0
+git_object_inventory_before_after_cmp_exit_status: 0
+accepted_attempt_outputs_cmp_exit_status: 0
+
+invalid_attempt_command: PYTHONPATH=src .venv/bin/python docs/evidence/M1/run_real_intake.py --workspace . --factory-revision dec8118c78fef675143942c1dc84880ee330306e --recorded-at 2026-09-19T08:52:13Z
+invalid_attempt_exit_status: 0
+invalid_attempt_disposition: rejected because factory_revision is not the tested Git object ID

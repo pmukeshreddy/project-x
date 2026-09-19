@@ -1,0 +1,282 @@
+{
+  "authoring_view": {
+    "baseline": {
+      "encoding": "bytes",
+      "kind": "source-archive",
+      "schema_version": 1,
+      "sha256": "4ff1d8a5d478ffb12950ec2661f3b38be5b7c9925691726c27b83234c5814575",
+      "visibility": "authoring"
+    },
+    "license_text": {
+      "encoding": "bytes",
+      "kind": "source-response",
+      "schema_version": 1,
+      "sha256": "b84ace5d4d01f55ab2db4e25ffddb9239104176e99a73e4799dcadbd8e612ab9",
+      "visibility": "authoring"
+    },
+    "request_evidence": {
+      "encoding": "bytes",
+      "kind": "authoring-request",
+      "schema_version": 1,
+      "sha256": "d8d8a97861a597c7bfe181dfd3bbd6dbf72b7854ee13d555add1b1e07f0d2c61",
+      "visibility": "authoring"
+    }
+  },
+  "authoring_view_checks": {
+    "all_refs_authoring_or_public": true,
+    "baseline_archive_excludes_git_metadata": true,
+    "private_source_pair_denied_to_author": true,
+    "request_excludes_reference_and_source_commit_ids": true
+  },
+  "candidate": {
+    "costs": [
+      {
+        "category": "discovery",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Source acquisition costs were not measured; not zero",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      }
+    ],
+    "license": "BSD-3-Clause",
+    "partition": "train",
+    "provenance_label": "reconstructed_specification",
+    "redirect_evidence": {
+      "known": 0,
+      "unavailable": 24
+    },
+    "repository_family": "pallets-click",
+    "request_lineage": [
+      "click-pr-3228",
+      "click-issue-3107"
+    ],
+    "schema_version": 2,
+    "screening_disposition": "provisional",
+    "screening_reason": "Mixed-purpose changed files require explicit manual scope review",
+    "source_count": 24
+  },
+  "candidate_ref": {
+    "encoding": "json",
+    "kind": "CandidateRecord",
+    "schema_version": 2,
+    "sha256": "57fc2197b3f09da51a63e2f19c9c9b331b3aed9202425911f4f7772ba775a15e",
+    "visibility": "private"
+  },
+  "factory_revision": "dec8118c78fef675143942c1dc84880ee330306e",
+  "idempotent_retry": true,
+  "manual_review_required": [
+    "src/click/exceptions.py",
+    "src/click/parser.py",
+    "tests/test_options.py"
+  ],
+  "reconstruction_proof": {
+    "baseline_commit": "19fd4d6e18bc9fce451f92f422696b11169faa57",
+    "baseline_tree": "82e09e778456a399fb9819c0362f3dca06358987",
+    "ci_config_baseline_object": "7e5f73ce9c4b02fd5ae04ccbd7e8f2668162228f",
+    "ci_config_reference_object": "7e5f73ce9c4b02fd5ae04ccbd7e8f2668162228f",
+    "commit_mapping": [],
+    "current_api_base": "19fd4d6e18bc9fce451f92f422696b11169faa57",
+    "current_api_base_matches_graph": true,
+    "implementation_started_at": "2026-02-21T17:26:34Z",
+    "implementation_timestamp_limit": "Git author and committer timestamps are repository assertions, not independent wall-clock attestations",
+    "license_baseline_object": "d12a849186982399c537c5b9a8fd77bf2edd5eab",
+    "license_reference_object": "d12a849186982399c537c5b9a8fd77bf2edd5eab",
+    "manual_review_required": [
+      "src/click/exceptions.py",
+      "src/click/parser.py",
+      "tests/test_options.py"
+    ],
+    "partition_assignments": [
+      {
+        "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+        "partition": "train",
+        "source_id": "click-issue-3107"
+      },
+      {
+        "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+        "partition": "train",
+        "source_id": "click-pr-3228"
+      },
+      {
+        "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+        "partition": "train",
+        "source_id": "pallets-click"
+      },
+      {
+        "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+        "partition": "train",
+        "source_id": "rc2215-click"
+      }
+    ],
+    "patch_sha256": "868c9441243952215fb0c5c874209817111d080124c6cb4d22f9299d4f3be6e6",
+    "provenance_label": "reconstructed_specification",
+    "reference_commit": "831c8f0948af519e45b90801d7430ff25451f972",
+    "reference_tree": "1e65e01d5ddd281d5c9f4019cced263ceb6b43a6",
+    "relations": [
+      {
+        "kind": "same_request",
+        "left": "click-pr-3228",
+        "proof": "PR body and closure event link PR 3228 to issue 3107",
+        "right": "click-issue-3107"
+      },
+      {
+        "kind": "descendant",
+        "left": "pallets-click",
+        "proof": "Issue 3107 belongs to pallets/click",
+        "right": "click-issue-3107"
+      },
+      {
+        "kind": "fork",
+        "left": "pallets-click",
+        "proof": "PR metadata identifies RC2215/click as the head fork of pallets/click",
+        "right": "rc2215-click"
+      },
+      {
+        "kind": "descendant",
+        "left": "rc2215-click",
+        "proof": "PR 3228 head belongs to RC2215/click",
+        "right": "click-pr-3228"
+      }
+    ],
+    "source_commits": [
+      "f6da6a7470dcc222513675d47345707710596488",
+      "dc3e1e0294f7bee639fb170112f87d9ddbe51db5"
+    ],
+    "source_tree": "1e65e01d5ddd281d5c9f4019cced263ceb6b43a6"
+  },
+  "recorded_at": "2026-09-19T08:52:13Z",
+  "reference_ref": {
+    "encoding": "bytes",
+    "kind": "source-archive",
+    "schema_version": 1,
+    "sha256": "e4f10101549a77916c1898d3a4ed9ccc43dddbe1e6aa5c6c7cdcc896a232679c",
+    "visibility": "private"
+  },
+  "result_provenance_label": "reconstructed_specification",
+  "source_pair": {
+    "admissible_cutoff": "2026-02-13T20:25:22Z",
+    "baseline_commit": "19fd4d6e18bc9fce451f92f422696b11169faa57",
+    "changed_files": [
+      {
+        "category": "documentation",
+        "path": "CHANGES.rst",
+        "rationale": "Documentation or changelog path"
+      },
+      {
+        "category": "implementation",
+        "path": "src/click/__init__.py",
+        "rationale": "Implementation path"
+      },
+      {
+        "category": "implementation",
+        "path": "src/click/core.py",
+        "rationale": "Implementation path"
+      },
+      {
+        "category": "mixed",
+        "path": "src/click/exceptions.py",
+        "rationale": "Adds NoSuchCommand while also changing NoSuchOption formatting and matching"
+      },
+      {
+        "category": "mixed",
+        "path": "src/click/parser.py",
+        "rationale": "Moves NoSuchOption close-match calculation as a companion behavior change"
+      },
+      {
+        "category": "tests",
+        "path": "tests/test_commands.py",
+        "rationale": "Test or fixture path"
+      },
+      {
+        "category": "mixed",
+        "path": "tests/test_options.py",
+        "rationale": "Changes option-formatting expectations outside the core command suggestion request"
+      }
+    ],
+    "costs": [
+      {
+        "category": "construction",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "History reconstruction costs were not measured; not zero",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      }
+    ],
+    "implementation_commits": [
+      "f6da6a7470dcc222513675d47345707710596488",
+      "dc3e1e0294f7bee639fb170112f87d9ddbe51db5"
+    ],
+    "integration": "squash",
+    "parents": [
+      "19fd4d6e18bc9fce451f92f422696b11169faa57"
+    ],
+    "provenance_label": "reconstructed_specification",
+    "reference_commit": "831c8f0948af519e45b90801d7430ff25451f972",
+    "schema_version": 2
+  },
+  "source_pair_ref": {
+    "encoding": "json",
+    "kind": "SourcePair",
+    "schema_version": 2,
+    "sha256": "b97033e2898557fa7383ab601a06dd2801c7835de283107cb4d7b28796d1ade0",
+    "visibility": "private"
+  },
+  "split_assignments": [
+    {
+      "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+      "partition": "train",
+      "source_id": "click-issue-3107"
+    },
+    {
+      "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+      "partition": "train",
+      "source_id": "click-pr-3228"
+    },
+    {
+      "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+      "partition": "train",
+      "source_id": "pallets-click"
+    },
+    {
+      "component_id": "component-72074964ad6e8ca207dffa2f4800c58bf828d64221f8f6fe8cfd00cd869535e1",
+      "partition": "train",
+      "source_id": "rc2215-click"
+    }
+  ],
+  "split_relations": [
+    {
+      "kind": "same_request",
+      "left": "click-pr-3228",
+      "proof": "PR body and closure event link PR 3228 to issue 3107",
+      "right": "click-issue-3107"
+    },
+    {
+      "kind": "descendant",
+      "left": "pallets-click",
+      "proof": "Issue 3107 belongs to pallets/click",
+      "right": "click-issue-3107"
+    },
+    {
+      "kind": "fork",
+      "left": "pallets-click",
+      "proof": "PR metadata identifies RC2215/click as the head fork of pallets/click",
+      "right": "rc2215-click"
+    },
+    {
+      "kind": "descendant",
+      "left": "rc2215-click",
+      "proof": "PR 3228 head belongs to RC2215/click",
+      "right": "click-pr-3228"
+    }
+  ]
+}

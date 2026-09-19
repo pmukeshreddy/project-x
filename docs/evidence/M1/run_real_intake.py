@@ -183,6 +183,8 @@ def main() -> None:
             ),
         },
         "candidate": {
+            "schema_version": candidate.schema_version,
+            "provenance_label": candidate.provenance_label,
             "repository_family": candidate.repository_family,
             "request_lineage": list(candidate.request_lineage),
             "partition": candidate.partition.value,
@@ -191,8 +193,14 @@ def main() -> None:
             "screening_disposition": candidate.screening.disposition.value,
             "screening_reason": candidate.screening.reason,
             "costs": [item.model_dump(mode="json") for item in candidate.costs],
+            "redirect_evidence": {
+                "known": sum(item.redirect_chain is not None for item in candidate.sources),
+                "unavailable": sum(item.redirect_chain is None for item in candidate.sources),
+            },
         },
         "source_pair": {
+            "schema_version": pair.schema_version,
+            "provenance_label": pair.provenance_label,
             "baseline_commit": pair.baseline_commit,
             "reference_commit": pair.reference_commit,
             "integration": pair.relationship.integration,
@@ -208,6 +216,7 @@ def main() -> None:
         },
         "reconstruction_proof": reconstruction_proof,
         "manual_review_required": list(result.manual_review_required),
+        "result_provenance_label": result.provenance_label,
         "split_assignments": [
             {
                 "source_id": item.source_id,

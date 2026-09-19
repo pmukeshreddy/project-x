@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "docs/evidence/M1/run_real_intake.py",
+    "--workspace",
+    ".",
+    "--factory-revision",
+    "dec81182a507a9e41dd80e38f2eba91c10564fc7",
+    "--recorded-at",
+    "2026-09-19T08:53:03Z"
+  ],
+  "ended_at": "2026-09-19T08:53:58.450146Z",
+  "exit_status": 0,
+  "started_at": "2026-09-19T08:53:56.736147Z",
+  "stderr_path": "docs/evidence/M1/real-intake-v2-attempt-2.stderr",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "docs/evidence/M1/real-intake-v2-attempt-2.json",
+  "stdout_sha256": "c46030780dd1bed48792ede417bb676cc787fbaf211bf1d75f57523461c100f0",
+  "wall_seconds": 1.7138935420662165
+}

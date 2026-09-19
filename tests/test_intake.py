@@ -39,6 +39,12 @@ class Response:
         return self.final_url
 
 
+class TrickleResponse(Response):
+    def read(self, amount: int = -1) -> bytes:
+        time.sleep(0.03)
+        return self._stream.read(1)
+
+
 def test_http_fetch_enforces_declared_and_streamed_size_limits():
     """Catches trusting Content-Length or buffering an oversized body."""
     from feature_rl.intake import BoundedHttpFetcher, SourceTooLarge
@@ -120,6 +126,14 @@ def test_http_fetch_rejects_disallowed_redirect_and_bounds_whole_operation():
     with pytest.raises(SourceFetchTimeout):
         bounded.fetch("https://example.invalid/slow", edit_history="unavailable")
     assert time.monotonic() - started < 0.3
+
+    trickle = BoundedHttpFetcher(
+        max_bytes=10,
+        timeout_seconds=0.08,
+        opener=lambda *_args, **_kwargs: TrickleResponse(b"progress forever"),
+    )
+    with pytest.raises(SourceFetchTimeout):
+        trickle.fetch("https://example.invalid/trickle", edit_history="unavailable")
 
 
 def test_cached_catalog_verifies_digest_and_confines_paths(tmp_path):

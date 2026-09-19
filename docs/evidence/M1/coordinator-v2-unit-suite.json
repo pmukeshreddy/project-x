@@ -1,0 +1,22 @@
+{
+  "time": {
+    "current_time": "2026-09-19 08:56:00 UTC"
+  },
+  "product_revision": "dec8118",
+  "working_head": "b34b36677319293b334a3a92edb94c110c308878",
+  "command": "PYTHONPATH=src .venv/bin/python -m pytest -q",
+  "initial": {
+    "chunk_id": "3bfb4b",
+    "wall_time_seconds": 10.002293542,
+    "session_id": 18375,
+    "original_token_count": 37,
+    "output": "........................................................................ [ 48%]\n................................................................."
+  },
+  "result": {
+    "chunk_id": "f9cdf2",
+    "wall_time_seconds": 0.000002875,
+    "exit_code": 0,
+    "original_token_count": 29,
+    "output": "....... [ 96%]\n.....                                                                    [100%]\n149 passed in 10.69s\n"
+  }
+}

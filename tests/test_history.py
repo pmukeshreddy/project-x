@@ -216,6 +216,29 @@ def test_rebase_rejects_reordered_and_whitespace_changed_deltas(tmp_path):
         )
 
 
+def test_rebase_rejects_ambiguous_duplicate_deltas(tmp_path):
+    """Catches claiming a unique source mapping for indistinguishable deltas."""
+    from feature_rl.history import GitHistory
+
+    repo = init_repo(tmp_path)
+    commit(repo, "repeated.txt", "")
+    git(repo, "switch", "-c", "feature")
+    source_first = commit(repo, "repeated.txt", "same\n")
+    source_head = commit(repo, "repeated.txt", "same\nsame\n")
+    git(repo, "switch", "main")
+    commit(repo, "target.txt", "target\n")
+    git(repo, "cherry-pick", source_first, source_head)
+    integrated = git(repo, "rev-parse", "HEAD")
+
+    with pytest.raises(ValueError, match="ambiguous"):
+        GitHistory(repo / ".git").reconstruct(
+            integrated,
+            integration="rebase",
+            source_head=source_head,
+            source_commits=(source_first, source_head),
+        )
+
+
 def test_ambiguous_and_missing_graphs_are_rejected(tmp_path):
     """Catches guessing an integration method or silently accepting absent objects."""
     from feature_rl.history import GitHistory, UnrecoverableHistory
