@@ -54,6 +54,7 @@ from feature_rl.scenarios import (
 from feature_rl.generation import (
     GenerationCallRecord,
     GenerationLimits,
+    LocalGenerationProvider,
     GenerationResult,
     GenerationStage,
     GenerationUsage,
@@ -721,7 +722,7 @@ def archived_preexecution_error(store, request, *, preflight: bool) -> Generatio
             category="authoring", wall_seconds=None, cpu_seconds=None, gpu_seconds=None,
             input_tokens=None, output_tokens=None, human_minutes=None, usd=None,
             measurement="unknown",
-            note="Generation did not start because attempt registration failed; costs are unknown.",
+            note="Execution did not start because attempt registration failed; costs are unknown.",
         )
     status = {
         "attempt_id": attempt_id,
@@ -1036,6 +1037,62 @@ def test_recovered_preexecution_failure_journals_complete_variant(tmp_path, pref
         )
     assert len(caught.value.journal_refs) == 1
     assert provider.calls == []
+
+
+def test_actual_registration_publication_replay_journals_without_execution(tmp_path):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+
+    class NeverVerifiedBackend:
+        verify_calls = 0
+
+        def verify(self):
+            self.verify_calls += 1
+            raise AssertionError("registration failure must precede backend verification")
+
+    class NeverRun:
+        def __init__(self):
+            self.calls = []
+
+        def run(self, **values):
+            self.calls.append(values)
+            raise AssertionError("registration failure must precede runner execution")
+
+    backend = NeverVerifiedBackend()
+    runner = NeverRun()
+    failed = False
+
+    def fail_attempt_once(data, kind, visibility):
+        nonlocal failed
+        if kind == "generation-attempt" and not failed:
+            failed = True
+            raise OSError("synthetic registration publication failure")
+        return store.put_bytes(data, kind, visibility)
+
+    service = ContractAuthoringService(
+        provider=LocalGenerationProvider(
+            backend=backend, archive=fail_attempt_once, runner=runner
+        ),
+        store=store, resolver=FakeEvidenceResolver(sources()),
+        revision="2" * 40, evidence_scope="unit_diagnostic",
+    )
+    request = contract_request()
+    with pytest.raises(GenerationProviderError) as caught:
+        service.generate(
+            (GenerationCandidate(request=request),), contract_inputs(), sources()
+        )
+    recovered = caught.value.replay_error(store.put_bytes)
+    assert recovered.cost.note.startswith("Execution did not start")
+    no_model = FakeProvider(())
+    service.provider = no_model
+    with pytest.raises(AuthoringExhausted) as rejected:
+        service.generate(
+            (GenerationCandidate(request=request),), contract_inputs(), sources(),
+            recovered_error=recovered,
+        )
+    assert len(rejected.value.journal_refs) == 1
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert no_model.calls == []
 
 
 def test_recovered_response_receipt_cap_includes_base64_expansion(tmp_path):

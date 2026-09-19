@@ -190,7 +190,7 @@ def validate_recovered_generation(
             "gpu_seconds": None, "input_tokens": None, "output_tokens": None,
             "human_minutes": None, "usd": None, "measurement": "unknown",
             "note": (
-                "Generation did not start because attempt registration failed; "
+                "Execution did not start because attempt registration failed; "
                 "costs are unknown."
             ),
         }
