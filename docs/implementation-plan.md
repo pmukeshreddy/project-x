@@ -94,6 +94,7 @@ These are instance methods on configured services, not globals with hidden state
 
 ### Task 4: M3 construction and lifecycle
 
+- [ ] Integrate M0 bounded artifact-read extension identified by the M3 production-interface handoff, after independent review; enforce explicit envelope, decoded and aggregate staging caps through the public store API.
 - [ ] Implement pinned Docker recipes and controlled dependency acquisition; refuse unpinned images/artifacts. Historical build hooks execute inside disposable workers.
 - [ ] Implement actual isolated build/run/reset with PID/network/filesystem/resource boundaries, bounded output, deadlines, process cleanup, imported-package location and service readiness evidence.
 - [ ] Test host denial and malformed recipes; execute baseline health, timeout cleanup, network enforcement and fresh/interrupted reset checks through Docker if available. A missing daemon blocks these gates, never selects host execution.

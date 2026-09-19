@@ -22,10 +22,10 @@ Historical/candidate/generated source, adapters and build hooks execute only ins
 
 | Module | Accountable owner | Current state / next gate |
 | --- | --- | --- |
-| M0 | `/root/m0_contracts` | Core, provenancev2 and optional MLX config reviewed/integrated; owns shared changes |
+| M0 | `/root/m0_contracts` | Reviewed upstream slices; ACTIVE bounded artifact-read extension for M3 |
 | M1 | `/root/m1_sources` | Reviewed/integrated reconstruction scope; Click task provisional |
 | M2 | `/root/m2_authoring_recovery` | Round5 producte14f679 committed;98/253 owner tests; independent re-review next |
-| M3 | `/root/m3_runtime` | Preparation reviewed; availability confirmed; actual runtime after provider gate |
+| M3 | `/root/m3_runtime` | Preparation reviewed; production interface handoff complete; waits M2 + M0 bounded reads |
 | M4 | Unassigned (`m4_grading` planned) | Brief ready; no product |
 | M5 | `/root/m5_qualification` | Signature mechanism preflight only; no product |
 | M6 | `/root/m6_factory` | Durability preflight only; no product |
@@ -71,6 +71,12 @@ Provider stable API: LocalGenerationProvider(backend=BackendConfig(...),archive=
 Native selected backend: mlx-community/Qwen3-4B-Instruct-2507-4bit revision50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b,11 files2278969697B. Model under `.feature-rl/research/M2/model/mlx-community--Qwen3-4B-Instruct-2507-4bit/<revision>`, acquisitionmanifestSHA697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0. WeightsSHA2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f; tokenizerSHAaeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4. Dependency manifestSHA d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831. Exact allowlists, no custom/remote code, Python-I offline fresh caches/HOME preserved. Greedy selected_model_logprobs are not behavior-policy probabilities; behavior_logprobs=None, nontraining.
 
 Budget: owner two native calls USED; no more owner calls. One coordinator call remains <=2048 actual input,128 emitted,120s wall/CPU,1MiB stdin/output/file.3.5GiB MLX allocator/wired guideline/cache0,4GiB physical-footprint kill sampled20ms with1GiB guard; observation failure rejects, no zero-transient5GiB claim. Larger envelopes explicitly unqualified;262144 architectural tokens not host measurement. Research and two v1 smokes remain historical only: CodexCLI cap ineffective/disqualified; MLX research26/16 truncated, oversizedpreload rejection,64MiB killcanary; two v1 prod383/83 EOS BLUE/M2-PROD-1 at5.6719/5.8112wall,3.6368/4.0428CPU with cleanup. Later source corrected HOME/inputIDs/raw scores/cost publication. Old UTC/source gaps not retroactively repaired.
+
+## Active M0 extension required by M3
+
+M3 read-only handoff `docs/evidence/M3/production-interface-handoff.md` identified `_read_file` unbounded stream.read() before JSON and full get_bytes base64 allocation. ArtifactRef has no size; M3 cannot enforce source/dependency input caps before allocation through current public reads. Root confirmed actual source. Same M0 owner dispatched with base **0a08c916f68a82fb865696a355cfb63965b86f30** and `docs/briefs/M0-bounded-reads.md`: optional backward-compatible envelope cap on get_bytes/get_artifact, decoded cap on get_bytes, typed oversize, growth-safe bounded read and all existing integrity/access invariants. No schema version/identity/dependency change. Only artifacts/tests/owneddocs/evidence product edits; M2 review read-only. Initial dispatch hit thread limit before work started; retry succeeded after M3 FINAL freed a slot. Requires independent M0 review before root full/native integration and actual M3 dispatch. No local store-internals duplication in M3.
+
+M3 note proposes real lifecycle/build operations, exact raw-vs-envelope hashes, persisted ownership before Docker create, verified cleanup, last-saved source policy, CPU-time versus quota distinction, policy reference in recipe provenance and private SourcePair joins outside authoring views. It is design only; no product/test/Docker/historical execution or H semantics read. M0 exact new keyword names remain for its owner to publish.
 
 ## Completed upstream interfaces and artifacts
 
