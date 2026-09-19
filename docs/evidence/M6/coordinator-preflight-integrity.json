@@ -1,0 +1,22 @@
+{
+  "checks": {
+    "all_reported_assertions_pass": true,
+    "captured_script_hash": true,
+    "captured_script_length": true,
+    "case_counts": true,
+    "committed_and_live_script_match": true,
+    "explicit_diagnostic_scope": true,
+    "outer_command_zero": true,
+    "receipt_length": true,
+    "receipt_matches_report_hash": true
+  },
+  "command": [
+    ".venv/bin/python",
+    "docs/evidence/M6/coordinator-preflight-integrity.py"
+  ],
+  "evidence_revision": "8b68d99bd7bf07b381f50e74ee84f7fe994b89fd",
+  "passed": true,
+  "producer": "coordinator /root",
+  "recorded_at": "2026-09-19T15:02:47.058693+00:00",
+  "scope": "retained receipt and script integrity only; no crash-probe or product-test rerun"
+}

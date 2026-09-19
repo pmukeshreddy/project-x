@@ -1,0 +1,36 @@
+{
+  "accepted_content": {
+    "mode": {
+      "flag": true
+    }
+  },
+  "command": [
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/coordinator-literal-union.py"
+  ],
+  "defect_reproduced": true,
+  "input": {
+    "content": {
+      "mode": {
+        "flag": 1
+      }
+    },
+    "requirement_ids": [
+      "FEATURE_1"
+    ],
+    "response_id": "RESP_1",
+    "source_ids": [
+      "SRC_1"
+    ]
+  },
+  "input_type": "int",
+  "output_type": "bool",
+  "producer": "coordinator /root",
+  "provider_sha256": "a66692e5d808946928245669f74d6b03be9b926f91c26d139291dc96549fdc7b",
+  "recorded_at": "2026-09-19T14:57:18.020309+00:00",
+  "scope": "synthetic envelope parser diagnostic only; no runner/model/historical code",
+  "selected_variant": "Enabled",
+  "source_revision": "3f859ca991c8965fda48e9d95588e9be12b0fdab"
+}
