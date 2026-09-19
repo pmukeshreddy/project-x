@@ -1,0 +1,16 @@
+COMMAND ['.venv/bin/python', 'tests/run_factory_click_fixture.py', 'runtime', '--receipt', 'docs/evidence/M6/fixture-runtime/receipt.json']
+Actual M3 boundary qualification using the cached pinned image
+Actual M4 grade: baseline_missing_feature
+baseline_missing_feature: reward=0, all three cases completed; failed=['F1']
+Actual M4 grade: correct_reference_projection
+correct_reference_projection: reward=1, all three cases completed; failed=[]
+Actual M4 grade: omit_prefix
+omit_prefix: reward=0, all three cases completed; failed=['F1']
+Actual M4 grade: post_reset_baseline
+post_reset_baseline: reward=0, all three cases completed; failed=['F1']
+EXIT 0
+COMMAND ['.venv/bin/python', 'tests/run_factory_click_fixture.py', 'qualification', '--receipt', 'docs/evidence/M6/fixture-runtime/receipt.json']
+Actual M3 boundary qualification using the cached pinned image
+Actual M5 qualify: B + 3 fresh H + 2 controls + 3 interrupted/reset H grades
+M5 returned provisional after all nine grades; actual gates pass, missing admissions remain enforced
+EXIT 0
