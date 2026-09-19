@@ -1,0 +1,39 @@
+{
+  "accepted_content": {
+    "confirmed": true,
+    "version": 3
+  },
+  "command": [
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/coordinator-literal-envelope.py"
+  ],
+  "defect_reproduced": true,
+  "input": {
+    "content": {
+      "confirmed": 1,
+      "version": 3.0
+    },
+    "requirement_ids": [
+      "FEATURE_1"
+    ],
+    "response_id": "RESP_1",
+    "source_ids": [
+      "SRC_1"
+    ]
+  },
+  "input_types": {
+    "confirmed": "int",
+    "version": "float"
+  },
+  "output_types": {
+    "confirmed": "bool",
+    "version": "int"
+  },
+  "producer": "coordinator /root",
+  "provider_sha256": "62cc3a3b36d0d8a84c520a5719d303603f7251d371f146288e32273d419053be",
+  "recorded_at": "2026-09-19T11:10:51.325607+00:00",
+  "scope": "synthetic envelope parser diagnostic only; no runner/model/historical code",
+  "source_revision": "bae671a5a19098d7945f52c0e44115aa3e5fe2a0"
+}

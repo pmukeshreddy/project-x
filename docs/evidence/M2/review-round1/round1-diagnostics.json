@@ -1,0 +1,351 @@
+{
+  "F4_publication_recovery": {
+    "after_replay_archive_kinds": [
+      "attempt",
+      "cost",
+      "events",
+      "options",
+      "provenance",
+      "request",
+      "response",
+      "retrieval",
+      "schema",
+      "status",
+      "usage"
+    ],
+    "after_replay_success": true,
+    "all_recovered_refs_resolved": true,
+    "before_replay": {
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": 1.0,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": 41,
+        "measurement": "partial",
+        "note": "Local execution: wall/CPU and validated observed token counts are measured when present; GPU time, energy, human time and currency cost are unknown. No remote API was used.",
+        "output_tokens": 1,
+        "usd": null,
+        "wall_seconds": 1.5
+      },
+      "generation_succeeded": true,
+      "publication_complete": false,
+      "published": [
+        "attempt",
+        "request"
+      ],
+      "response_wall_seconds": 1.5
+    },
+    "synthetic_runner_calls": 1
+  },
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review-round1/reproduce-round1.py"
+  ],
+  "new_unarchived_preflight_rejection": {
+    "archive_calls": [],
+    "exception_message": "request, schema, or templated prompt exceeds the configured input byte cap",
+    "exception_type": "ValueError",
+    "has_record": false,
+    "request_json_bytes": 8382,
+    "request_passed_GenerationRequest_validation": true,
+    "stdin_cap_bytes": 4096,
+    "synthetic_runner_calls": 0
+  },
+  "original_cases": {
+    "F2_strict_json_transport": {
+      "accepted": true,
+      "content": {
+        "recorded_at": "2026-09-19T11:00:00Z",
+        "values": [
+          "valid"
+        ],
+        "visibility": "authoring"
+      },
+      "record_success": true,
+      "synthetic_runner_calls": 1,
+      "usage": {
+        "accepted": {
+          "behavior_logprobs": null,
+          "finish_reason": "stop",
+          "input_token_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40
+          ],
+          "input_tokens": 41,
+          "output_tokens": 1,
+          "sampling_policy": "greedy_argmax",
+          "selected_model_logprobs": [
+            -0.25
+          ],
+          "token_ids": [
+            100
+          ],
+          "truncated": false
+        },
+        "accepted_response_usage": true,
+        "observed": {
+          "behavior_logprobs": null,
+          "event_stream_complete": true,
+          "input_token_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40
+          ],
+          "input_tokens": 41,
+          "observation_errors": [],
+          "output_tokens_observed": 1,
+          "sampling_policy": "greedy_argmax",
+          "selected_model_logprobs": [
+            -0.25
+          ],
+          "token_ids": [
+            100
+          ]
+        }
+      }
+    },
+    "F3_extra_field": {
+      "accepted": false,
+      "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nunexpected\n  Extra inputs are not permitted [type=extra_forbidden, input_value='forbidden', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden"
+    },
+    "F3_missing_field": {
+      "accepted": false,
+      "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nconfig_sha256\n  Field required [type=missing, input_value={'protocol_version': 3, '...e, 'remote_code': False}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing"
+    },
+    "F3_nonlocal": {
+      "accepted": false,
+      "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nlocal_files_only\n  Input should be True [type=literal_error, input_value=False, input_type=bool]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error"
+    },
+    "F3_positive_logprob": {
+      "accepted": false,
+      "error": "worker 'token' event violates protocol v3: 1 validation error for TokenEmitted\nselected_model_logprob\n  Input should be less than or equal to 0 [type=less_than_equal, input_value=2.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal"
+    },
+    "F3_remote_code": {
+      "accepted": false,
+      "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nremote_code\n  Input should be False [type=literal_error, input_value=True, input_type=bool]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error"
+    },
+    "F3_wrong_completion_id": {
+      "accepted": false,
+      "error": "worker event request/protocol identity mismatch"
+    },
+    "F3_wrong_config_hash": {
+      "accepted": false,
+      "error": "worker backend/offline/configuration identity mismatch"
+    },
+    "F3_wrong_dependency": {
+      "accepted": false,
+      "error": "worker backend/offline/configuration identity mismatch"
+    },
+    "F3_wrong_tokenizer_hash": {
+      "accepted": false,
+      "error": "worker backend/offline/configuration identity mismatch"
+    },
+    "F3_wrong_weight_hash": {
+      "accepted": false,
+      "error": "worker backend/offline/configuration identity mismatch"
+    },
+    "F5_failed_envelope_usage": {
+      "accepted": false,
+      "error": "model response cites an unknown requirement ID",
+      "record_success": false,
+      "synthetic_runner_calls": 1,
+      "usage": {
+        "accepted": null,
+        "accepted_response_usage": false,
+        "observed": {
+          "behavior_logprobs": null,
+          "event_stream_complete": true,
+          "input_token_ids": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40
+          ],
+          "input_tokens": 41,
+          "observation_errors": [],
+          "output_tokens_observed": 1,
+          "sampling_policy": "greedy_argmax",
+          "selected_model_logprobs": [
+            -0.25
+          ],
+          "token_ids": [
+            100
+          ]
+        }
+      }
+    }
+  },
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_sha256": {
+    "src/feature_rl/generation/__init__.py": "feab8f63dfd2344003792855341731be6d9125cf707822104b1b8316fcb7c278",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "4ee0c21c3c8e8bb2abc9bb6e6c2b4b0229573733ce7fc61359affa9b22669305",
+    "src/feature_rl/generation/protocol.py": "c0a84ee32415a666edabc84a9644c2d56eb53b3c9c31df22321e3299f933fba1",
+    "src/feature_rl/generation/provider.py": "62cc3a3b36d0d8a84c520a5719d303603f7251d371f146288e32273d419053be",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+  },
+  "recorded_at": "2026-09-19T11:06:43.696338+00:00",
+  "remaining_F3_literal_coercion": {
+    "float_protocol_version": {
+      "field": "protocol_version",
+      "provider_accepted": true,
+      "record_success": true,
+      "supplied_type": "float",
+      "supplied_value": 3.0,
+      "usage_accepted": true
+    },
+    "integer_fresh_process": {
+      "field": "fresh_process",
+      "provider_accepted": true,
+      "record_success": true,
+      "supplied_type": "int",
+      "supplied_value": 1,
+      "usage_accepted": true
+    },
+    "integer_fresh_prompt_cache": {
+      "field": "fresh_prompt_cache",
+      "provider_accepted": true,
+      "record_success": true,
+      "supplied_type": "int",
+      "supplied_value": 1,
+      "usage_accepted": true
+    },
+    "integer_local_files_only": {
+      "field": "local_files_only",
+      "provider_accepted": true,
+      "record_success": true,
+      "supplied_type": "int",
+      "supplied_value": 1,
+      "usage_accepted": true
+    },
+    "integer_remote_code": {
+      "field": "remote_code",
+      "provider_accepted": true,
+      "record_success": true,
+      "supplied_type": "int",
+      "supplied_value": 0,
+      "usage_accepted": true
+    }
+  },
+  "reviewed_revision": "7239379ebf6921fd816b1bded9bb07a685b84c1a",
+  "scope": "unit_diagnostic; test doubles only; no subprocess/model/inference"
+}

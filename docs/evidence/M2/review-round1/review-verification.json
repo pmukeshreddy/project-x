@@ -1,0 +1,48 @@
+{
+  "native_inference_performed": false,
+  "owner_inventory_matches": true,
+  "owner_raw_output_hashes_match": true,
+  "previous_review_and_receipts_unchanged": true,
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_diff_exit_status": 0,
+  "recorded_at": "2026-09-19T11:10:07.368488+00:00",
+  "report_sha256": "a2a63ee5d22950ec1bd0832f5326a663c67113bc06c9edee4b444ebe4282b698",
+  "reviewed_revision": "7239379ebf6921fd816b1bded9bb07a685b84c1a",
+  "runs": [
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src:tests",
+        ".venv/bin/python",
+        "-B",
+        "docs/evidence/M2/review-round1/reproduce-round1.py"
+      ],
+      "exit_status": 0,
+      "exit_status_source": "Observed exec_command completion, not inferred from diagnostic JSON",
+      "scope": "unit_diagnostic; test doubles only; no subprocess/model/inference",
+      "script_sha256": "f8eec28b4c45bba460ccebe2444de8d7ee0353b9c25c321c78d74e034b13085e",
+      "stderr": "docs/evidence/M2/review-round1/round1-diagnostics.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/review-round1/round1-diagnostics.json",
+      "stdout_sha256": "c211d68b1954d7cdae4d452b5724765bd928ff143ec2c4f724b9cedb9418fc44"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src:tests",
+        ".venv/bin/python",
+        "-B",
+        "docs/evidence/M2/review-round1/check-runner-closure.py"
+      ],
+      "exit_status": 0,
+      "exit_status_source": "Observed exec_command completion, not inferred from diagnostic JSON",
+      "scope": "unit_diagnostic; two trusted short sleepers; no model/inference",
+      "script_sha256": "2955a53b0d62c6be5cd9d26f55ba8a0d418a765919d377f889aea6486cb064a0",
+      "stderr": "docs/evidence/M2/review-round1/runner-closure.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/review-round1/runner-closure.json",
+      "stdout_sha256": "57b0b795cdc1948d8b0c2061815bad8f1d3711c942fe649949927829e0b0ec1a"
+    }
+  ],
+  "whole_suite_rerun": false
+}

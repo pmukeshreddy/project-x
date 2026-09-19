@@ -1,0 +1,33 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review-round1/check-runner-closure.py"
+  ],
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "recorded_at": "2026-09-19T11:07:37.819155+00:00",
+  "results": {
+    "missing_observation": {
+      "cleanup_verified": true,
+      "cpu_seconds": 0.0007869999999999999,
+      "exit_status": -9,
+      "monitor_error_type": "ObservationUnavailable",
+      "monitoring_failures": 1,
+      "termination": "monitoring_failure",
+      "wall_seconds": 0.00357233383692801
+    },
+    "watchdog_exception": {
+      "cleanup_verified": true,
+      "cpu_seconds": 0.000931,
+      "exit_status": -9,
+      "monitor_error_type": "OSError",
+      "monitoring_failures": 1,
+      "termination": "monitoring_failure",
+      "wall_seconds": 0.004212290979921818
+    }
+  },
+  "reviewed_revision": "7239379ebf6921fd816b1bded9bb07a685b84c1a",
+  "scope": "unit_diagnostic; two trusted short sleepers; no model/inference"
+}
