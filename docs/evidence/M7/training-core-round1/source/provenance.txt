@@ -1,0 +1,5 @@
+SkyRL f5bc3b78dfddfb352870d5d7430cd226e5785838; existing inert audit sources, no new retrieval.
+https://github.com/NovaSky-AI/SkyRL/blob/f5bc3b78dfddfb352870d5d7430cd226e5785838/skyrl/train/dataset/preprocess.py
+sha256 9f7667890b9d789e6cc9875dca666627f493ceb3db55fc97599c244c6f25e205 preprocess.py.txt (complete upstream file)
+https://github.com/NovaSky-AI/SkyRL/blob/f5bc3b78dfddfb352870d5d7430cd226e5785838/skyrl/train/trainer.py#L848
+sha256 b3922d64c81080d99286fd5d1e6acaf41feadbca605eee2a129e14c18fc7a131 convert_to_training_input.py.txt (lines 848-967)

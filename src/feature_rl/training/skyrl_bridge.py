@@ -7,6 +7,7 @@ The stock Harbor trial/artifact/retry pipeline is intentionally never invoked.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import copy
 import importlib.metadata
 import json
 
@@ -91,6 +92,45 @@ def group_rows(groups):
     return rows
 
 
+def convert_eligible_batch(trainer, output, uids):
+    """Native tensor conversion for the rows that actually survived admission.
+
+    Pinned conversion assumes a divisible, fixed number of prompts. A shallow
+    trainer view with a private config converts the actual groups as single-prompt
+    minibatches. Only its boundary metadata is then coalesced to the configured
+    minibatch size, including a smaller final minibatch. Native tensor construction
+    and DP padding remain unchanged; no replacement episodes or measured rows are
+    inserted. The original trainer config and collection/accounting remain intact.
+    """
+    from skyrl.train.dataset.preprocess import compute_prompt_mini_batch_boundaries
+    if not uids or any(not isinstance(uid, str) or not uid for uid in uids):
+        raise ValueError('Nonempty eligible group identities required')
+    count = len(set(uids))
+    try:
+        prompts = compute_prompt_mini_batch_boundaries(uids, 1, count, True, 4)
+    except AssertionError as exc:
+        raise ValueError('Eligible group rows must be contiguous') from exc
+    cfg = trainer.cfg
+    if not cfg.generator.step_wise_trajectories or cfg.generator.n_samples_per_prompt != 4:
+        raise ValueError('Four-episode stepwise conversion required')
+    sizes = {'policy': cfg.trainer.policy_mini_batch_size}
+    if cfg.trainer.critic.model.path is not None:
+        sizes['critic'] = cfg.trainer.critic_mini_batch_size
+    if any(type(size) is not int or size < 1 for size in sizes.values()):
+        raise ValueError('Positive integral native minibatch sizes required')
+    view = copy.copy(trainer)
+    view.cfg = copy.deepcopy(cfg)
+    view.cfg.trainer.train_batch_size = count
+    for model in sizes:
+        setattr(view.cfg.trainer, f'{model}_mini_batch_size', 1)
+    data = view.convert_to_training_input(output, uids)
+    for model, size in sizes.items():
+        data.metadata[f'{model}_mini_batch_boundaries'] = [
+            (prompts[i][0], prompts[min(i + size, count) - 1][1]) for i in range(0, count, size)
+        ]
+    return data
+
+
 class SkyRLUpdateBridge:
     """Drive a constructed RayPPOTrainer with exact per-turn rows and explicit advantages.
 
@@ -152,7 +192,7 @@ class SkyRLUpdateBridge:
         self.ready = False
         if trainer.colocate_all:
             await trainer.inference_engine_client.sleep()
-        data = trainer.convert_to_training_input(output, uids)
+        data = convert_eligible_batch(trainer, output, uids)
         data = trainer.fwd_logprobs_values_reward(data)
         # Avoid stock singleton/invalid-peer estimator. Padding rows retain zero weight.
         advantages = torch.zeros_like(data['loss_mask'])

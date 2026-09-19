@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from feature_rl.contracts import ArtifactRef, Partition, PolicyConfig, RolloutRecord, TaskBundle
+from feature_rl.contracts import ArtifactRef, Disposition, Partition, PolicyConfig, RolloutRecord, TaskBundle
 from feature_rl.grading.service import read_grade
 from feature_rl.environments.archive import SourceArchive
 from feature_rl.environments import SandboxPolicy
@@ -56,6 +56,47 @@ class TrainingDataGate:
             raise ValueError('Grading receipt does not bind the exact task/submission/cases/outcome')
         return grade
 
+    def _episode_grade(self, record, case_seed):
+        """Bind controller-owned M4 evidence, including pre-execution outcomes.
+
+        A null reward is not evidence of invalidity. Until a runner-specific
+        invalidation receipt is integrated, exclusions also require an M4 receipt.
+        Scope describes how the outcome was established; it is never promoted.
+        """
+        if record.reward is None and record.disposition not in (Disposition.INVALID, Disposition.INFRASTRUCTURE):
+            raise ValueError('Unmeasured candidate outcome must be finalized before group preparation')
+        evidence = [e for e in record.grading_evidence if e.producer == 'feature_rl.grading']
+        refs = {ref for e in evidence for ref in e.artifacts if ref.kind == 'm4-grade-receipt'}
+        if len(refs) != 1 or record.submission is None:
+            raise ValueError('Unique bound M4 outcome receipt required')
+        ref = next(iter(refs))
+        grade = read_grade(self.store, ref)
+        if (grade.implementation_revision != self.grader_revision or grade.task != record.task
+                or grade.submission != record.submission or grade.case_seed != case_seed
+                or grade.disposition != record.disposition or grade.reward != record.reward
+                or (grade.reward is not None and not grade.cleanup_verified)):
+            raise ValueError('M4 receipt does not bind the exact episode outcome')
+        command = ('GradingService.grade', grade.task.sha256, grade.submission.sha256, str(case_seed))
+        source_rejection = (grade.reward == 0 and grade.source is None
+                            and grade.reason.startswith('source submission rejected: '))
+        for e in evidence:
+            if ref not in e.artifacts:
+                continue
+            if (e.revision != self.grader_revision or e.command != command or e.exit_status != 0
+                    or e.recorded_at != grade.recorded_at or e.artifacts != (ref, *grade.runtime_evidence)
+                    or e.scope not in ('source_inspection', 'real_integration')):
+                raise ValueError('M4 receipt evidence binding or scope differs')
+            if source_rejection and e.scope != 'source_inspection':
+                raise ValueError('M4 source rejection must retain its source-inspection scope')
+            if e.scope == 'source_inspection':
+                if (grade.build_evidence is not None or grade.runtime_evidence
+                        or (grade.reward is not None and (grade.reward != 0
+                            or grade.source is not None
+                            or grade.disposition != Disposition.REJECTED
+                            or not grade.reason.startswith('source submission rejected: ')))):
+                    raise ValueError('M4 source-inspection receipt is not a pre-execution outcome')
+        return grade
+
     def prepare_group(self, plan: GroupPlan, records: tuple[RolloutRecord, ...], *,
                       contexts: tuple[tuple[tuple[int, ...], ...], ...],
                       expected_policy: PolicyConfig, vocab_size: int, max_seq_len: int,
@@ -79,12 +120,7 @@ class TrainingDataGate:
             if record.reward is not None:
                 if not record.training_eligible or record.policy.identity.tokenizer_digest != tokenizer_digest:
                     raise ValueError('Measured episode is not an exact training trajectory')
-                grade_refs = {ref for e in record.grading_evidence if e.producer == 'feature_rl.grading'
-                              and e.scope == 'real_integration' for ref in e.artifacts if ref.kind == 'm4-grade-receipt'}
-                if len(grade_refs) != 1 or record.submission is None:
-                    raise ValueError('Unique real M4 grading receipt required')
-                self._grade(next(iter(grade_refs)), task=task, submission=record.submission,
-                            seed=plan.case_seed, reward=record.reward)
+            self._episode_grade(record, plan.case_seed)
         rewards = tuple(r.reward for r in checked)
         advantages = group_advantages(rewards, normalize_std=normalize_std)
         episodes = []
