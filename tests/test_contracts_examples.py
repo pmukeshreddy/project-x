@@ -91,6 +91,88 @@ def test_bool_reward_is_not_integer_reward():
 
 
 def test_training_rejects_mismatched_policy_token_trace():
-    value=examples()['RolloutRecord'];value.update(disposition='success',reward=1,grading_evidence=[evidence()],training_eligible=True)
+    value=examples()['RolloutRecord'];value.update(disposition='success',reward=1,grading_evidence=[evidence()],training_eligible=True,stopping_reason='submitted',submission=ref())
     value['steps']=[dict(index=0,action=ref(),observation=ref(),evidence=[evidence()],token_trace=dict(context_token_ids=[1],sampled_token_ids=[2],behavior_log_probabilities=[-0.5],assistant_loss_mask=[True],policy_version='old'))]
-    with pytest.raises(ValidationError): c.RolloutRecord.model_validate_json(json.dumps(value))
+    with pytest.raises(ValidationError,match='episode behavior policy'): c.RolloutRecord.model_validate_json(json.dumps(value))
+
+
+@pytest.mark.parametrize('kind,field',[('SourcePair','reference'),('TaskBundle','reference_solution'),('TaskBundle','private_oracle')])
+@pytest.mark.parametrize('visibility',['public','authoring','training','internal'])
+def test_review_reference_material_requires_privileged_visibility(kind,field,visibility):
+    value=examples()[kind];value[field]['visibility']=visibility
+    with pytest.raises(ValidationError):
+        getattr(c,kind).model_validate_json(json.dumps(value))
+
+
+def measured_rollout():
+    value=examples()['RolloutRecord']
+    value.update(disposition='success',reward=1,grading_evidence=[evidence()],training_eligible=True,stopping_reason='submitted',submission=ref())
+    value['steps']=[dict(index=0,action=ref(),observation=ref(),evidence=[evidence()],token_trace=dict(context_token_ids=[1],sampled_token_ids=[2],behavior_log_probabilities=[-0.5],assistant_loss_mask=[True],policy_version='p1'))]
+    return value
+
+
+@pytest.mark.parametrize('stop',['invalid_trajectory','infrastructure_failure'])
+@pytest.mark.parametrize('training_eligible',[True,False])
+def test_review_invalid_stop_cannot_claim_success(stop,training_eligible):
+    value=measured_rollout();value.update(stopping_reason=stop,training_eligible=training_eligible)
+    with pytest.raises(ValidationError,match='stop requires'):
+        c.RolloutRecord.model_validate_json(json.dumps(value))
+
+
+@pytest.mark.parametrize('stop,disposition',[('invalid_trajectory','invalid_measurement'),('infrastructure_failure','infrastructure_failure')])
+def test_review_untrainable_stop_preserves_saved_submission(stop,disposition):
+    value=measured_rollout();value.update(stopping_reason=stop,disposition=disposition,training_eligible=False,reward=None)
+    result=c.RolloutRecord.model_validate_json(json.dumps(value))
+    assert result.submission is not None and result.reward is None and not result.training_eligible
+
+
+@pytest.mark.parametrize('stop',['candidate_failure','malformed_action','token_limit','tool_limit','time_limit'])
+def test_review_valid_agent_failures_remain_training_examples(stop):
+    value=measured_rollout();value.update(stopping_reason=stop,disposition='candidate_rejection',reward=0)
+    result=c.RolloutRecord.model_validate_json(json.dumps(value))
+    assert result.training_eligible and result.reward==0
+    value['reward']=1
+    with pytest.raises(ValidationError,match='agent failure'):
+        c.RolloutRecord.model_validate_json(json.dumps(value))
+
+
+def evaluation_trial(**updates):
+    value=dict(trial_id='t1',task=ref('TaskBundle')|{'encoding':'json'},repository_family='family',arm='A',policy_seed=1,case_seed=1,rollout=None,disposition='blocked_dependency',resolved=None,evidence=[evidence()])
+    return value|updates
+
+
+def evaluation_metric(**updates):
+    return dict(name='pass_at_1',estimate=None,lower=None,upper=None,sample_size=0,method='not measured',limitations=['blocked'])|updates
+
+
+@pytest.mark.parametrize('has_trial,has_metric',[(False,False),(True,False),(False,True)])
+def test_review_success_requires_measured_trials_and_metrics(has_trial,has_metric):
+    value=examples()['EvaluationReport'];value['disposition']='success'
+    trial=evaluation_trial()
+    if has_trial: trial.update(disposition='success',resolved=False,rollout=ref('RolloutRecord')|{'encoding':'json'})
+    metric=evaluation_metric()
+    if has_metric: metric.update(estimate=0.0,sample_size=1)
+    value.update(trials=[trial],paired_metrics=[metric])
+    with pytest.raises(ValidationError,match='measured'):
+        c.EvaluationReport.model_validate_json(json.dumps(value))
+
+
+def test_review_evaluation_preserves_invalid_trial_accounting():
+    value=examples()['EvaluationReport']
+    value.update(disposition='success',trials=[evaluation_trial(trial_id='valid',disposition='success',resolved=True,rollout=ref('RolloutRecord')|{'encoding':'json'}),evaluation_trial(trial_id='blocked')],paired_metrics=[evaluation_metric(estimate=1.0,sample_size=1)])
+    report=c.EvaluationReport.model_validate_json(json.dumps(value))
+    assert len(report.trials)==2 and report.trials[1].resolved is None
+    value.update(disposition='provisional',trials=[evaluation_trial()],paired_metrics=[evaluation_metric()])
+    assert c.EvaluationReport.model_validate_json(json.dumps(value)).paired_metrics[0].estimate is None
+
+
+@pytest.mark.parametrize('updates',[
+ {'disposition':'success','resolved':None},
+ {'disposition':'success','resolved':True,'rollout':None},
+ {'disposition':'blocked_dependency','resolved':False},
+ {'disposition':'infrastructure_failure','resolved':True},
+ {'disposition':'invalid_measurement','resolved':False},
+ {'disposition':'candidate_rejection','resolved':True,'rollout':ref('RolloutRecord')|{'encoding':'json'}},
+])
+def test_review_trial_rejects_contradictory_outcomes(updates):
+    with pytest.raises(ValidationError):c.TrialResult.model_validate_json(json.dumps(evaluation_trial(**updates)))

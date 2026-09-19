@@ -345,8 +345,8 @@ class SourcePair(ArtifactModel):
     @model_validator(mode='after')
     def references_match(self):
         require_ref(self.candidate, 'CandidateRecord')
-        if self.reference.visibility == Visibility.PUBLIC:
-            raise ValueError('reference implementation cannot be public')
+        if self.reference.visibility not in {Visibility.PRIVATE, Visibility.EVALUATION}:
+            raise ValueError('reference implementation requires private or evaluation visibility')
         if self.baseline_commit == self.reference_commit:
             raise ValueError('B and H must differ')
         return self
@@ -572,8 +572,9 @@ class TaskBundle(ArtifactModel):
     def task_references(self):
         for ref,kind in ((self.source_pair,'SourcePair'),(self.contract,'RequirementContract'),(self.environment,'EnvironmentRecipe'),(self.private_oracle,'VerifierBundle')):
             require_ref(ref,kind)
-        if self.private_oracle.visibility == Visibility.PUBLIC or self.reference_solution.visibility == Visibility.PUBLIC:
-            raise ValueError('private oracle/reference cannot be public')
+        if any(ref.visibility not in {Visibility.PRIVATE, Visibility.EVALUATION}
+               for ref in (self.private_oracle, self.reference_solution)):
+            raise ValueError('oracle/reference requires private or evaluation visibility')
         if self.qualification is not None: require_ref(self.qualification,'QualificationReport')
         if self.state in {TaskState.QUALIFIED,TaskState.RELEASED,TaskState.CALIBRATED} and self.qualification is None:
             raise ValueError('admitted states require qualification reference')
@@ -668,6 +669,23 @@ class RolloutRecord(ArtifactModel):
     @model_validator(mode='after')
     def honest_rollout(self):
         require_ref(self.task,'TaskBundle')
+        stop_dispositions = {
+            StopReason.INVALID_TRAJECTORY: Disposition.INVALID,
+            StopReason.INFRASTRUCTURE_FAILURE: Disposition.INFRASTRUCTURE,
+        }
+        expected = stop_dispositions.get(self.stopping_reason)
+        if expected is not None:
+            if self.disposition != expected:
+                raise ValueError(f'{self.stopping_reason.value} stop requires {expected.value} disposition')
+            if self.training_eligible:
+                raise ValueError('invalid or infrastructure stop cannot be training eligible')
+        agent_failures = {StopReason.TOKEN_LIMIT, StopReason.TOOL_LIMIT,
+                          StopReason.TIME_LIMIT, StopReason.MALFORMED_ACTION,
+                          StopReason.CANDIDATE_FAILURE}
+        if self.stopping_reason in agent_failures and self.reward not in (None, 0):
+            raise ValueError('a measured agent failure requires zero reward')
+        if self.reward is not None and self.disposition not in {Disposition.SUCCESS, Disposition.REJECTED}:
+            raise ValueError('only valid measured outcomes can carry reward')
         if self.reward is not None and type(self.reward) is not int:
             raise ValueError('reward must be integer 0 or 1')
         if self.reward is not None and not self.grading_evidence:
@@ -710,6 +728,20 @@ class TrialResult(StrictModel):
     disposition: Disposition
     resolved: bool | None
     evidence: Evidence
+
+    @model_validator(mode='after')
+    def coherent_outcome(self):
+        require_ref(self.task, 'TaskBundle')
+        if self.rollout is not None:
+            require_ref(self.rollout, 'RolloutRecord')
+        if self.disposition in {Disposition.SUCCESS, Disposition.REJECTED}:
+            if self.resolved is None or self.rollout is None:
+                raise ValueError('measured trial requires resolved outcome and rollout')
+            if self.disposition == Disposition.REJECTED and self.resolved:
+                raise ValueError('rejected trial cannot be resolved')
+        elif self.resolved is not None:
+            raise ValueError('unmeasured or invalid trial must have null resolved outcome')
+        return self
 
 
 class MetricEstimate(StrictModel):
@@ -754,8 +786,12 @@ class EvaluationReport(ArtifactModel):
 
     @model_validator(mode='after')
     def successful_report(self):
-        if self.disposition == Disposition.SUCCESS and (not self.trials or not self.paired_metrics):
-            raise ValueError('evaluation success needs trials and measured metrics')
+        if self.disposition == Disposition.SUCCESS:
+            measured_trials = any(t.resolved is not None for t in self.trials)
+            measured_metrics = any(m.sample_size > 0 and m.estimate is not None
+                                   for m in self.paired_metrics)
+            if not measured_trials or not measured_metrics:
+                raise ValueError('evaluation success needs measured trials and measured metrics')
         unique([t.trial_id for t in self.trials], 'trial IDs')
         return self
 

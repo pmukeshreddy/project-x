@@ -117,3 +117,23 @@ def test_root_replaced_with_symlink_after_initialization_is_denied(tmp_path):
     root.rmdir();target=tmp_path/'target';target.mkdir();root.symlink_to(target)
     with pytest.raises(m.ArtifactIntegrityError):store.put_bytes(b'data','source',c.Visibility.PUBLIC)
     assert list(target.iterdir())==[]
+
+
+def test_review_author_readable_bytes_cannot_be_registered_as_reference(tmp_path):
+    import json
+    from pydantic import ValidationError
+    from test_contracts_examples import examples
+    m,c=api();controller=m.ArtifactStore(tmp_path,c.ActorRole.CONTROLLER)
+    author=m.ArtifactStore(tmp_path,c.ActorRole.AUTHOR)
+    author_visible=controller.put_bytes(b'reference implementation','source',c.Visibility.AUTHORING)
+    # Role consequence: authoring genuinely grants access, so the typed boundary must refuse it.
+    assert author.get_bytes(author_visible)==b'reference implementation'
+    for kind,field in [('SourcePair','reference'),('TaskBundle','reference_solution')]:
+        value=examples()[kind];value[field]=author_visible.model_dump(mode='json')
+        with pytest.raises(ValidationError):getattr(c,kind).model_validate_json(json.dumps(value))
+        for visibility in (c.Visibility.PRIVATE,c.Visibility.EVALUATION):
+            privileged=controller.put_bytes(b'reference implementation','source',visibility)
+            value[field]=privileged.model_dump(mode='json')
+            reference=controller.put_artifact(getattr(c,kind).model_validate_json(json.dumps(value)))
+            assert getattr(controller.get_artifact(reference),field)==privileged
+            with pytest.raises(m.AccessDenied):author.get_bytes(privileged)
