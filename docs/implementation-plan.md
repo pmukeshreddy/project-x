@@ -10,6 +10,8 @@
 
 **Spec:** `feature_rl_pipeline.md` in full, with execution authority in `codex_multi_agent_implementation_prompt.md`.
 
+**Current scope supersedes the original empirical stopping rule:** the user now requests complete code implementation and integration, available non-GPU checks, and reproducible training/evaluation commands; GPU execution and experimental results are deferred and explicitly unverified. Read `docs/decisions/code-completion-scope.md`. Preserve all runtime admission and evidence requirements in code. Missing experimental prerequisites do not block completing independent modules.
+
 ## Global constraints
 
 - No production stubs, placeholder success paths, hard-coded outcomes, fabricated tasks or metrics, canned learner answers, or false qualification records.
@@ -153,4 +155,4 @@ These are instance methods on configured services, not globals with hidden state
 
 ## Evidence and stopping rule
 
-`docs/progress.md` is the durable recovery entry point. `docs/reports/` holds implementation/review reports; `docs/evidence/` holds command output and concrete gate records. Local private artifact store is excluded from solver packages and Git. Commit coherent checkpoints on the integration branch. Continue independent authorized work when a dependency is missing. Full project completion requires all real construction, human/alternative qualification, genuine solver, actual weight-update/reload and independent evaluation gates; code/tests alone do not satisfy it.
+`docs/progress.md` is the durable recovery entry point. `docs/reports/` holds implementation/review reports; `docs/evidence/` holds command output and concrete gate records. Local private artifact store is excluded from solver packages and Git. Commit coherent checkpoints on the integration branch. Current deliverable completion requires all module code, independent reviews, integration, available non-GPU verification and reproducible commands. Actual qualification, human acceptance, solver, GPU update/reload and independent experimental results remain separately unverified until their real evidence exists, as directed in `docs/decisions/code-completion-scope.md`.

@@ -1,6 +1,6 @@
 # Feature-RL progress and recovery
 
-Read this ledger, the active owner brief, actual upstream interfaces/code and latest reports/reviews before acting. Both immutable inputs were read fully: `feature_rl_pipeline.md` (architecture) and `codex_multi_agent_implementation_prompt.md` (execution). User's latest steering: **No remote compute configured; finish all independent local work.** Do not finalize while independent implementation/review remains.
+Read this ledger, the active owner brief, actual upstream interfaces/code and latest reports/reviews before acting. Both immutable inputs were read fully: `feature_rl_pipeline.md` (architecture) and `codex_multi_agent_implementation_prompt.md` (execution). **Latest user scope: complete all code and integration, run available non-GPU checks, supply reproducible training/evaluation commands; GPU execution and experimental results are deferred and explicitly unverified.** Read `docs/decisions/code-completion-scope.md`; it supersedes older experimental stopping rules below. Do not finalize while independent implementation/review remains.
 
 Exact older ledgers and adjacent JSON hash receipts preserve every superseded state, failure and artifact identity:
 - `docs/history/progress-through-b3ce070.md`
@@ -28,7 +28,7 @@ Historical/candidate/generated application source, adapters/build hooks execute 
 | M0 | `/root/m0_contracts` | Core/provenancev2/optional MLX/bounded reads reviewed and integrated |
 | M1 | `/root/m1_sources` | Conservative history reconstruction reviewed/integrated; Click candidate provisional |
 | M2 | `/root/m2_authoring_recovery` | Provider reviewed/current-native integrated; bounded authoring-envelope preparation complete with reproducible receipts |
-| M3 | `/root/m3_runtime` | Fix ad154f8 frozen; independent scoped re-review ACTIVE |
+| M3 | `/root/m3_runtime` | Round2 review found connected terminal-cleanup P2; same owner ACTIVE on fix round2 |
 | M4 | `/root/m4_grading` | Bounded comparison/interface preparation complete; no product |
 | M5 | `/root/m5_qualification` | Signature preflight only; no product |
 | M6 | `/root/m6_factory` | Durability preflight only; no product |
