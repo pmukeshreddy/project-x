@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "docs/evidence/M6/durability-preflight-probe.py"
+  ],
+  "exit_status": 0,
+  "finished_at": "2026-09-19T11:21:32.462086+00:00",
+  "scope": "TRUSTED_SYNTHETIC_DIAGNOSTIC_NO_REAL_TASK_APPROVAL_OR_REWARD",
+  "started_at": "2026-09-19T11:21:29.644465+00:00",
+  "stderr": {
+    "base64": "",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "base64": "eyJzY29wZSI6ICJUUlVTVEVEX1NZTlRIRVRJQ19ESUFHTk9TVElDX05PX1JFQUxfVEFTS19BUFBST1ZBTF9PUl9SRVdBUkQiLCAicmVjZWlwdCI6ICJkb2NzL2V2aWRlbmNlL002L2R1cmFiaWxpdHktcHJlZmxpZ2h0LXJlY2VpcHRzLmpzb24iLCAic2hhMjU2IjogIjY4ODcxNDczY2JmNjAxMGU0YzA4MDYzOTg2MGY5YWU2ZDU1OGI0ODAyMWYwZWE5MzUwY2NlMjdmMGI3NmY3YjQiLCAiY2hlY2tzIjogMTY5LCAicGFzc2VkIjogdHJ1ZSwgIndhbGxfc2Vjb25kcyI6IDIuNzY5NjMwNTQyMDI0OTd9Cg==",
+    "bytes": 283,
+    "sha256": "56bbb08824fdc5f123c5c9b9aa626ce8cd20339772ce9f7d06a202e6d54da5bc"
+  },
+  "wall_seconds": 2.8172284169122577
+}
