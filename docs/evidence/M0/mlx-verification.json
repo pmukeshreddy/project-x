@@ -1,0 +1,123 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "-c",
+      "import platform,sys; assert sys.implementation.name == 'cpython' and sys.version_info[:2] == (3,13) and platform.system() == 'Darwin' and platform.machine() == 'arm64' and int(platform.mac_ver()[0].split('.')[0]) >= 26, 'Unsupported authoring-mlx platform: require CPython 3.13, macOS 26+ arm64'; print(platform.platform()); print(sys.version)"
+    ],
+    "utc": "2026-09-19T09:44:50.577912+00:00",
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "working_tree": "M0 optional MLX dependency slice",
+    "environment_overrides": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "exit_status": 0,
+    "stdout": "macOS-26.3-arm64-arm-64bit-Mach-O\n3.13.7 (main, Aug 14 2025, 11:12:11) [Clang 17.0.0 (clang-1700.3.19.1)]\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "uv",
+      "pip",
+      "install",
+      "--python",
+      ".venv/bin/python",
+      "--no-index",
+      "--find-links",
+      ".feature-rl/research/M2/downloads",
+      "--only-binary",
+      ":all:",
+      "--require-hashes",
+      "-r",
+      "requirements-authoring-mlx.lock"
+    ],
+    "utc": "2026-09-19T09:44:51.676095+00:00",
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "working_tree": "M0 optional MLX dependency slice",
+    "environment_overrides": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Resolved 34 packages in 15ms\nPrepared 31 packages in 896ms\nInstalled 31 packages in 74ms\n + annotated-doc==0.0.5\n + anyio==4.15.1\n + certifi==2026.7.22\n + click==8.5.0\n + filelock==4.0.1\n + fsspec==2026.9.0\n + h11==0.16.0\n + hf-xet==1.6.0\n + httpcore==1.0.9\n + httpx==0.28.1\n + huggingface-hub==1.32.0\n + idna==3.20\n + jinja2==3.1.6\n + markdown-it-py==4.2.0\n + markupsafe==3.0.3\n + mdurl==0.1.2\n + mlx==0.32.2\n + mlx-lm==0.31.3\n + mlx-metal==0.32.2\n + numpy==2.5.3\n + protobuf==7.36.2\n + pyyaml==6.0.3\n + regex==2026.9.10\n + rich==15.0.0\n + safetensors==0.8.0\n + sentencepiece==0.2.2\n + shellingham==1.5.4\n + tokenizers==0.23.2\n + tqdm==4.70.1\n + transformers==5.17.0\n + typer==0.27.2\n"
+  },
+  {
+    "command": [
+      "uv",
+      "pip",
+      "check",
+      "--python",
+      ".venv/bin/python"
+    ],
+    "utc": "2026-09-19T09:44:51.706393+00:00",
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "working_tree": "M0 optional MLX dependency slice",
+    "environment_overrides": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Checked 42 packages in 1ms\nAll installed packages are compatible\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-c",
+      "import importlib.metadata as md; import mlx.core as mx; import mlx_lm,transformers,numpy; import json; print(json.dumps({name:md.version(name) for name in ('mlx','mlx-metal','mlx-lm','transformers','numpy')},sort_keys=True)); print('Metal available:',mx.metal.is_available()); assert mx.metal.is_available(), 'MLX Metal backend unavailable'"
+    ],
+    "utc": "2026-09-19T09:44:55.465380+00:00",
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "working_tree": "M0 optional MLX dependency slice",
+    "environment_overrides": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "exit_status": 0,
+    "stdout": "{\"mlx\": \"0.32.2\", \"mlx-lm\": \"0.31.3\", \"mlx-metal\": \"0.32.2\", \"numpy\": \"2.5.3\", \"transformers\": \"5.17.0\"}\nMetal available: True\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "uv",
+      "sync",
+      "--frozen",
+      "--group",
+      "authoring-mlx",
+      "--no-install-project",
+      "--no-build",
+      "--offline",
+      "--dry-run"
+    ],
+    "utc": "2026-09-19T09:44:55.502386+00:00",
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "working_tree": "M0 optional MLX dependency slice",
+    "environment_overrides": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Would use project environment at: .venv\nWould uninstall 1 package\n - feature-rl==0.1.0 (from file:///Users/mukeshreddypochamreddy/Desktop/project%20x)\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-q"
+    ],
+    "utc": "2026-09-19T09:45:14.392598+00:00",
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "working_tree": "M0 optional MLX dependency slice",
+    "environment_overrides": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "exit_status": 0,
+    "stdout": "........................................................................ [ 46%]\n........................................................................ [ 92%]\n...........                                                              [100%]\n155 passed in 18.64s\n",
+    "stderr": ""
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+  "utc": "2026-09-19T09:46:19.756194+00:00",
+  "core_packages_unchanged": {
+    "annotated-types": "0.8.0",
+    "colorama": "0.4.6",
+    "feature-rl": "0.1.0",
+    "iniconfig": "2.3.0",
+    "packaging": "26.3",
+    "pluggy": "1.6.0",
+    "pydantic": "2.13.5",
+    "pydantic-core": "2.46.5",
+    "pygments": "2.21.0",
+    "pytest": "9.1.1",
+    "typing-extensions": "4.16.0",
+    "typing-inspection": "0.4.4"
+  },
+  "exact_closure_matches": 34,
+  "files": {
+    "pyproject.toml": "d682f26759ea0f7df4c64d89f86429e2c9febe199c6e2c51d6adad0e8cfd5e53",
+    "uv.lock": "23aed10cf14c548ca6a9791b7674e504af986a7bc1d0ba0c7941d368b7e7148c",
+    "requirements-authoring-mlx.lock": "d7279f2e2e8c84dfa98a2176040414f89e8cb521547487b221d9efce1c9c07a0"
+  }
+}

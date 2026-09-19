@@ -1,0 +1,38 @@
+[
+  {
+    "command": [
+      "uv",
+      "sync",
+      "--frozen",
+      "--group",
+      "authoring-mlx",
+      "--no-install-project",
+      "--inexact",
+      "--no-build",
+      "--offline",
+      "--dry-run"
+    ],
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "utc": "2026-09-19T09:47:36.920721+00:00",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Would use project environment at: .venv\nChecked 41 packages in 0.92ms\nWould make no changes\n"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "--",
+      "pyproject.toml",
+      "uv.lock",
+      "requirements-authoring-mlx.lock",
+      "docs/reports/M0-mlx-dependencies.md"
+    ],
+    "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+    "utc": "2026-09-19T09:47:36.931412+00:00",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

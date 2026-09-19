@@ -1,0 +1,14 @@
+{
+  "command": [
+    "uv",
+    "lock",
+    "--no-build",
+    "--python",
+    "3.13.7"
+  ],
+  "utc": "2026-09-19T09:44:13.032590+00:00",
+  "revision": "3761b3f9998650a2a6c5048a100cab1ee5d91f21",
+  "exit_status": 0,
+  "stdout": "",
+  "stderr": "Resolved 43 packages in 460ms\nAdded annotated-doc v0.0.5\nAdded anyio v4.15.1\nAdded certifi v2026.7.22\nAdded click v8.5.0\nAdded filelock v4.0.1\nAdded fsspec v2026.9.0\nAdded h11 v0.16.0\nAdded hf-xet v1.6.0\nAdded httpcore v1.0.9\nAdded httpx v0.28.1\nAdded huggingface-hub v1.32.0\nAdded idna v3.20\nAdded jinja2 v3.1.6\nAdded markdown-it-py v4.2.0\nAdded markupsafe v3.0.3\nAdded mdurl v0.1.2\nAdded mlx v0.32.2\nAdded mlx-lm v0.31.3\nAdded mlx-metal v0.32.2\nAdded numpy v2.5.3\nAdded protobuf v7.36.2\nAdded pyyaml v6.0.3\nAdded regex v2026.9.10\nAdded rich v15.0.0\nAdded safetensors v0.8.0\nAdded sentencepiece v0.2.2\nAdded shellingham v1.5.4\nAdded tokenizers v0.23.2\nAdded tqdm v4.70.1\nAdded transformers v5.17.0\nAdded typer v0.27.2\n"
+}

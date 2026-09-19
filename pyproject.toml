@@ -11,6 +11,43 @@ dependencies = ["pydantic==2.13.5"]
 
 [dependency-groups]
 dev = ["pytest==9.1.1"]
+# Qualified local authoring wheel closure; opt in only on CPython 3.13 / macOS 26+ arm64.
+authoring-mlx = [
+    "annotated-doc==0.0.5; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "anyio==4.15.1; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "certifi==2026.7.22; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "click==8.5.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "filelock==4.0.1; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "fsspec==2026.9.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "h11==0.16.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "hf-xet==1.6.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "httpcore==1.0.9; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "httpx==0.28.1; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "huggingface_hub==1.32.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "idna==3.20; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "Jinja2==3.1.6; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "markdown-it-py==4.2.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "MarkupSafe==3.0.3; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "mdurl==0.1.2; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "mlx-lm==0.31.3; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "mlx-metal==0.32.2; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "mlx==0.32.2; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "numpy==2.5.3; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "packaging==26.3; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "protobuf==7.36.2; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "Pygments==2.21.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "PyYAML==6.0.3; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "regex==2026.9.10; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "rich==15.0.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "safetensors==0.8.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "sentencepiece==0.2.2; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "shellingham==1.5.4; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "tokenizers==0.23.2; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "tqdm==4.70.1; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "transformers==5.17.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "typer==0.27.2; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+    "typing_extensions==4.16.0; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.13' and implementation_name == 'cpython'",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -19,3 +56,6 @@ addopts = "-ra"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/feature_rl"]
+
+[tool.uv.dependency-groups]
+authoring-mlx = { requires-python = ">=3.13,<3.14" }
