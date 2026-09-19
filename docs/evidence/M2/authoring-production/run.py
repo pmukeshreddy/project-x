@@ -566,7 +566,7 @@ def scenario() -> None:
     inputs = ScenarioFinalizationInputs(
         contract=contract_ref,
         supported_observables=("CLI exit code", "combined terminal output"),
-        seed_policy=SeedPolicy(algorithm="PYTHONHASHSEED", seeds=(0,), same_cases_within_group=True),
+        seed_policy=SeedPolicy(algorithm="m4-sha256-v1", seeds=(0,), same_cases_within_group=True),
         visibility=Visibility.EVALUATION,
         provenance=provenance,
         costs=(fixed_cost("authoring", "Generation cost is appended by the service."),),

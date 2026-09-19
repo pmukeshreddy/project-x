@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import io
 import tarfile
@@ -9,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from feature_rl.artifacts import ArtifactStore
+from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl.contracts import (
     ActorRole,
     AllowedChanges,
@@ -249,7 +250,7 @@ def contract_inputs() -> ContractFinalizationInputs:
         supported_observables=("combined terminal output", "CLI exit code"),
         runtime_discovery=DISCOVERY,
         allowed_changes=allowed(),
-        public_checks=(PUBLIC_CHECK,),
+        public_checks=(),
         episode_limits=limits(),
         provenance_label="reconstructed_specification",
         visibility=Visibility.AUTHORING,
@@ -545,6 +546,117 @@ def provider_result(content, index: int = 1) -> GenerationResult:
     )
 
 
+def archived_provider_result(store, request, content, index: int = 1) -> GenerationResult:
+    """Publish the provider archive bindings required to resume one successful result."""
+    base = provider_result(content, index)
+    visibility = (
+        Visibility.AUTHORING
+        if request.stage is GenerationStage.INITIAL_AUTHORING
+        else Visibility.PRIVATE
+    )
+    request_payload = request.model_dump(mode="json")
+    schema = (
+        RequirementContractProposal
+        if request.stage is GenerationStage.INITIAL_AUTHORING
+        else ScenarioPlanProposal
+    )
+    schema_payload = schema.model_json_schema()
+    envelope = {
+        "response_id": request.response_id,
+        "source_ids": [item.context_id for item in request.contexts],
+        "requirement_ids": list(request.allowed_requirement_ids),
+        "content": schema.model_validate(content).model_dump(mode="json"),
+    }
+    payloads = {
+        "attempt": {
+            "attempt_id": base.record.attempt_id,
+            "recorded_at": base.record.recorded_at.isoformat(),
+            "request_id": request.request_id,
+            "response_id": request.response_id,
+            "prompt_id": request.prompt_id,
+            "request_sha256": hashlib.sha256(canonical_json(request_payload)).hexdigest(),
+            "output_schema_sha256": hashlib.sha256(canonical_json(schema_payload)).hexdigest(),
+        },
+        "request": request_payload,
+        "response": {},
+        "retrieval": {"contexts": [item.model_dump(mode="json") for item in request.contexts]},
+        "schema": schema_payload,
+        "options": {"seed": request.seed, "limits": request.limits.model_dump(mode="json")},
+        "provenance": {"observed": True},
+        "usage": {"accepted_response_usage": True, "accepted": base.usage.model_dump(mode="json")},
+        "cost": base.cost.model_dump(mode="json"),
+        "events": (json.dumps({"event": "completed", "output_text": json.dumps(envelope)}) + "\n").encode(),
+    }
+    refs = {}
+    for name, payload in payloads.items():
+        raw = payload if isinstance(payload, bytes) else canonical_json(payload)
+        refs[name] = store.put_bytes(raw, f"generation-{name}", visibility)
+    status = {
+        "attempt_id": base.record.attempt_id,
+        "recorded_at": base.record.recorded_at.isoformat(),
+        "request_id": request.request_id,
+        "response_id": request.response_id,
+        "success": True,
+        "generation_succeeded": True,
+        "publication_complete": True,
+        "publication_recovered": True,
+        "error_type": None,
+        "error": None,
+        "archive_refs": {name: ref.model_dump(mode="json") for name, ref in refs.items()},
+    }
+    refs["status"] = store.put_bytes(canonical_json(status), "generation-status", visibility)
+    return base.model_copy(
+        update={
+            "record": base.record.model_copy(
+                update={
+                    "request_id": request.request_id,
+                    "response_id": request.response_id,
+                    "archives": refs,
+                }
+            )
+        }
+    )
+
+
+def archived_provider_error(store, request, content, index: int = 1) -> GenerationProviderError:
+    successful = archived_provider_result(store, request, content, index)
+    visibility = successful.record.archives["usage"].visibility
+    refs = dict(successful.record.archives)
+    refs["usage"] = store.put_bytes(
+        canonical_json({"accepted_response_usage": False, "accepted": None, "observed": {}}),
+        "generation-usage",
+        visibility,
+    )
+    record = successful.record.model_copy(
+        update={
+            "success": False,
+            "generation_succeeded": False,
+            "error_code": "ValueError",
+            "archives": refs,
+        }
+    )
+    status = {
+        "attempt_id": record.attempt_id,
+        "recorded_at": record.recorded_at.isoformat(),
+        "request_id": record.request_id,
+        "response_id": record.response_id,
+        "success": False,
+        "generation_succeeded": False,
+        "publication_complete": True,
+        "publication_recovered": True,
+        "error_type": "ValueError",
+        "error": "malformed output",
+        "archive_refs": {
+            name: ref.model_dump(mode="json") for name, ref in refs.items() if name != "status"
+        },
+    }
+    refs["status"] = store.put_bytes(canonical_json(status), "generation-status", visibility)
+    record = record.model_copy(update={"archives": refs})
+    return GenerationProviderError(
+        "malformed output", record, cost=successful.cost, usage_observation={}
+    )
+
+
 class FakeProvider:
     def __init__(self, outcomes):
         self.outcomes = list(outcomes)
@@ -707,7 +819,7 @@ def test_contract_service_rejects_identity_only_repair(tmp_path):
 
 def test_successful_provider_publication_recovery_stops_and_resumes_without_model_call(tmp_path):
     store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    successful = provider_result(contract_proposal())
+    successful = archived_provider_result(store, contract_request(), contract_proposal())
     pending_record = successful.record.model_copy(
         update={"success": False, "generation_succeeded": True, "publication_complete": False}
     )
@@ -717,12 +829,13 @@ def test_successful_provider_publication_recovery_stops_and_resumes_without_mode
         provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
         revision="2" * 40, evidence_scope="unit_diagnostic",
     )
+    archived_before = set(store.root.glob("*.json"))
     with pytest.raises(GenerationProviderError) as caught:
         service.generate(
             (GenerationCandidate(request=contract_request()),), contract_inputs(), sources()
-        )
+    )
     assert caught.value is pending
-    assert not tuple(store.root.glob("*.json"))
+    assert set(store.root.glob("*.json")) == archived_before
     recovered_provider = FakeProvider(())
     service.provider = recovered_provider
     result = service.generate(
@@ -731,6 +844,86 @@ def test_successful_provider_publication_recovery_stops_and_resumes_without_mode
     )
     assert result.contract_ref == store.put_artifact(result.contract)
     assert recovered_provider.calls == []
+
+
+@pytest.mark.parametrize("mutation", ("request", "cost"))
+def test_recovered_contract_result_must_match_archived_operation(tmp_path, mutation):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    request = contract_request()
+    recovered = archived_provider_result(store, request, contract_proposal())
+    if mutation == "request":
+        request = request.model_copy(update={"instruction": request.instruction + " changed"})
+    else:
+        recovered = recovered.model_copy(
+            update={
+                "cost": recovered.cost.model_copy(
+                    update={"wall_seconds": 0.0, "cpu_seconds": 0.0}
+                )
+            }
+        )
+    provider = FakeProvider(())
+    with pytest.raises(ValueError, match="recovered .* archive"):
+        ContractAuthoringService(
+            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+            revision="2" * 40, evidence_scope="unit_diagnostic",
+        ).generate(
+            (GenerationCandidate(request=request),), contract_inputs(), sources(),
+            recovered_result=recovered,
+        )
+    assert provider.calls == []
+
+
+def test_failed_generation_publication_recovery_stops_before_repair(tmp_path):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    record = provider_result(contract_proposal()).record.model_copy(
+        update={"success": False, "generation_succeeded": False, "publication_complete": False}
+    )
+    pending = GenerationProviderError("archive publication", record, recovery=object())
+    provider = FakeProvider((pending, provider_result(contract_proposal(), 2)))
+    with pytest.raises(GenerationProviderError) as caught:
+        ContractAuthoringService(
+            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+            revision="2" * 40, evidence_scope="unit_diagnostic",
+        ).generate(
+            (
+                GenerationCandidate(request=contract_request()),
+                GenerationCandidate(
+                    request=contract_request(2), diagnosis="retry", changed_input="repair"
+                ),
+            ),
+            contract_inputs(), sources(),
+        )
+    assert caught.value is pending
+    assert len(provider.calls) == 1
+
+
+def test_recovered_failed_generation_journals_without_another_model_call(tmp_path, monkeypatch):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    request = contract_request()
+    recovered = archived_provider_error(store, request, contract_proposal())
+    provider = FakeProvider(())
+    service = ContractAuthoringService(
+        provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+        revision="2" * 40, evidence_scope="unit_diagnostic",
+    )
+    original = store.put_bytes
+
+    def fail_journal(data, kind, visibility):
+        if kind == "contract-authoring-journal":
+            raise OSError("disk")
+        return original(data, kind, visibility)
+
+    monkeypatch.setattr(store, "put_bytes", fail_journal)
+    with pytest.raises(AuthoringJournalPublicationPending) as caught:
+        service.generate(
+            (GenerationCandidate(request=request),), contract_inputs(), sources(),
+            recovered_error=recovered,
+        )
+    assert provider.calls == []
+    monkeypatch.setattr(store, "put_bytes", original)
+    refs = caught.value.replay(store)
+    assert len(refs) == 1
+    assert "malformed output" in store.get_bytes(refs[0]).decode()
 
 
 def test_rejection_journal_publication_failure_is_replayable(tmp_path, monkeypatch):
@@ -810,6 +1003,99 @@ def test_scenario_request_and_service_resolve_exact_stored_contract(tmp_path):
     )
     assert result.plan.contract == contract_ref
     assert store.get_artifact(result.plan_ref) == result.plan
+
+
+@pytest.mark.parametrize("mutation", ("request", "cost"))
+def test_recovered_scenario_result_must_match_archived_operation(tmp_path, mutation):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    contract = finalized_contract()
+    contract_ref = store.put_artifact(contract)
+    request = build_scenario_request(
+        request_id="SCENARIO_RECOVER_REQ", response_id="SCENARIO_RECOVER_RESP",
+        prompt_id="SCENARIO_RECOVER_PROMPT", contract=contract,
+        contract_ref=contract_ref, sources=sources(), limits=generation_limits(), seed=0,
+    )
+    recovered = archived_provider_result(store, request, scenario_proposal())
+    if mutation == "request":
+        request = request.model_copy(update={"instruction": request.instruction + " changed"})
+    else:
+        recovered = recovered.model_copy(
+            update={
+                "cost": recovered.cost.model_copy(
+                    update={"wall_seconds": 0.0, "cpu_seconds": 0.0}
+                )
+            }
+        )
+    provider = FakeProvider(())
+    with pytest.raises(ValueError, match="recovered .* archive"):
+        ScenarioAuthoringService(
+            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+            revision="2" * 40, evidence_scope="unit_diagnostic",
+        ).generate(
+            (GenerationCandidate(request=request),), scenario_inputs(contract_ref), sources(),
+            recovered_result=recovered,
+        )
+    assert provider.calls == []
+
+
+def test_scenario_accepts_exact_public_check_frozen_by_contract(tmp_path):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    public_source = GroundedSource(
+        context_id="PUBLIC_CHECK", role="public_check", source=PUBLIC_CHECK,
+        locator="artifact:whole", text="Public compatibility obligation.",
+        provenance_label="existing_obligation",
+    )
+    admitted = sources() + (public_source,)
+    base_inputs = contract_inputs()
+    contract = ContractFinalizer().finalize(
+        contract_proposal(),
+        base_inputs.model_copy(
+            update={
+                "public_checks": (PUBLIC_CHECK,),
+                "provenance": base_inputs.provenance.model_copy(
+                    update={"inputs": base_inputs.provenance.inputs + (PUBLIC_CHECK,)}
+                )
+            }
+        ),
+        admitted,
+    )
+    contract_ref = store.put_artifact(contract)
+    request = build_scenario_request(
+        request_id="SCENARIO_PUBLIC_REQ", response_id="SCENARIO_PUBLIC_RESP",
+        prompt_id="SCENARIO_PUBLIC_PROMPT", contract=contract,
+        contract_ref=contract_ref, sources=admitted, limits=generation_limits(), seed=0,
+    )
+    provider = FakeProvider((provider_result(scenario_proposal()),))
+    result = ScenarioAuthoringService(
+        provider=provider, store=store, resolver=FakeEvidenceResolver(admitted),
+        revision="2" * 40, evidence_scope="unit_diagnostic",
+    ).generate(
+        (GenerationCandidate(request=request),), scenario_inputs(contract_ref), admitted,
+    )
+    assert result.plan.contract == contract_ref
+
+
+def test_recovered_failed_scenario_generation_journals_without_provider(tmp_path):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    contract = finalized_contract()
+    contract_ref = store.put_artifact(contract)
+    request = build_scenario_request(
+        request_id="SCENARIO_FAILED_REQ", response_id="SCENARIO_FAILED_RESP",
+        prompt_id="SCENARIO_FAILED_PROMPT", contract=contract,
+        contract_ref=contract_ref, sources=sources(), limits=generation_limits(), seed=0,
+    )
+    recovered = archived_provider_error(store, request, scenario_proposal())
+    provider = FakeProvider(())
+    with pytest.raises(AuthoringExhausted) as caught:
+        ScenarioAuthoringService(
+            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+            revision="2" * 40, evidence_scope="unit_diagnostic",
+        ).generate(
+            (GenerationCandidate(request=request),), scenario_inputs(contract_ref), sources(),
+            recovered_error=recovered,
+        )
+    assert len(caught.value.journal_refs) == 1
+    assert provider.calls == []
 
 
 def test_scenario_publication_failure_replays_without_another_generation(tmp_path, monkeypatch):

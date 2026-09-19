@@ -86,6 +86,21 @@ class GenerationProviderError(RuntimeError):
             raise RuntimeError("this provider failure has no pending archive publication")
         return self.recovery.replay_result(archive)
 
+    def replay_error(self, archive: ArchiveWriter) -> "GenerationProviderError":
+        """Finish a failed call's archive and return the same failure for controller replay."""
+        if self.recovery is None:
+            raise RuntimeError("this provider failure has no pending archive publication")
+        if self.recovery.generation_succeeded:
+            raise RuntimeError("successful generation publication must use replay_result")
+        record = self.recovery.replay(archive)
+        return GenerationProviderError(
+            self.recovery.underlying_error or str(self),
+            record,
+            cost=self.recovery.cost,
+            response=self.recovery.response,
+            usage_observation=self.recovery.usage_observation,
+        )
+
 
 class GenerationInputLimitError(ValueError):
     """A validated request cannot fit its declared serialized-input boundary."""

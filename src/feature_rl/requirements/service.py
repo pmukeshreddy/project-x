@@ -64,6 +64,160 @@ def semantic_request_sha256(request: GenerationRequest) -> str:
     return hashlib.sha256(canonical_json(payload)).hexdigest()
 
 
+_GENERATION_ARCHIVES = {
+    name: f"generation-{name}"
+    for name in (
+        "attempt", "request", "response", "retrieval", "schema", "options",
+        "provenance", "usage", "cost", "events", "status",
+    )
+}
+
+
+def _strict_json(data: bytes):
+    def pairs(items):
+        value = {}
+        for key, item in items:
+            if key in value:
+                raise ValueError(f"duplicate JSON key: {key}")
+            value[key] = item
+        return value
+
+    return json.loads(data, object_pairs_hook=pairs)
+
+
+def validate_recovered_generation(
+    store: ArtifactStore,
+    request: GenerationRequest,
+    output_schema: type[StrictModel],
+    recovered: GenerationResult | GenerationProviderError,
+) -> None:
+    """Bind a replayed provider outcome to its immutable archived operation."""
+    record = recovered.record
+    if set(record.archives) != set(_GENERATION_ARCHIVES):
+        raise ValueError("recovered generation archive set is incomplete")
+    visibility = (
+        Visibility.AUTHORING
+        if request.stage in {GenerationStage.DISCOVERY, GenerationStage.INITIAL_AUTHORING}
+        else Visibility.PRIVATE
+    )
+    raw = {}
+    for name, kind in _GENERATION_ARCHIVES.items():
+        ref = record.archives[name]
+        if (
+            ref.kind != kind
+            or ref.visibility is not visibility
+            or ref.encoding != "bytes"
+            or ref.schema_version != 1
+        ):
+            raise ValueError(f"recovered {name} archive reference is invalid")
+        raw[name] = store.get_bytes(
+            ref, max_envelope_bytes=2 * 1024 * 1024, max_payload_bytes=1024 * 1024
+        )
+
+    request_payload = request.model_dump(mode="json")
+    schema_payload = output_schema.model_json_schema()
+    try:
+        archived_request = _strict_json(raw["request"])
+        archived_schema = _strict_json(raw["schema"])
+        retrieval = _strict_json(raw["retrieval"])
+        attempt = _strict_json(raw["attempt"])
+        status = _strict_json(raw["status"])
+        usage = _strict_json(raw["usage"])
+        cost = _strict_json(raw["cost"])
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise ValueError("recovered generation archive JSON is invalid") from error
+    if archived_request != request_payload:
+        raise ValueError("recovered request archive differs from the resumed request")
+    if archived_schema != schema_payload:
+        raise ValueError("recovered schema archive differs from the expected proposal schema")
+    if retrieval != {
+        "contexts": [context.model_dump(mode="json") for context in request.contexts]
+    }:
+        raise ValueError("recovered context archive differs from the resumed request")
+    def recorded_at_matches(value) -> bool:
+        if not isinstance(value, str):
+            return False
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        return parsed == record.recorded_at
+
+    if (
+        attempt.get("attempt_id") != record.attempt_id
+        or not recorded_at_matches(attempt.get("recorded_at"))
+        or attempt.get("request_id") != request.request_id
+        or attempt.get("response_id") != request.response_id
+        or attempt.get("prompt_id") != request.prompt_id
+        or attempt.get("request_sha256")
+        != hashlib.sha256(canonical_json(request_payload)).hexdigest()
+        or attempt.get("output_schema_sha256")
+        != hashlib.sha256(canonical_json(schema_payload)).hexdigest()
+    ):
+        raise ValueError("recovered attempt archive differs from the resumed operation")
+    expected_archive_refs = {
+        name: ref.model_dump(mode="json")
+        for name, ref in record.archives.items()
+        if name != "status"
+    }
+    if (
+        status.get("attempt_id") != record.attempt_id
+        or not recorded_at_matches(status.get("recorded_at"))
+        or status.get("request_id") != record.request_id
+        or status.get("response_id") != record.response_id
+        or status.get("success") is not record.success
+        or status.get("generation_succeeded") is not record.generation_succeeded
+        or status.get("publication_complete") is not record.publication_complete
+        or status.get("error_type") != record.error_code
+        or status.get("archive_refs") != expected_archive_refs
+    ):
+        raise ValueError("recovered status archive differs from the provider record")
+    recovered_cost = getattr(recovered, "cost", None)
+    if recovered_cost is None or cost != recovered_cost.model_dump(mode="json"):
+        raise ValueError("recovered cost archive differs from the provider result")
+
+    if isinstance(recovered, GenerationResult):
+        if not (
+            record.success and record.generation_succeeded and record.publication_complete
+        ):
+            raise ValueError("recovered generation result status is not successful")
+        if not usage.get("accepted_response_usage") or usage.get("accepted") != recovered.usage.model_dump(mode="json"):
+            raise ValueError("recovered usage archive differs from the provider result")
+        completed = []
+        try:
+            for line in raw["events"].decode("utf-8").splitlines():
+                event = _strict_json(line.encode())
+                if isinstance(event, dict) and event.get("event") == "completed":
+                    completed.append(event)
+            envelope = _strict_json(completed[0]["output_text"].encode())
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, KeyError, IndexError, AttributeError) as error:
+            raise ValueError("recovered content archive is invalid") from error
+        expected_content = output_schema.model_validate(recovered.content).model_dump(mode="json")
+        if (
+            len(completed) != 1
+            or envelope.get("response_id") != request.response_id
+            or envelope.get("source_ids") != [context.context_id for context in request.contexts]
+            or len(envelope.get("requirement_ids", ()))
+            != len(set(envelope.get("requirement_ids", ())))
+            or not set(envelope.get("requirement_ids", ())).issubset(
+                request.allowed_requirement_ids
+            )
+            or envelope.get("content") != expected_content
+        ):
+            raise ValueError("recovered content archive differs from the provider result")
+    else:
+        if record.success or record.generation_succeeded or not record.publication_complete:
+            raise ValueError("recovered provider error status is invalid")
+        if usage.get("accepted_response_usage") is not False or usage.get("accepted") is not None:
+            raise ValueError("recovered usage archive incorrectly accepts a failed response")
+        if usage.get("observed") != recovered.usage_observation:
+            raise ValueError("recovered usage archive differs from the provider error")
+        if status.get("error") != str(recovered):
+            raise ValueError("recovered status archive differs from the provider error")
+        if recovered.response is not None and _strict_json(raw["response"]) != recovered.response:
+            raise ValueError("recovered response archive differs from the provider error")
+
+
 @dataclass(frozen=True)
 class ContractAuthoringResult:
     contract: RequirementContract
@@ -317,6 +471,7 @@ class ContractAuthoringService:
         *,
         prior_journal_refs: tuple[ArtifactRef, ...] = (),
         recovered_result: GenerationResult | None = None,
+        recovered_error: GenerationProviderError | None = None,
     ) -> ContractAuthoringResult:
         candidates = tuple(GenerationCandidate.model_validate(item) for item in candidates)
         prior_journal_refs = tuple(ArtifactRef.model_validate(ref) for ref in prior_journal_refs)
@@ -326,20 +481,27 @@ class ContractAuthoringService:
             raise
         self._validate_plan(candidates, prior_journal_refs, sources)
         inputs = ContractFinalizationInputs.model_validate(inputs)
+        if recovered_result is not None and recovered_error is not None:
+            raise ValueError("only one recovered provider outcome may be supplied")
         if recovered_result is not None:
             recovered_result = GenerationResult.model_validate(recovered_result)
-            if len(candidates) != 1 or not (
-                recovered_result.record.success
-                and recovered_result.record.generation_succeeded
-                and recovered_result.record.publication_complete
-                and recovered_result.record.request_id == candidates[0].request.request_id
-                and recovered_result.record.response_id == candidates[0].request.response_id
-            ):
-                raise ValueError("recovered contract generation result identity is invalid")
+            if len(candidates) != 1:
+                raise ValueError("recovered contract generation requires one candidate")
+            validate_recovered_generation(
+                self.store, candidates[0].request, RequirementContractProposal, recovered_result
+            )
+        if recovered_error is not None:
+            if not isinstance(recovered_error, GenerationProviderError) or len(candidates) != 1:
+                raise ValueError("recovered contract provider error is invalid")
+            validate_recovered_generation(
+                self.store, candidates[0].request, RequirementContractProposal, recovered_error
+            )
         journal_refs = list(prior_journal_refs)
         for index, candidate in enumerate(candidates, len(prior_journal_refs) + 1):
             result = None
             try:
+                if recovered_error is not None:
+                    raise recovered_error
                 result = (
                     recovered_result
                     if recovered_result is not None
@@ -370,7 +532,9 @@ class ContractAuthoringService:
                 )
                 contract = ContractFinalizer().finalize(proposal, final_inputs, sources)
             except (GenerationProviderError, ValidationError, GroundingError, ValueError) as error:
-                if isinstance(error, GenerationProviderError) and error.record.generation_succeeded:
+                if isinstance(error, GenerationProviderError) and (
+                    error.record.generation_succeeded or error.recovery is not None
+                ):
                     raise
                 journal_payload = self._journal_payload(
                     candidate, index, status="rejected", error=error, result=result

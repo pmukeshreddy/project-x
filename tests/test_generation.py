@@ -1771,6 +1771,39 @@ def test_archive_failure_retains_outcome_and_replays_without_execution(tmp_path)
     assert set(recovered.archives) == set(ARCHIVE_NAMES)
 
 
+def test_failed_generation_archive_recovery_returns_replayable_provider_error(tmp_path):
+    """A failed call finishes pending publication without becoming a fresh generation."""
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    events[-1]["output_text"] = "{"
+    runner = FakeRunner(
+        stdout=("\n".join(json.dumps(event) for event in events) + "\n").encode()
+    )
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    failed = False
+
+    def fail_response_once(data, kind, visibility):
+        nonlocal failed
+        if kind == "generation-response" and not failed:
+            failed = True
+            raise OSError("injected archive publication failure")
+        return store.put_bytes(data, kind, visibility)
+
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(), archive=fail_response_once, runner=runner
+    )
+    with pytest.raises(GenerationProviderError) as caught:
+        provider.generate(request(), SmokeContent)
+    assert caught.value.record.generation_succeeded is False
+    assert caught.value.recovery is not None
+
+    recovered = caught.value.replay_error(store.put_bytes)
+    assert len(runner.calls) == 1
+    assert recovered.record.publication_complete is True
+    assert recovered.record.generation_succeeded is False
+    assert recovered.recovery is None
+    assert set(recovered.record.archives) == set(ARCHIVE_NAMES)
+
+
 def oversized_request(*, maximum_ids=False) -> GenerationRequest:
     updates = {"instruction": "Attributable diagnostic instruction. " * 200}
     if maximum_ids:

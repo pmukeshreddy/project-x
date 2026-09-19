@@ -30,7 +30,11 @@ from feature_rl.requirements import (
     GenerationCandidate,
     GroundedSource,
 )
-from feature_rl.requirements.service import contexts_from_sources, semantic_request_sha256
+from feature_rl.requirements.service import (
+    contexts_from_sources,
+    semantic_request_sha256,
+    validate_recovered_generation,
+)
 
 from .finalize import ScenarioFinalizer, ScenarioJoinError
 from .models import ScenarioFinalizationInputs, ScenarioPlanProposal
@@ -177,7 +181,7 @@ class ScenarioAuthoringService:
                 "source-archive",
                 "click-runtime-discovery",
             }
-        }
+        } | set(contract.public_checks)
         actual_source_refs = {source.source for source in sources}
         if actual_source_refs != expected_source_refs:
             raise ValueError("scenario evidence set differs from the frozen contract inputs")
@@ -268,6 +272,7 @@ class ScenarioAuthoringService:
         *,
         prior_journal_refs: tuple[ArtifactRef, ...] = (),
         recovered_result: GenerationResult | None = None,
+        recovered_error: GenerationProviderError | None = None,
     ) -> ScenarioAuthoringResult:
         candidates = tuple(GenerationCandidate.model_validate(item) for item in candidates)
         prior_journal_refs = tuple(ArtifactRef.model_validate(ref) for ref in prior_journal_refs)
@@ -285,20 +290,27 @@ class ScenarioAuthoringService:
                 "scenario observables differ from the frozen contract requirements"
             )
         self._validate_plan(candidates, inputs.contract, resolved, prior_journal_refs, sources)
+        if recovered_result is not None and recovered_error is not None:
+            raise ValueError("only one recovered provider outcome may be supplied")
         if recovered_result is not None:
             recovered_result = GenerationResult.model_validate(recovered_result)
-            if len(candidates) != 1 or not (
-                recovered_result.record.success
-                and recovered_result.record.generation_succeeded
-                and recovered_result.record.publication_complete
-                and recovered_result.record.request_id == candidates[0].request.request_id
-                and recovered_result.record.response_id == candidates[0].request.response_id
-            ):
-                raise ValueError("recovered scenario generation result identity is invalid")
+            if len(candidates) != 1:
+                raise ValueError("recovered scenario generation requires one candidate")
+            validate_recovered_generation(
+                self.store, candidates[0].request, ScenarioPlanProposal, recovered_result
+            )
+        if recovered_error is not None:
+            if not isinstance(recovered_error, GenerationProviderError) or len(candidates) != 1:
+                raise ValueError("recovered scenario provider error is invalid")
+            validate_recovered_generation(
+                self.store, candidates[0].request, ScenarioPlanProposal, recovered_error
+            )
         journal_refs = list(prior_journal_refs)
         for index, candidate in enumerate(candidates, len(prior_journal_refs) + 1):
             result = None
             try:
+                if recovered_error is not None:
+                    raise recovered_error
                 result = (
                     recovered_result
                     if recovered_result is not None
@@ -335,7 +347,9 @@ class ScenarioAuthoringService:
                     expected_contract=inputs.contract,
                 )
             except (GenerationProviderError, ValidationError, ScenarioJoinError, ValueError) as error:
-                if isinstance(error, GenerationProviderError) and error.record.generation_succeeded:
+                if isinstance(error, GenerationProviderError) and (
+                    error.record.generation_succeeded or error.recovery is not None
+                ):
                     raise
                 journal_payload = self._journal_payload(
                     candidate, index, status="rejected", error=error, result=result
