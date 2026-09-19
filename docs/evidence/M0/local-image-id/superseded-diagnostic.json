@@ -1,0 +1,18 @@
+{
+  "status": "superseded; proposed extension cancelled before any product/test/interface edits",
+  "reason": "Coordinator reports real retained local RepoDigest supported by existing EnvironmentRecipe; no extension required. M0 did not inspect Docker.",
+  "recorded_at_utc": "2026-09-19T19:22:58.009367+00:00",
+  "execution_utc": null,
+  "execution_utc_note": "Exact execution timestamp not captured; command/output preserved from tool receipt 137089.",
+  "revision": "c37b9d9efe2300db76763da0c71b5c2a7596b8f7",
+  "command": "PYTHONPATH=src:tests .venv/bin/python - <<'PY'\nimport tempfile,json\nfrom pathlib import Path\nfrom feature_rl.contracts import EnvironmentRecipe,ActorRole\nfrom feature_rl.artifacts import ArtifactStore\nfrom test_contracts_examples import examples\nwith tempfile.TemporaryDirectory() as d:\n a=EnvironmentRecipe.model_validate_json(json.dumps(examples()['EnvironmentRecipe']))\n r=ArtifactStore(Path(d).resolve(),ActorRole.CONTROLLER).put_artifact(a)\n print(r.sha256)\nPY",
+  "exit_status": 0,
+  "stdout": "af97746e026624b5ce72e6fa6055a5ee93937551e228405eefee43f55dd5f30b\n",
+  "stderr": "",
+  "source_sha256": {
+    "src/feature_rl/contracts/models.py": "e2103bd90901c58e2ce88fa0dad7e6dc87b1181c807ea1482f26d3713a54f3bd",
+    "src/feature_rl/artifacts/store.py": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c",
+    "tests/test_contracts_examples.py": "b1d777ab2a645c37c34bdb813342372a7f1f2de5a0af8d55f8ae32ccabde9d0f"
+  },
+  "limitations": "Synthetic repository-digest storage identity only; no local image validation, tests, Docker, network or model execution. No implementation commit."
+}
