@@ -1,0 +1,447 @@
+{
+  "checks": [
+    {
+      "name": "index_matches_product_commit",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/__init__.py",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/archive.py",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/docker.py",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/models.py",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/probes.py",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/runtime.py",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/seccomp.json",
+      "passed": true
+    },
+    {
+      "name": "source_hashes:src/feature_rl/environments/workers.py",
+      "passed": true
+    },
+    {
+      "name": "test_hashes:tests/test_environments.py",
+      "passed": true
+    },
+    {
+      "name": "test_hashes:tests/test_environments_docker.py",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/acquire_less.py",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/baseline-diagnosis-1.json",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/baseline-diagnosis-1.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/baseline-diagnosis-2.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/build-recovery-attribution.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/capacity.json",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/click-final-smoke.json",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/click-final-smoke.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/click-initial-1.json",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/click-initial-1.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/click-repair1-complete.json",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/click-repair1-complete.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/diagnose_baseline.py",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/final-owned-containers.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/full-suite.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-archive.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-development-attribution-attempt1.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-development-attribution-attempt2.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-docker-attempt1.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-docker-attempt2.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-forged-archive.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-publication.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-resource-attribution.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-runtime-checkpoint.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/green-workspace.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/index_evidence.py",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/less-acquisition.json",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/less-acquisition.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/less-image-build.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/less-image-receipt.json",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/less-repodigest-resolution.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/memory-denial.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/neutral-repair.md",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-archive.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-development-attribution.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-docker.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-forged-archive.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-memory-gate.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-publication.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-resource-attribution.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-runtime-longpath.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/red-workspace-roundtrip.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/run_click.py",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/system-inventory.log",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/system_inventory.py",
+      "passed": true
+    },
+    {
+      "name": "evidence_file:docs/evidence/M3/production/tmpfs-export-diagnosis.json",
+      "passed": true
+    },
+    {
+      "name": "retained_full_suite_result",
+      "passed": true
+    },
+    {
+      "name": "all_attempt_dispositions_retained",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:06c741c20fcc5fe7106ef6aeb1d7ecf1ca9cd1e4ef2c3047550536e118094408",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:06c741c20fcc5fe7106ef6aeb1d7ecf1ca9cd1e4ef2c3047550536e118094408",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:f7c88524a45037d832d72aba8d310f4dd9ce21456e6f7644677bae8c4742ffa0",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:f7c88524a45037d832d72aba8d310f4dd9ce21456e6f7644677bae8c4742ffa0",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:e5c3a06a1502b874f09663b6be686557af642a093d0fe008eb33fc5ebc0f34ad",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:e5c3a06a1502b874f09663b6be686557af642a093d0fe008eb33fc5ebc0f34ad",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:e199d79840eb03b9cbed222dac2e05013566e912940a354cfd0515f524c0b0ca",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:e199d79840eb03b9cbed222dac2e05013566e912940a354cfd0515f524c0b0ca",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:f84360e6f16f75750df0b776bb15f8d77378c8d3ea889f553c656afebb17a329",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:f84360e6f16f75750df0b776bb15f8d77378c8d3ea889f553c656afebb17a329",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:39054e194ac2895efbe6c76e6f50a6a2133fbddbf2444ce7e0953487d50e6f57",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:39054e194ac2895efbe6c76e6f50a6a2133fbddbf2444ce7e0953487d50e6f57",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:8db5d0b0d302cababa3926df175f2ffa7210604a3ce39957a04e659f0146f87e",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:8db5d0b0d302cababa3926df175f2ffa7210604a3ce39957a04e659f0146f87e",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:5b55c8162a4d40e23704e071f32954333794debb9f4c57b2b8c060f34df0f2a1",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:5b55c8162a4d40e23704e071f32954333794debb9f4c57b2b8c060f34df0f2a1",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:ff996b33cf6227ac4c687cc75658d1b0788378c158dda619a3f0420c400323a1",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:ff996b33cf6227ac4c687cc75658d1b0788378c158dda619a3f0420c400323a1",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:9c81c884deb82fe03ad36c0b1f5ce7a038ff6e94dc64f8ac643e136a44445ffb",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:9c81c884deb82fe03ad36c0b1f5ce7a038ff6e94dc64f8ac643e136a44445ffb",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:fc50cae1bb22226a1f198f96428e8810911d55694811b39bbf513d0e95f3c2e4",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:fc50cae1bb22226a1f198f96428e8810911d55694811b39bbf513d0e95f3c2e4",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:abb8192cec9bac63ad6108f599a9f5fc8bae72bf9b105d713ee57e5af01accb0",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:abb8192cec9bac63ad6108f599a9f5fc8bae72bf9b105d713ee57e5af01accb0",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:24294558bb834fa10b92a7cbc86169724db361afa1987bb74ea6d09d0410d895",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:24294558bb834fa10b92a7cbc86169724db361afa1987bb74ea6d09d0410d895",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:2c7af7a2815774f354c8ced776f7ad779654db3c92668b1fb54992db4ecc90c8",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:2c7af7a2815774f354c8ced776f7ad779654db3c92668b1fb54992db4ecc90c8",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:2aecdc3eaa298afba8bc1e77e48e397dc9c7e7fbf8e09210556d3fa0a9f2dba3",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:2aecdc3eaa298afba8bc1e77e48e397dc9c7e7fbf8e09210556d3fa0a9f2dba3",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:2452fecf64a7c1e43c8c96e86955ebfb2efabc38c4286b183116513d712a0c79",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:2452fecf64a7c1e43c8c96e86955ebfb2efabc38c4286b183116513d712a0c79",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:f01da0c9ec8dba1d8b03423d9192541d619c11df5eb436d8df0713231245bd1d",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:f01da0c9ec8dba1d8b03423d9192541d619c11df5eb436d8df0713231245bd1d",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:451d0ebcbfdab954bc8502b96844ae94217b89bbcebb4c1850da125b47115001",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:451d0ebcbfdab954bc8502b96844ae94217b89bbcebb4c1850da125b47115001",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:76e5d8f7d487b78da1588e6ba836b16b7f78a3d601d79c5e96d95116600130da",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:76e5d8f7d487b78da1588e6ba836b16b7f78a3d601d79c5e96d95116600130da",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:4637f38e7d3501de783b185a91c7bb7d6b56785ab8b0982512f33db86d1fd7ac",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:4637f38e7d3501de783b185a91c7bb7d6b56785ab8b0982512f33db86d1fd7ac",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:5d3c8287d112c63bc97ce318296c3c9ac0c941ffbc130c566ceda88bf56d66f2",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:5d3c8287d112c63bc97ce318296c3c9ac0c941ffbc130c566ceda88bf56d66f2",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:6509786b1ac66773b5a2e1a4d06e4fb6c0524a2a6a35bc06513f0186455425fc",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:6509786b1ac66773b5a2e1a4d06e4fb6c0524a2a6a35bc06513f0186455425fc",
+      "passed": true
+    },
+    {
+      "name": "receipt_bytes:fa01090113eb58795e76c92924a061f38cb467045b979a4ec6a12eedbf8f5aad",
+      "passed": true
+    },
+    {
+      "name": "receipt_bindings:fa01090113eb58795e76c92924a061f38cb467045b979a4ec6a12eedbf8f5aad",
+      "passed": true
+    },
+    {
+      "name": "receipt_count",
+      "passed": true
+    }
+  ],
+  "checks_passed": 106,
+  "command": [
+    "env",
+    "PYTHONPATH=src",
+    ".venv/bin/python",
+    "docs/evidence/M3/coordinator-runtime-binding.py"
+  ],
+  "driver_sha256": "7e77f2d253c03f47c5ccf0d4bdcb25801e73699fb82e3d07b095e843e3554512",
+  "exit_status": 0,
+  "finished_at_utc": "2026-09-19T19:45:59.902515+00:00",
+  "index_sha256": "12d393942c71abaf4129535db3a02b8922822a6a2355dee8649c5efc53c03754",
+  "limitations": [
+    "This binds retained observations; it does not rerun the earlier source revisions or Docker inventory.",
+    "Independent product review remains authoritative for unresolved implementation defects; feature construction/qualification and training are still open."
+  ],
+  "purpose": "Verify retained M3 source/test/log/CAS bindings without executing Docker or application code.",
+  "receipt_count": 23,
+  "started_at_utc": "2026-09-19T19:45:59.574823+00:00",
+  "target_revision": "a9fec98ce2fec8cd8bc30c245a1100156532e847"
+}
