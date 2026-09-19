@@ -1,0 +1,109 @@
+{
+  "created_at": "2026-09-19T19:55:59.813147+00:00",
+  "product_base": "a9fec98ce2fec8cd8bc30c245a1100156532e847",
+  "source_hashes": {
+    "src/feature_rl/environments/seccomp.json": "005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44",
+    "src/feature_rl/environments/models.py": "ab6cb150a252f3d5f57c335ed15dd26608d5cf827c7ec53a70721e81b5c699da",
+    "src/feature_rl/environments/__init__.py": "bf204b871a62df026c04882279f6b80cbe55177ce7366fc4b1d093e90a18b556",
+    "src/feature_rl/environments/docker.py": "f158fad2c4a03f4d749683865440bb9854e9fceaf017c5b80ee2ab422d78f3e1",
+    "src/feature_rl/environments/runtime.py": "cd0eb49c91738c4aaac11d4848ad5a5bb0c264e48a6aa034827a52c59c1f4d9d",
+    "src/feature_rl/environments/archive.py": "e18b59e2b036dcd5843e9f4b39e3f5d2a491f7564d1bad700cc0026c2225fd4a",
+    "src/feature_rl/environments/probes.py": "01b871bb0fbcce519c233d32e4087e1f5df8514dcada5d046443f7e070a0618e",
+    "src/feature_rl/environments/workers.py": "ad57c0cb19a8d234476716b84d759e1e8e5182f2260c42ceb08551e497dd0dce"
+  },
+  "test_hashes": {
+    "tests/test_environments.py": "dcc3415617b36c54e562b170546fd186d6941366d61e639ee741d240e2eb570b",
+    "tests/test_environments_docker.py": "b1d8c3ac1d41ff9a93e9b98cb8e0d14a99a78d429bcdee33a09d320ea477dfa8"
+  },
+  "checks": [
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/pytest",
+        "-q",
+        "tests/test_environments_docker.py",
+        "-k",
+        "terminal_transition or overlapping_resets"
+      ],
+      "exit_status": 0,
+      "result": "3 passed, 21 deselected in 10.17s",
+      "log": "docs/evidence/M3/fix-round1/green-interleaving.log",
+      "sha256": "0cfa1256d0bbeaf1912196bd842b40366a0e099ee12583216289d3b52af05de2",
+      "utc_capture_started": "2026-09-19T19:52:34.322227+00:00",
+      "utc_capture_finished": "2026-09-19T19:52:44.691317+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/pytest",
+        "-q",
+        "tests/test_environments.py",
+        "tests/test_environments_docker.py"
+      ],
+      "exit_status": 0,
+      "result": "41 passed in 60.91s",
+      "log": "docs/evidence/M3/fix-round1/focused-suite.log",
+      "sha256": "9e96d235df69090751c62e0f3b493d5d8d51e6f30f9191cdf57c93de5d217079",
+      "utc_capture_started": "2026-09-19T19:54:10.455867+00:00",
+      "utc_capture_finished": "2026-09-19T19:55:11.557309+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "docs/evidence/M3/fix-round1/interleaving.py"
+      ],
+      "exit_status": 0,
+      "result": "5 schedules passed; all owned operations removed",
+      "log": "docs/evidence/M3/fix-round1/interleaving.log",
+      "sha256": "fe48429a96177f10208dae8c2e38877df2cc0aa5b7430a3f23294c7b0dadfb74",
+      "utc_capture_started": "2026-09-19T19:53:46.022532+00:00",
+      "utc_capture_finished": "2026-09-19T19:53:53.868695+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    },
+    {
+      "command": [
+        "docker",
+        "ps",
+        "-aq",
+        "--filter",
+        "label=feature-rl.owner"
+      ],
+      "exit_status": 0,
+      "result": "no remaining owned containers",
+      "log": "docs/evidence/M3/fix-round1/owned-containers.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "utc_capture_started": "2026-09-19T19:55:59.745514+00:00",
+      "utc_capture_finished": "2026-09-19T19:55:59.745514+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    }
+  ],
+  "diagnostic_operation_ids": [
+    "6e42d34fe4174c2382356dfd3498ef1f",
+    "a0a4806eee804a569ddc4beda20ece30",
+    "c06b59c35e4e4fb3beeb2887dce9e998",
+    "f0266dc8dcb74961847c447c5dd893e5"
+  ],
+  "repair_counts": {
+    "environment": 1,
+    "environment_budget": 2,
+    "candidate": 1,
+    "candidate_budget": 4
+  },
+  "cost_scope": "Local synthetic Docker and host controller tests only. No historical B/H, model/provider/native, downloads, remote or paid work; CPU/wall partial observations are retained in the diagnostic and test logs.",
+  "evidence_files": {
+    "docs/evidence/M3/fix-round1/interleaving.py": "0ae68bfdd16a79042fb6ccc78acec7c028b9cd43873c2ae38909c123f67e7676",
+    "docs/evidence/M3/fix-round1/focused-suite.log": "9e96d235df69090751c62e0f3b493d5d8d51e6f30f9191cdf57c93de5d217079",
+    "docs/evidence/M3/fix-round1/red-interleaving.log": "e1f0312275f5359780c8b85d692f145173a5272a8b7d708fdba487bcd615be67",
+    "docs/evidence/M3/fix-round1/red-receipt.json": "fa016eacd20e8f9dd07d17b609c004edec9e4eb45835844b68fbd22dacc139ec",
+    "docs/evidence/M3/fix-round1/owned-containers.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/evidence/M3/fix-round1/interleaving.log": "fe48429a96177f10208dae8c2e38877df2cc0aa5b7430a3f23294c7b0dadfb74",
+    "docs/evidence/M3/fix-round1/green-interleaving.log": "0cfa1256d0bbeaf1912196bd842b40366a0e099ee12583216289d3b52af05de2",
+    "docs/evidence/M3/fix-round1/interleaving-result.json": "2a26a4c374f2b4a4eec117f05a0a85cf8b717bb3ee208e83c451f60eb81736b0"
+  }
+}

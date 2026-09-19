@@ -226,3 +226,78 @@ def test_forbidden_dependency_policy_cannot_allow_manifest_edits(runtime_fixture
     runtime,prepared=runtime_fixture
     policy=AllowedChanges(source_roots=('pyproject.toml',),forbidden_paths=(),dependencies='forbidden',dependency_artifacts=(),additional_artifact_types=())
     with pytest.raises(PolicyRejected):runtime.open_workspace(prepared,allowed_changes=policy)
+
+
+@pytest.mark.parametrize('transition', ['close', 'reset'])
+def test_terminal_transition_reloads_after_concurrent_confirmed_save(runtime_fixture, monkeypatch, transition):
+    from contextlib import contextmanager
+    import threading
+    from feature_rl.environments import CommandSpec,ExecutionRequest
+    runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared)
+    initial=runtime.workspace(handle)[3]
+    paused=threading.Event();release=threading.Event();outcome={};original_lock=runtime.engine.state.lock
+    @contextmanager
+    def scheduled_lock():
+        if threading.current_thread().name=='terminal-transition':
+            outcome['lock_calls']=outcome.get('lock_calls',0)+1
+            # Recovery takes the first lock; delay the terminal transition's own lock.
+            if outcome['lock_calls']==2:
+                paused.set();assert release.wait(10), 'bounded interleaving expired'
+        with original_lock():yield
+    def terminal():
+        try:outcome['saved']=getattr(runtime,transition)(handle)
+        except BaseException as exc:outcome['error']=exc
+    with monkeypatch.context() as patch:
+        patch.setattr(runtime.engine.state,'lock',scheduled_lock)
+        thread=threading.Thread(target=terminal,name='terminal-transition');thread.start()
+        try:
+            assert paused.wait(3)
+            result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(
+                argv=('python','-c',"import pathlib;pathlib.Path('/workspace/source/src/click/__init__.py').write_text('x=42\\n')"),
+                working_directory='/workspace',timeout_seconds=2.0)))
+            assert result.reason=='completed' and result.save_status=='saved' and result.cleanup_verified
+            intermediate=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+        finally:release.set();thread.join(3)
+    assert not thread.is_alive() and 'error' not in outcome
+    state=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+    expected=result.saved_source if transition=='close' else initial
+    assert outcome['saved']==expected
+    assert state['saved']==expected.model_dump(mode='json')
+    assert state['generation']==intermediate['generation']+1
+    assert state['closed']==(transition=='close')
+    assert runtime.recover_owned()==[]
+
+
+def test_overlapping_resets_advance_generation_and_reject_old_admission(runtime_fixture, monkeypatch):
+    from contextlib import contextmanager
+    import threading
+    from feature_rl.environments import PolicyRejected
+    runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared)
+    paused=threading.Event();release=threading.Event();outcome={};original_lock=runtime.engine.state.lock
+    @contextmanager
+    def scheduled_lock():
+        if threading.current_thread().name=='terminal-reset':
+            outcome['lock_calls']=outcome.get('lock_calls',0)+1
+            if outcome['lock_calls']==2:
+                paused.set();assert release.wait(10), 'bounded interleaving expired'
+        with original_lock():yield
+    def reset():
+        try:outcome['saved']=runtime.reset(handle)
+        except BaseException as exc:outcome['error']=exc
+    with monkeypatch.context() as patch:
+        patch.setattr(runtime.engine.state,'lock',scheduled_lock)
+        thread=threading.Thread(target=reset,name='terminal-reset');thread.start()
+        try:
+            assert paused.wait(3)
+            runtime.reset(handle)
+            intermediate,actual,recipe,saved,source=runtime.workspace(handle)
+            pending=runtime.engine.session(binding=runtime.binding(actual,saved,'development',intermediate),saved_source=saved.model_dump(mode='json'))
+        finally:release.set();thread.join(3)
+    assert not thread.is_alive() and 'error' not in outcome
+    state=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+    assert state['saved']==intermediate['saved']  # Same bytes cannot excuse generation reuse.
+    assert state['generation']==intermediate['generation']+1
+    with pytest.raises(PolicyRejected,match='workspace changed before operation admission'):
+        with pending:pass
+    assert pending.record.container_id is None and pending.cleanup_verified
+    assert runtime.recover_owned()==[]

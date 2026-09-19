@@ -1,0 +1,134 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___ test_terminal_transition_reloads_after_concurrent_confirmed_save[close] ____
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x1099aaa50>, PreparedEnvironment(recipe=ArtifactRef(sh...8205acac', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1090b35c0>
+transition = 'close'
+
+    @pytest.mark.parametrize('transition', ['close', 'reset'])
+    def test_terminal_transition_reloads_after_concurrent_confirmed_save(runtime_fixture, monkeypatch, transition):
+        from contextlib import contextmanager
+        import threading
+        from feature_rl.environments import CommandSpec,ExecutionRequest
+        runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared)
+        initial=runtime.workspace(handle)[3]
+        paused=threading.Event();release=threading.Event();outcome={};original_lock=runtime.engine.state.lock
+        @contextmanager
+        def scheduled_lock():
+            if threading.current_thread().name=='terminal-transition':
+                outcome['lock_calls']=outcome.get('lock_calls',0)+1
+                # Recovery takes the first lock; delay the terminal transition's own lock.
+                if outcome['lock_calls']==2:
+                    paused.set();assert release.wait(10), 'bounded interleaving expired'
+            with original_lock():yield
+        def terminal():
+            try:outcome['saved']=getattr(runtime,transition)(handle)
+            except BaseException as exc:outcome['error']=exc
+        with monkeypatch.context() as patch:
+            patch.setattr(runtime.engine.state,'lock',scheduled_lock)
+            thread=threading.Thread(target=terminal,name='terminal-transition');thread.start()
+            try:
+                assert paused.wait(3)
+                result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(
+                    argv=('python','-c',"import pathlib;pathlib.Path('/workspace/source/src/click/__init__.py').write_text('x=42\\n')"),
+                    working_directory='/workspace',timeout_seconds=2.0)))
+                assert result.reason=='completed' and result.save_status=='saved' and result.cleanup_verified
+                intermediate=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+            finally:release.set();thread.join(3)
+        assert not thread.is_alive() and 'error' not in outcome
+        state=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+        expected=result.saved_source if transition=='close' else initial
+>       assert outcome['saved']==expected
+E       AssertionError: assert SavedSource(a...666180+00:00') == SavedSource(a...557533+00:00')
+E         
+E         Use -v to get more diff
+
+tests/test_environments_docker.py:264: AssertionError
+___ test_terminal_transition_reloads_after_concurrent_confirmed_save[reset] ____
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x109a907d0>, PreparedEnvironment(recipe=ArtifactRef(sh...8205acac', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109a945f0>
+transition = 'reset'
+
+    @pytest.mark.parametrize('transition', ['close', 'reset'])
+    def test_terminal_transition_reloads_after_concurrent_confirmed_save(runtime_fixture, monkeypatch, transition):
+        from contextlib import contextmanager
+        import threading
+        from feature_rl.environments import CommandSpec,ExecutionRequest
+        runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared)
+        initial=runtime.workspace(handle)[3]
+        paused=threading.Event();release=threading.Event();outcome={};original_lock=runtime.engine.state.lock
+        @contextmanager
+        def scheduled_lock():
+            if threading.current_thread().name=='terminal-transition':
+                outcome['lock_calls']=outcome.get('lock_calls',0)+1
+                # Recovery takes the first lock; delay the terminal transition's own lock.
+                if outcome['lock_calls']==2:
+                    paused.set();assert release.wait(10), 'bounded interleaving expired'
+            with original_lock():yield
+        def terminal():
+            try:outcome['saved']=getattr(runtime,transition)(handle)
+            except BaseException as exc:outcome['error']=exc
+        with monkeypatch.context() as patch:
+            patch.setattr(runtime.engine.state,'lock',scheduled_lock)
+            thread=threading.Thread(target=terminal,name='terminal-transition');thread.start()
+            try:
+                assert paused.wait(3)
+                result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(
+                    argv=('python','-c',"import pathlib;pathlib.Path('/workspace/source/src/click/__init__.py').write_text('x=42\\n')"),
+                    working_directory='/workspace',timeout_seconds=2.0)))
+                assert result.reason=='completed' and result.save_status=='saved' and result.cleanup_verified
+                intermediate=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+            finally:release.set();thread.join(3)
+        assert not thread.is_alive() and 'error' not in outcome
+        state=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+        expected=result.saved_source if transition=='close' else initial
+        assert outcome['saved']==expected
+        assert state['saved']==expected.model_dump(mode='json')
+>       assert state['generation']==intermediate['generation']+1
+E       assert 1 == (1 + 1)
+
+tests/test_environments_docker.py:266: AssertionError
+_____ test_overlapping_resets_advance_generation_and_reject_old_admission ______
+
+runtime_fixture = (<feature_rl.environments.runtime.EnvironmentRuntime object at 0x109a91310>, PreparedEnvironment(recipe=ArtifactRef(sh...8205acac', kind='sandbox-policy', schema_version=1, visibility=<Visibility.AUTHORING: 'authoring'>, encoding='bytes')))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109a08c00>
+
+    def test_overlapping_resets_advance_generation_and_reject_old_admission(runtime_fixture, monkeypatch):
+        from contextlib import contextmanager
+        import threading
+        from feature_rl.environments import PolicyRejected
+        runtime,prepared=runtime_fixture;handle=runtime.open_workspace(prepared)
+        paused=threading.Event();release=threading.Event();outcome={};original_lock=runtime.engine.state.lock
+        @contextmanager
+        def scheduled_lock():
+            if threading.current_thread().name=='terminal-reset':
+                outcome['lock_calls']=outcome.get('lock_calls',0)+1
+                if outcome['lock_calls']==2:
+                    paused.set();assert release.wait(10), 'bounded interleaving expired'
+            with original_lock():yield
+        def reset():
+            try:outcome['saved']=runtime.reset(handle)
+            except BaseException as exc:outcome['error']=exc
+        with monkeypatch.context() as patch:
+            patch.setattr(runtime.engine.state,'lock',scheduled_lock)
+            thread=threading.Thread(target=reset,name='terminal-reset');thread.start()
+            try:
+                assert paused.wait(3)
+                runtime.reset(handle)
+                intermediate,actual,recipe,saved,source=runtime.workspace(handle)
+                pending=runtime.engine.session(binding=runtime.binding(actual,saved,'development',intermediate),saved_source=saved.model_dump(mode='json'))
+            finally:release.set();thread.join(3)
+        assert not thread.is_alive() and 'error' not in outcome
+        state=runtime.engine.state.read('workspace-'+handle.workspace_id+'.json')
+        assert state['saved']==intermediate['saved']  # Same bytes cannot excuse generation reuse.
+>       assert state['generation']==intermediate['generation']+1
+E       assert 1 == (1 + 1)
+
+tests/test_environments_docker.py:299: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_environments_docker.py::test_terminal_transition_reloads_after_concurrent_confirmed_save[close]
+FAILED tests/test_environments_docker.py::test_terminal_transition_reloads_after_concurrent_confirmed_save[reset]
+FAILED tests/test_environments_docker.py::test_overlapping_resets_advance_generation_and_reject_old_admission
+3 failed, 21 deselected in 10.66s

@@ -274,14 +274,14 @@ class EnvironmentRuntime:
             container_exit_code=s.container_state.get('ExitCode'),oom_killed=bool(s.container_state.get('OOMKilled')) or s.memory_oom_events>0,maximum_memory_bytes=s.maximum_memory_bytes,cleanup_verified=s.cleanup_verified,saved_source=next_saved,save_status=save_status,evidence=evidence,cost=cost)
     def reset(self,handle):
         self.recover_owned()
-        value,prepared,recipe,saved,source=self.workspace(handle)
         with self.engine.state.lock():
+            value,prepared,recipe,saved,source=self.workspace(handle)
             value['saved']=value['initial'];value['generation']+=1;self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
         return SavedSource.model_validate_json(canonical_json(value['saved']))
     def close(self,handle):
         self.recover_owned()
-        value,*_=self.workspace(handle)
         with self.engine.state.lock():
-            value['closed']=True;self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
+            value,*_=self.workspace(handle)
+            value['closed']=True;value['generation']+=1;self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
         return SavedSource.model_validate_json(canonical_json(value['saved']))
     def recover_owned(self):return self.engine.recover_owned()
