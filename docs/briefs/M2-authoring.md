@@ -1,5 +1,7 @@
 # M2 requirement/scenario slice — same accountable owner
 
+Current scope: `docs/decisions/code-completion-scope.md` supersedes empirical stopping rules. Complete the usable authoring/scenario implementation and non-GPU validation even if the bounded actual model run cannot produce an accepted task. Preserve that failure and its exact retry command; do not use a handwritten production answer or stop implementing dependent code. Read `docs/decisions/M2-proposal-finalization.md` for derived schemas, finalization, evidence roles and the required explicit scenario-planning stage. The first real invocation budget will be declared separately at handoff; all earlier native provider diagnostics stay closed.
+
 Read this first. Implement Task 5 in `docs/implementation-plan.md`, spec §§5-6.4,7,10,17 and the execution prompt. The coordinator will supply reviewed M1/provider/M3 checkpoints and the actual M3 API handoff. This is M2's second slice, after real baseline execution. No subagents.
 
 Writable: `src/feature_rl/requirements/**`, `scenarios/**`, owned generation integration fixes, dedicated tests, `docs/reports/M2-authoring.md`, `docs/evidence/M2/**`, `docs/interfaces-M2.md`. Do not edit M0 schemas, M3 runtime, M4 checker or other product paths. Request interface changes through coordinator and their owner. Commit only owned files.
