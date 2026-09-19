@@ -1,0 +1,51 @@
+{
+  "full_suite_rerun": false,
+  "native_inference_performed": false,
+  "original_v1_receipts_unchanged": {
+    "docs/evidence/M2/production-provider-input-rejection.json": true,
+    "docs/evidence/M2/production-provider-smoke-attempt-1.json": true,
+    "docs/evidence/M2/production-provider-smoke-attempt-2.json": true
+  },
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_diff_exit_status": 0,
+  "product_inventory_matches_precommit": true,
+  "recorded_at": "2026-09-19T10:39:37.520500+00:00",
+  "report_sha256": "b6318cf7b4b12ba5159f04c6a298472fa58a723b64040cd3c6a0c3dce31a6022",
+  "reviewed_revision": "8a4637552b87dbf5e7bfe57b0a843c3a59327dad",
+  "runs": [
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src:tests",
+        ".venv/bin/python",
+        "-B",
+        "docs/evidence/M2/review/reproduce-provider-review.py"
+      ],
+      "exit_status": 0,
+      "exit_status_source": "Observed functions.exec exec_command results from the reviewer run, not inferred from output contents",
+      "scope": "unit_diagnostic",
+      "script_sha256": "5b99a653324d11d650771771a132f51b46b970693b3de29b6236f24d0abc65bb",
+      "stderr": "docs/evidence/M2/review/provider-review-diagnostics.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/review/provider-review-diagnostics.json",
+      "stdout_sha256": "604b81ec5eced17f5d035c2e9fcc943295be08ae9734a29fc242fd040b189fec"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src:tests",
+        ".venv/bin/python",
+        "-B",
+        "docs/evidence/M2/review/reproduce-archive-failure.py"
+      ],
+      "exit_status": 0,
+      "exit_status_source": "Observed functions.exec exec_command results from the reviewer run, not inferred from output contents",
+      "scope": "unit_diagnostic",
+      "script_sha256": "926e425e30f52fe005755da8c7332c2e87095b1c3885a91ff0f58138c66cbb37",
+      "stderr": "docs/evidence/M2/review/archive-failure-diagnostic.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/review/archive-failure-diagnostic.json",
+      "stdout_sha256": "177469e7dfd1e6fa4181affc4ba8e573bc95f7124ab11cb514822b2ef0668a30"
+    }
+  ]
+}

@@ -1,0 +1,1074 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review/reproduce-provider-review.py"
+  ],
+  "event_protocol": {
+    "contradictory_backend_identity": {
+      "content": {
+        "nonce": "unit",
+        "ok": true
+      },
+      "injected_identity_event": {
+        "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "dependency_versions": {
+          "mlx": "0.0.0"
+        },
+        "event": "identity_validated",
+        "local_files_only": false,
+        "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+        "remote_code": true,
+        "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+        "tokenizer_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "unexpected": "not in the worker protocol",
+        "weights_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "options_archive": {
+        "limits": {
+          "cpu_seconds": 120,
+          "declared_memory_ceiling_bytes": 5368709120,
+          "file_size_bytes": 1048576,
+          "input_tokens": 2048,
+          "measurement_profile": "tiny_smoke_2048x128",
+          "mlx_cache_limit_bytes": 0,
+          "mlx_memory_guideline_bytes": 3758096384,
+          "mlx_wired_limit_bytes": 3758096384,
+          "output_bytes": 1048576,
+          "output_tokens": 128,
+          "physical_footprint_kill_bytes": 4294967296,
+          "physical_footprint_poll_seconds": 0.02,
+          "stdin_bytes": 1048576,
+          "wall_seconds": 120.0
+        },
+        "model": {
+          "file_count": 11,
+          "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+          "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+          "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+          "total_bytes": 2278969697,
+          "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+        },
+        "resource_enforcement": {
+          "cpu": "kernel_rlimit_cpu",
+          "file_size": "kernel_rlimit_fsize",
+          "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+          "wall": "external_monotonic_deadline"
+        },
+        "seed": 0
+      },
+      "provider_accepted": true,
+      "record_success": true,
+      "status_archive": {
+        "archive_refs": {
+          "cost": {
+            "encoding": "bytes",
+            "kind": "generation-cost",
+            "schema_version": 1,
+            "sha256": "ffe9d90d1c3ce7be97149ef59657f0a5511ec34e509134b8d2a59511778f156c",
+            "visibility": "authoring"
+          },
+          "events": {
+            "encoding": "bytes",
+            "kind": "generation-events",
+            "schema_version": 1,
+            "sha256": "8388d2e39362c94d74a16b122e0079a419fb62d49ddb559701d8031128b6a299",
+            "visibility": "authoring"
+          },
+          "options": {
+            "encoding": "bytes",
+            "kind": "generation-options",
+            "schema_version": 1,
+            "sha256": "a95340197e73b90e3296969499c7d9cc1641c65ac39c81d145abac9622f2b4b9",
+            "visibility": "authoring"
+          },
+          "provenance": {
+            "encoding": "bytes",
+            "kind": "generation-provenance",
+            "schema_version": 1,
+            "sha256": "02a02c868f4116de770c459d6205381cd68783443c64d52ed63ad43220092ee2",
+            "visibility": "authoring"
+          },
+          "request": {
+            "encoding": "bytes",
+            "kind": "generation-request",
+            "schema_version": 1,
+            "sha256": "075725d3660387ac3d4fb2131c16ec7db6c8d4f15aa0c30f522f536765d9378d",
+            "visibility": "authoring"
+          },
+          "response": {
+            "encoding": "bytes",
+            "kind": "generation-response",
+            "schema_version": 1,
+            "sha256": "a20d4d78aa5544c57e19de5367195e1036ea7e0324dfd919d4b33ac6d36c271e",
+            "visibility": "authoring"
+          },
+          "retrieval": {
+            "encoding": "bytes",
+            "kind": "generation-retrieval",
+            "schema_version": 1,
+            "sha256": "9a116def1a07185c084992dfe426f67e25ca5674edc8705c26371e0055cb72a0",
+            "visibility": "authoring"
+          },
+          "schema": {
+            "encoding": "bytes",
+            "kind": "generation-schema",
+            "schema_version": 1,
+            "sha256": "ac8f877a326b46c56acc7550a5dd3abb0d64a7629b048b0448ed469f5ef52bba",
+            "visibility": "authoring"
+          },
+          "usage": {
+            "encoding": "bytes",
+            "kind": "generation-usage",
+            "schema_version": 1,
+            "sha256": "df4397d71fc1f2699263ff80560ae341b74699e4af058bb1566d21c4f3efa388",
+            "visibility": "authoring"
+          }
+        },
+        "error": null,
+        "error_type": null,
+        "request_id": "REQ_CALL_1",
+        "response_id": "RESP_1",
+        "success": true
+      },
+      "usage_archive": {
+        "behavior_logprobs": null,
+        "finish_reason": "stop",
+        "input_token_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40
+        ],
+        "input_tokens": 41,
+        "output_tokens": 1,
+        "sampling_policy": "greedy_argmax",
+        "selected_model_logprobs": [
+          -0.25
+        ],
+        "token_ids": [
+          100
+        ],
+        "truncated": false
+      }
+    },
+    "different_completion_response_id": {
+      "content": {
+        "nonce": "unit",
+        "ok": true
+      },
+      "options_archive": {
+        "limits": {
+          "cpu_seconds": 120,
+          "declared_memory_ceiling_bytes": 5368709120,
+          "file_size_bytes": 1048576,
+          "input_tokens": 2048,
+          "measurement_profile": "tiny_smoke_2048x128",
+          "mlx_cache_limit_bytes": 0,
+          "mlx_memory_guideline_bytes": 3758096384,
+          "mlx_wired_limit_bytes": 3758096384,
+          "output_bytes": 1048576,
+          "output_tokens": 128,
+          "physical_footprint_kill_bytes": 4294967296,
+          "physical_footprint_poll_seconds": 0.02,
+          "stdin_bytes": 1048576,
+          "wall_seconds": 120.0
+        },
+        "model": {
+          "file_count": 11,
+          "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+          "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+          "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+          "total_bytes": 2278969697,
+          "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+        },
+        "resource_enforcement": {
+          "cpu": "kernel_rlimit_cpu",
+          "file_size": "kernel_rlimit_fsize",
+          "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+          "wall": "external_monotonic_deadline"
+        },
+        "seed": 0
+      },
+      "provider_accepted": true,
+      "record_success": true,
+      "status_archive": {
+        "archive_refs": {
+          "cost": {
+            "encoding": "bytes",
+            "kind": "generation-cost",
+            "schema_version": 1,
+            "sha256": "ffe9d90d1c3ce7be97149ef59657f0a5511ec34e509134b8d2a59511778f156c",
+            "visibility": "authoring"
+          },
+          "events": {
+            "encoding": "bytes",
+            "kind": "generation-events",
+            "schema_version": 1,
+            "sha256": "898cb1ff25eb9ec9a221889a691b5c935a089bb62847256e3f96623ac50c2d73",
+            "visibility": "authoring"
+          },
+          "options": {
+            "encoding": "bytes",
+            "kind": "generation-options",
+            "schema_version": 1,
+            "sha256": "a95340197e73b90e3296969499c7d9cc1641c65ac39c81d145abac9622f2b4b9",
+            "visibility": "authoring"
+          },
+          "provenance": {
+            "encoding": "bytes",
+            "kind": "generation-provenance",
+            "schema_version": 1,
+            "sha256": "02a02c868f4116de770c459d6205381cd68783443c64d52ed63ad43220092ee2",
+            "visibility": "authoring"
+          },
+          "request": {
+            "encoding": "bytes",
+            "kind": "generation-request",
+            "schema_version": 1,
+            "sha256": "075725d3660387ac3d4fb2131c16ec7db6c8d4f15aa0c30f522f536765d9378d",
+            "visibility": "authoring"
+          },
+          "response": {
+            "encoding": "bytes",
+            "kind": "generation-response",
+            "schema_version": 1,
+            "sha256": "dafa8048d43f61c2ce62ac9e793a00e64d5e9d5ab96d11c657b29131d4ea209e",
+            "visibility": "authoring"
+          },
+          "retrieval": {
+            "encoding": "bytes",
+            "kind": "generation-retrieval",
+            "schema_version": 1,
+            "sha256": "9a116def1a07185c084992dfe426f67e25ca5674edc8705c26371e0055cb72a0",
+            "visibility": "authoring"
+          },
+          "schema": {
+            "encoding": "bytes",
+            "kind": "generation-schema",
+            "schema_version": 1,
+            "sha256": "ac8f877a326b46c56acc7550a5dd3abb0d64a7629b048b0448ed469f5ef52bba",
+            "visibility": "authoring"
+          },
+          "usage": {
+            "encoding": "bytes",
+            "kind": "generation-usage",
+            "schema_version": 1,
+            "sha256": "df4397d71fc1f2699263ff80560ae341b74699e4af058bb1566d21c4f3efa388",
+            "visibility": "authoring"
+          }
+        },
+        "error": null,
+        "error_type": null,
+        "request_id": "REQ_CALL_1",
+        "response_id": "RESP_1",
+        "success": true
+      },
+      "usage_archive": {
+        "behavior_logprobs": null,
+        "finish_reason": "stop",
+        "input_token_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40
+        ],
+        "input_tokens": 41,
+        "output_tokens": 1,
+        "sampling_policy": "greedy_argmax",
+        "selected_model_logprobs": [
+          -0.25
+        ],
+        "token_ids": [
+          100
+        ],
+        "truncated": false
+      }
+    },
+    "impossible_positive_log_probability": {
+      "content": {
+        "nonce": "unit",
+        "ok": true
+      },
+      "options_archive": {
+        "limits": {
+          "cpu_seconds": 120,
+          "declared_memory_ceiling_bytes": 5368709120,
+          "file_size_bytes": 1048576,
+          "input_tokens": 2048,
+          "measurement_profile": "tiny_smoke_2048x128",
+          "mlx_cache_limit_bytes": 0,
+          "mlx_memory_guideline_bytes": 3758096384,
+          "mlx_wired_limit_bytes": 3758096384,
+          "output_bytes": 1048576,
+          "output_tokens": 128,
+          "physical_footprint_kill_bytes": 4294967296,
+          "physical_footprint_poll_seconds": 0.02,
+          "stdin_bytes": 1048576,
+          "wall_seconds": 120.0
+        },
+        "model": {
+          "file_count": 11,
+          "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+          "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+          "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+          "total_bytes": 2278969697,
+          "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+        },
+        "resource_enforcement": {
+          "cpu": "kernel_rlimit_cpu",
+          "file_size": "kernel_rlimit_fsize",
+          "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+          "wall": "external_monotonic_deadline"
+        },
+        "seed": 0
+      },
+      "provider_accepted": true,
+      "record_success": true,
+      "status_archive": {
+        "archive_refs": {
+          "cost": {
+            "encoding": "bytes",
+            "kind": "generation-cost",
+            "schema_version": 1,
+            "sha256": "ffe9d90d1c3ce7be97149ef59657f0a5511ec34e509134b8d2a59511778f156c",
+            "visibility": "authoring"
+          },
+          "events": {
+            "encoding": "bytes",
+            "kind": "generation-events",
+            "schema_version": 1,
+            "sha256": "465292679da7a66ecf1cadba0e94442a708439db42bed159daba9b4ddff03212",
+            "visibility": "authoring"
+          },
+          "options": {
+            "encoding": "bytes",
+            "kind": "generation-options",
+            "schema_version": 1,
+            "sha256": "a95340197e73b90e3296969499c7d9cc1641c65ac39c81d145abac9622f2b4b9",
+            "visibility": "authoring"
+          },
+          "provenance": {
+            "encoding": "bytes",
+            "kind": "generation-provenance",
+            "schema_version": 1,
+            "sha256": "02a02c868f4116de770c459d6205381cd68783443c64d52ed63ad43220092ee2",
+            "visibility": "authoring"
+          },
+          "request": {
+            "encoding": "bytes",
+            "kind": "generation-request",
+            "schema_version": 1,
+            "sha256": "075725d3660387ac3d4fb2131c16ec7db6c8d4f15aa0c30f522f536765d9378d",
+            "visibility": "authoring"
+          },
+          "response": {
+            "encoding": "bytes",
+            "kind": "generation-response",
+            "schema_version": 1,
+            "sha256": "1fd5d62e814bcea5b6517e48dbe6d77be94b2897ab8b30333b246bbc8bf1b4e7",
+            "visibility": "authoring"
+          },
+          "retrieval": {
+            "encoding": "bytes",
+            "kind": "generation-retrieval",
+            "schema_version": 1,
+            "sha256": "9a116def1a07185c084992dfe426f67e25ca5674edc8705c26371e0055cb72a0",
+            "visibility": "authoring"
+          },
+          "schema": {
+            "encoding": "bytes",
+            "kind": "generation-schema",
+            "schema_version": 1,
+            "sha256": "ac8f877a326b46c56acc7550a5dd3abb0d64a7629b048b0448ed469f5ef52bba",
+            "visibility": "authoring"
+          },
+          "usage": {
+            "encoding": "bytes",
+            "kind": "generation-usage",
+            "schema_version": 1,
+            "sha256": "b96a5feba12f295a03ed68ff76d84fa715b5736dc32be2146d84442c69e95f00",
+            "visibility": "authoring"
+          }
+        },
+        "error": null,
+        "error_type": null,
+        "request_id": "REQ_CALL_1",
+        "response_id": "RESP_1",
+        "success": true
+      },
+      "usage_archive": {
+        "behavior_logprobs": null,
+        "finish_reason": "stop",
+        "input_token_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40
+        ],
+        "input_tokens": 41,
+        "output_tokens": 1,
+        "sampling_policy": "greedy_argmax",
+        "selected_model_logprobs": [
+          2.0
+        ],
+        "token_ids": [
+          100
+        ],
+        "truncated": false
+      }
+    },
+    "missing_identity_and_measurement_fields": {
+      "content": {
+        "nonce": "unit",
+        "ok": true
+      },
+      "options_archive": {
+        "limits": {
+          "cpu_seconds": 120,
+          "declared_memory_ceiling_bytes": 5368709120,
+          "file_size_bytes": 1048576,
+          "input_tokens": 2048,
+          "measurement_profile": "tiny_smoke_2048x128",
+          "mlx_cache_limit_bytes": 0,
+          "mlx_memory_guideline_bytes": 3758096384,
+          "mlx_wired_limit_bytes": 3758096384,
+          "output_bytes": 1048576,
+          "output_tokens": 128,
+          "physical_footprint_kill_bytes": 4294967296,
+          "physical_footprint_poll_seconds": 0.02,
+          "stdin_bytes": 1048576,
+          "wall_seconds": 120.0
+        },
+        "model": {
+          "file_count": 11,
+          "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+          "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+          "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+          "total_bytes": 2278969697,
+          "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+        },
+        "resource_enforcement": {
+          "cpu": "kernel_rlimit_cpu",
+          "file_size": "kernel_rlimit_fsize",
+          "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+          "wall": "external_monotonic_deadline"
+        },
+        "seed": 0
+      },
+      "provider_accepted": true,
+      "record_success": true,
+      "status_archive": {
+        "archive_refs": {
+          "cost": {
+            "encoding": "bytes",
+            "kind": "generation-cost",
+            "schema_version": 1,
+            "sha256": "ffe9d90d1c3ce7be97149ef59657f0a5511ec34e509134b8d2a59511778f156c",
+            "visibility": "authoring"
+          },
+          "events": {
+            "encoding": "bytes",
+            "kind": "generation-events",
+            "schema_version": 1,
+            "sha256": "5517d64a93cee5df0bce37da73d89bd668a8fb904ec2af55beebc718bee31c9f",
+            "visibility": "authoring"
+          },
+          "options": {
+            "encoding": "bytes",
+            "kind": "generation-options",
+            "schema_version": 1,
+            "sha256": "a95340197e73b90e3296969499c7d9cc1641c65ac39c81d145abac9622f2b4b9",
+            "visibility": "authoring"
+          },
+          "provenance": {
+            "encoding": "bytes",
+            "kind": "generation-provenance",
+            "schema_version": 1,
+            "sha256": "02a02c868f4116de770c459d6205381cd68783443c64d52ed63ad43220092ee2",
+            "visibility": "authoring"
+          },
+          "request": {
+            "encoding": "bytes",
+            "kind": "generation-request",
+            "schema_version": 1,
+            "sha256": "075725d3660387ac3d4fb2131c16ec7db6c8d4f15aa0c30f522f536765d9378d",
+            "visibility": "authoring"
+          },
+          "response": {
+            "encoding": "bytes",
+            "kind": "generation-response",
+            "schema_version": 1,
+            "sha256": "47db40ba9fe81836cb497218c06e4633f368a927e9f6b89bc632821575c3f43c",
+            "visibility": "authoring"
+          },
+          "retrieval": {
+            "encoding": "bytes",
+            "kind": "generation-retrieval",
+            "schema_version": 1,
+            "sha256": "9a116def1a07185c084992dfe426f67e25ca5674edc8705c26371e0055cb72a0",
+            "visibility": "authoring"
+          },
+          "schema": {
+            "encoding": "bytes",
+            "kind": "generation-schema",
+            "schema_version": 1,
+            "sha256": "ac8f877a326b46c56acc7550a5dd3abb0d64a7629b048b0448ed469f5ef52bba",
+            "visibility": "authoring"
+          },
+          "usage": {
+            "encoding": "bytes",
+            "kind": "generation-usage",
+            "schema_version": 1,
+            "sha256": "df4397d71fc1f2699263ff80560ae341b74699e4af058bb1566d21c4f3efa388",
+            "visibility": "authoring"
+          }
+        },
+        "error": null,
+        "error_type": null,
+        "request_id": "REQ_CALL_1",
+        "response_id": "RESP_1",
+        "success": true
+      },
+      "usage_archive": {
+        "behavior_logprobs": null,
+        "finish_reason": "stop",
+        "input_token_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40
+        ],
+        "input_tokens": 41,
+        "output_tokens": 1,
+        "sampling_policy": "greedy_argmax",
+        "selected_model_logprobs": [
+          -0.25
+        ],
+        "token_ids": [
+          100
+        ],
+        "truncated": false
+      }
+    }
+  },
+  "failed_envelope_usage": {
+    "error": "model response cites an unknown requirement ID",
+    "options_archive": {
+      "limits": {
+        "cpu_seconds": 120,
+        "declared_memory_ceiling_bytes": 5368709120,
+        "file_size_bytes": 1048576,
+        "input_tokens": 2048,
+        "measurement_profile": "tiny_smoke_2048x128",
+        "mlx_cache_limit_bytes": 0,
+        "mlx_memory_guideline_bytes": 3758096384,
+        "mlx_wired_limit_bytes": 3758096384,
+        "output_bytes": 1048576,
+        "output_tokens": 128,
+        "physical_footprint_kill_bytes": 4294967296,
+        "physical_footprint_poll_seconds": 0.02,
+        "stdin_bytes": 1048576,
+        "wall_seconds": 120.0
+      },
+      "model": {
+        "file_count": 11,
+        "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+        "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+        "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "total_bytes": 2278969697,
+        "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+      },
+      "resource_enforcement": {
+        "cpu": "kernel_rlimit_cpu",
+        "file_size": "kernel_rlimit_fsize",
+        "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+        "wall": "external_monotonic_deadline"
+      },
+      "seed": 0
+    },
+    "provider_accepted": false,
+    "record_success": false,
+    "status_archive": {
+      "archive_refs": {
+        "cost": {
+          "encoding": "bytes",
+          "kind": "generation-cost",
+          "schema_version": 1,
+          "sha256": "ffe9d90d1c3ce7be97149ef59657f0a5511ec34e509134b8d2a59511778f156c",
+          "visibility": "authoring"
+        },
+        "events": {
+          "encoding": "bytes",
+          "kind": "generation-events",
+          "schema_version": 1,
+          "sha256": "d4915a04496362b0e471b53bb2ddf3666f4780b9a1378ac2cfb00201902806e4",
+          "visibility": "authoring"
+        },
+        "options": {
+          "encoding": "bytes",
+          "kind": "generation-options",
+          "schema_version": 1,
+          "sha256": "a95340197e73b90e3296969499c7d9cc1641c65ac39c81d145abac9622f2b4b9",
+          "visibility": "authoring"
+        },
+        "provenance": {
+          "encoding": "bytes",
+          "kind": "generation-provenance",
+          "schema_version": 1,
+          "sha256": "0eef27f28b5dcaa76525c01801ed6a73927c85052d812d6ad85bbd32fff0be1d",
+          "visibility": "authoring"
+        },
+        "request": {
+          "encoding": "bytes",
+          "kind": "generation-request",
+          "schema_version": 1,
+          "sha256": "075725d3660387ac3d4fb2131c16ec7db6c8d4f15aa0c30f522f536765d9378d",
+          "visibility": "authoring"
+        },
+        "response": {
+          "encoding": "bytes",
+          "kind": "generation-response",
+          "schema_version": 1,
+          "sha256": "c3d78e32b528cdf324de349db684be25a6fa6c92a1e29b8f37a3d6ef07d92055",
+          "visibility": "authoring"
+        },
+        "retrieval": {
+          "encoding": "bytes",
+          "kind": "generation-retrieval",
+          "schema_version": 1,
+          "sha256": "9a116def1a07185c084992dfe426f67e25ca5674edc8705c26371e0055cb72a0",
+          "visibility": "authoring"
+        },
+        "schema": {
+          "encoding": "bytes",
+          "kind": "generation-schema",
+          "schema_version": 1,
+          "sha256": "ac8f877a326b46c56acc7550a5dd3abb0d64a7629b048b0448ed469f5ef52bba",
+          "visibility": "authoring"
+        },
+        "usage": {
+          "encoding": "bytes",
+          "kind": "generation-usage",
+          "schema_version": 1,
+          "sha256": "df4397d71fc1f2699263ff80560ae341b74699e4af058bb1566d21c4f3efa388",
+          "visibility": "authoring"
+        }
+      },
+      "error": "model response cites an unknown requirement ID",
+      "error_type": "ValueError",
+      "request_id": "REQ_CALL_1",
+      "response_id": "RESP_1",
+      "success": false
+    },
+    "usage_archive": {
+      "behavior_logprobs": null,
+      "finish_reason": "stop",
+      "input_token_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40
+      ],
+      "input_tokens": 41,
+      "output_tokens": 1,
+      "sampling_policy": "greedy_argmax",
+      "selected_model_logprobs": [
+        -0.25
+      ],
+      "token_ids": [
+        100
+      ],
+      "truncated": false
+    }
+  },
+  "monitor_exception_cleanup": {
+    "child_alive_after_runner_raised": true,
+    "child_pid": 33565,
+    "exception": "injected watchdog observation exception",
+    "process_group_absent_after_runner_raised": false,
+    "reviewer_cleanup_exit_status": -9,
+    "reviewer_cleanup_group_absent": true
+  },
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_sha256": {
+    "src/feature_rl/generation/__init__.py": "36fdcdbf5f639728b686471c5c8d73def3fb9131a2229aa487b01ea8e3722d18",
+    "src/feature_rl/generation/_worker.py": "54124d294d035665ba44dce9d83affce0c8f9de510cbb2fc476c8406f6620af2",
+    "src/feature_rl/generation/backend.py": "73f5d42e3ad0f68751c5f4b64cb69f992fe82e1cc8e578895d2291f3535adfbb",
+    "src/feature_rl/generation/models.py": "05d5fd5e28add74c2daefdd6b8393285004dfb6e7c376db3a9bf89c846d0c5c3",
+    "src/feature_rl/generation/provider.py": "70837132298c2dcdd652706f6f0eb39a117e0c85d8be131b667f0ae0e0b923da",
+    "src/feature_rl/generation/runner.py": "aa9a838f01bbf5cca25d0d52bb518814383ca7edd0c5de417a1c4e4d8dc672d0",
+    "tests/test_generation.py": "25f3e71a90e5d0ffbcc29c6753a853265e39ea295d87b3ad5bbeae8ec4d518da"
+  },
+  "recorded_at": "2026-09-19T10:32:38.069771+00:00",
+  "recovered_monitor_loss": {
+    "cleanup": true,
+    "exit_status": 0,
+    "injected_observation_failures": 1,
+    "memory_samples": 3,
+    "termination": "process_exit"
+  },
+  "reviewed_revision": "8a4637552b87dbf5e7bfe57b0a843c3a59327dad",
+  "scope": "unit_diagnostic; synthetic events and injected monitor failures; no inference",
+  "strict_json_transport": {
+    "error": "model response content violates its strict schema",
+    "json_transport_accepts_same_content": true,
+    "options_archive": {
+      "limits": {
+        "cpu_seconds": 120,
+        "declared_memory_ceiling_bytes": 5368709120,
+        "file_size_bytes": 1048576,
+        "input_tokens": 2048,
+        "measurement_profile": "tiny_smoke_2048x128",
+        "mlx_cache_limit_bytes": 0,
+        "mlx_memory_guideline_bytes": 3758096384,
+        "mlx_wired_limit_bytes": 3758096384,
+        "output_bytes": 1048576,
+        "output_tokens": 128,
+        "physical_footprint_kill_bytes": 4294967296,
+        "physical_footprint_poll_seconds": 0.02,
+        "stdin_bytes": 1048576,
+        "wall_seconds": 120.0
+      },
+      "model": {
+        "file_count": 11,
+        "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+        "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+        "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "total_bytes": 2278969697,
+        "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+      },
+      "resource_enforcement": {
+        "cpu": "kernel_rlimit_cpu",
+        "file_size": "kernel_rlimit_fsize",
+        "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+        "wall": "external_monotonic_deadline"
+      },
+      "seed": 0
+    },
+    "provider_accepted": false,
+    "record_success": false,
+    "status_archive": {
+      "archive_refs": {
+        "cost": {
+          "encoding": "bytes",
+          "kind": "generation-cost",
+          "schema_version": 1,
+          "sha256": "ffe9d90d1c3ce7be97149ef59657f0a5511ec34e509134b8d2a59511778f156c",
+          "visibility": "authoring"
+        },
+        "events": {
+          "encoding": "bytes",
+          "kind": "generation-events",
+          "schema_version": 1,
+          "sha256": "a3d5df5fdc5da61522e8aa28ee0d3cd6575df311a192fe093a185a46de5b5007",
+          "visibility": "authoring"
+        },
+        "options": {
+          "encoding": "bytes",
+          "kind": "generation-options",
+          "schema_version": 1,
+          "sha256": "a95340197e73b90e3296969499c7d9cc1641c65ac39c81d145abac9622f2b4b9",
+          "visibility": "authoring"
+        },
+        "provenance": {
+          "encoding": "bytes",
+          "kind": "generation-provenance",
+          "schema_version": 1,
+          "sha256": "0eef27f28b5dcaa76525c01801ed6a73927c85052d812d6ad85bbd32fff0be1d",
+          "visibility": "authoring"
+        },
+        "request": {
+          "encoding": "bytes",
+          "kind": "generation-request",
+          "schema_version": 1,
+          "sha256": "075725d3660387ac3d4fb2131c16ec7db6c8d4f15aa0c30f522f536765d9378d",
+          "visibility": "authoring"
+        },
+        "response": {
+          "encoding": "bytes",
+          "kind": "generation-response",
+          "schema_version": 1,
+          "sha256": "a5c8db7c7ae532d5c22558cc6134c915076bcdf5580ca2912771cbaaa6cf33f0",
+          "visibility": "authoring"
+        },
+        "retrieval": {
+          "encoding": "bytes",
+          "kind": "generation-retrieval",
+          "schema_version": 1,
+          "sha256": "9a116def1a07185c084992dfe426f67e25ca5674edc8705c26371e0055cb72a0",
+          "visibility": "authoring"
+        },
+        "schema": {
+          "encoding": "bytes",
+          "kind": "generation-schema",
+          "schema_version": 1,
+          "sha256": "147161c01bc209a88ce71b9d66761ef0d4208a89a1cdeb0d7b2813e94f3dd10f",
+          "visibility": "authoring"
+        },
+        "usage": {
+          "encoding": "bytes",
+          "kind": "generation-usage",
+          "schema_version": 1,
+          "sha256": "df4397d71fc1f2699263ff80560ae341b74699e4af058bb1566d21c4f3efa388",
+          "visibility": "authoring"
+        }
+      },
+      "error": "model response content violates its strict schema",
+      "error_type": "ValueError",
+      "request_id": "REQ_CALL_1",
+      "response_id": "RESP_1",
+      "success": false
+    },
+    "submitted_content": {
+      "values": [
+        "valid"
+      ],
+      "visibility": "authoring"
+    },
+    "usage_archive": {
+      "behavior_logprobs": null,
+      "finish_reason": "stop",
+      "input_token_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40
+      ],
+      "input_tokens": 41,
+      "output_tokens": 1,
+      "sampling_policy": "greedy_argmax",
+      "selected_model_logprobs": [
+        -0.25
+      ],
+      "token_ids": [
+        100
+      ],
+      "truncated": false
+    }
+  }
+}

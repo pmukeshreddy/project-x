@@ -1,0 +1,27 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review/reproduce-archive-failure.py"
+  ],
+  "exception_has_call_record": false,
+  "exception_message": "injected archive publication failure",
+  "exception_type": "OSError",
+  "known_diagnostic_measurements_lost_from_api": {
+    "cpu_seconds": 1.0,
+    "input_tokens": 41,
+    "output_tokens": 1,
+    "wall_seconds": 1.5
+  },
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "provider_sha256": "70837132298c2dcdd652706f6f0eb39a117e0c85d8be131b667f0ae0e0b923da",
+  "published_artifact_kinds": [
+    "generation-request"
+  ],
+  "recorded_at": "2026-09-19T10:35:02.696654+00:00",
+  "reviewed_revision": "8a4637552b87dbf5e7bfe57b0a843c3a59327dad",
+  "runner_returned_complete_response": true,
+  "scope": "unit_diagnostic; existing test doubles; no inference or subprocess"
+}
