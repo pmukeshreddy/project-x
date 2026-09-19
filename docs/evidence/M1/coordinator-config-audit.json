@@ -1,0 +1,13 @@
+{
+  "time": {
+    "current_time": "2026-09-19 08:22:08 UTC"
+  },
+  "result": {
+    "chunk_id": "e67a10",
+    "wall_time_seconds": 0.000003042,
+    "exit_code": 1,
+    "original_token_count": 0,
+    "output": ""
+  },
+  "interpretation": "No matching repository-local Git config keys were observed at audit time, with system/global config excluded. This bounds current cache evidence only; it is not historical proof and does not fix unsafe generic command execution. An earlier unscoped query saw global filter.lfs keys, so it was not used to attest the cache."
+}

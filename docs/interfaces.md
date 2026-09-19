@@ -1,6 +1,6 @@
 # Shared M0 interfaces (schema version 1)
 
-Status: implemented and unit-tested, pending independent review. Import public contracts from `feature_rl.contracts`; storage from `feature_rl.artifacts`. Python >=3.11 is declared; this checkpoint executes on CPython 3.13.7 with Pydantic 2.13.5 and pytest 9.1.1. Dependencies and transitive versions are locked in `uv.lock`; queried PyPI compatibility metadata is in `docs/evidence/M0/dependencies.json`.
+Status: implemented and independently reviewed at `cb53f99`, with coordinator verification of 103 tests. Review closure is in `docs/reviews/M0-round1.md`. Import public contracts from `feature_rl.contracts`; storage from `feature_rl.artifacts`. Python >=3.11 is declared; this checkpoint executes on CPython 3.13.7 with Pydantic 2.13.5 and pytest 9.1.1. Dependencies and transitive versions are locked in `uv.lock`; queried PyPI compatibility metadata is in `docs/evidence/M0/dependencies.json`.
 
 ## Exact schema and examples
 
