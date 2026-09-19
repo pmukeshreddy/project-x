@@ -24,7 +24,7 @@ Historical/candidate/generated source, adapters and build hooks execute only ins
 | --- | --- | --- |
 | M0 | `/root/m0_contracts` | Core, provenancev2 and optional MLX config reviewed/integrated; owns shared changes |
 | M1 | `/root/m1_sources` | Reviewed/integrated reconstruction scope; Click task provisional |
-| M2 | `/root/m2_authoring_recovery` | ACTIVE round5 provider correction; prior owner `/root/m2_authoring` read-only after capacity transfer |
+| M2 | `/root/m2_authoring_recovery` | Round5 producte14f679 committed;98/253 owner tests; independent re-review next |
 | M3 | `/root/m3_runtime` | Preparation reviewed; availability confirmed; actual runtime after provider gate |
 | M4 | Unassigned (`m4_grading` planned) | Brief ready; no product |
 | M5 | `/root/m5_qualification` | Signature mechanism preflight only; no product |
@@ -35,6 +35,8 @@ Historical/candidate/generated source, adapters and build hooks execute only ins
 Reviews: M0 slices PASS (`review_m0`), M1 round2 PASS (`review_m1`), M3 preparation PASS (`review_m3_preparation`); future product slices require their own independent verdicts. Current reviewer `/root/review_m2_provider` FINAL round4 FAIL. Dormant-agent send_message can produce pending_init/thread-limit occupancy; recover through a bounded availability followup asking FINAL, as already done for M3. Do not simulate delegation or repeatedly spawn at capacity.
 
 ## Active M2 handoff and next coordinator gate
+
+**Current handoff:** owner FINAL round5 product **e14f67983db678813afcfeb191532e691b0b20e3**; final98 provider /253 full tests exit0 at2026-09-19T16:37:47.982782–16:38:08.148553UTC, no native/remote/download/install/historical calls. `provider-v3-fixround5-verification.json` preserves three RED runs, prior94/249 pre-extra logs and corrected final logs. Root mechanically matched24 source/doc/log identities against receipt and committed product (`coordinator-round5-binding.json`). Complete product/test/doc diff `.superpowers/sdd/implementation-plan/review-840e114..e14f679-M2-product.diff`,40451B,SHA9df907c52ffc5a44606663ef871d9dda8f92d903d4aada5ed17747cff88faef1; complete four-commit range also retained296911B. Independent same reviewer now receives final changed scope including R3/R4, Decimal and extra-allow boundaries. No product implementer edits while review runs. Later root suite/native remain unexecuted.
 
 Assigned base **840e11407d6c0c15548678fef2f2102dd58d100e**; product under repair **44e9dcf1079a186a8a0432fa51333d1d07f6422f**. Same owner dispatched to `docs/briefs/M2-provider-round5.md`. Read final `docs/reviews/M2-provider-round4.md`, both full-provider reproducers under `docs/evidence/M2/review-round4/`, and `docs/decisions/M2-literal-validation.md`. Owner has exclusive generation/**, generation tests, M2 interface/report/new owner evidence; root coordinator-* / transfer evidence and briefs excluded. No native/load/download/install/remote/historical execution authorized in this fix. Required final mechanical source/doc/log/UTC/exit receipt, owned commit and FINAL.
 

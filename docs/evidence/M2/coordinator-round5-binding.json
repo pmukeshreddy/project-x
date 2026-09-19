@@ -1,0 +1,183 @@
+{
+  "scope": "Coordinator binding of owner final source/docs and all retained logs; no suite or native execution",
+  "recorded_at": "2026-09-19T16:39:49.168094+00:00",
+  "product_revision": "e14f67983db678813afcfeb191532e691b0b20e3",
+  "assigned_base_revision": "840e11407d6c0c15548678fef2f2102dd58d100e",
+  "owner_receipt_sha256": "b934cf17f0239a275457c397917f6d205ce59e47698c42150b85d29417f7c9c3",
+  "identities": [
+    {
+      "path": "src/feature_rl/generation/__init__.py",
+      "sha256": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+      "bytes": 1405,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "src/feature_rl/generation/_worker.py",
+      "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+      "bytes": 11650,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "src/feature_rl/generation/backend.py",
+      "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+      "bytes": 11173,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "src/feature_rl/generation/models.py",
+      "sha256": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc",
+      "bytes": 7960,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "src/feature_rl/generation/protocol.py",
+      "sha256": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+      "bytes": 3857,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "src/feature_rl/generation/provider.py",
+      "sha256": "dec64bb8b8ed0983faf426664a875fb5bea408f3108c0d5a5abf30b0bb5314e9",
+      "bytes": 55379,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "src/feature_rl/generation/runner.py",
+      "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e",
+      "bytes": 9828,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "tests/test_generation.py",
+      "sha256": "918225a1f826986e65255b0a292ba6659b7186e5b53de9e81c243da870026769",
+      "bytes": 69918,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/interfaces-M2.md",
+      "sha256": "27ffc0a07c8e1465fc11fa0c5524b1e75e178b17d555033b9216aa559ebd3ae9",
+      "bytes": 14088,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/reports/M2-provider.md",
+      "sha256": "d2cab10c2f92e24ea720c7c039a22ed5b5f9ab1bd086ded8240557ee7958bbfb",
+      "bytes": 3383,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-red-tests.stdout",
+      "sha256": "42b7ba2810bbc2754a85d938125af722fb35a2eaf452c41255605c9c8b32c142",
+      "bytes": 123272,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-red-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-decimal-red-tests.stdout",
+      "sha256": "b7b24f25147ee2b005d67b54794d70b80edba46d56bf1c0b4a5d969063458a80",
+      "bytes": 1314,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-decimal-red-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-pre-extra-focused-tests.stdout",
+      "sha256": "bcd888f70bb3d6476f20a400ac052bdf0082ca7c9ce5e1f62f9476ea79cb4de4",
+      "bytes": 179,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-pre-extra-focused-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-pre-extra-full-tests.stdout",
+      "sha256": "c2ebcf4145aedffb668cc0a83a3af55dedc4953acd2db45a6998c38f2109308f",
+      "bytes": 341,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-pre-extra-full-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-extra-allow-red-tests.stdout",
+      "sha256": "396d8c9640acb516c0eae4283b2144280b12708b8ace3dfa07bcbc0af4c19cae",
+      "bytes": 3654,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-extra-allow-red-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-focused-tests.stdout",
+      "sha256": "9c33149b6e0063f1df9ff2c783620787538d7ef645aa18b6a0945a96e414bc07",
+      "bytes": 179,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-focused-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-full-tests.stdout",
+      "sha256": "a023ab9acb3a742c6ac231eff8c175f89023c1f415ff13eb98f5d73d7f49d786",
+      "bytes": 341,
+      "matches_receipt": true,
+      "matches_product": true
+    },
+    {
+      "path": "docs/evidence/M2/provider-v3-fixround5-full-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "matches_receipt": true,
+      "matches_product": true
+    }
+  ],
+  "all_match": true,
+  "product_diff": {
+    "path": ".superpowers/sdd/implementation-plan/review-840e114..e14f679-M2-product.diff",
+    "bytes": 40451,
+    "sha256": "9df907c52ffc5a44606663ef871d9dda8f92d903d4aada5ed17747cff88faef1"
+  }
+}
