@@ -32,7 +32,8 @@ Recovery: read this file, docs/interfaces.md if present, latest reports and git 
 
 ## Checkpoints
 
-- Planning baseline: pending commit; M0 not yet dispatched.
+- Planning baseline committed `767e790`.
+- Task 1 / M0: owner `/root/m0_contracts`, base `767e790`, active. Brief `docs/briefs/M0.md`; report `docs/reports/M0.md`. Shared contracts not yet approved for downstream use.
 
 ## External gates
 
