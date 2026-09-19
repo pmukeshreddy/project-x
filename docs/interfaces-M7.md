@@ -1,0 +1,39 @@
+# M7 training-core interface — first implementation slice
+
+This is implemented library code, not the full runner/training service. Authoritative release admission, real agent collection and the complete framework launcher remain subsequent M7 work. GPU execution is unverified. `import feature_rl.training` does not import Torch, SkyRL or vLLM.
+
+## Grouping and admission
+
+`BalancedSampler(list[TaskSlot], seed=...)` round-robins repository family, then feature, then task with deterministic seeded ordering. `next_group(policy_version) -> GroupPlan` produces four distinct episode seeds and one private case seed. The group ID binds roster digest, seed, position and policy. `state_dict/load_state_dict` reject changed roster/seed/cursor. Only the training service may populate the roster after authoritative admission.
+
+`TrainingDataGate(store=..., admit=..., grader_revision=...)` requires an explicit trusted callable `admit(ArtifactRef) -> TaskBundle`. It must invoke M5/M6's actual complete release/quarantine/revocation resolver; there is no default state-string check or provisional-task bypass. `admit_task` checks the returned task is the exact stored artifact and in TRAIN. A test callback is not a production admission.
+
+`prepare_group(plan, records, contexts=..., expected_policy=PolicyConfig, vocab_size=..., max_seq_len=..., normalize_std=False) -> PreparedGroup` requires four actual M0 `RolloutRecord`s with unique run IDs and matching full policy configuration except the distinct seed. `contexts` has one tuple of actual prompt-token tuples per episode. Each measured trajectory needs its unique real-scope M4 receipt, exact task/submission/reward/case seed/grader revision, identified tokenizer and exact M0 TokenTrace. Invalid peers retain null rewards and original records/costs. `PreparedGroup.optimization_turns()` excludes invalid peers and skips groups with fewer than two valid outcomes; valid-only advantages are broadcast to each turn.
+
+`group_advantages((reward0,...,reward3), normalize_std=False)` computes a mean over nonnull binary outcomes; optional std is population std with epsilon 1e-6. Singletons and uniform valid rewards have zero task advantage. `SignalGate.observe(group_id, task_id, rewards)` rejects duplicates, caps the probe at 64 groups and reports readiness after eight mixed groups across four tasks. It does not itself authenticate measurements; the eventual service must only pass admitted groups and retain original costs. The full budget/signal/update orchestration is not in this slice.
+
+## Supervised targets and exact contexts
+
+`prepare_supervised_source(task=..., submission=..., grade_ref=..., render_solution=..., encode_context=..., encode_target=..., max_seq_len=...)` admits the task, requires an exact successful M4 source receipt, reads its source archive with M3's bounded inert reader and invokes a **trusted fixed harness renderer**. That renderer receives controller-only task metadata and inert source and returns rendered context/completion pairs; never install a renderer from candidate code. The same renderer/tokenizer/template must be bound in the training configuration across arms. It must not leak private task fields into rendered context.
+
+`tokenize_supervision` uses `encode_context(context)` and `encode_target(context+target)` and requires exact prefix equality. It creates deterministic assistant targets with no behavior logprobs, not an RL TokenTrace. This source-SFT path has no supplied executable renderer yet; the actual agent action protocol will provide it in the runner slice. Per-example source, grade, tokenizer and template provenance must be retained by the full training service.
+
+`validate_trace` checks M0 schema, exact original prompt IDs, policy version, token vocabulary, finite nonpositive logprobs, nonempty assistant mask and sequence limit. Turns are trained separately; no final-conversation retokenization or unsafe prefix flattening occurs.
+
+## Actual tensor updater and checkpoints
+
+`TorchUpdater(model, learning_rate=..., kl_coefficient=.001, epsilon_low=.2, epsilon_high=.2, max_grad_norm=1., weight_decay=0., max_seq_len=4096, temperature=1.)` owns a real Torch AdamW optimizer and a frozen deep copy of the initial reference. It disables model dropout when computing probabilities. `update(list[CausalTurn], algorithm='sft'|'grpo') -> UpdateReceipt` performs one full-batch gradient update with token-mean normalization; SFT requires no behavior/advantage fields, GRPO requires both. All context is fed to the causal model; only explicit assistant targets enter loss/ratio/KL. GRPO uses the exact sampled behavior denominator and k3 reference KL; uniform task advantage may still produce KL gradients. Zero-gradient batches skip optimizer/weight decay. Nonfinite gradients reject; failures during optimizer mutation poison the updater until reload.
+
+`UpdateReceipt` contains loss, gradient norm, assistant token count, actual before/after tensor digests and optimizer step count. It is a tensor diagnostic/update receipt, not an M0 experiment checkpoint or proof of feature learning.
+
+`save_checkpoint(path, binding=..., progress=..., policy_version=...) -> manifest_sha256` creates a new private directory atomically containing hashed native tensor/optimizer/reference/Python/Torch/CUDA RNG state and finite-JSON metadata. `binding` must include immutable config/task/reference/model/tokenizer/template joins; `progress` must carry sampler/signal/budgets/consumed-task state supplied by the full service. `load_checkpoint(path, expected_digest=..., binding=...)` verifies bytes/settings/joins, validates model/optimizer copies, restores state and RNG, and rejects changed CUDA topology. These are trusted controller checkpoints; never load candidate checkpoint paths. No scheduler is used by this constant-learning-rate CPU updater.
+
+`PolicyBarrier` requires a `PolicyStamp(version, weights, tokenizer, template)`, a fixed-input inference result and acknowledgments from every configured worker. Changing policy clears readiness. Loading identity from checkpoint also clears acknowledgments: workers must be freshly synchronized and probed. This is a control-channel validation primitive, not endpoint authentication or a claim that a local counter proves remote weights.
+
+## Pinned SkyRL bridge
+
+`feature_rl.training.skyrl_bridge.register_losses()` registers custom loss functions through actual `PolicyLossRegistry.register` and `sync_registries`; call with Ray initialized before building model workers. The GRPO loss uses sampled behavior probabilities and SUM reduction because SkyRL already normalizes advantages. The SFT loss uses normalized unit weights for the same reduction. Their actual Torch gradients are CPU-tested; distributed registry execution is unverified.
+
+`SkyRLUpdateBridge(actual_constructed_RayPPOTrainer)` checks the supported fixed configuration. `initialize_sync()` invokes native `init_weight_sync_state` and awaited `dispatch.save_weights_for_sampler`. `update(UpdateRow[], algorithm=...)` builds exact per-turn GeneratorOutput, validates it, sleeps colocated inference, calls native `convert_to_training_input`, `fwd_logprobs_values_reward`, substitutes explicit valid-group advantages, calls `train_critic_and_policy`, and awaits weight synchronization. `group_rows` adapts `PreparedGroup`s without manufacturing invalid-peer placeholders. The caller must enforce policy barrier, admission, group ownership and costs before this low-level update.
+
+This bridge is usable by the upcoming launcher but has not been imported under the actual pinned CUDA stack. It does not construct the distributed experiment or implement native checkpoint publication/resume; those are explicit next-slice work. Stable source references and incompatibilities remain in `docs/evidence/M7/compatibility.md`. Stock Harbor Trial/ArtifactHandler is never invoked here.
