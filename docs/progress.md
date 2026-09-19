@@ -16,9 +16,9 @@ Complete every module, actual service/CLI integration and available CPU/Docker v
 | M3 | `/root/m3_runtime` | Runtime2190af0 reviewed PASS; real Docker build/health/reset evidence retained. |
 | M4 | `/root/m4_grading` | Mechanical core430df6f PASS. New checker/control/alternative services4086ee6 independently PASS;84 owner checks,28 independent focused checks. Ready for M6 consumption. |
 | M5 | `/root/m5_qualification` | Complete qualification/acceptance3cc9f11 plus fixes e3d868a independently PASS round2.72 owner checks,13 independent fix checks. Actual external human gate enforced. |
-| M6 | `/root/m6_factory` | Registry/package/fixture reviewed. TaskLifecycle8efdc89 independently PASS,18 focused checks. **ACTIVE:** full Factory construction/accounting/history, concrete per-task M5 service resolver, recovery and CLI. |
+| M6 | `/root/m6_factory` | Registry/package/fixture reviewed. TaskLifecycle8efdc89 and per-task resolver3845b7b independently PASS,18+9 focused checks. **ACTIVE:** full Factory construction/accounting/history, recovery and CLI. |
 | M7 | `/root/m7_learning` | Training core17e43f4 independently PASS round2,38 CPU checks. **ACTIVE:** actual AgentRunner, native inference/training services, SFT/GRPO orchestration/checkpoint/resume and commands. |
-| M8 | `/root/m8_evaluation` | Independent core35d3fcf has13 focused passes; coordinator review found6 confirmed defects. **ACTIVE:** audit fixes/source-audit path/durability, then actual EvaluationService on M7 runner. |
+| M8 | `/root/m8_evaluation` | Independent core35d3fcf has13 focused passes; coordinator review found6 confirmed defects. **ACTIVE:** audit fixes/source-audit path/durability, actual EvaluationService on M7 runner, executable external-corpus adaptation with M1/M6 (no payload acquisition). |
 
 Current active slots: root coordinator plus M6/M7/M8 owners. No child agents. Root independently reviewed the new M4 authoring/M6 lifecycle and M8 core while owners implement disjoint code. Existing M2/M5 reviewers closed their deltas. Same owner fixes each module. Old `/root/m2_authoring` transferred ownership; never reactivate it as writer.
 
