@@ -120,6 +120,8 @@ class PullRequestIntakeSpec:
             raise ValueError("admissible_cutoff must explicitly use UTC")
         if self.recorded_at.utcoffset() != timezone.utc.utcoffset(self.recorded_at):
             raise ValueError("recorded_at must explicitly use UTC")
+        if self.admissible_cutoff > self.recorded_at:
+            raise ValueError("admissible_cutoff cannot follow recorded_at")
         if type(self.max_tree_archive_bytes) is not int or self.max_tree_archive_bytes <= 0:
             raise ValueError("max_tree_archive_bytes must be positive")
 
@@ -143,6 +145,7 @@ class PullRequestIntakeResult:
     authoring: AuthoringSourceView
     reference: ArtifactRef
     manual_review_required: tuple[str, ...]
+    provenance_label: Literal["historical_request", "reconstructed_specification"]
 
 
 class GitHubPullRequestIntake:
@@ -237,13 +240,53 @@ class GitHubPullRequestIntake:
         reconstruction = self.history.reconstruct(
             integrated_after,
             integration=spec.integration,
-            source_head=source_head if spec.integration in {"merge", "squash"} else None,
+            source_head=(
+                source_head if spec.integration in {"merge", "squash", "rebase"} else None
+            ),
             implementation_commits=(
-                source_commits if spec.integration in {"rebase", "linear"} else ()
+                source_commits if spec.integration == "linear" else ()
+            ),
+            source_commits=(
+                source_commits if spec.integration in {"squash", "rebase"} else ()
             ),
         )
-        if reconstruction.implementation_commits != source_commits:
+        recovered_source = (
+            reconstruction.source_commits
+            if spec.integration == "rebase"
+            else reconstruction.implementation_commits
+        )
+        if recovered_source != source_commits:
             raise ValueError("Git graph and PR commit list disagree")
+
+        issue_created = _parse_time(issue_data["created_at"])
+        merged_at = _parse_time(pr_data["merged_at"])
+        if issue_created > spec.admissible_cutoff:
+            raise ValueError("visible issue did not exist by the admissible cutoff")
+        if spec.admissible_cutoff > merged_at or merged_at > spec.recorded_at:
+            raise ValueError("cutoff, integration, and recording chronology is contradictory")
+        all_sources = (*loaded.values(), license_text_source)
+        if any(item.retrieved_at > spec.recorded_at for item in all_sources):
+            raise ValueError("recorded_at predates a source retrieval")
+        source_objects = tuple(self.history.commit(item) for item in source_commits)
+        implementation_started = min(
+            timestamp
+            for item in source_objects
+            for timestamp in (item.authored_at, item.committed_at)
+        )
+        if not (
+            spec.admissible_cutoff <= implementation_started <= merged_at
+        ):
+            raise ValueError("admissible cutoff is not preimplementation")
+        historical_snapshot = loaded[spec.issue_name].retrieved_at <= spec.admissible_cutoff
+        if spec.provenance_label == "historical_request" and not historical_snapshot:
+            raise ValueError(
+                "historical_request requires an archived preimplementation issue snapshot"
+            )
+        issue_updated = _parse_time(issue_data["updated_at"])
+        if spec.provenance_label == "historical_request" and (
+            issue_updated > loaded[spec.issue_name].retrieved_at
+        ):
+            raise ValueError("historical issue metadata postdates its archived snapshot")
 
         response_paths = tuple(item["filename"] for item in files_data)
         graph_paths = self.history.changed_paths(
@@ -256,8 +299,33 @@ class GitHubPullRequestIntake:
         )
 
         license_blob = license_data["sha"]
-        if self.history.path_object(reconstruction.baseline_commit, "LICENSE.txt") != license_blob:
+        if not isinstance(license_blob, str) or not _REVISION.fullmatch(license_blob):
+            raise ValueError("license response lacks a full Git object ID")
+        baseline_license_blob = self.history.path_object(
+            reconstruction.baseline_commit, "LICENSE.txt"
+        )
+        reference_license_blob = self.history.path_object(
+            reconstruction.reference_commit, "LICENSE.txt"
+        )
+        if baseline_license_blob != license_blob:
             raise ValueError("license response does not match baseline LICENSE.txt")
+        if reference_license_blob != baseline_license_blob:
+            raise ValueError("reference changes LICENSE.txt; automatic license scope is unsafe")
+        baseline_license_text = self.history.path_bytes(
+            reconstruction.baseline_commit,
+            "LICENSE.txt",
+            max_bytes=spec.max_tree_archive_bytes,
+        )
+        reference_license_text = self.history.path_bytes(
+            reconstruction.reference_commit,
+            "LICENSE.txt",
+            max_bytes=spec.max_tree_archive_bytes,
+        )
+        if (
+            license_text_source.body != baseline_license_text
+            or reference_license_text != baseline_license_text
+        ):
+            raise ValueError("archived license text does not match B and H LICENSE.txt")
         spdx_id = license_data["license"]["spdx_id"]
         if not isinstance(spdx_id, str) or not spdx_id:
             raise ValueError("license response lacks an SPDX identifier")
@@ -325,6 +393,20 @@ class GitHubPullRequestIntake:
             ],
             "manual_review_required": list(classification.manual_review_required),
             "provenance_label": spec.provenance_label,
+            "source_commits": list(reconstruction.source_commits),
+            "commit_mapping": [
+                {"source": source, "integrated": integrated, "delta_sha256": digest}
+                for source, integrated, digest in reconstruction.commit_mapping
+            ],
+            "implementation_started_at": implementation_started.isoformat().replace(
+                "+00:00", "Z"
+            ),
+            "implementation_timestamp_limit": (
+                "Git author and committer timestamps are repository assertions, not "
+                "independent wall-clock attestations"
+            ),
+            "license_baseline_object": baseline_license_blob,
+            "license_reference_object": reference_license_blob,
         }
         proof_ref = self.store.put_bytes(
             _canonical(proof), "source-inspection-log", Visibility.PRIVATE
@@ -366,7 +448,8 @@ class GitHubPullRequestIntake:
         inputs = tuple(item.content for item in snapshots)
         candidate = CandidateRecord(
             kind="CandidateRecord",
-            schema_version=1,
+            schema_version=2,
+            provenance_label=spec.provenance_label,
             visibility=Visibility.PRIVATE,
             provenance=Provenance(
                 producer="feature_rl.intake.GitHubPullRequestIntake",
@@ -402,7 +485,8 @@ class GitHubPullRequestIntake:
 
         source_pair = SourcePair(
             kind="SourcePair",
-            schema_version=1,
+            schema_version=2,
+            provenance_label=spec.provenance_label,
             visibility=Visibility.PRIVATE,
             provenance=Provenance(
                 producer="feature_rl.history.GitHistory",
@@ -432,6 +516,8 @@ class GitHubPullRequestIntake:
         for comment in comments_data:
             created = _parse_time(comment["created_at"])
             updated = _parse_time(comment["updated_at"])
+            if updated < created or updated > spec.recorded_at:
+                raise ValueError("comment chronology is contradictory")
             if created <= spec.admissible_cutoff and updated <= spec.admissible_cutoff:
                 cutoff_comments.append(
                     {
@@ -463,6 +549,8 @@ class GitHubPullRequestIntake:
             "caveat": (
                 "Current request text has no recoverable preimplementation body revision; "
                 "later contract evidence must retain reconstructed-specification provenance."
+                if spec.provenance_label == "reconstructed_specification"
+                else "Archived issue response was captured before implementation began."
             ),
         }
         request_ref = self.store.put_bytes(
@@ -478,4 +566,5 @@ class GitHubPullRequestIntake:
             ),
             reference=reference_ref,
             manual_review_required=classification.manual_review_required,
+            provenance_label=spec.provenance_label,
         )

@@ -5,14 +5,23 @@ from datetime import datetime, timezone
 import hashlib
 import io
 from pathlib import Path
+import time
 
 import pytest
 
 
 class Response:
-    def __init__(self, body: bytes, *, content_length: int | None = None, status: int = 200):
+    def __init__(
+        self,
+        body: bytes,
+        *,
+        content_length: int | None = None,
+        status: int = 200,
+        final_url: str | None = None,
+    ):
         self._stream = io.BytesIO(body)
         self.status = status
+        self.final_url = final_url
         self.headers = {"Content-Type": "application/json"}
         if content_length is not None:
             self.headers["Content-Length"] = str(content_length)
@@ -25,6 +34,9 @@ class Response:
 
     def read(self, amount: int = -1) -> bytes:
         return self._stream.read(amount)
+
+    def geturl(self) -> str | None:
+        return self.final_url
 
 
 def test_http_fetch_enforces_declared_and_streamed_size_limits():
@@ -62,6 +74,52 @@ def test_http_fetch_rejects_unsafe_scheme_and_reports_timeout():
         fetcher.fetch("file:///etc/passwd", edit_history="not_applicable")
     with pytest.raises(SourceFetchTimeout):
         fetcher.fetch("https://example.invalid/slow", edit_history="unavailable")
+
+
+def test_http_fetch_rejects_disallowed_redirect_and_bounds_whole_operation():
+    """Catches redirects escaping source policy and progress extending the deadline."""
+    from feature_rl.intake import BoundedHttpFetcher, SourceFetchTimeout
+
+    redirected = BoundedHttpFetcher(
+        max_bytes=10,
+        timeout_seconds=1,
+        opener=lambda *_args, **_kwargs: Response(
+            b"ok", final_url="http://127.0.0.1/private"
+        ),
+    )
+    with pytest.raises(ValueError, match="redirect|https"):
+        redirected.fetch("https://example.invalid/source", edit_history="unavailable")
+
+    captured = BoundedHttpFetcher(
+        max_bytes=10,
+        timeout_seconds=1,
+        opener=lambda *_args, **_kwargs: Response(
+            b"ok", final_url="https://example.invalid/final"
+        ),
+    ).fetch("https://example.invalid/source", edit_history="unavailable")
+    assert captured.redirect_chain == (
+        "https://example.invalid/source",
+        "https://example.invalid/final",
+    )
+
+    with pytest.raises(ValueError, match="nonpublic"):
+        BoundedHttpFetcher(max_bytes=10, timeout_seconds=1).fetch(
+            "https://127.0.0.1/private", edit_history="unavailable"
+        )
+
+    def blocked(*_args, **_kwargs):
+        time.sleep(0.5)
+        return Response(b"late")
+
+    bounded = BoundedHttpFetcher(
+        max_bytes=10,
+        timeout_seconds=0.05,
+        opener=blocked,
+    )
+    started = time.monotonic()
+    with pytest.raises(SourceFetchTimeout):
+        bounded.fetch("https://example.invalid/slow", edit_history="unavailable")
+    assert time.monotonic() - started < 0.3
 
 
 def test_cached_catalog_verifies_digest_and_confines_paths(tmp_path):
@@ -119,10 +177,12 @@ def test_source_archive_preserves_edit_status_and_detects_store_corruption(tmp_p
         edit_history="unavailable",
         media_type="application/json",
         status_code=200,
+        redirect_chain=None,
     )
 
     snapshot = archiver.archive(fetched, Visibility.PRIVATE)
     assert snapshot.edit_history == "unavailable"
+    assert snapshot.redirect_chain is None
     assert archiver.verify(snapshot) == b"current issue body"
 
     (store_root / f"{snapshot.content.sha256}.json").write_bytes(b"corrupted")
