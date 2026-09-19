@@ -24,7 +24,7 @@ Candidate/application/build hooks/generated adapters execute only inside M3 work
 | --- | --- | --- |
 | M0 | `/root/m0_contracts` | Core/provenance-v2/MLX dependency config/bounded artifact reads reviewed and integrated |
 | M1 | `/root/m1_sources` | Intake/history/splits reviewed and integrated; real Click candidate remains provisional |
-| M2 | `/root/m2_authoring_recovery` | Provider reviewed/native-integrated; authoring/scenario implementation NEXT after M3 review + root suite |
+| M2 | `/root/m2_authoring_recovery` | Complete authoring/scenario implementation ACTIVE at approved4530ad7; sole product writer |
 | M3 | `/root/m3_runtime` | Product2190af0 round3 spec/quality PASS; integrated342tests PASS; local no-service runtime complete |
 | M4 | `/root/m4_grading` | Interface/comparison preparation complete; no product yet |
 | M5 | `/root/m5_qualification` | Signature mechanism preflight only; no product yet |
@@ -119,3 +119,5 @@ M8 metadata `docs/evidence/M8/baseline-feasibility.md`: SWE-Bench++HFda364537055
 Checkpoint: M3 round3 FINAL received and full report read by root: specification PASS, quality PASS, P0/P1/P2 all0. Independent18 hash checks plus actual2CAS/live/removed/retry schedules support both race closures; no duplicate runtime execution. Root is committing review/evidence then launching fresh integrated suite. M3 portability question also answered from source: explicit forwarded protected Unix socket can target the supported arm64 daemon from an x86 CUDA controller, but forwarding is unexecuted/unverified and not authenticated by M3. See `docs/decisions/training-worker-endpoint.md`; later M7/M6 commands must expose this topology and qualification prerequisite. No runtime platform edit was made.
 
 **Root integration gate PASSED:** `PYTHONPATH=src .venv/bin/python docs/evidence/coordinator-local-check.py docs/evidence/M3/coordinator-integration-round3` atdcb442b55a12f4ffeee36ab32d5a3ef5ddc7cb63,2026-09-19T20:20:21.271153–20:21:51.392891UTC,exit0.342tests passed89.73s (outer90.122s);41 source/test/config files unchanged before/after; raw stdout/stderr hashes matched the retained receipt. No provider native rerun or experimental result. M3 is reviewed/integrated for its declared scope. Same M2 owner receives full authoring/scenario implementation handoff next at this reviewed baseline and new bounded allocation.
+
+Same M2 owner DISPATCHED complete authoring/scenario implementation at approved4530ad7, sole product writer. Full existing brief plus new proposal/stage/scope/allocation decisions supplied; actual M3 API stable. Requires owned product/tests/report/interface/evidence + FINAL, notify root when first grounded draft freezes before privileged H review. Missing model output is an execution gap and cannot leave generic code unfinished. `docs/briefs/M2-authoring-review.md` is ready for actual final target; reviewer not yet dispatched.
