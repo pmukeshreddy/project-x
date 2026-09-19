@@ -1,0 +1,139 @@
+{
+  "created_at": "2026-09-19T20:13:26.887834+00:00",
+  "product_base": "ad154f88013200d9c0134b808c9211032ed67a2b",
+  "source_hashes": {
+    "src/feature_rl/environments/seccomp.json": "005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44",
+    "src/feature_rl/environments/models.py": "ab6cb150a252f3d5f57c335ed15dd26608d5cf827c7ec53a70721e81b5c699da",
+    "src/feature_rl/environments/__init__.py": "bf204b871a62df026c04882279f6b80cbe55177ce7366fc4b1d093e90a18b556",
+    "src/feature_rl/environments/docker.py": "25be92992a5214442ef1b95cf0f499d260460072df68b564decd2da024e7e7a6",
+    "src/feature_rl/environments/runtime.py": "4994c5801464cc0fb7b676f1ad2247d534720db253f45b99933aab2278443b68",
+    "src/feature_rl/environments/archive.py": "e18b59e2b036dcd5843e9f4b39e3f5d2a491f7564d1bad700cc0026c2225fd4a",
+    "src/feature_rl/environments/probes.py": "01b871bb0fbcce519c233d32e4087e1f5df8514dcada5d046443f7e070a0618e",
+    "src/feature_rl/environments/workers.py": "ad57c0cb19a8d234476716b84d759e1e8e5182f2260c42ceb08551e497dd0dce"
+  },
+  "test_hashes": {
+    "tests/test_environments.py": "dcc3415617b36c54e562b170546fd186d6941366d61e639ee741d240e2eb570b",
+    "tests/test_environments_docker.py": "6c0bc4bec0bfbef85b9211c678a87c34f97409c0d154d951c5f26e3d0af032da"
+  },
+  "checks": [
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/pytest",
+        "-q",
+        "tests/test_environments_docker.py",
+        "-k",
+        "terminal_admission_rejects_new_pending"
+      ],
+      "exit_status": 0,
+      "result": "2 passed, 24 deselected in 8.38s",
+      "log": "docs/evidence/M3/fix-round2/green-terminal-cleanup.log",
+      "sha256": "fe56dc55549d6c53267279ef2632583e7f6817ec841fdd5e9ff5fd7670a24b0c",
+      "utc_capture_started": "2026-09-19T20:09:38.062297+00:00",
+      "utc_capture_finished": "2026-09-19T20:09:46.641397+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/pytest",
+        "-q",
+        "tests/test_environments.py",
+        "tests/test_environments_docker.py"
+      ],
+      "exit_status": 0,
+      "result": "43 passed in 68.29s",
+      "log": "docs/evidence/M3/fix-round2/focused-suite.log",
+      "sha256": "d6a96bae7785781bd20bbe0266eea43293c90a166923bf4a96de96cd9604c841",
+      "utc_capture_started": "2026-09-19T20:11:21.755099+00:00",
+      "utc_capture_finished": "2026-09-19T20:12:30.260324+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "docs/evidence/M3/fix-round2/terminal_cleanup.py"
+      ],
+      "exit_status": 0,
+      "result": "2 schedules passed; all owned operations removed",
+      "log": "docs/evidence/M3/fix-round2/terminal-cleanup.log",
+      "sha256": "520e09c456a2f07d74c0bbe16c8481c6e5f76db8cd3cedc8ea1f9f0c4141de5c",
+      "utc_capture_started": "2026-09-19T20:10:58.791039+00:00",
+      "utc_capture_finished": "2026-09-19T20:11:07.692589+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    },
+    {
+      "command": [
+        "docker",
+        "ps",
+        "-aq",
+        "--filter",
+        "label=feature-rl.owner"
+      ],
+      "exit_status": 0,
+      "result": "no remaining owned containers",
+      "log": "docs/evidence/M3/fix-round2/owned-containers.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "utc_capture_started": "2026-09-19T20:13:26.709885+00:00",
+      "utc_capture_finished": "2026-09-19T20:13:26.709885+00:00",
+      "timestamp_source": "filesystem log creation/final-write observations"
+    }
+  ],
+  "verified_diagnostic_cases": [
+    {
+      "transition": "close",
+      "operation_id": "26d3e48a498142aabbc057316c901741",
+      "container_id": "ea59ccabbfc06a25096a41141186f5fd615e23aa7cacd07cd693464c62b6b3a3",
+      "execution_evidence_ref": {
+        "sha256": "79ecac7d91c673b6ea48db344f0038f4df4d4259846062167e9ea5b04245df3d",
+        "kind": "environment-execution",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "payload_sha256": "4286260c0a8cb0dad3792bca9d2c79122baf355a264b86d5bd4cd21e55176fdc",
+      "exact_live_identity": true,
+      "unchanged_failed_transition": true,
+      "verified_remove_and_absence": true,
+      "successful_retry": true
+    },
+    {
+      "transition": "reset",
+      "operation_id": "3536d42a86d641ce8b512369747fe968",
+      "container_id": "c93680b2cc59bbe684dc74830d9b3ff31b9303b02a87207106ea4ad6babac519",
+      "execution_evidence_ref": {
+        "sha256": "af879b684e2e92e857fdea775269a63d26b4c1a738dcfeaca3b55529c3511f32",
+        "kind": "environment-execution",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "payload_sha256": "4e8c351f9c87c04333e2a93526dcc63177237a0ca4929d75f91c0250c6337318",
+      "exact_live_identity": true,
+      "unchanged_failed_transition": true,
+      "verified_remove_and_absence": true,
+      "successful_retry": true
+    }
+  ],
+  "repair_counts": {
+    "environment": 1,
+    "environment_budget": 2,
+    "candidate": 1,
+    "candidate_budget": 4
+  },
+  "cost_scope": "Local synthetic Docker and controller tests; no historical/native/provider/model, downloads, remote or paid work. Partial CPU/wall/memory costs remain in diagnostic receipts; GPU results deferred and unverified.",
+  "evidence_files": {
+    "docs/evidence/M3/fix-round2/terminal-cleanup-result.json": "c3327f7341744c564a47ff7c202f633d4234e585157a4baa7e38b8b13f0053b2",
+    "docs/evidence/M3/fix-round2/terminal_cleanup.py": "c7dbffab35430b87f82d2daf65a5f4775f4af6373d02dd13fae577727fe553d7",
+    "docs/evidence/M3/fix-round2/terminal-cleanup.log": "520e09c456a2f07d74c0bbe16c8481c6e5f76db8cd3cedc8ea1f9f0c4141de5c",
+    "docs/evidence/M3/fix-round2/focused-suite.log": "d6a96bae7785781bd20bbe0266eea43293c90a166923bf4a96de96cd9604c841",
+    "docs/evidence/M3/fix-round2/red-receipt.json": "1e02b03616dbfaa734c3eab6d87f78caaaa2963b34b010d47ec5b80f80e75a8f",
+    "docs/evidence/M3/fix-round2/owned-containers.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/evidence/M3/fix-round2/green-terminal-cleanup.log": "fe56dc55549d6c53267279ef2632583e7f6817ec841fdd5e9ff5fd7670a24b0c",
+    "docs/evidence/M3/fix-round2/red-terminal-cleanup.log": "1e9c1b24232b1f161ca1b2f770ac4aca14e4be833c832fb70a267dd3a1b75a3b"
+  }
+}

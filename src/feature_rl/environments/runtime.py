@@ -275,12 +275,14 @@ class EnvironmentRuntime:
     def reset(self,handle):
         self.recover_owned()
         with self.engine.state.lock():
+            self.engine._require_clean_owned_state()
             value,prepared,recipe,saved,source=self.workspace(handle)
             value['saved']=value['initial'];value['generation']+=1;self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
         return SavedSource.model_validate_json(canonical_json(value['saved']))
     def close(self,handle):
         self.recover_owned()
         with self.engine.state.lock():
+            self.engine._require_clean_owned_state()
             value,*_=self.workspace(handle)
             value['closed']=True;value['generation']+=1;self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
         return SavedSource.model_validate_json(canonical_json(value['saved']))

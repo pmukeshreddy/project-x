@@ -186,6 +186,14 @@ class DockerEngine:
                 s.cleanup();recovered.append({'operation_id':record.operation_id,'cleanup_verified':s.cleanup_verified,'receipts':s.receipts})
         return recovered
 
+    def _require_clean_owned_state(self):
+        """Caller holds the operation lock through this check and terminal commit."""
+        for name in self.state.names():
+            if not name.startswith('operation-') or not name.endswith('.json'):continue
+            record=Ownership.model_validate(self.state.read(name))
+            if record.phase!='removed':
+                raise CleanupUnverified('pending owned cleanup blocks terminal transition; recover and retry: '+record.operation_id)
+
     def qualify_boundary(self):
         from .probes import BOUNDARY_CODE,check_boundary
         with self.session(binding={'purpose':'trusted-boundary'},saved_source={}) as s:

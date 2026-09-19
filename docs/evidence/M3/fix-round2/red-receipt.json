@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src",
+    ".venv/bin/pytest",
+    "-q",
+    "tests/test_environments_docker.py",
+    "-k",
+    "terminal_admission_rejects_new_pending"
+  ],
+  "exit_status": 1,
+  "result": "2 failed, 24 deselected in 9.49s",
+  "source_hashes": {
+    "src/feature_rl/environments/seccomp.json": "005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44",
+    "src/feature_rl/environments/models.py": "ab6cb150a252f3d5f57c335ed15dd26608d5cf827c7ec53a70721e81b5c699da",
+    "src/feature_rl/environments/__init__.py": "bf204b871a62df026c04882279f6b80cbe55177ce7366fc4b1d093e90a18b556",
+    "src/feature_rl/environments/docker.py": "f158fad2c4a03f4d749683865440bb9854e9fceaf017c5b80ee2ab422d78f3e1",
+    "src/feature_rl/environments/runtime.py": "cd0eb49c91738c4aaac11d4848ad5a5bb0c264e48a6aa034827a52c59c1f4d9d",
+    "src/feature_rl/environments/archive.py": "e18b59e2b036dcd5843e9f4b39e3f5d2a491f7564d1bad700cc0026c2225fd4a",
+    "src/feature_rl/environments/probes.py": "01b871bb0fbcce519c233d32e4087e1f5df8514dcada5d046443f7e070a0618e",
+    "src/feature_rl/environments/workers.py": "ad57c0cb19a8d234476716b84d759e1e8e5182f2260c42ceb08551e497dd0dce"
+  },
+  "test_sha256": "6c0bc4bec0bfbef85b9211c678a87c34f97409c0d154d951c5f26e3d0af032da",
+  "utc_capture_started": "2026-09-19T20:08:59.368422+00:00",
+  "utc_capture_finished": "2026-09-19T20:09:09.086045+00:00",
+  "timestamp_source": "log filesystem creation/final-write times",
+  "log_sha256": "1e9c1b24232b1f161ca1b2f770ac4aca14e4be833c832fb70a267dd3a1b75a3b"
+}

@@ -301,3 +301,63 @@ def test_overlapping_resets_advance_generation_and_reject_old_admission(runtime_
         with pending:pass
     assert pending.record.container_id is None and pending.cleanup_verified
     assert runtime.recover_owned()==[]
+
+
+@pytest.mark.parametrize('transition', ['close', 'reset'])
+def test_terminal_admission_rejects_new_pending_cleanup_and_allows_recovered_retry(runtime_fixture, monkeypatch, transition):
+    from contextlib import contextmanager
+    import threading,time
+    from feature_rl.environments import CommandSpec,ExecutionRequest,CleanupUnverified
+    from feature_rl.environments.docker import DockerSession
+    runtime,prepared=runtime_fixture;engine=runtime.engine;handle=runtime.open_workspace(prepared)
+    initial=runtime.workspace(handle)[3]
+    paused=threading.Event();release=threading.Event();outcome={};original_lock=engine.state.lock
+    @contextmanager
+    def scheduled_lock():
+        if threading.current_thread().name=='terminal-cleanup':
+            outcome['lock_calls']=outcome.get('lock_calls',0)+1
+            if outcome['lock_calls']==2:
+                paused.set();assert release.wait(10), 'bounded interleaving expired'
+        with original_lock():yield
+    def terminal():
+        try:outcome['saved']=getattr(runtime,transition)(handle)
+        except BaseException as exc:outcome['error']=exc
+    original_cleanup=DockerSession.cleanup;original_base=engine.base
+    def unavailable_cleanup(session):
+        session.engine.base=[*original_base[:3],'--host','unix:///tmp/feature-rl-definitely-missing.sock']
+        try:return original_cleanup(session)
+        finally:session.engine.base=original_base
+    with monkeypatch.context() as patch:
+        patch.setattr(engine.state,'lock',scheduled_lock)
+        thread=threading.Thread(target=terminal,name='terminal-cleanup');thread.start()
+        try:
+            assert paused.wait(3)
+            with monkeypatch.context() as fault:
+                fault.setattr(DockerSession,'cleanup',unavailable_cleanup)
+                result=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(
+                    argv=('python','-c',"import pathlib;pathlib.Path('/workspace/source/src/click/__init__.py').write_text('x=42\\n')"),
+                    working_directory='/workspace',timeout_seconds=2.0)))
+            assert result.failure_category=='infrastructure' and not result.cleanup_verified and result.save_status=='saved'
+            pending=engine.state.read('operation-'+result.operation_id+'.json')
+            assert pending['phase']=='cleanup_pending'
+            status,body=engine.http('GET','/containers/'+pending['container_id']+'/json',deadline=time.monotonic()+2,cap=1024*1024)
+            assert status==200 and json.loads(body)['State']['Running']
+            before=engine.state.read('workspace-'+handle.workspace_id+'.json')
+            release.set();thread.join(3)
+            assert not thread.is_alive()
+            after=engine.state.read('workspace-'+handle.workspace_id+'.json')
+            status,body=engine.http('GET','/containers/'+pending['container_id']+'/json',deadline=time.monotonic()+2,cap=1024*1024)
+            assert status==200 and json.loads(body)['State']['Running']
+        finally:
+            release.set();thread.join(3)
+            recovery=runtime.recover_owned()
+    assert isinstance(outcome.get('error'),CleanupUnverified) and 'saved' not in outcome
+    assert after==before  # Includes exact source, generation and closed state.
+    assert any(x['operation_id']==result.operation_id and x['cleanup_verified'] for x in recovery)
+    status,_=engine.http('GET','/containers/'+pending['container_id']+'/json',deadline=time.monotonic()+2,cap=1024*1024)
+    assert status==404
+    final=getattr(runtime,transition)(handle)
+    assert final==(result.saved_source if transition=='close' else initial)
+    state=engine.state.read('workspace-'+handle.workspace_id+'.json')
+    assert state['generation']==before['generation']+1 and state['closed']==(transition=='close')
+    assert runtime.recover_owned()==[]
