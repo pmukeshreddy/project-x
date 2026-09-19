@@ -126,13 +126,23 @@ def test_review_untrainable_stop_preserves_saved_submission(stop,disposition):
     assert result.submission is not None and result.reward is None and not result.training_eligible
 
 
-@pytest.mark.parametrize('stop',['candidate_failure','malformed_action','token_limit','tool_limit','time_limit'])
-def test_review_valid_agent_failures_remain_training_examples(stop):
-    value=measured_rollout();value.update(stopping_reason=stop,disposition='candidate_rejection',reward=0)
+def test_review_terminal_candidate_failure_remains_zero_reward():
+    value=measured_rollout();value.update(stopping_reason='candidate_failure',disposition='candidate_rejection',reward=0)
     result=c.RolloutRecord.model_validate_json(json.dumps(value))
     assert result.training_eligible and result.reward==0
     value['reward']=1
-    with pytest.raises(ValidationError,match='agent failure'):
+    with pytest.raises(ValidationError):
+        c.RolloutRecord.model_validate_json(json.dumps(value))
+
+
+@pytest.mark.parametrize('stop',['malformed_action','token_limit','tool_limit','time_limit'])
+@pytest.mark.parametrize('reward',[0,1])
+def test_review_ordinary_stops_preserve_final_submission_grade(stop,reward):
+    value=measured_rollout();value.update(stopping_reason=stop,disposition='success',reward=reward)
+    result=c.RolloutRecord.model_validate_json(json.dumps(value))
+    assert result.training_eligible and result.reward==reward and result.submission is not None
+    value['grading_evidence']=[]
+    with pytest.raises(ValidationError,match='grading evidence'):
         c.RolloutRecord.model_validate_json(json.dumps(value))
 
 

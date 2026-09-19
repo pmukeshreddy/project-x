@@ -679,11 +679,10 @@ class RolloutRecord(ArtifactModel):
                 raise ValueError(f'{self.stopping_reason.value} stop requires {expected.value} disposition')
             if self.training_eligible:
                 raise ValueError('invalid or infrastructure stop cannot be training eligible')
-        agent_failures = {StopReason.TOKEN_LIMIT, StopReason.TOOL_LIMIT,
-                          StopReason.TIME_LIMIT, StopReason.MALFORMED_ACTION,
-                          StopReason.CANDIDATE_FAILURE}
-        if self.stopping_reason in agent_failures and self.reward not in (None, 0):
-            raise ValueError('a measured agent failure requires zero reward')
+        # This stop denotes a terminal candidate build/import/worker grading failure.
+        # Ordinary agent limits and invalid commands still grade the saved source.
+        if self.stopping_reason == StopReason.CANDIDATE_FAILURE and self.reward not in (None, 0):
+            raise ValueError('a measured terminal candidate failure requires zero reward')
         if self.reward is not None and self.disposition not in {Disposition.SUCCESS, Disposition.REJECTED}:
             raise ValueError('only valid measured outcomes can carry reward')
         if self.reward is not None and type(self.reward) is not int:

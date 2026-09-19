@@ -1,11 +1,11 @@
 {
-  "src/feature_rl/contracts/models.py": "cdf7405020c80dd5404de7503fa8df3467383b5915832a69df6a8307902b62c4",
+  "src/feature_rl/contracts/models.py": "ccf44d353af476e01bd5d3f2b030eeea11cdcb4c42ff772427032a644b8fd2a7",
   "src/feature_rl/contracts/__init__.py": "b998f8e0a43502104b9a80059cda51c8c8b0f197b33a6f9af108241408a5c512",
   "src/feature_rl/artifacts/store.py": "46111a53d4f61a3e0fa47b92b93ad2c4d028a104299b2d02677ef20cd8271eeb",
   "src/feature_rl/artifacts/__init__.py": "a580fb523d70b0be41fa39a4481681a45774c03d08a47e00f08867be87fa31fc",
   "tests/test_contracts.py": "0c83069837bfbf093893474b99032d291ac513c37215291c5b1f0748bd090f16",
   "tests/test_artifacts.py": "92a08251ad6fed5ffd48a2e587ca448e2967ff5722ee1beb8710c3245a6e1edf",
-  "tests/test_contracts_examples.py": "c0257f9ec759daec0505ff8bef9a2897352ebf48f8f2f8f8980159be279aea4e",
+  "tests/test_contracts_examples.py": "fc27f861da9d5a840f7e4079eea15e8e7afbedade0e7cdd7f3849864961c8e1a",
   "src/feature_rl/__init__.py": "1548a46574e9bcc968f5bf5201d959cd9d068d6f266d104a4bb1a77c55bd4236",
   "pyproject.toml": "3eb30f011e0d8a730b0cd0b6e1149a663ba37436bd0a4cdf281f0b60643d939d",
   "uv.lock": "684b533ed7d0deb5657241eecbb33b3ceab3115fa12ca7405c7195f0d834f8bd"
