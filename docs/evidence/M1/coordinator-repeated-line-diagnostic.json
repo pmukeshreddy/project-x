@@ -1,0 +1,21 @@
+{
+  "scope": "unit_diagnostic",
+  "producer": "root bounded inert repeated-line rebase diagnostic",
+  "factory_revision": "18a735b7817047964720b56b694f4b233a59100d",
+  "started_at_utc": "2026-09-19T09:10:27.752493+00:00",
+  "finished_at_utc": "2026-09-19T09:10:30.762535+00:00",
+  "wall_seconds": 3.0099602499976754,
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "-c",
+    "from feature_rl.history.git import GitHistory; before = b'x\\n' * 10000 + b'end\\n'; after = b'new\\n' + before; print(len(GitHistory._line_delta(before, after)))"
+  ],
+  "input_bytes_before": 20004,
+  "input_bytes_after": 20008,
+  "external_deadline_seconds": 3,
+  "external_deadline_exceeded": true,
+  "exit_status": -9,
+  "stdout": "",
+  "stderr": "",
+  "limitation": "Trusted synthetic bytes only; demonstrates behavior of current pure delta algorithm, not real-source history admission."
+}
