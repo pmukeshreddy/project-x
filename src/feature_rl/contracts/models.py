@@ -1,4 +1,4 @@
-"""Strict version-one contracts. Execution and attestation gates belong to services.
+"""Strict versioned contracts. Execution and attestation gates belong to services.
 
 Python inputs use exact enum/tuple/datetime types; JSON inputs use their JSON forms.
 All nullable measurements are required: absence never silently means zero.
@@ -102,7 +102,7 @@ class StopReason(str, Enum):
 class ArtifactRef(StrictModel):
     sha256: Digest
     kind: Identifier
-    schema_version: Annotated[int, Field(ge=1, le=1)]
+    schema_version: Annotated[int, Field(ge=1, le=2)]
     visibility: Visibility
     encoding: Literal['json', 'bytes']
 
@@ -286,6 +286,13 @@ class SourceSnapshot(StrictModel):
     edited_at: UTCDateTime | None
     edit_history: Literal['available', 'unavailable', 'not_applicable']
     media_type: Text
+    redirect_chain: Annotated[tuple[Text, ...], Field(min_length=1)] | None
+
+    @model_validator(mode='after')
+    def redirect_origin(self):
+        if self.redirect_chain is not None and self.redirect_chain[0] != self.url:
+            raise ValueError('known redirect chain must begin with the requested URL')
+        return self
 
 
 class LicenseRecord(StrictModel):
@@ -312,6 +319,8 @@ class ScreeningDecision(StrictModel):
 
 class CandidateRecord(ArtifactModel):
     kind: Literal['CandidateRecord']
+    schema_version: Annotated[int, Field(ge=2, le=2)]
+    provenance_label: Literal['historical_request','reconstructed_specification']
     visibility: Literal[Visibility.AUTHORING, Visibility.EVALUATION, Visibility.PRIVATE]
     repository_url: Text
     repository_family: Identifier
@@ -331,6 +340,8 @@ class ChangedFile(StrictModel):
 
 class SourcePair(ArtifactModel):
     kind: Literal['SourcePair']
+    schema_version: Annotated[int, Field(ge=2, le=2)]
+    provenance_label: Literal['historical_request','reconstructed_specification']
     visibility: Literal[Visibility.PRIVATE, Visibility.EVALUATION]
     candidate: ArtifactRef
     baseline_commit: Revision
@@ -802,6 +813,8 @@ def unique(values, label):
 def require_ref(ref: ArtifactRef, kind: str):
     if ref.kind != kind or ref.encoding != 'json':
         raise ValueError(f'expected JSON {kind} reference')
+    if ref.schema_version != ARTIFACT_SCHEMA_VERSIONS[kind]:
+        raise ValueError(f'unsupported {kind} schema version; revalidate and republish')
 
 
 ARTIFACT_TYPES = {cls.__name__: cls for cls in (
@@ -809,6 +822,9 @@ ARTIFACT_TYPES = {cls.__name__: cls for cls in (
     VerifierBundle, TaskBundle, QualificationReport, RolloutRecord, TrainingCheckpoint,
     EvaluationReport,
 )}
+
+ARTIFACT_SCHEMA_VERSIONS = {kind: 2 if kind in {'CandidateRecord', 'SourcePair'} else 1
+                            for kind in ARTIFACT_TYPES}
 
 
 class ConstructRequest(StrictModel):

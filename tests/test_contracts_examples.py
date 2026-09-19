@@ -10,7 +10,7 @@ from test_contracts import cost, evidence, ref, ARTIFACT_KINDS
 
 def examples():
     def r(kind, visibility='private', encoding='json'):
-        return ref(kind,visibility) | {'encoding':encoding}
+        return ref(kind,visibility) | {'encoding':encoding,'schema_version':2 if kind in {'CandidateRecord','SourcePair'} else 1}
     raw=ref(); public=ref(visibility='public')
     ev=evidence(); costs=[cost()]
     prov=dict(producer='unit fixture',producer_version='1',created_at='2026-09-19T00:00:00Z',inputs=[],evidence=[ev])
@@ -27,8 +27,8 @@ def examples():
     training=dict(initial_policy=policy,reference_checkpoint=raw,tasks=[r('TaskBundle')],limits=limits,seeds=seeds,algorithm='grpo',group_size=4,max_updates=1,learning_rate=0.0001,framework='unit fixture',framework_version='1',backend_version='1',budget_usd=None)
     evaluation=dict(tasks=[r('TaskBundle')],arms=[dict(arm='A',policy=policy,checkpoint=raw,training_config=None)],limits=limits,seeds=seeds,partition='locked_test',harness_version='1',checkpoint_selection_rule='frozen before test',invalid_trial_rule='report all assigned',metric='pass_at_1',episodes_per_trial=1,frozen_roster=raw,preregistration=raw)
     out={
-      'CandidateRecord':dict(repository_url='https://example.test/repo',repository_family='family',request_lineage=['request-1'],partition='train',sources=[dict(url='https://example.test/issue/1',content=raw,retrieved_at='2026-09-19T00:00:00Z',published_at=None,edited_at=None,edit_history='unavailable',media_type='text/plain')],license=dict(spdx_id=None,license_text=None,status='unknown',evidence=[ev]),commits=relation,screening=dict(disposition='provisional',reason='unit diagnostic',evidence=[ev])),
-      'SourcePair':dict(candidate=r('CandidateRecord'),baseline_commit='a'*40,reference_commit='b'*40,baseline=public,reference=raw,relationship=relation,changed_files=[dict(path='src/cli.py',category='implementation',rationale='feature')],admissible_cutoff='2026-09-01T00:00:00Z',verification=[ev]),
+      'CandidateRecord':dict(schema_version=2,provenance_label='reconstructed_specification',repository_url='https://example.test/repo',repository_family='family',request_lineage=['request-1'],partition='train',sources=[dict(url='https://example.test/issue/1',content=raw,retrieved_at='2026-09-19T00:00:00Z',published_at=None,edited_at=None,edit_history='unavailable',media_type='text/plain',redirect_chain=None)],license=dict(spdx_id=None,license_text=None,status='unknown',evidence=[ev]),commits=relation,screening=dict(disposition='provisional',reason='unit diagnostic',evidence=[ev])),
+      'SourcePair':dict(schema_version=2,provenance_label='reconstructed_specification',candidate=r('CandidateRecord'),baseline_commit='a'*40,reference_commit='b'*40,baseline=public,reference=raw,relationship=relation,changed_files=[dict(path='src/cli.py',category='implementation',rationale='feature')],admissible_cutoff='2026-09-01T00:00:00Z',verification=[ev]),
       'RequirementContract':dict(visible_request='Add command suggestions',capability='Suggestions',entry_points=['CLI'],requirements=[req],compatibility_obligations=[],ambiguities=[],allowed_changes=allowed,public_checks=[],episode_limits=limits,provenance_label='historical_request'),
       'ScenarioPlan':dict(contract=r('RequirementContract'),mandatory_requirement_ids=['R1'],scenarios=[dict(scenario_id='S1',requirement_ids=['R1'],preconditions=['command exists'],actions=['invoke typo'],observations=['stderr'],expected_relation='suggests command',input_domain='one edit typo',oracle_origin=link,reset_needs=[])],seed_policy=seeds),
       'EnvironmentRecipe':dict(image_digest='python@sha256:'+'d'*64,interpreter_version='3.13.7',dependencies=[],setup=[command],reset=[command],services=[],limits=limits,neutral_repairs=[],locale='C.UTF-8',timezone='UTC',environment=[],randomness=seeds,network_policy='none',baseline=public),
@@ -186,3 +186,61 @@ def test_review_evaluation_preserves_invalid_trial_accounting():
 ])
 def test_review_trial_rejects_contradictory_outcomes(updates):
     with pytest.raises(ValidationError):c.TrialResult.model_validate_json(json.dumps(evaluation_trial(**updates)))
+
+
+@pytest.mark.parametrize('kind',['CandidateRecord','SourcePair'])
+@pytest.mark.parametrize('label',['historical_request','reconstructed_specification'])
+def test_provenance_v2_roundtrip_binds_validated_label(tmp_path,kind,label):
+    value=examples()[kind];value.update(schema_version=2,provenance_label=label)
+    if kind=='SourcePair': value['candidate']['schema_version']=2
+    artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+    store=ArtifactStore(tmp_path,c.ActorRole.CONTROLLER)
+    reference=store.put_artifact(artifact)
+    assert reference.schema_version==2
+    assert store.get_artifact(reference).provenance_label==label
+    changed=value|{'provenance_label':'reconstructed_specification' if label=='historical_request' else 'historical_request'}
+    assert store.put_artifact(getattr(c,kind).model_validate_json(json.dumps(changed))) != reference
+
+
+@pytest.mark.parametrize('kind',['CandidateRecord','SourcePair'])
+@pytest.mark.parametrize('label',[None,'unknown','',True])
+def test_provenance_v2_rejects_missing_or_invalid_label(kind,label):
+    value=examples()[kind];value['schema_version']=2
+    value.pop('provenance_label',None)
+    if label is not None: value['provenance_label']=label
+    with pytest.raises(ValidationError) as failure:
+        getattr(c,kind).model_validate_json(json.dumps(value))
+    assert any(error['loc']==('provenance_label',) for error in failure.value.errors())
+
+
+@pytest.mark.parametrize('kind',['CandidateRecord','SourcePair'])
+def test_provenance_v2_rejects_unlabelled_v1_without_rewriting_store(tmp_path,kind):
+    import hashlib
+    from feature_rl.artifacts import canonical_json
+    value=examples()[kind];value['schema_version']=1;value.pop('provenance_label',None)
+    if kind=='SourcePair':value['candidate']['schema_version']=1
+    serialized=canonical_json(dict(kind=kind,schema_version=1,visibility='private',encoding='json',payload=value))
+    digest=hashlib.sha256(serialized).hexdigest();path=tmp_path/(digest+'.json');path.write_bytes(serialized)
+    reference=c.ArtifactRef.model_validate_json(json.dumps(ref(kind)|{'sha256':digest,'encoding':'json'}))
+    with pytest.raises(ArtifactIntegrityError,match='unsupported.*schema version'):
+        ArtifactStore(tmp_path,c.ActorRole.CONTROLLER).get_artifact(reference)
+    assert path.read_bytes()==serialized
+
+
+def test_provenance_v2_construct_rejects_old_candidate_reference():
+    with pytest.raises(ValidationError,match='schema version'):
+        c.ConstructRequest.model_validate_json(json.dumps({'candidate':ref('CandidateRecord')|{'encoding':'json'}}))
+
+
+@pytest.mark.parametrize('chain',[None,['https://example.test/issue/1'],['https://example.test/issue/1','https://archive.test/issue/1']])
+def test_provenance_v2_redirect_chain_preserves_known_and_unknown(chain):
+    value=examples()['CandidateRecord']['sources'][0]|{'redirect_chain':chain}
+    snapshot=c.SourceSnapshot.model_validate_json(json.dumps(value))
+    assert snapshot.model_dump(mode='json')['redirect_chain']==chain
+
+
+@pytest.mark.parametrize('chain',['missing',[],['https://wrong.test/issue/1']])
+def test_provenance_v2_redirect_chain_rejects_omission_empty_or_wrong_origin(chain):
+    value=examples()['CandidateRecord']['sources'][0];value.pop('redirect_chain',None)
+    if chain!='missing':value['redirect_chain']=chain
+    with pytest.raises(ValidationError):c.SourceSnapshot.model_validate_json(json.dumps(value))

@@ -1,6 +1,6 @@
 {
   "CandidateRecord": {
-    "schema_version": 1,
+    "schema_version": 2,
     "visibility": "private",
     "provenance": {
       "producer": "unit fixture",
@@ -44,6 +44,7 @@
       }
     ],
     "kind": "CandidateRecord",
+    "provenance_label": "reconstructed_specification",
     "repository_url": "https://example.test/repo",
     "repository_family": "family",
     "request_lineage": [
@@ -64,7 +65,8 @@
         "published_at": null,
         "edited_at": null,
         "edit_history": "unavailable",
-        "media_type": "text/plain"
+        "media_type": "text/plain",
+        "redirect_chain": null
       }
     ],
     "license": {
@@ -152,7 +154,7 @@
     }
   },
   "SourcePair": {
-    "schema_version": 1,
+    "schema_version": 2,
     "visibility": "private",
     "provenance": {
       "producer": "unit fixture",
@@ -196,10 +198,11 @@
       }
     ],
     "kind": "SourcePair",
+    "provenance_label": "reconstructed_specification",
     "candidate": {
       "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "kind": "CandidateRecord",
-      "schema_version": 1,
+      "schema_version": 2,
       "visibility": "private",
       "encoding": "json"
     },
@@ -755,7 +758,7 @@
     "source_pair": {
       "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "kind": "SourcePair",
-      "schema_version": 1,
+      "schema_version": 2,
       "visibility": "private",
       "encoding": "json"
     },

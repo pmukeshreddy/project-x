@@ -1,4 +1,4 @@
-# Shared M0 interfaces (schema version 1)
+# Shared M0 interfaces (per-kind schema versions)
 
 Status: implemented and independently reviewed at `cb53f99`, with coordinator verification of 103 tests. Review closure is in `docs/reviews/M0-round1.md`. Import public contracts from `feature_rl.contracts`; storage from `feature_rl.artifacts`. Python >=3.11 is declared; this checkpoint executes on CPython 3.13.7 with Pydantic 2.13.5 and pytest 9.1.1. Dependencies and transitive versions are locked in `uv.lock`; queried PyPI compatibility metadata is in `docs/evidence/M0/dependencies.json`.
 
@@ -6,12 +6,12 @@ Status: implemented and independently reviewed at `cb53f99`, with coordinator ve
 
 [Complete JSON Schema catalog](evidence/M0/schemas.json) contains every required property, nested model, enum, bound and nullable type. [All eleven complete JSON examples](evidence/M0/examples.json) are synthetic unit diagnostics; they are not real candidates, measured training, or qualification evidence. The executable builders and round-trip tests are in `tests/test_contracts_examples.py`. Do not use these examples as production success data.
 
-Every artifact requires `kind`, integer `schema_version=1`, `visibility`, typed `provenance`, and nonempty `costs`, plus these artifact-specific fields:
+Every artifact requires `kind`, strict integer `schema_version` (`2` for CandidateRecord and SourcePair, `1` for all other kinds), `visibility`, typed `provenance`, and nonempty `costs`, plus these artifact-specific fields:
 
 | Artifact | Additional required fields (nullable values still required) |
 | --- | --- |
-| CandidateRecord | `repository_url`, `repository_family`, `request_lineage`, `partition`, `sources`, `license`, `commits`, `screening` |
-| SourcePair | `candidate`, `baseline_commit`, `reference_commit`, `baseline`, `reference`, `relationship`, `changed_files`, `admissible_cutoff`, `verification` |
+| CandidateRecord | `provenance_label`, `repository_url`, `repository_family`, `request_lineage`, `partition`, `sources`, `license`, `commits`, `screening` |
+| SourcePair | `provenance_label`, `candidate`, `baseline_commit`, `reference_commit`, `baseline`, `reference`, `relationship`, `changed_files`, `admissible_cutoff`, `verification` |
 | RequirementContract | `visible_request`, `capability`, `entry_points`, `requirements`, `compatibility_obligations`, `ambiguities`, `allowed_changes`, `public_checks`, `episode_limits`, `provenance_label` |
 | ScenarioPlan | `contract`, `mandatory_requirement_ids`, `scenarios`, `seed_policy` |
 | EnvironmentRecipe | `image_digest`, `interpreter_version`, `dependencies`, `setup`, `reset`, `services`, `limits`, `neutral_repairs`, `locale`, `timezone`, `environment`, `randomness`, `network_policy`, `baseline` |
@@ -40,7 +40,7 @@ assert store.get_bytes(log_ref) == b"actual captured stdout\n"
 
 Exact methods: `put_artifact(artifact: ArtifactModel) -> ArtifactRef`, `get_artifact(ref: ArtifactRef) -> ArtifactModel`, `put_bytes(data: bytes, kind: str, visibility: Visibility) -> ArtifactRef`, `get_bytes(ref: ArtifactRef) -> bytes`.
 
-`ArtifactRef` requires `sha256` (64 lowercase hex), `kind` (safe identifier), `schema_version` (strict integer 1), `visibility` and `encoding` (`json` or `bytes`). No path is accepted in a ref. Known typed artifact names cannot be stored as raw bytes. Byte kinds are descriptive safe identifiers such as `source-archive`, `command-log` and `attestation`.
+`ArtifactRef` requires `sha256` (64 lowercase hex), `kind` (safe identifier), `schema_version` (strict integer 1 or 2, checked against the kind on typed reads and typed operation links), `visibility` and `encoding` (`json` or `bytes`). No path is accepted in a ref. Known typed artifact names cannot be stored as raw bytes. Byte kinds are descriptive safe identifiers such as `source-archive`, `command-log` and `attestation`.
 
 An object is `<sha256>.json` containing exactly `kind`, `schema_version`, `visibility`, `encoding`, `payload`. The digest covers the complete UTF-8 envelope with sorted keys, compact separators, `ensure_ascii=False`, and no NaN/Infinity. Typed payloads are JSON objects; byte payloads are canonical base64. Thus the digest binds metadata and content; equal bytes under different visibility/kind get different identities. Reordering input model keys does not change identity. Reads verify digest, canonical encoding, metadata, schema, and payload/envelope agreement. Duplicate JSON keys are rejected on store reads. No pickle, imports, evaluation, or executable deserialization is used.
 
@@ -104,3 +104,12 @@ PYTHONPATH=src .venv/bin/python -m pytest -q
 ```
 
 This host marks editable `.pth` files hidden, and Python 3.13 ignores them. Use explicit `PYTHONPATH=src` for local source commands; no permissions were changed. A normal wheel import is checked separately in M0 evidence. Downstream owners request reviewed schema extensions from M0, rather than adding permissive payload dictionaries.
+
+
+## Provenance admission extension: CandidateRecord and SourcePair v2
+
+`CandidateRecord` and `SourcePair` now require `schema_version=2` and `provenance_label` exactly `historical_request` or `reconstructed_specification`, with no default. M1 produces the validated admission decision, validates its archived edit/cutoff evidence and preserves the same decision in both records. The M0 schema does not infer historical provenance from missing edit history, and it does not authenticate this assertion. Cross-artifact equality remains M1's join validation. Reusable runtime and unrelated artifact models receive no provenance-label field.
+
+`SourceSnapshot`, nested in CandidateRecord, now requires `redirect_chain: tuple[Text, ...] | None` in Python (nonempty array or null in JSON). A known chain must begin with `url`; its last URL identifies the final response URL. A known request without a redirect is `(url,)`. Null means redirect evidence is unavailable and is never equivalent to no redirects. M1 enforces acquisition URL policy and propagates actually captured hop evidence; the shared model does not synthesize hops. The synthetic examples with unavailable historical evidence use explicit null and reconstructed provenance.
+
+`ARTIFACT_SCHEMA_VERSIONS` publishes the current kind/version map. The store writes the model's declared schema version into its envelope/reference. Raw-byte objects remain version 1. ArtifactRef can represent version 1 or 2 for preserved receipts, but current typed reads and required typed links reject v1 CandidateRecord/SourcePair with an unsupported-version error. Other artifact kinds remain version 1. Old stored bytes, references and evidence are preserved; there is no automatic migration or inferred default. M1 must inspect original evidence, revalidate provenance/redirect status and publish new v2 records and dependent references. Changing a reference's version alone cannot upgrade its digest-bound envelope. Old dependent manifests pointing to v1 source/candidate records also require reconstruction before current admission.

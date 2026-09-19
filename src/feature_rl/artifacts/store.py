@@ -17,7 +17,7 @@ import uuid
 from pydantic import ValidationError
 
 from feature_rl.contracts import (
-    ARTIFACT_TYPES, ActorRole, ArtifactModel, ArtifactRef, Visibility,
+    ARTIFACT_TYPES, ARTIFACT_SCHEMA_VERSIONS, ActorRole, ArtifactModel, ArtifactRef, Visibility,
 )
 
 
@@ -146,7 +146,7 @@ class ArtifactStore:
             raise ArtifactIntegrityError('invalid artifact model') from exc
         payload = checked.model_dump(mode='json')
         self._check_exposure(checked.visibility, payload)
-        return self._put(checked.kind, checked.visibility, 'json', payload)
+        return self._put(checked.kind, checked.visibility, 'json', payload, checked.schema_version)
 
     @staticmethod
     def _check_exposure(visibility, payload):
@@ -155,16 +155,16 @@ class ArtifactStore:
         elif visibility == Visibility.AUTHORING:
             _public_refs(payload, {'public','authoring'})
 
-    def _put(self, kind, visibility, encoding, payload):
+    def _put(self, kind, visibility, encoding, payload, schema_version=1):
         # Validate metadata before constructing paths or touching content.
-        template = ArtifactRef(sha256='0'*64, kind=kind, schema_version=1,
+        template = ArtifactRef(sha256='0'*64, kind=kind, schema_version=schema_version,
                                visibility=visibility, encoding=encoding)
         self._authorize(template.visibility, write=True)
-        envelope = dict(kind=kind, schema_version=1, visibility=visibility.value,
+        envelope = dict(kind=kind, schema_version=schema_version, visibility=visibility.value,
                         encoding=encoding, payload=payload)
         data = canonical_json(envelope)
         digest = hashlib.sha256(data).hexdigest()
-        ref = ArtifactRef(sha256=digest, kind=kind, schema_version=1,
+        ref = ArtifactRef(sha256=digest, kind=kind, schema_version=schema_version,
                           visibility=visibility, encoding=encoding)
         name = digest + '.json'
         temp = '.pending-' + uuid.uuid4().hex
@@ -223,6 +223,8 @@ class ArtifactStore:
         ref = _validate_ref(ref)
         if ref.encoding != 'bytes' or ref.kind in ARTIFACT_TYPES:
             raise ArtifactIntegrityError('reference is not an opaque byte object')
+        if ref.schema_version != 1:
+            raise ArtifactIntegrityError('unsupported bytes schema version')
         payload = self._get(ref)
         try:
             data = base64.b64decode(payload, validate=True)
@@ -236,6 +238,8 @@ class ArtifactStore:
         ref = _validate_ref(ref)
         if ref.encoding != 'json' or ref.kind not in ARTIFACT_TYPES:
             raise ArtifactIntegrityError('reference is not a known typed artifact')
+        if ref.schema_version != ARTIFACT_SCHEMA_VERSIONS[ref.kind]:
+            raise ArtifactIntegrityError('unsupported artifact schema version; revalidate and republish')
         payload = self._get(ref)
         try:
             artifact = ARTIFACT_TYPES[ref.kind].model_validate_json(canonical_json(payload))

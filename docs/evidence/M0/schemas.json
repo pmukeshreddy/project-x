@@ -33,7 +33,7 @@
         "type": "string"
       },
       "schema_version": {
-        "maximum": 1,
+        "maximum": 2,
         "minimum": 1,
         "title": "Schema Version",
         "type": "integer"
@@ -76,7 +76,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -333,7 +333,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -498,7 +498,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -762,7 +762,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -871,7 +871,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -1034,7 +1034,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -1386,7 +1386,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -1589,7 +1589,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -1979,7 +1979,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -2309,7 +2309,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -2652,7 +2652,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -2746,6 +2746,23 @@
         "pattern": "\\S",
         "title": "Media Type",
         "type": "string"
+      },
+      "redirect_chain": {
+        "anyOf": [
+          {
+            "items": {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Redirect Chain"
       }
     },
     "required": [
@@ -2755,7 +2772,8 @@
       "published_at",
       "edited_at",
       "edit_history",
-      "media_type"
+      "media_type",
+      "redirect_chain"
     ],
     "title": "SourceSnapshot",
     "type": "object"
@@ -2776,7 +2794,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -2948,7 +2966,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -3141,7 +3159,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -3302,7 +3320,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -3811,6 +3829,23 @@
             "pattern": "\\S",
             "title": "Media Type",
             "type": "string"
+          },
+          "redirect_chain": {
+            "anyOf": [
+              {
+                "items": {
+                  "minLength": 1,
+                  "pattern": "\\S",
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Chain"
           }
         },
         "required": [
@@ -3820,7 +3855,8 @@
           "published_at",
           "edited_at",
           "edit_history",
-          "media_type"
+          "media_type",
+          "redirect_chain"
         ],
         "title": "SourceSnapshot",
         "type": "object"
@@ -3846,8 +3882,8 @@
         "type": "string"
       },
       "schema_version": {
-        "maximum": 1,
-        "minimum": 1,
+        "maximum": 2,
+        "minimum": 2,
         "title": "Schema Version",
         "type": "integer"
       },
@@ -3870,6 +3906,14 @@
         "minItems": 1,
         "title": "Costs",
         "type": "array"
+      },
+      "provenance_label": {
+        "enum": [
+          "historical_request",
+          "reconstructed_specification"
+        ],
+        "title": "Provenance Label",
+        "type": "string"
       },
       "repository_url": {
         "minLength": 1,
@@ -3918,6 +3962,7 @@
       "visibility",
       "provenance",
       "costs",
+      "provenance_label",
       "repository_url",
       "repository_family",
       "request_lineage",
@@ -3982,7 +4027,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -4388,8 +4433,8 @@
         "type": "string"
       },
       "schema_version": {
-        "maximum": 1,
-        "minimum": 1,
+        "maximum": 2,
+        "minimum": 2,
         "title": "Schema Version",
         "type": "integer"
       },
@@ -4411,6 +4456,14 @@
         "minItems": 1,
         "title": "Costs",
         "type": "array"
+      },
+      "provenance_label": {
+        "enum": [
+          "historical_request",
+          "reconstructed_specification"
+        ],
+        "title": "Provenance Label",
+        "type": "string"
       },
       "candidate": {
         "$ref": "#/$defs/ArtifactRef"
@@ -4462,6 +4515,7 @@
       "visibility",
       "provenance",
       "costs",
+      "provenance_label",
       "candidate",
       "baseline_commit",
       "reference_commit",
@@ -4491,7 +4545,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -4583,7 +4637,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -4718,7 +4772,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -4859,7 +4913,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -5077,7 +5131,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -5637,7 +5691,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -5815,7 +5869,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -6376,7 +6430,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -6555,7 +6609,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -6703,7 +6757,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -7388,7 +7442,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -7481,7 +7535,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -7704,7 +7758,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -7857,7 +7911,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -8005,7 +8059,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -8576,7 +8630,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -8664,7 +8718,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -9139,7 +9193,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -9331,7 +9385,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -9948,7 +10002,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -10160,7 +10214,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -10906,7 +10960,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -11611,7 +11665,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -11903,7 +11957,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -12140,7 +12194,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -13164,7 +13218,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -13232,7 +13286,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -13300,7 +13354,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -13369,7 +13423,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -13438,7 +13492,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -13685,7 +13739,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -13782,7 +13836,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
@@ -14147,7 +14201,7 @@
             "type": "string"
           },
           "schema_version": {
-            "maximum": 1,
+            "maximum": 2,
             "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
