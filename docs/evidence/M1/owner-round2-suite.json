@@ -1,0 +1,46 @@
+{
+  "scope": "M1 round-two source and test verification",
+  "producer": "M1 owner",
+  "recorded_at_utc": "2026-09-19T09:25:35Z",
+  "product_revision": "a658ae4d0ffba45d1fbde6c4edad71da33ea570e",
+  "execution_state": "worktree immediately before the product commit",
+  "content_binding": {
+    "command": "git diff --exit-code a658ae4d0ffba45d1fbde6c4edad71da33ea570e -- src/feature_rl/history/git.py tests/test_history.py",
+    "exit_status": 0,
+    "meaning": "The tested product and test bytes were committed without modification."
+  },
+  "full_suite": {
+    "command": "PYTHONPATH=src .venv/bin/python -m pytest -q",
+    "exit_status": 0,
+    "wall_seconds": 17.30,
+    "result": "155 passed",
+    "stdout_tail": "155 passed in 17.30s"
+  },
+  "focused_reviewer_bundle": {
+    "exit_status": 0,
+    "wall_seconds": 7.16,
+    "result": "7 passed",
+    "coverage": [
+      "genuine distinct rewritten chain",
+      "unique-context line-number movement",
+      "reordered and whitespace-altered rejection",
+      "duplicate-action rejection",
+      "wrong semantic occurrence rejection",
+      "repeated-line ambiguity rejection without SequenceMatcher",
+      "target-advanced squash scope rejection"
+    ]
+  },
+  "additional_budget_bundle": {
+    "exit_status": 0,
+    "wall_seconds": 2.83,
+    "result": "4 passed",
+    "coverage": [
+      "explicit blob-budget exhaustion",
+      "repeated-line bounded rejection",
+      "wrong semantic occurrence rejection",
+      "unique-context line-number movement"
+    ]
+  },
+  "real_click_intake_rerun": false,
+  "real_click_note": "The round-two change affects only rewritten-rebase proof. Preserved Click evidence uses the separately proven B-rooted squash path; final current-revision cached intake remains a post-review coordinator gate."
+}
