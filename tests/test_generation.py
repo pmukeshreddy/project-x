@@ -65,13 +65,18 @@ ARCHIVE_NAMES = (
 )
 
 
-def artifact(kind: str, visibility: Visibility = Visibility.AUTHORING) -> ArtifactRef:
+def artifact(
+    kind: str,
+    visibility: Visibility = Visibility.AUTHORING,
+    *,
+    encoding: str = "bytes",
+) -> ArtifactRef:
     return ArtifactRef(
         sha256="a" * 64,
         kind=kind,
         schema_version=1,
         visibility=visibility,
-        encoding="bytes",
+        encoding=encoding,
     )
 
 
@@ -159,6 +164,131 @@ def test_checker_stage_accepts_only_explicit_contract_and_scenario_context():
     assert tuple(item.role for item in built.contexts) == ("contract", "scenario", "public_check")
     with pytest.raises(ValidationError):
         request(stage=GenerationStage.CHECKER_GENERATION, contexts=(context(role="baseline"),))
+
+
+def test_control_authoring_requires_frozen_contract_and_baseline_with_explicit_reference():
+    contract = context(
+        context_id="CONTRACT", role="contract", kind="RequirementContract"
+    ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
+    baseline = context(context_id="BASELINE", role="baseline", kind="source-archive")
+    scenario = context(
+        context_id="SCENARIO", role="scenario", kind="ScenarioPlan",
+        visibility=Visibility.EVALUATION,
+    ).model_copy(
+        update={"source": artifact("ScenarioPlan", Visibility.EVALUATION, encoding="json")}
+    )
+    reference = context(
+        context_id="REFERENCE", role="reference", kind="source-archive",
+        visibility=Visibility.PRIVATE,
+    )
+    built = request(
+        stage=GenerationStage.CONTROL_AUTHORING,
+        contexts=(contract, baseline, scenario, reference),
+    )
+    assert tuple(item.role for item in built.contexts) == (
+        "contract", "baseline", "scenario", "reference"
+    )
+    second_reference = reference.model_copy(update={"context_id": "REFERENCE_2"})
+    assert request(
+        stage=GenerationStage.CONTROL_AUTHORING,
+        contexts=(contract, baseline, reference, second_reference),
+    ).contexts[-1] == second_reference
+
+    invalid = (
+        (baseline,),
+        (contract,),
+        (contract, contract.model_copy(update={"context_id": "CONTRACT_2"}), baseline),
+        (contract, baseline, scenario, scenario.model_copy(update={"context_id": "SCENARIO_2"})),
+        (contract, baseline, reference.model_copy(
+            update={"source": artifact("source-archive", Visibility.AUTHORING)}
+        )),
+        (contract, baseline, reference.model_copy(
+            update={"source": artifact("SourcePair", Visibility.PRIVATE, encoding="json")}
+        )),
+        (contract, baseline, scenario.model_copy(
+            update={"source": artifact("ScenarioPlan", Visibility.AUTHORING, encoding="json")}
+        )),
+    )
+    for contexts in invalid:
+        with pytest.raises(ValidationError):
+            request(stage=GenerationStage.CONTROL_AUTHORING, contexts=contexts)
+
+
+def test_alternative_authoring_accepts_only_visible_contract_and_solver_safe_context():
+    contract = context(
+        context_id="CONTRACT", role="contract", kind="RequirementContract"
+    ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
+    baseline = context(context_id="BASELINE", role="baseline", kind="source-archive")
+    admitted = (
+        contract,
+        baseline,
+        context(context_id="REQUEST", role="request", kind="authoring-request"),
+        context(
+            context_id="PUBLIC_CHECK", role="public_check", kind="public-check",
+            visibility=Visibility.PUBLIC,
+        ),
+        context(
+            context_id="SOLVER_SAFE", role="solver_safe", kind="solver-safe-context",
+            visibility=Visibility.PUBLIC,
+        ),
+    )
+    built = request(stage=GenerationStage.ALTERNATIVE_AUTHORING, contexts=admitted)
+    assert tuple(item.role for item in built.contexts) == (
+        "contract", "baseline", "request", "public_check", "solver_safe"
+    )
+
+    invalid = (
+        (baseline,),
+        (contract,),
+        (contract, contract.model_copy(update={"context_id": "CONTRACT_2"}), baseline),
+        (contract, baseline, context(
+            context_id="REFERENCE", role="reference", kind="source-archive",
+            visibility=Visibility.PRIVATE,
+        )),
+        (contract, baseline, context(
+            context_id="SCENARIO", role="scenario", kind="ScenarioPlan",
+            visibility=Visibility.EVALUATION,
+        ).model_copy(
+            update={"source": artifact("ScenarioPlan", Visibility.EVALUATION, encoding="json")}
+        )),
+        (contract, baseline.model_copy(
+            update={"source": artifact("source-archive", Visibility.PRIVATE)}
+        )),
+        (contract, baseline, context(
+            context_id="CHECKER", role="solver_safe", kind="checker-output",
+            visibility=Visibility.PUBLIC,
+        )),
+        (contract, baseline, context(
+            context_id="PRIVATE_SAFE", role="solver_safe", kind="solver-safe-context",
+            visibility=Visibility.PRIVATE,
+        )),
+    )
+    for contexts in invalid:
+        with pytest.raises(ValidationError):
+            request(stage=GenerationStage.ALTERNATIVE_AUTHORING, contexts=contexts)
+
+
+def test_reference_role_is_exclusive_to_control_authoring():
+    reference = context(
+        context_id="REFERENCE", role="reference", kind="source-archive",
+        visibility=Visibility.PRIVATE,
+    )
+    contract = context(
+        context_id="CONTRACT", role="contract", kind="RequirementContract"
+    ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
+    scenario = context(
+        context_id="SCENARIO", role="scenario", kind="ScenarioPlan",
+        visibility=Visibility.EVALUATION,
+    ).model_copy(
+        update={"source": artifact("ScenarioPlan", Visibility.EVALUATION, encoding="json")}
+    )
+    for stage, contexts in (
+        (GenerationStage.INITIAL_AUTHORING, (reference,)),
+        (GenerationStage.SCENARIO_PLANNING, (contract, reference)),
+        (GenerationStage.CHECKER_GENERATION, (contract, scenario, reference)),
+    ):
+        with pytest.raises(ValidationError):
+            request(stage=stage, contexts=contexts)
 
 
 def test_scenario_planning_requires_one_authoring_contract_and_admitted_evidence():
@@ -882,6 +1012,50 @@ class FakeRunner:
                 if self.termination == "monitoring_failure" else None
             ),
         )
+
+
+@pytest.mark.parametrize(
+    ("stage", "extra"),
+    (
+        (
+            GenerationStage.CONTROL_AUTHORING,
+            context(
+                context_id="REFERENCE", role="reference", kind="source-archive",
+                visibility=Visibility.PRIVATE,
+            ),
+        ),
+        (
+            GenerationStage.ALTERNATIVE_AUTHORING,
+            context(
+                context_id="SOLVER_SAFE", role="solver_safe", kind="solver-safe-context",
+                visibility=Visibility.PUBLIC,
+            ),
+        ),
+    ),
+)
+def test_new_authoring_stages_register_private_attempt_before_backend(tmp_path, stage, extra):
+    contract = context(
+        context_id="CONTRACT", role="contract", kind="RequirementContract"
+    ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
+    baseline = context(context_id="BASELINE", role="baseline", kind="source-archive")
+    built = request(stage=stage, contexts=(contract, baseline, extra))
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    seen = []
+
+    def fail_attempt(data, kind, visibility):
+        seen.append((kind, visibility))
+        raise OSError("registration unavailable")
+
+    provider = LocalGenerationProvider(backend=backend, archive=fail_attempt, runner=runner)
+    with pytest.raises(GenerationProviderError) as caught:
+        provider.generate(built, SmokeContent)
+    assert seen == [("generation-attempt", Visibility.PRIVATE)]
+    assert caught.value.cost.category == "authoring"
+    assert caught.value.recovery.payloads[0].visibility is Visibility.PRIVATE
+    assert backend.verify_calls == 0
+    assert runner.calls == []
 
 
 def test_provider_validates_envelope_and_archives_complete_call(tmp_path):
