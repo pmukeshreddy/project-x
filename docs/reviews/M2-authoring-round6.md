@@ -1,0 +1,14 @@
+# M2 authoring delta review — round 6
+
+**Specification compliance: PASS. Implementation quality: PASS.** No findings in this bounded delta. The [round-five approval](M2-authoring-round5.md) remains closed.
+
+Reviewed only the `control_authoring` / `alternative_authoring` addition in product commit `29412648e5a12a9b336d6cf143d6180b0fa19b54` and its handoff `62b02337051eb95be4557cf81712b89a3baf32bc`: the enum/context validation changes, added tests, documentation, and retained focused evidence.
+
+- **Control boundary:** requires exactly one authoring-visible JSON `RequirementContract` and at least one public/authoring byte baseline context of kind `source-archive` or `click-runtime-discovery`. It admits the documented request/public-check roles, explicit private/evaluation byte `source-archive` references, and at most one private/evaluation JSON `ScenarioPlan`. Other role/kind/encoding/visibility combinations reject.
+- **Alternative boundary:** requires the same contract/baseline classes, permits attributable request/public-check contexts and explicitly public byte `solver-safe-context`, and rejects reference/scenario roles and private/evaluation inputs. Rendering only visible contract fields and binding exact B/H/public-source identities remain M4 service responsibilities, as documented.
+- **Existing boundaries:** discovery/initial authoring, scenario planning, and checker generation retain their existing role gates. Neither newly added role is admitted by those branches. This addition does not broaden their context permissions.
+- **Costs and provenance:** both new stages follow the existing private-archive path and `authoring` cost category. Common request/schema/source hashing, context serialization, ordered source-ID checks, resource limits, and publication recovery are unchanged. The new registration cases check private attempt/recovery payloads and authoring cost metadata before any backend verification or runner call.
+
+Read the source-bound [receipt](../evidence/M2/authoring-stage-addition/receipt.json), [exit record](../evidence/M2/authoring-stage-addition/focused-tests-exit.json), and retained stdout/stderr: the owner's `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_generation.py` reports **105 passed in 0.86s, exit 0**, with empty stderr. All four source-inventory byte counts/hashes match the assigned product/documentation commits; all three evidence-inventory byte counts/hashes match the retained files. No reviewer test rerun was needed.
+
+No original/provider audit, broad suite, native/model/tokenizer/backend/Docker/network/H/private execution or inspection, product/index/commit mutation, or subagent was used. This pass qualifies the stage transport addition for integration; it does not establish M4 semantic source joins or change the prior failed construction outcome. Three earlier contract model calls remain consumed, with no frozen contract or scenario and no authorized H feasibility review.
