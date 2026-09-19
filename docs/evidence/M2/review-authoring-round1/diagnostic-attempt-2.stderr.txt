@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/review-authoring-round1/reproduce.py", line 179, in <module>
+    recovery = GenerationPublicationRecovery(
+        attempt_id=record.attempt_id, recorded_at=record.recorded_at, request_id=record.request_id,
+    ...<4 lines>...
+        response={"fixture_only": True}, usage_observation={"fixture_only": True},
+    )
+TypeError: GenerationPublicationRecovery.__init__() missing 2 required positional arguments: 'content' and 'usage'

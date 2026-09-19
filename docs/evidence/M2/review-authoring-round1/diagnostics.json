@@ -1,0 +1,119 @@
+{
+  "cases": {
+    "driver_cost_category": {
+      "has_cost": false,
+      "has_generation": false,
+      "has_recovery": false,
+      "message": "1 validation error for CostRecord\ncategory\n  Input should be 'discovery', 'authoring', 'construction', 'rejection', 'repair', 'reference', 'alternative', 'verifier', 'human_review', 'rollout', 'training', 'execution', 'storage' or 'evaluation' [type=literal_error, input_value='scenario_design', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error",
+      "type": "ValidationError"
+    },
+    "driver_fixed_earlier_success_states": {
+      "1": {
+        "has_cost": false,
+        "has_generation": false,
+        "has_recovery": false,
+        "message": "scenario requires the retained M3 and contract repair accounting",
+        "type": "RuntimeError"
+      },
+      "2": {
+        "has_cost": false,
+        "has_generation": false,
+        "has_recovery": false,
+        "message": "scenario requires the retained M3 and contract repair accounting",
+        "type": "RuntimeError"
+      }
+    },
+    "driver_fixed_source_and_cost": {
+      "cost_category": "authoring",
+      "strict_source_json": true
+    },
+    "driver_grounded_source_json": {
+      "has_cost": false,
+      "has_generation": false,
+      "has_recovery": false,
+      "message": "1 validation error for GroundedSource\nsource.visibility\n  Input should be an instance of Visibility [type=is_instance_of, input_value='authoring', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/is_instance_of",
+      "type": "ValidationError"
+    },
+    "driver_repaired_contract": {
+      "has_cost": false,
+      "has_generation": false,
+      "has_recovery": false,
+      "message": "scenario requires exactly one completed contract call",
+      "type": "RuntimeError"
+    },
+    "provider_publication_recovery_dropped": {
+      "accepted_attempt": "attempt-2",
+      "first_generation_succeeded": true,
+      "first_publication_complete": false,
+      "journal_has_recovery": false,
+      "provider_calls": 2
+    },
+    "rejected_journal_publication": {
+      "has_cost": false,
+      "has_generation": false,
+      "has_recovery": false,
+      "message": "fixture rejection-journal disk failure",
+      "provider_calls": 1,
+      "type": "OSError"
+    },
+    "scenario_source_and_capability_not_joined": {
+      "accepted": true,
+      "accepted_observations": [
+        "object identity"
+      ],
+      "discovery_supported_observables": [
+        "CLI exit code",
+        "combined terminal output"
+      ],
+      "oracle_source_in_contract_inputs": false
+    },
+    "stage_and_total_repairs": {
+      "candidate_repairs_total": 5,
+      "contract_calls": 3,
+      "contract_repair_semantic_input_unchanged": true,
+      "new_authoring_repairs": 4,
+      "prior_click_environment_repairs": 1,
+      "scenario_calls": 3,
+      "specified_candidate_limit": 4
+    },
+    "visible_request_and_provenance_not_joined": {
+      "accepted": true,
+      "contract_provenance_label": "historical_request",
+      "source_provenance_label": "reconstructed_specification",
+      "source_request": "Unknown commands should offer a close command suggestion.",
+      "visible_request": "DIAGNOSTIC UNRELATED REQUEST: delete every CLI command."
+    }
+  },
+  "docker_calls": 0,
+  "driver_fix_revision": "aa75086",
+  "driver_fix_sha256": "9d4cba06d786c4cf4ecb2124820721909548f3f6e54b7264c33c031648d80db9",
+  "driver_revision": "d267208",
+  "driver_sha256": "43ca0acd1a5bfe82bbffc8716df25937670a65981f5f4c0e1cf154d7e182aa53",
+  "fixture_sha256": "67ffeab2f1ec07ed0775fe2d88def0875b8cb0632bc38fdf17ba1c11e1f79057",
+  "native_calls": 0,
+  "private_or_production_state_reads": 0,
+  "product_revision": "c4ed70df6f3218ee2280b346eedb57945d0a44ab",
+  "product_sha256": {
+    "src/feature_rl/generation/__init__.py": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "9848c32f6ca6ebebe76c95315c8d25c75bdac8738c8a11df58a574977dcb1133",
+    "src/feature_rl/generation/protocol.py": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10",
+    "src/feature_rl/generation/provider.py": "dec64bb8b8ed0983faf426664a875fb5bea408f3108c0d5a5abf30b0bb5314e9",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e",
+    "src/feature_rl/requirements/__init__.py": "b2196b2d6900c19e676b5846d4e5f812785d518c3fd0243445358a985972e913",
+    "src/feature_rl/requirements/discovery.py": "c2ef6dc0e77125db54c82b096f180f0f2b5c19b1db63e7dd8a6ffc06af5c7822",
+    "src/feature_rl/requirements/evidence.py": "403ba0389f6fe5323b9fd44c9d300c205640d6dcb75698e31bf2b0051a4f3191",
+    "src/feature_rl/requirements/finalize.py": "e9de4df85fd001c43ea65cb1e9e2fa88b421cdcb21fb409ca41ce08bb35e63dd",
+    "src/feature_rl/requirements/models.py": "efc9e2e99b7d7389cadd141fb1147a84301dcf944aa90658361820c7fa8e6e80",
+    "src/feature_rl/requirements/retrieval.py": "c182ada1a86c20e809f1748742e2a28dba01c37c460b73fe25bf887bae13f03e",
+    "src/feature_rl/requirements/service.py": "9a53dd85aca4879b895782be6828b9654a1065015564298124e1d29aeb3fe351",
+    "src/feature_rl/scenarios/__init__.py": "7e626e2df7ac1c0b83eeea02065d3b628395a9df06dcc1c2c4a6c56192ac339b",
+    "src/feature_rl/scenarios/finalize.py": "5112baba9588b33a6248ad36ff37d67073249cf298ad88879af1b4c51e6f2a3a",
+    "src/feature_rl/scenarios/models.py": "85b5ccb5e9c6e88aac18a18d99fb3bf5bac0288dce233824542a2f82d0dc5f69",
+    "src/feature_rl/scenarios/service.py": "205d305cedf98c87e94dfce6b7409d1e6a431d3c32796dceffe7e4fe2d862c8e"
+  },
+  "recorded_at": "2026-09-19T21:12:44.543388+00:00",
+  "scope": "unit_diagnostic",
+  "tokenizer_calls": 0
+}
