@@ -12,12 +12,22 @@ from typing import Annotated, Literal
 from unittest.mock import patch
 
 import pytest
-from pydantic import Field, PlainValidator, ValidationError, model_validator
+from pydantic import (
+    Field,
+    PlainValidator,
+    ValidationInfo,
+    ValidationError,
+    WrapValidator,
+    field_validator,
+    model_validator,
+)
 
 from feature_rl.artifacts import ArtifactStore
 from feature_rl.contracts import (
     ActorRole,
     ArtifactRef,
+    RequirementContract,
+    ScenarioPlan,
     StrictModel,
     UTCDateTime,
     Visibility,
@@ -448,6 +458,28 @@ class MixedLiteralContent(StrictModel):
     mode: EnabledLiteral | NumberAlternative
 
 
+class ScalarBooleanUnionContent(StrictModel):
+    flag: Literal[True] | int
+
+
+class ScalarIntegerUnionContent(StrictModel):
+    value: Literal[3] | float
+
+
+class NestedScalarUnionContent(StrictModel):
+    values: tuple[Literal[True] | int, ...]
+
+
+class JsonModeLiteralContent(StrictModel):
+    flag: Literal[True]
+
+    @model_validator(mode="after")
+    def require_json_mode(self, info: ValidationInfo):
+        if info.mode != "json":
+            raise ValueError("JSON validation mode required")
+        return self
+
+
 class EnumLiteralContent(StrictModel):
     visibility: Literal[Visibility.AUTHORING]
     values: tuple[str, ...]
@@ -468,6 +500,51 @@ class AllowedBooleanAlternative(StrictModel):
 
 class CallbackUnionContent(StrictModel):
     mode: DeclinedLiteralAlternative | AllowedBooleanAlternative
+
+
+class DecliningPostInitAlternative(StrictModel):
+    flag: Literal[True]
+
+    def model_post_init(self, _context):
+        raise ValueError("declined in post init")
+
+
+class PostInitUnionContent(StrictModel):
+    mode: DecliningPostInitAlternative | AllowedBooleanAlternative
+
+
+class BeforeFieldContent(StrictModel):
+    flag: Literal[True]
+    number: int
+
+    @field_validator("number", mode="before")
+    @classmethod
+    def normalize_number(cls, value):
+        return int(value) if isinstance(value, str) else value
+
+
+def _normalize_wrapped_integer(value, handler):
+    return handler(int(value) if isinstance(value, str) else value)
+
+
+class WrapFieldContent(StrictModel):
+    flag: Literal[True]
+    number: Annotated[int, WrapValidator(_normalize_wrapped_integer)]
+
+
+class ReferencedBeforeLeaf(StrictModel):
+    number: int
+
+    @field_validator("number", mode="before")
+    @classmethod
+    def normalize_number(cls, value):
+        return int(value) if isinstance(value, str) else value
+
+
+class ReferencedBeforeContent(StrictModel):
+    flag: Literal[True]
+    first: ReferencedBeforeLeaf
+    second: ReferencedBeforeLeaf
 
 
 class PatternedLiteralContent(StrictModel):
@@ -816,6 +893,49 @@ def test_provider_exact_literal_validation_returns_the_branch_that_checked_raw_t
     assert result.content.model_dump_json() == '{"mode":{"flag":1}}'
 
 
+@pytest.mark.parametrize(
+    ("schema", "content", "field", "expected_type", "serialized"),
+    [
+        (ScalarBooleanUnionContent, {"flag": True}, "flag", bool, {"flag": True}),
+        (ScalarBooleanUnionContent, {"flag": 1}, "flag", int, {"flag": 1}),
+        (ScalarIntegerUnionContent, {"value": 3}, "value", int, {"value": 3}),
+        (ScalarIntegerUnionContent, {"value": 3.0}, "value", float, {"value": 3.0}),
+    ],
+)
+def test_provider_preserves_selected_scalar_literal_union_branch(
+    tmp_path, schema, content, field, expected_type, serialized
+):
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = content
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), schema)
+    assert type(getattr(result.content, field)) is expected_type
+    assert json.loads(result.content.model_dump_json()) == serialized
+
+
+def test_provider_preserves_nested_scalar_literal_union_branches(tmp_path):
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = {"values": [1, True, 2]}
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), NestedScalarUnionContent)
+    assert tuple(type(value) for value in result.content.values) == (int, bool, int)
+    assert result.content.model_dump_json() == '{"values":[1,true,2]}'
+
+
 def test_provider_exact_literal_validation_preserves_json_enum_transport(tmp_path):
     events = [json.loads(line) for line in worker_events().splitlines()]
     envelope = json.loads(events[-1]["output_text"])
@@ -864,6 +984,22 @@ def test_literal_prevalidation_does_not_run_defaults_or_post_init(tmp_path):
     assert lifecycle == ["default", "post_init"]
 
 
+def test_literal_revalidation_preserves_strict_json_callback_mode(tmp_path):
+    assert JsonModeLiteralContent.model_validate_json(b'{"flag":true}').flag is True
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = {"flag": True}
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), JsonModeLiteralContent)
+    assert result.content.flag is True
+
+
 def test_unsupported_literal_schema_refuses_before_backend_execution(tmp_path):
     backend = NeverVerifiedBackend()
     runner = FakeRunner()
@@ -896,6 +1032,109 @@ def test_literal_union_with_branch_callback_refuses_before_backend_execution(tmp
     assert backend.verify_calls == 0
     assert runner.calls == []
     assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+
+
+@pytest.mark.parametrize(
+    ("schema", "content", "accepted_type"),
+    [
+        (
+            PostInitUnionContent,
+            {"mode": {"flag": True}},
+            AllowedBooleanAlternative,
+        ),
+        (BeforeFieldContent, {"flag": True, "number": "3"}, BeforeFieldContent),
+        (WrapFieldContent, {"flag": True, "number": "3"}, WrapFieldContent),
+        (
+            ReferencedBeforeContent,
+            {
+                "flag": True,
+                "first": {"number": "3"},
+                "second": {"number": "4"},
+            },
+            ReferencedBeforeContent,
+        ),
+    ],
+)
+def test_callback_sensitive_literal_schemas_refuse_before_backend_execution(
+    tmp_path, schema, content, accepted_type
+):
+    baseline = schema.model_validate_json(json.dumps(content))
+    if schema is PostInitUnionContent:
+        assert isinstance(baseline.mode, accepted_type)
+    else:
+        assert isinstance(baseline, accepted_type)
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    provider = LocalGenerationProvider(
+        backend=backend, archive=store.put_bytes, runner=runner
+    )
+    with pytest.raises(
+        GenerationProviderError, match="cannot preserve callback or lifecycle semantics"
+    ) as caught:
+        provider.generate(request(), schema)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
+
+
+def test_unsupported_callback_schema_publication_replays_without_execution(tmp_path):
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    failed = False
+
+    def fail_schema_once(data, kind, visibility):
+        nonlocal failed
+        if kind == "generation-schema" and not failed:
+            failed = True
+            raise OSError("injected unsupported-schema publication failure")
+        return store.put_bytes(data, kind, visibility)
+
+    provider = LocalGenerationProvider(
+        backend=backend, archive=fail_schema_once, runner=runner
+    )
+    with pytest.raises(GenerationProviderError, match="archive publication failed") as caught:
+        provider.generate(request(), BeforeFieldContent)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.recovery is not None
+    assert caught.value.record.publication_complete is False
+
+    recovered = caught.value.replay_publication(store.put_bytes)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert recovered.publication_complete is True
+    assert recovered.generation_succeeded is False
+    assert recovered.error_code == "GenerationSchemaUnsupportedError"
+    assert set(recovered.archives) == set(ARCHIVE_NAMES)
+
+
+@pytest.mark.parametrize(
+    ("schema", "example_name"),
+    [
+        (RequirementContract, "RequirementContract"),
+        (ScenarioPlan, "ScenarioPlan"),
+    ],
+)
+def test_provider_preserves_actual_m0_schema_json_transport(
+    tmp_path, schema, example_name
+):
+    from test_contracts_examples import examples
+
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = examples()[example_name]
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), schema)
+    assert isinstance(result.content, schema)
 
 
 @pytest.mark.parametrize(

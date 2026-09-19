@@ -452,30 +452,75 @@ def _contains_literal_schema(value: object) -> bool:
     return False
 
 
-def _contains_custom_validator(value: object) -> bool:
-    if isinstance(value, dict):
-        return value.get("type") in {
-            "function-before",
-            "function-after",
-            "function-wrap",
-            "function-plain",
-        } or any(_contains_custom_validator(member) for member in value.values())
-    if isinstance(value, (list, tuple)):
-        return any(_contains_custom_validator(member) for member in value)
-    return False
+_SUPPORTED_LITERAL_CORE_FORMS = frozenset(
+    {
+        "any",
+        "bool",
+        "bytes",
+        "chain",
+        "date",
+        "datetime",
+        "decimal",
+        "default",
+        "definition-ref",
+        "definitions",
+        "dict",
+        "enum",
+        "float",
+        "frozenset",
+        "function-after",
+        "function-before",
+        "function-plain",
+        "function-wrap",
+        "int",
+        "json-or-python",
+        "lax-or-strict",
+        "list",
+        "literal",
+        "model",
+        "model-field",
+        "model-fields",
+        "no-info",
+        "none",
+        "nullable",
+        "set",
+        "str",
+        "tagged-union",
+        "time",
+        "timedelta",
+        "tuple",
+        "typed-dict",
+        "typed-dict-field",
+        "union",
+        "uuid",
+        "with-info",
+    }
+)
 
 
-def _union_has_custom_validator(value: object) -> bool:
-    if isinstance(value, dict):
-        if value.get("type") in {"union", "tagged-union"}:
-            choices = value.get("choices", ())
-            alternatives = choices.values() if isinstance(choices, dict) else choices
-            if any(_contains_custom_validator(choice) for choice in alternatives):
-                return True
-        return any(_union_has_custom_validator(member) for member in value.values())
-    if isinstance(value, (list, tuple)):
-        return any(_union_has_custom_validator(member) for member in value)
-    return False
+def _literal_schema_features(value: object) -> set[str]:
+    features: set[str] = set()
+
+    def visit(member: object) -> None:
+        if isinstance(member, dict):
+            kind = member.get("type")
+            if isinstance(kind, str):
+                features.add(kind)
+            if kind == "model":
+                if member.get("custom_init"):
+                    features.add("custom-init")
+                if member.get("post_init") is not None:
+                    features.add("post-init")
+            if kind == "default" and member.get("default_factory") is not None:
+                features.add("default-factory")
+            for child in member.values():
+                visit(child)
+        elif isinstance(member, (list, tuple)):
+            for child in member:
+                visit(child)
+
+    visit(value)
+    return features
 
 
 def _exact_literal_value(value: object, expected: tuple[object, ...]) -> object:
@@ -583,11 +628,13 @@ class _LiteralPrevalidator:
     schema: type[StrictModel]
     validator: SchemaValidator
     original_by_dummy: dict[type, type[StrictModel]]
+    requires_revalidation: bool
 
     def validate_json(self, data: bytes) -> StrictModel:
         checked = self.validator.validate_json(data)
-        selected = _restore_literal_models(checked, self.original_by_dummy)
-        return self.schema.model_validate(selected)
+        if self.requires_revalidation:
+            return self.schema.model_validate_json(data)
+        return _restore_literal_models(checked, self.original_by_dummy)
 
 
 def _build_literal_prevalidator(
@@ -597,9 +644,41 @@ def _build_literal_prevalidator(
     if not _contains_literal_schema(core):
         return None
     try:
-        if _union_has_custom_validator(core):
+        features = _literal_schema_features(core)
+        unknown = {
+            feature
+            for feature in features
+            if feature not in _SUPPORTED_LITERAL_CORE_FORMS
+            and feature not in {"custom-init", "default-factory", "post-init"}
+        }
+        if unknown:
             raise GenerationSchemaUnsupportedError(
-                "output schema with Literals cannot use a custom validator in a union alternative"
+                "output schema with Literals uses unsupported core schema forms: "
+                + ", ".join(sorted(unknown))
+            )
+        if "function-plain" in features:
+            raise GenerationSchemaUnsupportedError(
+                "output schema with Literals cannot use a plain custom validator"
+            )
+        if features & {"function-before", "function-wrap"}:
+            raise GenerationSchemaUnsupportedError(
+                "output schema with Literals cannot preserve callback or lifecycle "
+                "semantics for before/wrap validators"
+            )
+        if features & {"custom-init", "dataclass", "call"}:
+            raise GenerationSchemaUnsupportedError(
+                "output schema with Literals cannot preserve custom initialization semantics"
+            )
+        revalidation_features = features & {
+            "default",
+            "default-factory",
+            "function-after",
+            "post-init",
+        }
+        if features & {"union", "tagged-union"} and revalidation_features:
+            raise GenerationSchemaUnsupportedError(
+                "output schema with Literals cannot preserve callback or lifecycle semantics: "
+                "custom validator in a union alternative"
             )
         dummy_models: dict[type, type] = {}
         validator = SchemaValidator(_literal_precheck_schema(core, dummy_models))
@@ -607,6 +686,7 @@ def _build_literal_prevalidator(
             schema=schema,
             validator=validator,
             original_by_dummy={dummy: original for original, dummy in dummy_models.items()},
+            requires_revalidation=bool(revalidation_features),
         )
     except GenerationSchemaUnsupportedError:
         raise
