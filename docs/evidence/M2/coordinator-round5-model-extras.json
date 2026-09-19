@@ -1,0 +1,24 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/coordinator-round5-model-extras.py"
+  ],
+  "PYTHONPATH": "src",
+  "started_at": "2026-09-19T16:35:57.807754+00:00",
+  "ended_at": "2026-09-19T16:35:57.913013+00:00",
+  "wall_seconds": 0.10517099988646805,
+  "exit_status": 0,
+  "outputs": {
+    "stdout": {
+      "path": "docs/evidence/M2/coordinator-round5-model-extras.stdout",
+      "bytes": 612,
+      "sha256": "ce5199e49d325ff41270bd88aefea74df3c7d67b305bbe0eeb1ea0e1e4d5f386"
+    },
+    "stderr": {
+      "path": "docs/evidence/M2/coordinator-round5-model-extras.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

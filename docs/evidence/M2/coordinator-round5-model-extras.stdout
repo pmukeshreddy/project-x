@@ -1,0 +1,20 @@
+{
+  "backend_calls": 0,
+  "error": "'ExactLiteralInner' object has no attribute 'y'",
+  "error_type": "AttributeError",
+  "native_calls": 0,
+  "ordinary_json": {
+    "flag": true,
+    "item": {
+      "x": 1,
+      "y": 2
+    }
+  },
+  "preflight_admitted": true,
+  "raw": "{\"flag\":true,\"item\":{\"x\":1,\"y\":2}}",
+  "recorded_at": "2026-09-19T16:35:57.902082+00:00",
+  "runner_calls": 0,
+  "scope": "trusted working-source schema diagnostic; not full-provider verification",
+  "source_sha256": "f672d0e0ff4867aea11e0cd21002193a10427f32e7c56d66249655abe0c1181c",
+  "source_unchanged_during_diagnostic": true
+}
