@@ -4,6 +4,8 @@ The earlier coordinator rule of one product writer globally was a conservative s
 
 At most two product owners work concurrently, leaving root and one review slot within the four-agent limit. Each owner writes only its explicit module/slice files, commits only owned paths, and runs focused checks in separate temporary/private state. No concurrent shared dependency/configuration changes. Native authoring and heavy runtime/CPU diagnostics are scheduled separately. Root runs the integrated suite after reviewed checkpoints when product files are stable.
 
+For a small confirmed integration-blocking correction, the coordinator may briefly use an idle review slot for its existing owner as a third disjoint writer. This exception is limited to the named fix and its focused regression, with no shared paths, configuration, native execution or broad tests; the owner returns the slot immediately for review. It avoids stopping independent module implementation for a local compatibility fix.
+
 The first such pair is M2 authoring/scenarios and M6's standalone registry/event/job/dependency core. The registry consumes existing M0 references, artifacts, costs and operation records; it does not yet import or invent M2 authoring, M4 grading, M5 admission or M7/M8 service APIs. Its owner later implements factory orchestration and CLI against those actual reviewed interfaces. No placeholder construct/qualify/run/train/evaluate methods are permitted in the registry slice.
 
 Every independently reviewed slice receives an honest partial-module status, complete working code for its scoped behavior, meaningful checks and evidence. The same owner handles the rest of its module and integration fixes. The final integrated review still covers all modules and boundaries.

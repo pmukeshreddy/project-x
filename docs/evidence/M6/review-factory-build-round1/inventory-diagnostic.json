@@ -1,0 +1,55 @@
+{
+  "scope": "TRUSTED_SYNTHETIC_LONG_PATH_INVENTORY_DIAGNOSTIC_NO_FEATURE_EXECUTION",
+  "target": "f70c406d7a876405060a43d61ba3db0893803971",
+  "started_at": "2026-09-19T22:24:41.394300+00:00",
+  "source_file_count": 1902,
+  "source_archive_bytes": 3901440,
+  "document_limit": 1048576,
+  "request_bytes": 890382,
+  "build_error": {
+    "type": "BuildRecoveryRequired",
+    "message": "frozen outcome could not be completed; retain claim and exact reconciled receipt",
+    "cause_type": "ArtifactSizeLimitError",
+    "cause": "max_envelope_bytes=1402200 exceeded: observed at least 1499527 bytes"
+  },
+  "job_state": "running",
+  "frozen_revision": 2,
+  "recovery_error": {
+    "type": "BuildRecoveryRequired",
+    "cause_type": "ArtifactSizeLimitError",
+    "cause": "max_envelope_bytes=1402200 exceeded: observed at least 1499527 bytes"
+  },
+  "published_observed_records": [
+    {
+      "kind": "m6-solver-inventory",
+      "bytes": 1124568,
+      "sha256": "6d2bb67dde896778f00846ba38fe23bb084573234c40b8196962c8015b5633fe"
+    },
+    {
+      "kind": "m6-frozen-build",
+      "bytes": 3948,
+      "sha256": "fdb5909bab41787c78475f37f56f969972dbc65951b87f79743686990909ec36"
+    }
+  ],
+  "finished_at": "2026-09-19T22:24:44.156413+00:00",
+  "wall_seconds": 2.761832500109449,
+  "command": "PYTHONPATH=src:tests .venv/bin/python - (quoted heredoc)",
+  "exit_status": 0,
+  "tool_reported_wall_seconds": 2.865427792,
+  "tool_chunk_id": "765f9f",
+  "source_pin_before_diagnostic": [
+    "src/feature_rl/pipeline/build.py",
+    "src/feature_rl/pipeline/packaging.py",
+    "src/feature_rl/pipeline/models.py",
+    "tests/test_factory.py"
+  ],
+  "new_slice_source_matches_target_and_owner_receipt": {
+    "src/feature_rl/pipeline/__init__.py": "dee2e1264e310b9a9e8fc2ba84707303841523a14cb5cb23d2fd47e971acf045",
+    "src/feature_rl/pipeline/build.py": "fa3f7b435fdc2533db1e4ac6f0ce7877c445d5243bf5fd7b46ab7584ab248fa5",
+    "src/feature_rl/pipeline/models.py": "b3f0b53ebca6a930380beffdecabf569a324f3222858d1975ae79fa3311f80ee",
+    "src/feature_rl/pipeline/packaging.py": "8bc8b33be91be26423b9bbc505e806dcf3944d1d86359a080f8490e91916e3bb",
+    "tests/test_factory.py": "fa0343a0ade8a49d0d097ed15bb85089888cc830bc7503a7841879e4ca00956d"
+  },
+  "owner_focused_output_sha256_verified": "5a72f2702f799c8e5bf1d1b0baac03dffd2991d8e6370337596056b02baa7b1b",
+  "reviewer_suite_rerun": false
+}

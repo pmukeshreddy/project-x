@@ -1,0 +1,24 @@
+typing-extensions 4.16.0 verified (retained wheelhouse)
+filelock 4.0.1 verified (retained wheelhouse)
+jinja2 3.1.6 verified (retained wheelhouse)
+fsspec 2026.9.0 verified (retained wheelhouse)
+markupsafe 3.0.3 verified (retained wheelhouse)
+setuptools 80.10.2 verified (retained wheelhouse)
+networkx 3.6.1 verified (retained wheelhouse)
+sympy 1.14.0 verified (retained wheelhouse)
+annotated-types 0.8.0 verified (retained wheelhouse)
+mpmath 1.3.0 verified (retained wheelhouse)
+iniconfig 2.3.0 verified (retained wheelhouse)
+pluggy 1.6.0 verified (retained wheelhouse)
+packaging 26.3 verified (retained wheelhouse)
+pydantic 2.13.5 verified (retained wheelhouse)
+pydantic-core 2.46.5 verified (retained wheelhouse)
+pytest 9.1.1 verified (retained wheelhouse)
+pygments 2.21.0 verified (retained wheelhouse)
+typing-inspection 0.4.4 verified (retained wheelhouse)
+torch 2.11.0 verified (retained wheelhouse)
+create: exit 0
+install: exit 0
+consistency: exit 0
+cpu-import: exit 0
+Ready: /Users/mukeshreddypochamreddy/Desktop/project x/.venv-training-cpu/bin/python
