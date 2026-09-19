@@ -2,7 +2,7 @@
 
 ## Result
 
-The authoring/scenario product is implemented at product revision `6568a11e0fd85a9f2f4864acc4025030ff55901f`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, an explicit scenario-planning stage, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
+The authoring/scenario product is implemented at product revision `29412648e5a12a9b336d6cf143d6180b0fa19b54`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, explicit scenario/control/alternative authoring stages, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
 
 The actual Click construction gate did not pass. One M3 discovery succeeded. Three contract calls consumed the stage budget: two reached the fixed 120-second deadline, and the final concise call completed but returned a duplicate-key response. No contract was frozen, no privileged H feasibility review was authorized, and no scenario call was made. There is no handwritten or salvaged production artifact.
 
@@ -72,6 +72,8 @@ Result: **146 passed in 1.01s**, exit 0. It adds exact recovered-request/schema/
 Round-three focused compatibility command used the same two test files. Result: **149 passed in 1.05s**, exit 0. It covers complete registration and preflight recovery variants plus a valid 1,262,039-byte response receipt under the unchanged 1-MiB raw-output limit. No full suite, native generation, tokenizer, or Docker command ran.
 
 Round-four C1 verification ran four registration/preflight tests: **4 passed in 0.17s**, exit 0. Its real `LocalGenerationProvider` case injects the initial registration publication fault, replays the authentic provider error, and journals it through authoring with zero backend verifications, runner calls, or recovery-provider calls. The validator now matches the producer's exact unknown-cost note beginning `Execution did not start`.
+
+The downstream stage-interface addition ran `PYTHONPATH=src ./.venv/bin/pytest -q tests/test_generation.py`: **105 passed in 0.86s**, exit 0. `control_authoring` and `alternative_authoring` now have distinct strict role/kind/encoding/visibility gates; the provider registration test confirms private archives, authoring cost metadata, and zero backend/runner execution. No M4 proposal, request builder, service, or artifact implementation was added here.
 
 Affected full-suite command:
 
