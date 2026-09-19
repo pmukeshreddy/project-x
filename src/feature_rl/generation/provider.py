@@ -80,6 +80,10 @@ class GenerationProviderError(RuntimeError):
         return self.recovery.replay(archive)
 
 
+class GenerationInputLimitError(ValueError):
+    """A validated request cannot fit its declared serialized-input boundary."""
+
+
 @dataclass(frozen=True)
 class _ArchivePayload:
     name: str
@@ -432,6 +436,108 @@ def _observed_usage(raw: bytes, request: GenerationRequest | None = None) -> dic
     return observed
 
 
+def _resolve_local_schema_ref(schema: dict, definitions: dict) -> dict:
+    reference = schema.get("$ref")
+    if not isinstance(reference, str):
+        return schema
+    prefix = "#/$defs/"
+    if not reference.startswith(prefix) or reference[len(prefix):] not in definitions:
+        raise ValueError("output schema contains an unsupported reference")
+    return definitions[reference[len(prefix):]]
+
+
+def _raw_json_type_matches(value: object, schema: dict, definitions: dict) -> bool:
+    schema = _resolve_local_schema_ref(schema, definitions)
+    declared = schema.get("type")
+    if isinstance(declared, list):
+        return any(
+            _raw_json_type_matches(value, {"type": member}, definitions)
+            for member in declared
+        )
+    checks = {
+        "null": lambda: value is None,
+        "boolean": lambda: type(value) is bool,
+        "integer": lambda: type(value) is int,
+        "number": lambda: type(value) in {int, float},
+        "string": lambda: type(value) is str,
+        "array": lambda: type(value) is list,
+        "object": lambda: type(value) is dict,
+    }
+    return declared not in checks or checks[declared]()
+
+
+def _check_literal_json_types(
+    value: object,
+    schema: dict,
+    definitions: dict,
+    *,
+    path: str = "$",
+) -> None:
+    """Reject equality-based Literal coercion before Pydantic converts JSON values."""
+    schema = _resolve_local_schema_ref(schema, definitions)
+    if "const" in schema:
+        expected = schema["const"]
+        if value == expected and type(value) is not type(expected):
+            raise ValueError(f"model response has wrong literal JSON type at {path}")
+    if isinstance(schema.get("enum"), list):
+        equal = [expected for expected in schema["enum"] if value == expected]
+        if equal and not any(type(value) is type(expected) for expected in equal):
+            raise ValueError(f"model response has wrong literal JSON type at {path}")
+
+    alternatives = schema.get("anyOf") or schema.get("oneOf")
+    if isinstance(alternatives, list):
+        applicable = [
+            branch for branch in alternatives
+            if isinstance(branch, dict) and _raw_json_type_matches(value, branch, definitions)
+        ]
+        if applicable:
+            errors = []
+            for branch in applicable:
+                try:
+                    _check_literal_json_types(value, branch, definitions, path=path)
+                    break
+                except ValueError as error:
+                    errors.append(error)
+            else:
+                raise errors[0]
+        else:
+            for branch in alternatives:
+                if isinstance(branch, dict):
+                    _check_literal_json_types(value, branch, definitions, path=path)
+
+    for branch in schema.get("allOf", ()):
+        if isinstance(branch, dict):
+            _check_literal_json_types(value, branch, definitions, path=path)
+    if type(value) is dict:
+        properties = schema.get("properties", {})
+        if isinstance(properties, dict):
+            for name, child_schema in properties.items():
+                if name in value and isinstance(child_schema, dict):
+                    _check_literal_json_types(
+                        value[name], child_schema, definitions, path=f"{path}.{name}"
+                    )
+        additional = schema.get("additionalProperties")
+        if isinstance(additional, dict):
+            for name in value.keys() - properties.keys():
+                _check_literal_json_types(
+                    value[name], additional, definitions, path=f"{path}.{name}"
+                )
+    elif type(value) is list:
+        prefix_items = schema.get("prefixItems", ())
+        for index, child_schema in enumerate(prefix_items):
+            if index < len(value) and isinstance(child_schema, dict):
+                _check_literal_json_types(
+                    value[index], child_schema, definitions, path=f"{path}[{index}]"
+                )
+        items = schema.get("items")
+        if isinstance(items, dict):
+            start = len(prefix_items) if isinstance(prefix_items, list) else 0
+            for index in range(start, len(value)):
+                _check_literal_json_types(
+                    value[index], items, definitions, path=f"{path}[{index}]"
+                )
+
+
 def _parse_envelope(
     output_text: str, request: GenerationRequest, schema: type[StrictModel]
 ) -> StrictModel:
@@ -453,6 +559,10 @@ def _parse_envelope(
         raise ValueError("model response requirement provenance is malformed")
     if not set(requirement_ids).issubset(request.allowed_requirement_ids):
         raise ValueError("model response cites an unknown requirement ID")
+    json_schema = schema.model_json_schema()
+    _check_literal_json_types(
+        envelope["content"], json_schema, json_schema.get("$defs", {})
+    )
     try:
         return schema.model_validate_json(canonical_json(envelope["content"]))
     except ValidationError as error:
@@ -489,15 +599,19 @@ class LocalGenerationProvider:
         worker_source_sha256 = hashlib.sha256(worker_source).hexdigest()
         schema_payload = output_schema.model_json_schema()
         request_payload = request.model_dump(mode="json")
-        if any(
-            len(data) > request.limits.stdin_bytes
-            for data in (
-                canonical_json(request_payload),
-                canonical_json(schema_payload),
-                prompt.encode("utf-8"),
-            )
-        ):
-            raise ValueError("request, schema, or templated prompt exceeds the configured input byte cap")
+        request_bytes = canonical_json(request_payload)
+        schema_bytes = canonical_json(schema_payload)
+        prompt_bytes = prompt.encode("utf-8")
+        observed_input_bytes = {
+            "request_json": len(request_bytes),
+            "output_schema_json": len(schema_bytes),
+            "templated_prompt_utf8": len(prompt_bytes),
+        }
+        oversized_components = tuple(
+            name
+            for name, size in observed_input_bytes.items()
+            if size > request.limits.stdin_bytes
+        )
         attempt_id = "gen-" + uuid.uuid4().hex
         recorded_at = datetime.now(timezone.utc)
         source_paths = {
@@ -515,8 +629,8 @@ class LocalGenerationProvider:
             request_id=request.request_id,
             response_id=request.response_id,
             prompt_id=request.prompt_id,
-            request_sha256=hashlib.sha256(canonical_json(request_payload)).hexdigest(),
-            output_schema_sha256=hashlib.sha256(canonical_json(schema_payload)).hexdigest(),
+            request_sha256=hashlib.sha256(request_bytes).hexdigest(),
+            output_schema_sha256=hashlib.sha256(schema_bytes).hexdigest(),
             source_sha256={
                 name: hashlib.sha256(path.read_bytes()).hexdigest()
                 for name, path in source_paths.items()
@@ -534,12 +648,111 @@ class LocalGenerationProvider:
             kind="generation-attempt",
             visibility=visibility,
         )
+        limit_error = (
+            GenerationInputLimitError(
+                "request, schema, or templated prompt exceeds the configured input byte cap"
+            )
+            if oversized_components
+            else None
+        )
+        preflight = (
+            {
+                "attempt_id": attempt_id,
+                "recorded_at": recorded_at.isoformat(),
+                "request_id": request.request_id,
+                "response_id": request.response_id,
+                "prompt_id": request.prompt_id,
+                "request_sha256": attempt.request_sha256,
+                "output_schema_sha256": attempt.output_schema_sha256,
+                "stdin_cap_bytes": request.limits.stdin_bytes,
+                "observed_bytes": observed_input_bytes,
+                "oversized_components": list(oversized_components),
+                "execution_started": False,
+                "cause": str(limit_error),
+            }
+            if limit_error is not None
+            else None
+        )
+        preflight_cost = (
+            CostRecord(
+                category="authoring",
+                wall_seconds=None,
+                cpu_seconds=None,
+                gpu_seconds=None,
+                input_tokens=None,
+                output_tokens=None,
+                human_minutes=None,
+                usd=None,
+                measurement="unknown",
+                note=(
+                    "Execution did not start because declared serialized-input bytes were exceeded; "
+                    "runtime and token costs are unknown."
+                ),
+            )
+            if limit_error is not None
+            else None
+        )
+        rejection_payloads = (
+            (
+                attempt_archive,
+                _ArchivePayload(
+                    name="preflight",
+                    data=canonical_json(preflight),
+                    kind="generation-preflight",
+                    visibility=visibility,
+                ),
+                _ArchivePayload(
+                    name="cost",
+                    data=canonical_json(preflight_cost.model_dump(mode="json")),
+                    kind="generation-cost",
+                    visibility=visibility,
+                ),
+            )
+            if preflight is not None and preflight_cost is not None
+            else None
+        )
         refs: dict[str, ArtifactRef] = {}
         try:
             refs["attempt"] = ArtifactRef.model_validate(
                 self._archive(attempt_archive.data, attempt_archive.kind, visibility)
             )
         except Exception as caught:
+            if rejection_payloads is not None:
+                assert limit_error is not None and preflight is not None
+                assert preflight_cost is not None
+                recovery = GenerationPublicationRecovery(
+                    attempt_id=attempt_id,
+                    recorded_at=recorded_at,
+                    request_id=request.request_id,
+                    response_id=request.response_id,
+                    payloads=rejection_payloads,
+                    published_refs=(),
+                    generation_succeeded=False,
+                    underlying_error_code=type(limit_error).__name__,
+                    underlying_error=str(limit_error),
+                    publication_error=f"{type(caught).__name__}: {caught}",
+                    cost=preflight_cost,
+                    response=preflight,
+                    usage_observation=None,
+                )
+                record = GenerationCallRecord(
+                    attempt_id=attempt_id,
+                    recorded_at=recorded_at,
+                    request_id=request.request_id,
+                    response_id=request.response_id,
+                    success=False,
+                    generation_succeeded=False,
+                    publication_complete=False,
+                    error_code="ArchivePublicationError",
+                    archives={},
+                )
+                raise GenerationProviderError(
+                    f"attempt registration failed before execution: {caught}",
+                    record,
+                    cost=preflight_cost,
+                    response=preflight,
+                    recovery=recovery,
+                ) from caught
             cost = CostRecord(
                 category="authoring",
                 wall_seconds=None,
@@ -584,6 +797,84 @@ class LocalGenerationProvider:
                 cost=cost,
                 recovery=recovery,
             ) from caught
+        if rejection_payloads is not None:
+            assert limit_error is not None and preflight is not None
+            assert preflight_cost is not None
+            try:
+                for payload in rejection_payloads:
+                    if payload.name in refs:
+                        continue
+                    refs[payload.name] = ArtifactRef.model_validate(
+                        self._archive(payload.data, payload.kind, visibility)
+                    )
+                status = {
+                    "attempt_id": attempt_id,
+                    "recorded_at": recorded_at.isoformat(),
+                    "request_id": request.request_id,
+                    "response_id": request.response_id,
+                    "success": False,
+                    "generation_succeeded": False,
+                    "publication_complete": True,
+                    "publication_recovered": False,
+                    "error_type": type(limit_error).__name__,
+                    "error": str(limit_error),
+                    "archive_refs": {
+                        key: value.model_dump(mode="json") for key, value in refs.items()
+                    },
+                }
+                refs["status"] = ArtifactRef.model_validate(
+                    self._archive(canonical_json(status), "generation-status", visibility)
+                )
+            except Exception as publication_error:
+                recovery = GenerationPublicationRecovery(
+                    attempt_id=attempt_id,
+                    recorded_at=recorded_at,
+                    request_id=request.request_id,
+                    response_id=request.response_id,
+                    payloads=rejection_payloads,
+                    published_refs=tuple(refs.items()),
+                    generation_succeeded=False,
+                    underlying_error_code=type(limit_error).__name__,
+                    underlying_error=str(limit_error),
+                    publication_error=(
+                        f"{type(publication_error).__name__}: {publication_error}"
+                    ),
+                    cost=preflight_cost,
+                    response=preflight,
+                    usage_observation=None,
+                )
+                record = GenerationCallRecord(
+                    attempt_id=attempt_id,
+                    recorded_at=recorded_at,
+                    request_id=request.request_id,
+                    response_id=request.response_id,
+                    success=False,
+                    generation_succeeded=False,
+                    publication_complete=False,
+                    error_code="ArchivePublicationError",
+                    archives=refs,
+                )
+                raise GenerationProviderError(
+                    f"archive publication failed: {publication_error}",
+                    record,
+                    cost=preflight_cost,
+                    response=preflight,
+                    recovery=recovery,
+                ) from publication_error
+            record = GenerationCallRecord(
+                attempt_id=attempt_id,
+                recorded_at=recorded_at,
+                request_id=request.request_id,
+                response_id=request.response_id,
+                success=False,
+                generation_succeeded=False,
+                publication_complete=True,
+                error_code=type(limit_error).__name__,
+                archives=refs,
+            )
+            raise GenerationProviderError(
+                str(limit_error), record, cost=preflight_cost, response=preflight
+            ) from limit_error
         outcome: ProcessOutcome | None = None
         verified: VerifiedBackend | None = None
         events: list[dict] = []

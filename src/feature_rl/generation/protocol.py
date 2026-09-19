@@ -4,15 +4,31 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import BeforeValidator, Field
 
 from feature_rl.contracts import Digest, Identifier, NonnegativeFloat, NonnegativeInt, StrictModel
 
 PROTOCOL_VERSION = 3
 
 
+def _exact_literal(expected):
+    def validate(value):
+        if type(value) is not type(expected) or value != expected:
+            raise ValueError(
+                f"expected exact JSON {type(expected).__name__} literal {expected!r}"
+            )
+        return value
+
+    return validate
+
+
+ExactProtocolVersion = Annotated[Literal[3], BeforeValidator(_exact_literal(3))]
+ExactTrue = Annotated[Literal[True], BeforeValidator(_exact_literal(True))]
+ExactFalse = Annotated[Literal[False], BeforeValidator(_exact_literal(False))]
+
+
 class EventIdentity(StrictModel):
-    protocol_version: Literal[3]
+    protocol_version: ExactProtocolVersion
     request_id: Identifier
     response_id: Identifier
     prompt_id: Identifier
@@ -32,8 +48,8 @@ class IdentityValidated(EventIdentity):
     prompt_sha256: Digest
     worker_source_sha256: Digest
     offline_environment: dict[str, str]
-    local_files_only: Literal[True]
-    remote_code: Literal[False]
+    local_files_only: ExactTrue
+    remote_code: ExactFalse
 
 
 class InputAccepted(EventIdentity):
@@ -47,8 +63,8 @@ class InputRejected(EventIdentity):
     event: Literal["input_rejected"]
     actual_input_tokens: NonnegativeInt
     max_input_tokens: NonnegativeInt
-    model_load_started: Literal[False]
-    inference_started: Literal[False]
+    model_load_started: ExactFalse
+    inference_started: ExactFalse
 
 
 class MemoryControlsSet(EventIdentity):
@@ -65,8 +81,8 @@ class ModelLoaded(EventIdentity):
     event: Literal["model_loaded"]
     model_id: str
     revision: str
-    fresh_process: Literal[True]
-    fresh_prompt_cache: Literal[True]
+    fresh_process: ExactTrue
+    fresh_prompt_cache: ExactTrue
     active_memory_bytes: NonnegativeInt
     peak_memory_bytes: NonnegativeInt
     cache_memory_bytes: NonnegativeInt
@@ -96,8 +112,8 @@ class Completed(EventIdentity):
     active_memory_bytes: NonnegativeInt
     peak_memory_bytes: NonnegativeInt
     cache_memory_bytes: NonnegativeInt
-    fresh_process: Literal[True]
-    fresh_prompt_cache: Literal[True]
+    fresh_process: ExactTrue
+    fresh_prompt_cache: ExactTrue
 
 
 EVENT_MODELS = {

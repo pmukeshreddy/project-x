@@ -8,6 +8,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 from unittest.mock import patch
 
 import pytest
@@ -35,6 +36,7 @@ from feature_rl.generation import (
     VerifiedModel,
 )
 import feature_rl.generation.runner as runner_module
+from feature_rl.generation.provider import _decode_event
 
 ARCHIVE_NAMES = (
     "attempt", "request", "response", "retrieval", "schema", "options",
@@ -371,6 +373,15 @@ class StructuredContent(StrictModel):
     recorded_at: datetime
 
 
+class LiteralLeaf(StrictModel):
+    confirmed: Literal[True]
+    version: Literal[3]
+
+
+class NestedLiteralContent(StrictModel):
+    leaf: LiteralLeaf
+
+
 class FakeBackend:
     python_executable = Path(sys.executable)
     model_directory = Path("/explicit/model")
@@ -602,6 +613,75 @@ def test_provider_json_transport_keeps_nested_strict_rejections(tmp_path, invali
         provider.generate(request(), StructuredContent)
 
 
+def test_provider_preserves_exact_nested_literal_json_types(tmp_path):
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = {"leaf": {"confirmed": True, "version": 3}}
+    events[-1]["output_text"] = json.dumps(envelope)
+    valid = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "valid", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()),
+    ).generate(request(), NestedLiteralContent)
+    assert valid.content.leaf.confirmed is True
+    assert type(valid.content.leaf.version) is int
+
+    for field, wrong_value in (("confirmed", 1), ("version", 3.0)):
+        changed = [dict(item) for item in events]
+        changed_envelope = json.loads(changed[-1]["output_text"])
+        changed_envelope["content"]["leaf"][field] = wrong_value
+        changed[-1]["output_text"] = json.dumps(changed_envelope)
+        provider = LocalGenerationProvider(
+            backend=FakeBackend(),
+            archive=ArtifactStore(tmp_path / f"invalid-{field}", ActorRole.AUTHOR).put_bytes,
+            runner=FakeRunner(
+                stdout=("\n".join(json.dumps(item) for item in changed) + "\n").encode()
+            ),
+        )
+        with pytest.raises(GenerationProviderError, match="literal JSON type"):
+            provider.generate(request(), NestedLiteralContent)
+
+
+@pytest.mark.parametrize(
+    ("event_index", "field", "wrong_value"),
+    [
+        (0, "protocol_version", 3.0),
+        (0, "local_files_only", 1),
+        (0, "remote_code", 0),
+        (3, "fresh_process", 1),
+        (3, "fresh_prompt_cache", 1),
+        (5, "fresh_process", 1),
+        (5, "fresh_prompt_cache", 1),
+    ],
+)
+def test_event_protocol_rejects_numeric_equivalents_for_literals(
+    event_index, field, wrong_value
+):
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    events[event_index][field] = wrong_value
+    with pytest.raises(ValueError, match="protocol v3"):
+        _decode_event(json.dumps(events[event_index]))
+
+
+@pytest.mark.parametrize("field", ["model_load_started", "inference_started"])
+def test_input_rejection_protocol_rejects_numeric_false(field):
+    rejected = {
+        "protocol_version": 3,
+        "request_id": "REQ_CALL_1",
+        "response_id": "RESP_1",
+        "prompt_id": "PROMPT_1",
+        "event": "input_rejected",
+        "actual_input_tokens": 381,
+        "max_input_tokens": 16,
+        "model_load_started": False,
+        "inference_started": False,
+    }
+    assert _decode_event(json.dumps(rejected)).event == "input_rejected"
+    rejected[field] = 0
+    with pytest.raises(ValueError, match="protocol v3"):
+        _decode_event(json.dumps(rejected))
+
+
 @pytest.mark.parametrize(
     ("event_index", "field", "value"),
     [
@@ -784,3 +864,81 @@ def test_archive_failure_retains_outcome_and_replays_without_execution(tmp_path)
     assert recovered.success is True
     assert recovered.publication_complete is True
     assert set(recovered.archives) == set(ARCHIVE_NAMES)
+
+
+def oversized_request() -> GenerationRequest:
+    return GenerationRequest.model_validate(
+        request(generation_limits=limits(stdin_bytes=4096)).model_dump()
+        | {"instruction": "Attributable diagnostic instruction. " * 200}
+    )
+
+
+def test_oversized_preflight_is_attributable_bounded_and_never_executes(tmp_path):
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    archive_kinds = []
+
+    def archive(data, kind, visibility):
+        archive_kinds.append(kind)
+        return store.put_bytes(data, kind, visibility)
+
+    provider = LocalGenerationProvider(backend=FakeBackend(), archive=archive, runner=runner)
+    with pytest.raises(GenerationProviderError, match="input byte cap") as caught:
+        provider.generate(oversized_request(), SmokeContent)
+
+    failure = caught.value
+    assert runner.calls == []
+    assert failure.record.success is False
+    assert failure.record.generation_succeeded is False
+    assert failure.record.publication_complete is True
+    assert failure.record.error_code == "GenerationInputLimitError"
+    assert failure.cost.measurement == "unknown"
+    assert failure.recovery is None
+    assert archive_kinds == [
+        "generation-attempt", "generation-preflight", "generation-cost", "generation-status"
+    ]
+    assert set(failure.record.archives) == {"attempt", "preflight", "cost", "status"}
+    attempt = json.loads(store.get_bytes(failure.record.archives["attempt"]))
+    preflight = json.loads(store.get_bytes(failure.record.archives["preflight"]))
+    status = json.loads(store.get_bytes(failure.record.archives["status"]))
+    assert preflight["request_id"] == "REQ_CALL_1"
+    assert preflight["response_id"] == "RESP_1"
+    assert preflight["prompt_id"] == "PROMPT_1"
+    assert preflight["stdin_cap_bytes"] == 4096
+    assert preflight["observed_bytes"]["request_json"] > 4096
+    assert preflight["request_sha256"] == attempt["request_sha256"]
+    assert preflight["output_schema_sha256"] == attempt["output_schema_sha256"]
+    assert preflight["oversized_components"]
+    assert max(len(store.get_bytes(ref)) for ref in failure.record.archives.values()) < 4096
+    assert status["error_type"] == "GenerationInputLimitError"
+
+
+def test_oversized_preflight_publication_failure_replays_without_execution(tmp_path):
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    failed = False
+
+    def fail_preflight_once(data, kind, visibility):
+        nonlocal failed
+        if kind == "generation-preflight" and not failed:
+            failed = True
+            raise OSError("injected preflight publication failure")
+        return store.put_bytes(data, kind, visibility)
+
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(), archive=fail_preflight_once, runner=runner
+    )
+    with pytest.raises(GenerationProviderError, match="archive publication failed") as caught:
+        provider.generate(oversized_request(), SmokeContent)
+    assert runner.calls == []
+    assert caught.value.record.archives.keys() == {"attempt"}
+    assert caught.value.recovery is not None
+    assert caught.value.response["oversized_components"]
+
+    recovered = caught.value.replay_publication(store.put_bytes)
+    assert runner.calls == []
+    assert recovered.success is False
+    assert recovered.generation_succeeded is False
+    assert recovered.publication_complete is True
+    assert recovered.error_code == "GenerationInputLimitError"
+    assert set(recovered.archives) == {"attempt", "preflight", "cost", "status"}

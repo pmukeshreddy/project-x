@@ -1,0 +1,94 @@
+{
+  "assigned_base_revision": "9cea0bd0d02f123bb91eb828e7e0b7ad2763a7ff",
+  "commands": [
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "name": "focused",
+      "stderr": "docs/evidence/M2/provider-v3-fixround2-focused-tests.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround2-focused-tests.stdout",
+      "stdout_sha256": "bb4bad8bee596a906435c3176637189a53c1bc20b22f1c537b6944e8d255e06c"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "name": "full",
+      "stderr": "docs/evidence/M2/provider-v3-fixround2-full-tests.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround2-full-tests.stdout",
+      "stdout_sha256": "167840761d7af7b1f4ad18704323f04cf532e3df54c74b94884f578e80005e6e"
+    }
+  ],
+  "committed_product_revision": null,
+  "excluded_unowned_paths": [
+    "docs/evidence/M2/coordinator-literal-envelope.py",
+    "docs/evidence/M2/coordinator-literal-envelope.json",
+    "docs/evidence/M2/coordinator-v3-native.py"
+  ],
+  "limitations": [
+    "This precommit receipt binds working-tree source/test bytes and does not claim a committed source revision.",
+    "No MLX model was loaded and no native inference was performed in fix round 2.",
+    "The coordinator current-version native verification remains pending independent re-review."
+  ],
+  "native_inference_calls": 0,
+  "preserved_review_evidence": "docs/evidence/M2/review-round1",
+  "producer": "M2 provider owner fix round 2",
+  "product_and_test_inventory": {
+    "src/feature_rl/generation/__init__.py": {
+      "bytes": 1327,
+      "sha256": "feab8f63dfd2344003792855341731be6d9125cf707822104b1b8316fcb7c278"
+    },
+    "src/feature_rl/generation/_worker.py": {
+      "bytes": 11650,
+      "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed"
+    },
+    "src/feature_rl/generation/backend.py": {
+      "bytes": 11173,
+      "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647"
+    },
+    "src/feature_rl/generation/models.py": {
+      "bytes": 7737,
+      "sha256": "4ee0c21c3c8e8bb2abc9bb6e6c2b4b0229573733ce7fc61359affa9b22669305"
+    },
+    "src/feature_rl/generation/protocol.py": {
+      "bytes": 3797,
+      "sha256": "dcc6361d6c1807353f34ba47a34816b3a4748f5fb2ee12daddaacb0d32824f7b"
+    },
+    "src/feature_rl/generation/provider.py": {
+      "bytes": 48867,
+      "sha256": "a66692e5d808946928245669f74d6b03be9b926f91c26d139291dc96549fdc7b"
+    },
+    "src/feature_rl/generation/runner.py": {
+      "bytes": 9828,
+      "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+    },
+    "tests/test_generation.py": {
+      "bytes": 40357,
+      "sha256": "4afe06c99fd5a6b0ccd23cba1f48af0b8c7a0efac127d38456311f9af0b1561f"
+    }
+  },
+  "protocol_version": 3,
+  "recorded_at_utc": "2026-09-19T11:18:45.638414Z",
+  "remote_compute_calls": 0,
+  "schema_version": 1,
+  "scope": "unit_diagnostic_and_full_test_verification",
+  "workspace_head_at_verification": "9133fadc797e178c0c7ea054f62ef6dd015a14ef"
+}
