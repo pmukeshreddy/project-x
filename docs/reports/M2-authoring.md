@@ -2,7 +2,7 @@
 
 ## Result
 
-The authoring/scenario product is implemented at product revision `7b8974633ec5946bd1b38471457ff7ba428a9372`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, an explicit scenario-planning stage, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
+The authoring/scenario product is implemented at product revision `7b8974637e9ffc5bab79f9590b90c7021228d473`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, an explicit scenario-planning stage, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
 
 The actual Click construction gate did not pass. One M3 discovery succeeded. Three contract calls consumed the stage budget: two reached the fixed 120-second deadline, and the final concise call completed but returned a duplicate-key response. No contract was frozen, no privileged H feasibility review was authorized, and no scenario call was made. There is no handwritten or salvaged production artifact.
 
@@ -67,7 +67,7 @@ Affected full-suite command:
 PYTHONPATH=src ./.venv/bin/pytest -q
 ```
 
-Result: **414 passed in 97.85s**, exit 0. A preceding invocation without exported `PYTHONPATH` is retained separately: 406 passed and eight independently owned M6 durability subprocess tests failed because their child interpreters could not import `feature_rl`. The corrected command changed only inherited source-path discovery and all 414 tests passed.
+Result: **414 passed in 97.85s**, exit 0. A preceding invocation without exported `PYTHONPATH` is retained separately: 406 passed and eight independently owned M6 durability subprocess tests failed because their child interpreters could not import `feature_rl`. Both full-suite runs exceeded the focused-only concurrent-owner instruction. Their logs are retained as observations, but source hashes were not captured before and after those runs, so they do not establish a source-stable cross-module integration snapshot while M4 was editing concurrently.
 
 The production commands were:
 

@@ -51,6 +51,7 @@ Every `AuthoringContext` carries a fixed `context_id`, explicit role, immutable 
 | Stage | Admitted explicit context | Forbidden context |
 |---|---|---|
 | `discovery` / `initial_authoring` | request, B/baseline, and public-check data with public or authoring visibility | H, diffs, reference trees, `SourcePair`, private/evaluation data, frozen private scenarios, and ambient stores |
+| `scenario_planning` | exact frozen authoring `RequirementContract` plus its admitted request, B/baseline, and discovery evidence | H, diffs, reference trees, `SourcePair`, private/evaluation data, caller-invented observations, and alternate evidence sets |
 | `checker_generation` | required frozen `RequirementContract` and `ScenarioPlan`, plus explicitly supplied attributable request/B/public-check context | reference implementation/H data, non-allowlisted roles or kinds, and private B/public-check data |
 
 The initial contract draft therefore occurs without H or privileged checker inspection. After that draft is frozen, a controller may call the later checker stage with the frozen contract and private/evaluation scenario plan as explicit data. This later privilege does not broaden initial-authoring inputs and does not give the model access to the underlying store.
@@ -59,7 +60,7 @@ The initial contract draft therefore occurs without H or privileged checker insp
 
 `GenerationLimits` declares positive wall, CPU, stdin, retained-output/file, input-token, emitted-output-token, MLX memory, and external physical-footprint limits. The fully templated chat input is tokenized before model loading and rejects above its declared input limit. `mlx_lm.generate_step(max_tokens=...)` bounds emitted tokens; the controller independently verifies the event count and refuses truncation.
 
-The `tiny_smoke_2048x128` measurement profile is qualified only through 2,048 actual input tokens and 128 emitted output tokens. `larger_unqualified` permits a caller to declare a larger positive pair within the pinned model's 262,144-token architectural context capacity. That architectural capacity is not a measured host-usable envelope. Before a first construction batch uses larger values, the controller must record a separate bounded measurement under the same watchdog, CPU, wall, and output policy. No larger call was made in this slice.
+The `tiny_smoke_2048x128` measurement profile is qualified only through 2,048 actual input tokens and 128 emitted output tokens. `larger_unqualified` permits a caller to declare a larger positive pair within the pinned model's 262,144-token architectural context capacity. That architectural capacity is not a measured host-usable envelope. Before a first construction batch uses larger values, the controller must record a separate bounded measurement under the same watchdog, CPU, wall, and output policy. This slice made three measured `initial_authoring` calls with 9,216-token input and 4,096-token output caps: two reached the 120-second deadline, and one completed generation but failed strict duplicate-key validation. None produced an accepted artifact.
 
 | Resource | Boundary and evidence meaning |
 |---|---|
