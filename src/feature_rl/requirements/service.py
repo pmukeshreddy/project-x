@@ -68,9 +68,12 @@ _GENERATION_ARCHIVES = {
     name: f"generation-{name}"
     for name in (
         "attempt", "request", "response", "retrieval", "schema", "options",
-        "provenance", "usage", "cost", "events", "status",
+        "provenance", "usage", "cost", "events", "status", "preflight",
     )
 }
+_FULL_GENERATION_ARCHIVES = frozenset(_GENERATION_ARCHIVES) - {"preflight"}
+_REGISTRATION_ARCHIVES = frozenset({"attempt", "status"})
+_PREFLIGHT_ARCHIVES = frozenset({"attempt", "preflight", "cost", "status"})
 
 
 def _strict_json(data: bytes):
@@ -85,6 +88,21 @@ def _strict_json(data: bytes):
     return json.loads(data, object_pairs_hook=pairs)
 
 
+def _archive_read_caps(name: str, request: GenerationRequest) -> tuple[int, int]:
+    if name == "response":
+        # stdout+stderr are jointly bounded by output_bytes, then base64 encoded in JSON.
+        payload = 4 * ((request.limits.output_bytes + 2) // 3) + 64 * 1024
+    elif name == "events":
+        payload = request.limits.output_bytes
+    elif name in {"request", "schema", "retrieval"}:
+        payload = request.limits.stdin_bytes + 4096
+    else:
+        payload = 1024 * 1024
+    # Opaque ArtifactStore payloads are themselves base64 encoded in a small JSON envelope.
+    envelope = 4 * ((payload + 2) // 3) + 4096
+    return payload, envelope
+
+
 def validate_recovered_generation(
     store: ArtifactStore,
     request: GenerationRequest,
@@ -93,15 +111,19 @@ def validate_recovered_generation(
 ) -> None:
     """Bind a replayed provider outcome to its immutable archived operation."""
     record = recovered.record
-    if set(record.archives) != set(_GENERATION_ARCHIVES):
-        raise ValueError("recovered generation archive set is incomplete")
+    archive_names = frozenset(record.archives)
+    if archive_names not in {
+        _FULL_GENERATION_ARCHIVES, _REGISTRATION_ARCHIVES, _PREFLIGHT_ARCHIVES
+    }:
+        raise ValueError("recovered generation archive set is not a complete provider variant")
     visibility = (
         Visibility.AUTHORING
         if request.stage in {GenerationStage.DISCOVERY, GenerationStage.INITIAL_AUTHORING}
         else Visibility.PRIVATE
     )
     raw = {}
-    for name, kind in _GENERATION_ARCHIVES.items():
+    for name in record.archives:
+        kind = _GENERATION_ARCHIVES[name]
         ref = record.archives[name]
         if (
             ref.kind != kind
@@ -110,30 +132,18 @@ def validate_recovered_generation(
             or ref.schema_version != 1
         ):
             raise ValueError(f"recovered {name} archive reference is invalid")
+        payload_cap, envelope_cap = _archive_read_caps(name, request)
         raw[name] = store.get_bytes(
-            ref, max_envelope_bytes=2 * 1024 * 1024, max_payload_bytes=1024 * 1024
+            ref, max_envelope_bytes=envelope_cap, max_payload_bytes=payload_cap
         )
 
     request_payload = request.model_dump(mode="json")
     schema_payload = output_schema.model_json_schema()
     try:
-        archived_request = _strict_json(raw["request"])
-        archived_schema = _strict_json(raw["schema"])
-        retrieval = _strict_json(raw["retrieval"])
         attempt = _strict_json(raw["attempt"])
         status = _strict_json(raw["status"])
-        usage = _strict_json(raw["usage"])
-        cost = _strict_json(raw["cost"])
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
         raise ValueError("recovered generation archive JSON is invalid") from error
-    if archived_request != request_payload:
-        raise ValueError("recovered request archive differs from the resumed request")
-    if archived_schema != schema_payload:
-        raise ValueError("recovered schema archive differs from the expected proposal schema")
-    if retrieval != {
-        "contexts": [context.model_dump(mode="json") for context in request.contexts]
-    }:
-        raise ValueError("recovered context archive differs from the resumed request")
     def recorded_at_matches(value) -> bool:
         if not isinstance(value, str):
             return False
@@ -173,6 +183,90 @@ def validate_recovered_generation(
     ):
         raise ValueError("recovered status archive differs from the provider record")
     recovered_cost = getattr(recovered, "cost", None)
+
+    if archive_names == _REGISTRATION_ARCHIVES:
+        expected_cost = {
+            "category": "authoring", "wall_seconds": None, "cpu_seconds": None,
+            "gpu_seconds": None, "input_tokens": None, "output_tokens": None,
+            "human_minutes": None, "usd": None, "measurement": "unknown",
+            "note": (
+                "Generation did not start because attempt registration failed; "
+                "costs are unknown."
+            ),
+        }
+        if not isinstance(recovered, GenerationProviderError) or (
+            record.success
+            or record.generation_succeeded
+            or not record.publication_complete
+            or record.error_code != "ArchivePublicationError"
+            or recovered.response is not None
+            or recovered.usage_observation is not None
+            or recovered_cost is None
+            or recovered_cost.model_dump(mode="json") != expected_cost
+            or status.get("error") != str(recovered)
+        ):
+            raise ValueError("recovered registration archive disposition is invalid")
+        return
+
+    if archive_names == _PREFLIGHT_ARCHIVES:
+        try:
+            preflight = _strict_json(raw["preflight"])
+            cost = _strict_json(raw["cost"])
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+            raise ValueError("recovered preflight archive JSON is invalid") from error
+        observed = preflight.get("observed_bytes")
+        oversized = preflight.get("oversized_components")
+        if not isinstance(recovered, GenerationProviderError) or (
+            record.success
+            or record.generation_succeeded
+            or not record.publication_complete
+            or record.error_code != "GenerationInputLimitError"
+            or recovered.usage_observation is not None
+            or recovered_cost is None
+            or cost != recovered_cost.model_dump(mode="json")
+            or recovered.response != preflight
+            or preflight.get("attempt_id") != record.attempt_id
+            or not recorded_at_matches(preflight.get("recorded_at"))
+            or preflight.get("request_id") != request.request_id
+            or preflight.get("response_id") != request.response_id
+            or preflight.get("prompt_id") != request.prompt_id
+            or preflight.get("request_sha256") != attempt.get("request_sha256")
+            or preflight.get("output_schema_sha256") != attempt.get("output_schema_sha256")
+            or preflight.get("stdin_cap_bytes") != request.limits.stdin_bytes
+            or preflight.get("execution_started") is not False
+            or preflight.get("cause") != str(recovered)
+            or not isinstance(observed, dict)
+            or observed.get("request_json") != len(canonical_json(request_payload))
+            or observed.get("output_schema_json") != len(canonical_json(schema_payload))
+            or not isinstance(oversized, list)
+            or not oversized
+            or any(
+                name not in {"request_json", "output_schema_json", "templated_prompt_utf8"}
+                or type(observed.get(name)) is not int
+                or observed[name] <= request.limits.stdin_bytes
+                for name in oversized
+            )
+            or status.get("error") != str(recovered)
+        ):
+            raise ValueError("recovered preflight archive disposition is invalid")
+        return
+
+    try:
+        archived_request = _strict_json(raw["request"])
+        archived_schema = _strict_json(raw["schema"])
+        retrieval = _strict_json(raw["retrieval"])
+        usage = _strict_json(raw["usage"])
+        cost = _strict_json(raw["cost"])
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise ValueError("recovered generation archive JSON is invalid") from error
+    if archived_request != request_payload:
+        raise ValueError("recovered request archive differs from the resumed request")
+    if archived_schema != schema_payload:
+        raise ValueError("recovered schema archive differs from the expected proposal schema")
+    if retrieval != {
+        "contexts": [context.model_dump(mode="json") for context in request.contexts]
+    }:
+        raise ValueError("recovered context archive differs from the resumed request")
     if recovered_cost is None or cost != recovered_cost.model_dump(mode="json"):
         raise ValueError("recovered cost archive differs from the provider result")
 

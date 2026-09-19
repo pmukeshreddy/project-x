@@ -546,7 +546,9 @@ def provider_result(content, index: int = 1) -> GenerationResult:
     )
 
 
-def archived_provider_result(store, request, content, index: int = 1) -> GenerationResult:
+def archived_provider_result(
+    store, request, content, index: int = 1, *, response_payload=None
+) -> GenerationResult:
     """Publish the provider archive bindings required to resume one successful result."""
     base = provider_result(content, index)
     visibility = (
@@ -578,7 +580,7 @@ def archived_provider_result(store, request, content, index: int = 1) -> Generat
             "output_schema_sha256": hashlib.sha256(canonical_json(schema_payload)).hexdigest(),
         },
         "request": request_payload,
-        "response": {},
+        "response": {} if response_payload is None else response_payload,
         "retrieval": {"contexts": [item.model_dump(mode="json") for item in request.contexts]},
         "schema": schema_payload,
         "options": {"seed": request.seed, "limits": request.limits.model_dump(mode="json")},
@@ -654,6 +656,98 @@ def archived_provider_error(store, request, content, index: int = 1) -> Generati
     record = record.model_copy(update={"archives": refs})
     return GenerationProviderError(
         "malformed output", record, cost=successful.cost, usage_observation={}
+    )
+
+
+def archived_preexecution_error(store, request, *, preflight: bool) -> GenerationProviderError:
+    schema_payload = RequirementContractProposal.model_json_schema()
+    request_payload = request.model_dump(mode="json")
+    attempt_id = "attempt-preflight" if preflight else "attempt-registration"
+    recorded_at = datetime(2026, 9, 19, 2, 0, tzinfo=timezone.utc)
+    attempt = {
+        "attempt_id": attempt_id,
+        "recorded_at": recorded_at.isoformat(),
+        "request_id": request.request_id,
+        "response_id": request.response_id,
+        "prompt_id": request.prompt_id,
+        "request_sha256": hashlib.sha256(canonical_json(request_payload)).hexdigest(),
+        "output_schema_sha256": hashlib.sha256(canonical_json(schema_payload)).hexdigest(),
+    }
+    refs = {
+        "attempt": store.put_bytes(
+            canonical_json(attempt), "generation-attempt", Visibility.AUTHORING
+        )
+    }
+    if preflight:
+        error_code = "GenerationInputLimitError"
+        message = "request, schema, or templated prompt exceeds the configured input byte cap"
+        response = {
+            "attempt_id": attempt_id,
+            "recorded_at": recorded_at.isoformat(),
+            "request_id": request.request_id,
+            "response_id": request.response_id,
+            "prompt_id": request.prompt_id,
+            "request_sha256": attempt["request_sha256"],
+            "output_schema_sha256": attempt["output_schema_sha256"],
+            "stdin_cap_bytes": request.limits.stdin_bytes,
+            "observed_bytes": {
+                "request_json": len(canonical_json(request_payload)),
+                "output_schema_json": len(canonical_json(schema_payload)),
+                "templated_prompt_utf8": request.limits.stdin_bytes + 1,
+            },
+            "oversized_components": ["templated_prompt_utf8"],
+            "execution_started": False,
+            "cause": message,
+        }
+        archived_cost = CostRecord(
+            category="authoring", wall_seconds=None, cpu_seconds=None, gpu_seconds=None,
+            input_tokens=None, output_tokens=None, human_minutes=None, usd=None,
+            measurement="unknown",
+            note=("Execution did not start because declared serialized-input bytes were "
+                  "exceeded; runtime and token costs are unknown."),
+        )
+        refs["preflight"] = store.put_bytes(
+            canonical_json(response), "generation-preflight", Visibility.AUTHORING
+        )
+        refs["cost"] = store.put_bytes(
+            canonical_json(archived_cost.model_dump(mode="json")),
+            "generation-cost", Visibility.AUTHORING,
+        )
+    else:
+        error_code = "ArchivePublicationError"
+        message = "attempt registration failed before execution"
+        response = None
+        archived_cost = CostRecord(
+            category="authoring", wall_seconds=None, cpu_seconds=None, gpu_seconds=None,
+            input_tokens=None, output_tokens=None, human_minutes=None, usd=None,
+            measurement="unknown",
+            note="Generation did not start because attempt registration failed; costs are unknown.",
+        )
+    status = {
+        "attempt_id": attempt_id,
+        "recorded_at": recorded_at.isoformat(),
+        "request_id": request.request_id,
+        "response_id": request.response_id,
+        "success": False,
+        "generation_succeeded": False,
+        "publication_complete": True,
+        "publication_recovered": True,
+        "publication_failure": "OSError: synthetic",
+        "error_type": error_code,
+        "error": message,
+        "archive_refs": {name: ref.model_dump(mode="json") for name, ref in refs.items()},
+    }
+    refs["status"] = store.put_bytes(
+        canonical_json(status), "generation-status", Visibility.AUTHORING
+    )
+    record = GenerationCallRecord(
+        attempt_id=attempt_id, recorded_at=recorded_at,
+        request_id=request.request_id, response_id=request.response_id,
+        success=False, generation_succeeded=False, publication_complete=True,
+        error_code=error_code, archives=refs,
+    )
+    return GenerationProviderError(
+        message, record, cost=archived_cost, response=response, usage_observation=None
     )
 
 
@@ -924,6 +1018,43 @@ def test_recovered_failed_generation_journals_without_another_model_call(tmp_pat
     refs = caught.value.replay(store)
     assert len(refs) == 1
     assert "malformed output" in store.get_bytes(refs[0]).decode()
+
+
+@pytest.mark.parametrize("preflight", (False, True))
+def test_recovered_preexecution_failure_journals_complete_variant(tmp_path, preflight):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    request = contract_request()
+    recovered = archived_preexecution_error(store, request, preflight=preflight)
+    provider = FakeProvider(())
+    with pytest.raises(AuthoringExhausted) as caught:
+        ContractAuthoringService(
+            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+            revision="2" * 40, evidence_scope="unit_diagnostic",
+        ).generate(
+            (GenerationCandidate(request=request),), contract_inputs(), sources(),
+            recovered_error=recovered,
+        )
+    assert len(caught.value.journal_refs) == 1
+    assert provider.calls == []
+
+
+def test_recovered_response_receipt_cap_includes_base64_expansion(tmp_path):
+    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
+    request = contract_request()
+    response = {"stdout_base64": "A" * 1_262_000, "stderr_base64": ""}
+    recovered = archived_provider_result(
+        store, request, contract_proposal(), response_payload=response
+    )
+    provider = FakeProvider(())
+    result = ContractAuthoringService(
+        provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+        revision="2" * 40, evidence_scope="unit_diagnostic",
+    ).generate(
+        (GenerationCandidate(request=request),), contract_inputs(), sources(),
+        recovered_result=recovered,
+    )
+    assert result.contract_ref.kind == "RequirementContract"
+    assert provider.calls == []
 
 
 def test_rejection_journal_publication_failure_is_replayable(tmp_path, monkeypatch):
