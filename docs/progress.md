@@ -22,7 +22,7 @@ Historical/candidate/generated source, adapters and build hooks execute only ins
 
 | Module | Accountable owner | Current state / next gate |
 | --- | --- | --- |
-| M0 | `/root/m0_contracts` | Bounded-read productbf065ec,170/299 tests; independent review active |
+| M0 | `/root/m0_contracts` | Bounded reads bf065ec independentlyPASS; root integration/M3 adoption next |
 | M1 | `/root/m1_sources` | Reviewed/integrated reconstruction scope; Click task provisional |
 | M2 | `/root/m2_authoring_recovery` | Provider e14f679 independent round5 PASS; root suite/native pending, authoring later |
 | M3 | `/root/m3_runtime` | Preparation reviewed; production interface handoff complete; waits M2 + M0 bounded reads |
@@ -75,6 +75,8 @@ Native selected backend: mlx-community/Qwen3-4B-Instruct-2507-4bit revision50d42
 Budget: owner two native calls USED; no more owner calls. One coordinator call remains <=2048 actual input,128 emitted,120s wall/CPU,1MiB stdin/output/file.3.5GiB MLX allocator/wired guideline/cache0,4GiB physical-footprint kill sampled20ms with1GiB guard; observation failure rejects, no zero-transient5GiB claim. Larger envelopes explicitly unqualified;262144 architectural tokens not host measurement. Research and two v1 smokes remain historical only: CodexCLI cap ineffective/disqualified; MLX research26/16 truncated, oversizedpreload rejection,64MiB killcanary; two v1 prod383/83 EOS BLUE/M2-PROD-1 at5.6719/5.8112wall,3.6368/4.0428CPU with cleanup. Later source corrected HOME/inputIDs/raw scores/cost publication. Old UTC/source gaps not retroactively repaired.
 
 ## Active M0 extension required by M3
+
+**M0 independent clearance:** `docs/reviews/M0-bounded-reads.md` final specPASS/qualityPASS, no substantive findings; reviewer15/15 bindings match. No suite rerun. Root confirms generation sources exactlye14f679 and artifacts sources exactlybf065ec before integration. Both prepared integration/native claim files remain absent at this pre-run check. Root will execute the declared suite+one-native wrapper now; this is pending execution, not success.
 
 **Current M0 handoff:** product **bf065ec738f29f13cf0cc783b53353adcbe6fab8**, owner FINAL/frozen. Optional keyword max_envelope_bytes on get_bytes/get_artifact, max_payload_bytes on get_bytes, public ArtifactSizeLimitError, growth-safe chunks and predecode size cap; old defaults compatible, no schema/identity/dependency change. New46 cases;170focused/299full exit0, exact inline outputs/source hashes at `docs/evidence/M0/bounded-reads/verification.json`; root15 command/source matches in `docs/evidence/M0/coordinator-bounded-read-binding.json`. Report `docs/reports/M0-bounded-reads.md`. Existing reviewer `/root/review_m0` actively reviews full owned `.superpowers/sdd/implementation-plan/review-0a08c91..bf065ec-M0-bounded.diff`,76393B,SHA6cf10681b11de9c9ae2bb6301c54d40366697aa9ff4b3dc2395d85a0474cfb8a; expected report `docs/reviews/M0-bounded-reads.md`. No owner edits until verdict. Native claims still absent.
 
