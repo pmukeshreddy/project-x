@@ -1,0 +1,8 @@
+{
+  "product_base": "ad154f88013200d9c0134b808c9211032ed67a2b",
+  "product_target": "2190af04ed10dccd65249963a727f19c0cdedaab",
+  "path": ".superpowers/sdd/implementation-plan/review-ad154f8..2190af0-M3-fix.diff",
+  "bytes": 16418,
+  "sha256": "c73410f8139800153406ca7a2e065ec8d50bb4372c9eb1a84339037491853a97",
+  "evidence": "docs/evidence/M3/fix-round2/verification.json"
+}
