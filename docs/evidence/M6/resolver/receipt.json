@@ -1,0 +1,42 @@
+{
+  "diagnostic_only": true,
+  "native_model_or_docker_execution": false,
+  "positive_gate": "TEST ONLY class method substitution; reports remain PROVISIONAL; no HumanReview or accepted QualificationReport created",
+  "observed_head_at_receipt": "62c2db6558284235ef3c98868f2967ee2fc91e92",
+  "recorded_at": "2026-09-19T23:49:05.698703+00:00",
+  "source_hashes_captured_after_unchanged_check": {
+    "src/feature_rl/pipeline/resolver.py": "f288e54890c4f13281aa6c3cfc5d94b169cf7295ac34baac31bef9889675454f",
+    "src/feature_rl/pipeline/__init__.py": "2414722023c1b0e3dbf25b58e6a5d4a37dd75729b1734f504142e31b8db91fbc",
+    "src/feature_rl/pipeline/lifecycle.py": "05d908395b3ec8e9cfb10bb0431dcc6c9010e3b9fd42b5db14523c12ab1ad9ce",
+    "tests/test_factory_resolver.py": "5b7958cef438c1dffcd8fecee3d71ae82a85326994c66a4736f86586f4bfbd16",
+    "src/feature_rl/qualification/__init__.py": "757e368d50b313cdfc50349acfb2bbdeca0e5e6c127e659d5deafb6c98524690",
+    "src/feature_rl/qualification/admission.py": "28b8f7f5fc1155fedc05abb83a2d97a8227ad4a4547ef9783a2de5116c1fea67",
+    "src/feature_rl/qualification/attestation.py": "ac0975c047ad96305bd4a68452a09009a0704b79518a3824ba3d708b12ebde52",
+    "src/feature_rl/qualification/controls.py": "94b85664321e46ef45da9a53d4c84b38dea4b4afaad367064e1ffb1d04c19259",
+    "src/feature_rl/qualification/evidence.py": "dd10c6e76cc3fcbb822f881ff8f32bd1bea3650a05569181b999a74aebb95908",
+    "src/feature_rl/qualification/models.py": "270f115d7e385d63d08be362144ad9fad5f3cd8be17feacf7c14cec9d005c6c4",
+    "src/feature_rl/qualification/projection.py": "c7d2d20c74d75baf452349d05eddfa4b214b67b57934398043be0a5878d9b177",
+    "src/feature_rl/qualification/service.py": "c22485cc9097bef4e91424d6415221f6720326a5900cb5201a6b5019fd0c384e"
+  },
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_factory_resolver.py"
+  ],
+  "environment": {
+    "PYTHONPATH": "src"
+  },
+  "red": {
+    "exit_code": 1,
+    "result": "9 failed: ReleasedTaskResolver missing",
+    "pytest_seconds": 0.19
+  },
+  "focused": {
+    "exit_code": 0,
+    "result": "9 passed",
+    "pytest_seconds": 29.09
+  },
+  "stdout_note": "Final pytest lines transcribed from exec session 70774, whose source bytes were unchanged during execution."
+}

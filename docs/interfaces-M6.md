@@ -159,3 +159,15 @@ not automatically repeated. A completed historical `recover` result is readback;
 current consumption still requires `resolve_released`. Keep claim/pending capabilities
 controller-private. Recovery/publication/current-trust overhead remains explicitly
 unmeasured rather than being counted as zero or rewriting frozen manifest costs.
+# Candidate-specific released-task consumer
+
+```python
+from feature_rl.pipeline import ReleasedTaskResolver
+
+resolver = ReleasedTaskResolver(profiles=(actual_task_lifecycle,), revision=git_revision)
+released = resolver.resolve_released(task_ref)  # exact stored TaskBundle
+```
+
+`profiles` is a tuple of one to 32 actual `TaskLifecycle` instances sharing the same controller store and Registry. Duplicate version profiles reject because their current trust could be ambiguous. Each profile supplies supported lifecycle/M5/grader/runtime/builder revisions and the current actual external human verifier. Candidate-specific qualification policies are resolved from the selected release configuration; they do not choose code, service versions or external trust. Multiple policies can share one profile. Unsupported or ambiguous selected chains raise `AdmissionRejected`.
+
+The resolver exposes `.store`, `.registry`, `.configuration` (private `m6-resolver-configuration` ref with explicit profile dependencies) and `.revision`, matching consumer identity needs. Every call enforces exact Tn→accepted Q→BUILT T0 equality, actual legal Registry transitions and current M5/quarantine/revocation. It dispatches no grade, source, model, transition or Registry job. Existing selected CAS/configuration bytes are reasserted idempotently. Audit historical reads grant no admission. A consumer's one `TaskBuilder` must still match the accepted Q.task construction revision when calling `builder.solver_package(Q.task)`.
