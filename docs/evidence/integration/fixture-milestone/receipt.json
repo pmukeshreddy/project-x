@@ -1,0 +1,21 @@
+{
+  "scope": "Stable non-Docker integration suite; actual Docker evidence retained in M6 fixture receipt",
+  "revision": "da26580abe88987c3a139b78e75f85712a3aa201",
+  "cwd": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/milestone-da26580",
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "--ignore=tests/test_environments_docker.py",
+    "--ignore=tests/test_grading_docker.py"
+  ],
+  "PYTHONPATH": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/milestone-da26580/src",
+  "started_at": "2026-09-19T22:44:45.047436+00:00",
+  "ended_at": "2026-09-19T22:45:21.179384+00:00",
+  "wall_seconds": 36.13183383294381,
+  "exit_status": 0,
+  "tracked_status_after": "",
+  "docker_evidence": "docs/evidence/M6/fixture-runtime/receipt.json",
+  "gpu_execution": "unverified; deferred"
+}
