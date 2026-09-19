@@ -1,0 +1,1 @@
+{"command":"PYTHONPATH=src ./.venv/bin/pytest -q tests/test_authoring.py tests/test_generation.py","completed_at":"2026-09-19T22:08:37Z","exit_status":0,"started_at":"2026-09-19T22:08:35Z","stderr":"docs/evidence/M2/authoring-round3/focused-tests.stderr.txt","stdout":"docs/evidence/M2/authoring-round3/focused-tests.stdout.txt"}

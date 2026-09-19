@@ -2,7 +2,7 @@
 
 ## Result
 
-The authoring/scenario product is implemented at product revision `d64f172efb2d50ce9303725a08ed2fcfd9f4a65f`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, an explicit scenario-planning stage, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
+The authoring/scenario product is implemented at product revision `2493f090fe88924094b28b3ce7ae6ea8182026ab`. It provides real M3 Click discovery, store-backed request/B/discovery resolution, M0-derived proposals, deterministic grounding and finalization, an explicit scenario-planning stage, exact frozen-contract joins, bounded repair journals, and replay after provider, journal, or final-artifact publication failure.
 
 The actual Click construction gate did not pass. One M3 discovery succeeded. Three contract calls consumed the stage budget: two reached the fixed 120-second deadline, and the final concise call completed but returned a duplicate-key response. No contract was frozen, no privileged H feasibility review was authorized, and no scenario call was made. There is no handwritten or salvaged production artifact.
 
@@ -68,6 +68,8 @@ PYTHONPATH=src ./.venv/bin/pytest -q tests/test_authoring.py tests/test_generati
 ```
 
 Result: **146 passed in 1.01s**, exit 0. It adds exact recovered-request/schema/context/status/content/usage/cost binding for both services, failed-generation publication replay and rejection-journal recovery without provider reuse, exact frozen public-check admission, and the `m4-sha256-v1` reproduction default. An earlier identical pytest invocation printed 146 passes in 1.12s, but its wrapper then failed because it assigned zsh's read-only `status` variable; that wrapper did not capture pytest's exit status and is retained separately rather than treated as verification.
+
+Round-three focused compatibility command used the same two test files. Result: **149 passed in 1.05s**, exit 0. It covers complete registration and preflight recovery variants plus a valid 1,262,039-byte response receipt under the unchanged 1-MiB raw-output limit. No full suite, native generation, tokenizer, or Docker command ran.
 
 Affected full-suite command:
 
