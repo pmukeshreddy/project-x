@@ -1,0 +1,236 @@
+............FFFFFFFFFFF.                                                 [100%]
+=================================== FAILURES ===================================
+____ test_baseline_health_and_missing_feature_are_separate_semantic_checks _____
+
+    def test_baseline_health_and_missing_feature_are_separate_semantic_checks():
+        from feature_rl.qualification import assess_outcome
+        observed=receipt(failed=('feature',))
+>       assert assess_outcome(checked(),observed,'baseline_health',()).passed
+                              ^^^^^^^^^
+
+tests/test_qualification_controls.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[protocol_failure] _
+
+status = 'protocol_failure'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+        from feature_rl.qualification import assess_outcome
+>       assert not assess_outcome(checked(),receipt(status=status),'semantic_negative',('feature',)).passed
+                                  ^^^^^^^^^
+
+tests/test_qualification_controls.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[candidate_failure] _
+
+status = 'candidate_failure'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+        from feature_rl.qualification import assess_outcome
+>       assert not assess_outcome(checked(),receipt(status=status),'semantic_negative',('feature',)).passed
+                                  ^^^^^^^^^
+
+tests/test_qualification_controls.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[not_run] _
+
+status = 'not_run'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+        from feature_rl.qualification import assess_outcome
+>       assert not assess_outcome(checked(),receipt(status=status),'semantic_negative',('feature',)).passed
+                                  ^^^^^^^^^
+
+tests/test_qualification_controls.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[infrastructure_failure] _
+
+status = 'infrastructure_failure'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+        from feature_rl.qualification import assess_outcome
+>       assert not assess_outcome(checked(),receipt(status=status),'semantic_negative',('feature',)).passed
+                                  ^^^^^^^^^
+
+tests/test_qualification_controls.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_ test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed0] _
+
+failed = ()
+
+    @pytest.mark.parametrize('failed',[(),('compat',),('feature','compat')])
+    def test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations(failed):
+        from feature_rl.qualification import assess_outcome
+>       assert not assess_outcome(checked(),receipt(failed=failed),'semantic_negative',('feature',)).passed
+                                  ^^^^^^^^^
+
+tests/test_qualification_controls.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_ test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed1] _
+
+failed = ('compat',)
+
+    @pytest.mark.parametrize('failed',[(),('compat',),('feature','compat')])
+    def test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations(failed):
+        from feature_rl.qualification import assess_outcome
+>       assert not assess_outcome(checked(),receipt(failed=failed),'semantic_negative',('feature',)).passed
+                                  ^^^^^^^^^
+
+tests/test_qualification_controls.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_ test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed2] _
+
+failed = ('feature', 'compat')
+
+    @pytest.mark.parametrize('failed',[(),('compat',),('feature','compat')])
+    def test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations(failed):
+        from feature_rl.qualification import assess_outcome
+>       assert not assess_outcome(checked(),receipt(failed=failed),'semantic_negative',('feature',)).passed
+                                  ^^^^^^^^^
+
+tests/test_qualification_controls.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+___ test_known_false_pass_false_rejection_and_cleanup_have_explicit_reasons ____
+
+    def test_known_false_pass_false_rejection_and_cleanup_have_explicit_reasons():
+        from feature_rl.qualification import assess_outcome
+>       assert assess_outcome(checked(),receipt(reward=1),'semantic_negative',('feature',)).code=='false_acceptance'
+                              ^^^^^^^^^
+
+tests/test_qualification_controls.py:47: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+___________ test_positive_reference_requires_complete_compared_cases ___________
+
+    def test_positive_reference_requires_complete_compared_cases():
+        from feature_rl.qualification import assess_outcome
+>       assert assess_outcome(checked(),receipt(reward=1),'positive',()).passed
+                              ^^^^^^^^^
+
+tests/test_qualification_controls.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+_______ test_adversarial_rejection_does_not_hide_infrastructure_failure ________
+
+    def test_adversarial_rejection_does_not_hide_infrastructure_failure():
+        from feature_rl.qualification import assess_outcome
+        output=receipt(status='protocol_failure')
+>       assert assess_outcome(checked(),output,'protocol_failure',()).passed
+                              ^^^^^^^^^
+
+tests/test_qualification_controls.py:62: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def checked():
+        feature=SimpleNamespace(requirement_id='feature',mandatory=True)
+        compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
+>       return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compat,)))
+                                                                                                           ^^^^^^
+E       NameError: name 'compat' is not defined
+
+tests/test_qualification_controls.py:11: NameError
+=========================== short test summary info ============================
+FAILED tests/test_qualification_controls.py::test_baseline_health_and_missing_feature_are_separate_semantic_checks
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[protocol_failure]
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[candidate_failure]
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[not_run]
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[infrastructure_failure]
+FAILED tests/test_qualification_controls.py::test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed0]
+FAILED tests/test_qualification_controls.py::test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed1]
+FAILED tests/test_qualification_controls.py::test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed2]
+FAILED tests/test_qualification_controls.py::test_known_false_pass_false_rejection_and_cleanup_have_explicit_reasons
+FAILED tests/test_qualification_controls.py::test_positive_reference_requires_complete_compared_cases
+FAILED tests/test_qualification_controls.py::test_adversarial_rejection_does_not_hide_infrastructure_failure
+11 failed, 13 passed in 0.32s

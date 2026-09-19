@@ -1,0 +1,144 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_verified_history_uses_actual_registry_candidate_trace_jobs ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1206/test_verified_history_uses_act0')
+
+    def test_verified_history_uses_actual_registry_candidate_trace_jobs(tmp_path):
+        from feature_rl.qualification import QualificationService, QualificationPolicy, RepairHistory
+        from feature_rl.qualification.evidence import put_record
+        from feature_rl.registry import JobSpec
+        from feature_rl.verifiers import load_verifier
+        q=service(tmp_path);task_ref=task_fixture(q.store);checked=load_verifier(q.store,task_ref)
+        pair=q.store.get_artifact(checked.task.source_pair)
+        history=RepairHistory(candidate=pair.candidate,complete=True,initial_evidence=pair.verification,
+            attempts=(),journal_refs=(pair.verification[0].artifacts[0],))
+        history_ref=put_record(q.store,history,'m5-repair-history')
+        q.registry.register(history_ref,dependencies=(pair.candidate,*history.journal_refs))
+        config=put_record(q.store,{'diagnostic_only':True},'unit-diagnostic')
+        job=q.registry.enqueue(JobSpec(operation='construct',inputs=(pair.candidate,),configuration=config,
+            implementation='d'*40,invocation='synthetic-history-only',attempt_limit=1))
+        claim=q.registry.claim(job.job_id,owner='synthetic-diagnostic',claim_key='synthetic-history')
+        result=c.OperationResult(operation='construct',disposition=c.Disposition.SUCCESS,artifacts=(history_ref,),
+            evidence=pair.verification,costs=checked.task.costs,reason='Synthetic history fixture, not real construction')
+>       q.registry.complete(claim,result,observations=())
+
+tests/test_qualification_service.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/registry/core.py:179: in complete
+    return self._storage.change(build).jobs[claim.job_id]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/registry/storage.py:276: in change
+    state.apply(action, data)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.registry.state.State object at 0x107fb98c0>
+action = 'complete'
+data = {'artifacts': [{'ref': {'sha256': '332693af8bfdd9173e66eba863448ef5c1232a2de6458a64c990cee94fdf1a4b', 'kind': 'm5-repa...and': ['diagnostic-fixture'], 'recorded_at': '2026-09-19T00:00:00Z', 'exit_status': 0, ...}], ...}, 'observations': []}
+
+    def apply(self, action, data):
+        shapes = {
+            'register': {'artifacts'}, 'enqueue': {'artifacts', 'spec'},
+            'claim': {'artifacts', 'claim'}, 'abandon': {'artifacts', 'claim', 'reason', 'evidence'},
+            'retry': {'artifacts', 'job_id', 'reason', 'evidence'},
+            'reconcile': {'artifacts', 'claim', 'observation'},
+            'complete': {'artifacts', 'claim', 'result', 'observations'},
+            'quarantine': {'artifacts', 'notice'},
+            'lift': {'artifacts', 'notice_id', 'reason', 'evidence'},
+        }
+        if action not in shapes or set(data) != shapes[action] or type(data['artifacts']) is not list:
+            raise RegistryIntegrityError('unexpected event payload shape')
+        records = tuple(validated(ArtifactRecord, r) for r in data['artifacts'])
+        if len(records) > self.limits.max_closure_artifacts:
+            raise RegistryLimit('event artifact closure exceeded')
+        self.install(records)
+        if action == 'register':
+            return
+        if action == 'enqueue':
+            spec = validated(JobSpec, data['spec'])
+            key = identity(spec)
+            if key in self.jobs:
+                raise RegistryConflict('duplicate enqueue event')
+            if len(self.jobs) >= self.limits.max_jobs:
+                raise RegistryLimit('job index capacity exceeded')
+            if sum(job.state in ('queued', 'running', 'paused') for job in self.jobs.values()) >= self.limits.max_active_jobs:
+                raise Backpressure('active job queue is full')
+            if spec.attempt_limit > self.limits.max_attempts_per_job:
+                raise AttemptLimit('job attempt limit exceeds registry policy')
+            self.usable((*spec.inputs, spec.configuration))
+            self.jobs[key] = JobRecord(job_id=key, spec=spec, state='queued', attempts=(), result=None, result_observations=())
+            return
+        if action in ('claim', 'abandon', 'reconcile', 'complete'):
+            claim = validated(Claim, data['claim'])
+            job = self.get_job(claim.job_id)
+        if action == 'claim':
+            if job.state != 'queued':
+                raise ClaimConflict('job is not queued; paused jobs require explicit retry')
+            if any(attempt.claim.claim_key == claim.claim_key for attempt in self.attempts.values()):
+                raise ClaimConflict('claim key already belongs to an attempt')
+            if len(job.attempts) >= job.spec.attempt_limit:
+                raise AttemptLimit('job attempt limit exhausted')
+            if claim.attempt_id != identity({'job_id': job.job_id, 'claim_key': claim.claim_key, 'owner': claim.owner}):
+                raise RegistryConflict('attempt identity mismatch')
+            self.usable((*job.spec.inputs, job.spec.configuration))
+            self.attempts[claim.attempt_id] = AttemptRecord(claim=claim, state='running', reason=None, evidence=())
+            self.jobs[job.job_id] = updated(job, state='running', attempts=[*job.attempts, claim.attempt_id])
+        elif action == 'abandon':
+            attempt, job = self.authenticate(claim, running=True)
+            candidate = updated(attempt, state='abandoned', reason=data['reason'], evidence=data['evidence'])
+            if not candidate.evidence:
+                raise RegistryConflict('abandonment requires supervisor evidence')
+            self.attempts[claim.attempt_id] = candidate
+            self.jobs[job.job_id] = updated(job, state='exhausted' if len(job.attempts) >= job.spec.attempt_limit else 'paused')
+        elif action == 'retry':
+            job = self.get_job(data['job_id'])
+            if len(job.attempts) >= job.spec.attempt_limit:
+                raise AttemptLimit('job attempt limit exhausted')
+            if job.state != 'paused':
+                raise ClaimConflict('only paused interrupted jobs can be explicitly retried')
+            # Validate reason/evidence using the same strict envelope as abandonment.
+            record = updated(self.attempts[job.attempts[-1]], reason=data['reason'], evidence=data['evidence'])
+            if not record.evidence:
+                raise RegistryConflict('retry requires diagnosed cause/change evidence')
+            self.usable((*job.spec.inputs, job.spec.configuration))
+            self.jobs[job.job_id] = updated(job, state='queued')
+        elif action == 'reconcile':
+            self.authenticate(claim)
+            observation = validated(CostObservation, data['observation'])
+            latest = self.latest().get((observation.source, observation.upstream_attempt_id))
+            if latest is None:
+                if observation.revision != 1:
+                    raise RegistryConflict('first accounting snapshot must be revision 1')
+            else:
+                old = latest.observation
+                if latest.attempt_id != claim.attempt_id:
+                    raise RegistryConflict('upstream attempt already attributed to another registry attempt')
+                if observation.revision != old.revision + 1:
+                    raise RegistryConflict('accounting revisions must be contiguous')
+                if not set(old.receipts) <= set(observation.receipts):
+                    raise RegistryConflict('new snapshot cannot drop existing receipts')
+                channels = {cost.category: cost for cost in observation.costs}
+                for cost in old.costs:
+                    if cost.category not in channels:
+                        raise RegistryConflict('new snapshot cannot drop incurred cost channels')
+                    newer = channels[cost.category]
+                    for field in ('wall_seconds', 'cpu_seconds', 'gpu_seconds', 'input_tokens', 'output_tokens', 'human_minutes', 'usd'):
+                        previous, current = getattr(cost, field), getattr(newer, field)
+                        if previous is not None and (current is None or current < previous):
+                            raise RegistryConflict('new snapshot cannot erase or reduce known incurred cost')
+            key = identity({'attempt_id': claim.attempt_id, 'observation': document(observation)})
+            self.observations[key] = ObservationRecord(observation_id=key, attempt_id=claim.attempt_id, observation=observation)
+        elif action == 'complete':
+            attempt, job = self.authenticate(claim, running=True)
+            result = validated(OperationResult, data['result'])
+            if result.operation != job.spec.operation:
+                raise RegistryConflict('operation result does not match job operation')
+            wanted = tuple(sorted(item.observation_id for item in self.latest().values() if item.attempt_id == claim.attempt_id))
+            if not wanted or tuple(data['observations']) != wanted:
+>               raise RegistryConflict('completion must bind all current accounting snapshots of its attempt')
+E               feature_rl.registry.models.RegistryConflict: completion must bind all current accounting snapshots of its attempt
+
+src/feature_rl/registry/state.py:256: RegistryConflict
+=========================== short test summary info ============================
+FAILED tests/test_qualification_service.py::test_verified_history_uses_actual_registry_candidate_trace_jobs
+1 failed in 0.28s

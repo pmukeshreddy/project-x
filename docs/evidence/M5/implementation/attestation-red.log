@@ -1,0 +1,101 @@
+FFFFFFFFF.                                                               [100%]
+=================================== FAILURES ===================================
+_ test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[none] _
+
+defect = 'none'
+
+    @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
+    def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:34: ModuleNotFoundError
+_ test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[replay] _
+
+defect = 'replay'
+
+    @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
+    def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:34: ModuleNotFoundError
+_ test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[payload] _
+
+defect = 'payload'
+
+    @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
+    def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:34: ModuleNotFoundError
+_ test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[key] _
+
+defect = 'key'
+
+    @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
+    def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:34: ModuleNotFoundError
+_ test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[principal] _
+
+defect = 'principal'
+
+    @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
+    def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:34: ModuleNotFoundError
+_ test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[namespace] _
+
+defect = 'namespace'
+
+    @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
+    def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:34: ModuleNotFoundError
+_ test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[malformed] _
+
+defect = 'malformed'
+
+    @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
+    def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:34: ModuleNotFoundError
+___ test_agent_owned_enrollment_cannot_turn_a_model_key_into_human_authority ___
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1202/test_agent_owned_enrollment_ca0')
+
+    def test_agent_owned_enrollment_cannot_turn_a_model_key_into_human_authority(tmp_path):
+>       from feature_rl.qualification.attestation import SSHHumanVerifier
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:54: ModuleNotFoundError
+____________ test_native_verifier_never_runs_arbitrary_binary_path _____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1202/test_native_verifier_never_run0')
+
+    def test_native_verifier_never_runs_arbitrary_binary_path(tmp_path):
+>       from feature_rl.qualification.attestation import verify_sshsig
+E       ModuleNotFoundError: No module named 'feature_rl.qualification.attestation'
+
+tests/test_qualification_attestation.py:62: ModuleNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_qualification_attestation.py::test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[none]
+FAILED tests/test_qualification_attestation.py::test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[replay]
+FAILED tests/test_qualification_attestation.py::test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[payload]
+FAILED tests/test_qualification_attestation.py::test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[key]
+FAILED tests/test_qualification_attestation.py::test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[principal]
+FAILED tests/test_qualification_attestation.py::test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[namespace]
+FAILED tests/test_qualification_attestation.py::test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key[malformed]
+FAILED tests/test_qualification_attestation.py::test_agent_owned_enrollment_cannot_turn_a_model_key_into_human_authority
+FAILED tests/test_qualification_attestation.py::test_native_verifier_never_runs_arbitrary_binary_path
+9 failed, 1 passed in 0.12s

@@ -1,0 +1,63 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_missing_real_package_validator_returns_precise_provisional_without_worker_execution _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1200/test_missing_real_package_vali0')
+
+    def test_missing_real_package_validator_returns_precise_provisional_without_worker_execution(tmp_path):
+>       q=service(tmp_path);task=task_fixture(q.store)
+          ^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_service.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1200/test_missing_real_package_vali0')
+
+    def service(tmp_path):
+>       from feature_rl.qualification import QualificationService
+E       ImportError: cannot import name 'QualificationService' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_service.py:12: ImportError
+_____ test_forged_accepted_report_without_authenticated_origin_is_rejected _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1200/test_forged_accepted_report_wi0')
+
+    def test_forged_accepted_report_without_authenticated_origin_is_rejected(tmp_path):
+        from feature_rl.qualification import QualificationRejected
+>       q=service(tmp_path);task=task_fixture(q.store)
+          ^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_service.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1200/test_forged_accepted_report_wi0')
+
+    def service(tmp_path):
+>       from feature_rl.qualification import QualificationService
+E       ImportError: cannot import name 'QualificationService' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_service.py:12: ImportError
+_______ test_missing_human_origin_is_not_authenticated_by_identity_text ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1200/test_missing_human_origin_is_n0')
+
+    def test_missing_human_origin_is_not_authenticated_by_identity_text(tmp_path):
+        from feature_rl.qualification import QualificationRejected
+>       q=service(tmp_path);task=task_fixture(q.store)
+          ^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_service.py:36: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1200/test_missing_human_origin_is_n0')
+
+    def service(tmp_path):
+>       from feature_rl.qualification import QualificationService
+E       ImportError: cannot import name 'QualificationService' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_service.py:12: ImportError
+=========================== short test summary info ============================
+FAILED tests/test_qualification_service.py::test_missing_real_package_validator_returns_precise_provisional_without_worker_execution
+FAILED tests/test_qualification_service.py::test_forged_accepted_report_without_authenticated_origin_is_rejected
+FAILED tests/test_qualification_service.py::test_missing_human_origin_is_not_authenticated_by_identity_text
+3 failed in 0.14s

@@ -1,0 +1,144 @@
+FFFFFFFFFFFF                                                             [100%]
+=================================== FAILURES ===================================
+__ test_reference_projection_retains_exact_h_and_accounts_for_excluded_paths ___
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x1093942f0>
+
+    def test_reference_projection_retains_exact_h_and_accounts_for_excluded_paths(store):
+>       from feature_rl.qualification import derive_reference
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:15: ModuleNotFoundError
+____ test_reference_projection_never_drops_unsupported_changed_paths[mixed] ____
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a350050>
+category = 'mixed'
+
+    @pytest.mark.parametrize('category',['mixed','unrelated','dependency_build'])
+    def test_reference_projection_never_drops_unsupported_changed_paths(store,category):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:33: ModuleNotFoundError
+__ test_reference_projection_never_drops_unsupported_changed_paths[unrelated] __
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a350690>
+category = 'unrelated'
+
+    @pytest.mark.parametrize('category',['mixed','unrelated','dependency_build'])
+    def test_reference_projection_never_drops_unsupported_changed_paths(store,category):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:33: ModuleNotFoundError
+_ test_reference_projection_never_drops_unsupported_changed_paths[dependency_build] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a36c9d0>
+category = 'dependency_build'
+
+    @pytest.mark.parametrize('category',['mixed','unrelated','dependency_build'])
+    def test_reference_projection_never_drops_unsupported_changed_paths(store,category):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:33: ModuleNotFoundError
+_ test_reference_projection_rejects_mismatched_classification_or_submission_policy[omitted] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a36cd60>
+defect = 'omitted'
+
+    @pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+    def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:41: ModuleNotFoundError
+_ test_reference_projection_rejects_mismatched_classification_or_submission_policy[duplicate] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a361370>
+defect = 'duplicate'
+
+    @pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+    def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:41: ModuleNotFoundError
+_ test_reference_projection_rejects_mismatched_classification_or_submission_policy[extra] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a311f20>
+defect = 'extra'
+
+    @pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+    def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:41: ModuleNotFoundError
+_ test_reference_projection_rejects_mismatched_classification_or_submission_policy[disguised_implementation] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a312690>
+defect = 'disguised_implementation'
+
+    @pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+    def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:41: ModuleNotFoundError
+_ test_reference_projection_rejects_mismatched_classification_or_submission_policy[wrong_h] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a341850>
+defect = 'wrong_h'
+
+    @pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+    def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:41: ModuleNotFoundError
+_ test_reference_projection_rejects_mismatched_classification_or_submission_policy[out_of_policy] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a342050>
+defect = 'out_of_policy'
+
+    @pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+    def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:41: ModuleNotFoundError
+_ test_reference_projection_rejects_mismatched_classification_or_submission_policy[executable] _
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a369e50>
+defect = 'executable'
+
+    @pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+    def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
+>       from feature_rl.qualification import derive_reference, QualificationRejected
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:41: ModuleNotFoundError
+_______ test_reference_projection_handles_source_deletion_with_evidence ________
+
+store = <feature_rl.artifacts.store.ArtifactStore object at 0x10a368410>
+
+    def test_reference_projection_handles_source_deletion_with_evidence(store):
+>       from feature_rl.qualification import derive_reference
+E       ModuleNotFoundError: No module named 'feature_rl.qualification'
+
+tests/test_qualification_projection.py:61: ModuleNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_qualification_projection.py::test_reference_projection_retains_exact_h_and_accounts_for_excluded_paths
+FAILED tests/test_qualification_projection.py::test_reference_projection_never_drops_unsupported_changed_paths[mixed]
+FAILED tests/test_qualification_projection.py::test_reference_projection_never_drops_unsupported_changed_paths[unrelated]
+FAILED tests/test_qualification_projection.py::test_reference_projection_never_drops_unsupported_changed_paths[dependency_build]
+FAILED tests/test_qualification_projection.py::test_reference_projection_rejects_mismatched_classification_or_submission_policy[omitted]
+FAILED tests/test_qualification_projection.py::test_reference_projection_rejects_mismatched_classification_or_submission_policy[duplicate]
+FAILED tests/test_qualification_projection.py::test_reference_projection_rejects_mismatched_classification_or_submission_policy[extra]
+FAILED tests/test_qualification_projection.py::test_reference_projection_rejects_mismatched_classification_or_submission_policy[disguised_implementation]
+FAILED tests/test_qualification_projection.py::test_reference_projection_rejects_mismatched_classification_or_submission_policy[wrong_h]
+FAILED tests/test_qualification_projection.py::test_reference_projection_rejects_mismatched_classification_or_submission_policy[out_of_policy]
+FAILED tests/test_qualification_projection.py::test_reference_projection_rejects_mismatched_classification_or_submission_policy[executable]
+FAILED tests/test_qualification_projection.py::test_reference_projection_handles_source_deletion_with_evidence
+12 failed in 0.13s

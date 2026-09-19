@@ -1,0 +1,121 @@
+FFFFFFFFFFFF                                                             [100%]
+=================================== FAILURES ===================================
+____ test_baseline_health_and_missing_feature_are_separate_semantic_checks _____
+
+    def test_baseline_health_and_missing_feature_are_separate_semantic_checks():
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:26: ImportError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[protocol_failure] _
+
+status = 'protocol_failure'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:35: ImportError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[candidate_failure] _
+
+status = 'candidate_failure'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:35: ImportError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[not_run] _
+
+status = 'not_run'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:35: ImportError
+_ test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[infrastructure_failure] _
+
+status = 'infrastructure_failure'
+
+    @pytest.mark.parametrize('status',['protocol_failure','candidate_failure','not_run','infrastructure_failure'])
+    def test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions(status):
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:35: ImportError
+_ test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed0] _
+
+failed = ()
+
+    @pytest.mark.parametrize('failed',[(),('compat',),('feature','compat')])
+    def test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations(failed):
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:41: ImportError
+_ test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed1] _
+
+failed = ('compat',)
+
+    @pytest.mark.parametrize('failed',[(),('compat',),('feature','compat')])
+    def test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations(failed):
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:41: ImportError
+_ test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed2] _
+
+failed = ('feature', 'compat')
+
+    @pytest.mark.parametrize('failed',[(),('compat',),('feature','compat')])
+    def test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations(failed):
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:41: ImportError
+___ test_known_false_pass_false_rejection_and_cleanup_have_explicit_reasons ____
+
+    def test_known_false_pass_false_rejection_and_cleanup_have_explicit_reasons():
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:46: ImportError
+___________ test_positive_reference_requires_complete_compared_cases ___________
+
+    def test_positive_reference_requires_complete_compared_cases():
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:54: ImportError
+_______ test_adversarial_rejection_does_not_hide_infrastructure_failure ________
+
+    def test_adversarial_rejection_does_not_hide_infrastructure_failure():
+>       from feature_rl.qualification import assess_outcome
+E       ImportError: cannot import name 'assess_outcome' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:60: ImportError
+_ test_repair_budget_rejects_duplicate_no_change_wrong_candidate_and_exact_caps _
+
+    def test_repair_budget_rejects_duplicate_no_change_wrong_candidate_and_exact_caps():
+>       from feature_rl.qualification import RepairAttempt, RepairHistory, validate_repairs, QualificationRejected
+E       ImportError: cannot import name 'RepairAttempt' from 'feature_rl.qualification' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/qualification/__init__.py)
+
+tests/test_qualification_controls.py:68: ImportError
+=========================== short test summary info ============================
+FAILED tests/test_qualification_controls.py::test_baseline_health_and_missing_feature_are_separate_semantic_checks
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[protocol_failure]
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[candidate_failure]
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[not_run]
+FAILED tests/test_qualification_controls.py::test_syntax_protocol_infrastructure_and_unrun_failures_are_not_semantic_omissions[infrastructure_failure]
+FAILED tests/test_qualification_controls.py::test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed0]
+FAILED tests/test_qualification_controls.py::test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed1]
+FAILED tests/test_qualification_controls.py::test_semantic_negative_requires_exact_target_failures_and_preserved_other_obligations[failed2]
+FAILED tests/test_qualification_controls.py::test_known_false_pass_false_rejection_and_cleanup_have_explicit_reasons
+FAILED tests/test_qualification_controls.py::test_positive_reference_requires_complete_compared_cases
+FAILED tests/test_qualification_controls.py::test_adversarial_rejection_does_not_hide_infrastructure_failure
+FAILED tests/test_qualification_controls.py::test_repair_budget_rejects_duplicate_no_change_wrong_candidate_and_exact_caps
+12 failed in 0.14s

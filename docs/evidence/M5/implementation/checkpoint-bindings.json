@@ -1,0 +1,79 @@
+{
+  "scope": "provisional_qualification_callable_checkpoint_only",
+  "base_revision": "71f0fa2c96c3bf3ebfac7539b52065743e0661ef",
+  "files": [
+    {
+      "path": "src/feature_rl/qualification/__init__.py",
+      "sha256": "757e368d50b313cdfc50349acfb2bbdeca0e5e6c127e659d5deafb6c98524690"
+    },
+    {
+      "path": "src/feature_rl/qualification/admission.py",
+      "sha256": "35e6c59abb7004a6768a33d2e703efb6c624c93a5e86374f524592fbeaef1709"
+    },
+    {
+      "path": "src/feature_rl/qualification/attestation.py",
+      "sha256": "1bc8e91b7e97d584769c818505d2a7042965c7a5ea7c83ade84d2d9d4ad0dded"
+    },
+    {
+      "path": "src/feature_rl/qualification/controls.py",
+      "sha256": "039c74ceee23828ff8cf9a29eb5417e4475099931c4043e2e8df049fc987df3e"
+    },
+    {
+      "path": "src/feature_rl/qualification/evidence.py",
+      "sha256": "a15fc2773c68caec8168759721f2c819d5d736008438ac4539201b7ca2d8f0ae"
+    },
+    {
+      "path": "src/feature_rl/qualification/models.py",
+      "sha256": "5708e1d3d79bf0f7b0c13e3ac44a6e50f94010d365033f6c8af3a04409d8567e"
+    },
+    {
+      "path": "src/feature_rl/qualification/projection.py",
+      "sha256": "c7d2d20c74d75baf452349d05eddfa4b214b67b57934398043be0a5878d9b177"
+    },
+    {
+      "path": "src/feature_rl/qualification/service.py",
+      "sha256": "8b05a6e94fb8409248d3dc9b0a2e390d6ca2666572a3a594a0aa03cda25a3c3b"
+    },
+    {
+      "path": "tests/m5_fixtures.py",
+      "sha256": "f44192d775c8b42f1978a735e92bfd4eeb1c80e78f71f3ea1bcf174d73d567c8"
+    },
+    {
+      "path": "tests/test_qualification_attestation.py",
+      "sha256": "d9e4dd3a07b768d0d8519f55e0fb10e868dbdd6aa24d7a49bb2cdc9ba902c744"
+    },
+    {
+      "path": "tests/test_qualification_controls.py",
+      "sha256": "9fef949e8d6183c1ee89ac3351eed42e514e5783d59c44a78546b4f762c5d404"
+    },
+    {
+      "path": "tests/test_qualification_projection.py",
+      "sha256": "d559dd7452663076fdd7ff3b679a9c0d72009d02c95b253b2aa203d1efcc9694"
+    },
+    {
+      "path": "tests/test_qualification_service.py",
+      "sha256": "99429d078f394db062647c3bd0fea3a6908255182f85bef8309ef697558e1dd4"
+    }
+  ],
+  "tests": {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "tests/test_qualification_projection.py",
+      "tests/test_qualification_controls.py",
+      "tests/test_qualification_service.py",
+      "tests/test_qualification_attestation.py",
+      "-q"
+    ],
+    "environment": {
+      "PYTHONPATH": "src"
+    },
+    "exit_status": 0,
+    "passed": 38,
+    "log": "docs/evidence/M5/implementation/checkpoint-green.log",
+    "log_sha256": "d10f4e1687469d72520413ffecc1ea460cd9b35d4ca9f63b4e1486bf22b167bb"
+  },
+  "acceptance_status": "deny-all checkpoint pending authenticated admission implementation",
+  "actual_fixture_execution": "not executed by M5 owner"
+}
