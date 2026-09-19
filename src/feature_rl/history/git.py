@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import difflib
 import hashlib
 import os
 from pathlib import Path, PurePosixPath
@@ -16,6 +15,20 @@ from typing import Literal
 
 
 _REVISION = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
+_HUNK_HEADER = re.compile(
+    rb"^@@ -([0-9]+)(?:,([0-9]+))? \+([0-9]+)(?:,([0-9]+))? @@"
+)
+
+_MAX_CHAIN_COMMITS = 4_096
+_MAX_REWRITE_COMMITS = 128
+_MAX_REWRITE_PATHS = 256
+_MAX_REWRITE_PATH_BYTES = 16_384
+_MAX_REWRITE_BLOB_BYTES = 1_000_000
+_MAX_REWRITE_TOTAL_BLOB_BYTES = 8_000_000
+_MAX_REWRITE_DIFF_BYTES = 8_000_000
+_MAX_REWRITE_HUNKS = 1_024
+_MAX_REWRITE_LINES = 500_000
+_MAX_REWRITE_SEARCH_UNITS = 2_000_000
 
 
 class HistoryError(RuntimeError):
@@ -52,6 +65,33 @@ class Reconstruction:
     patch_sha256: str
     source_commits: tuple[str, ...]
     commit_mapping: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class _RewriteDelta:
+    proof_digest: str
+    action_digest: str
+
+
+@dataclass
+class _RewriteBudget:
+    deadline: float
+    paths: int = 0
+    blob_bytes: int = 0
+    diff_bytes: int = 0
+    hunks: int = 0
+    lines: int = 0
+    search_units: int = 0
+
+    def charge(self, field: str, amount: int, limit: int) -> None:
+        if amount < 0:
+            raise ValueError("rewrite work charge must be nonnegative")
+        if time.monotonic() >= self.deadline:
+            raise HistoryError("history reconstruction timed out")
+        value = getattr(self, field) + amount
+        if value > limit:
+            raise ValueError(f"rewritten rebase work budget exceeded: {field}")
+        setattr(self, field, value)
 
 
 class GitHistory:
@@ -152,9 +192,20 @@ class GitHistory:
                 )
             time.sleep(0.01)
 
-    def _run_bytes(self, *args: str, max_bytes: int = 16_000_000) -> bytes:
+    def _run_bytes(
+        self,
+        *args: str,
+        max_bytes: int = 16_000_000,
+        deadline: float | None = None,
+    ) -> bytes:
         if type(max_bytes) is not int or max_bytes <= 0:
             raise ValueError("max_bytes must be a positive integer")
+        now = time.monotonic()
+        command_deadline = now + self.timeout_seconds
+        if deadline is not None:
+            command_deadline = min(command_deadline, deadline)
+        if command_deadline <= now:
+            raise HistoryError(f"Git command timed out before start: {args[0]}")
         argv = self._argv(*args)
         process = subprocess.Popen(
             argv,
@@ -168,12 +219,11 @@ class GitHistory:
         selector = selectors.DefaultSelector()
         selector.register(process.stdout, selectors.EVENT_READ, "stdout")
         selector.register(process.stderr, selectors.EVENT_READ, "stderr")
-        deadline = time.monotonic() + self.timeout_seconds
         output = bytearray()
         errors = bytearray()
         try:
             while selector.get_map():
-                remaining = deadline - time.monotonic()
+                remaining = command_deadline - time.monotonic()
                 if remaining <= 0:
                     self._kill(process)
                     raise HistoryError(f"Git command timed out: {args[0]}")
@@ -193,7 +243,7 @@ class GitHistory:
                         raise HistoryOutputLimit(
                             f"Git command {key.data} exceeded {limit} bytes"
                         )
-            remaining = deadline - time.monotonic()
+            remaining = command_deadline - time.monotonic()
             if remaining <= 0:
                 self._kill(process)
                 raise HistoryError(f"Git command timed out: {args[0]}")
@@ -213,21 +263,30 @@ class GitHistory:
             )
         return bytes(output)
 
-    def _run_text(self, *args: str, max_bytes: int = 1_000_000) -> str:
+    def _run_text(
+        self,
+        *args: str,
+        max_bytes: int = 1_000_000,
+        deadline: float | None = None,
+    ) -> str:
         try:
-            return self._run_bytes(*args, max_bytes=max_bytes).decode("utf-8").strip()
+            return self._run_bytes(
+                *args, max_bytes=max_bytes, deadline=deadline
+            ).decode("utf-8").strip()
         except UnicodeDecodeError as exc:
             raise UnrecoverableHistory("Git metadata was not UTF-8") from exc
 
-    def commit(self, revision: str) -> CommitObject:
+    def commit(self, revision: str, *, _deadline: float | None = None) -> CommitObject:
         revision = self._revision(revision)
         try:
-            object_type = self._run_text("cat-file", "-t", revision)
+            object_type = self._run_text(
+                "cat-file", "-t", revision, deadline=_deadline
+            )
         except UnrecoverableHistory as exc:
             raise UnrecoverableHistory(f"commit object is unavailable: {revision}") from exc
         if object_type != "commit":
             raise UnrecoverableHistory(f"object is not a commit: {revision}")
-        raw = self._run_text("cat-file", "-p", revision)
+        raw = self._run_text("cat-file", "-p", revision, deadline=_deadline)
         tree = ""
         parents: list[str] = []
         authored_at: datetime | None = None
@@ -265,14 +324,25 @@ class GitHistory:
             raise UnrecoverableHistory("commit identity timestamp is malformed")
         return datetime.fromtimestamp(int(match.group(1)), timezone.utc)
 
-    def _commits_not_in(self, head: str, baseline: str) -> tuple[str, ...]:
-        text = self._run_text("rev-list", "--reverse", head, "--not", baseline)
+    @staticmethod
+    def _check_deadline(deadline: float) -> None:
+        if time.monotonic() >= deadline:
+            raise HistoryError("history reconstruction timed out")
+
+    def _commits_not_in(
+        self, head: str, baseline: str, *, deadline: float
+    ) -> tuple[str, ...]:
+        text = self._run_text(
+            "rev-list", "--reverse", head, "--not", baseline, deadline=deadline
+        )
         commits = tuple(line for line in text.splitlines() if line)
         if not commits:
             raise UnrecoverableHistory("implementation commit set is empty")
+        if len(commits) > _MAX_CHAIN_COMMITS:
+            raise ValueError("implementation commit chain exceeds supported bound")
         return commits
 
-    def _patch_digest(self, baseline: str, reference: str) -> str:
+    def _patch_digest(self, baseline: str, reference: str, *, deadline: float) -> str:
         patch = self._run_bytes(
             "diff",
             "--no-ext-diff",
@@ -287,40 +357,67 @@ class GitHistory:
             reference,
             "--",
             max_bytes=64_000_000,
+            deadline=deadline,
         )
-        return hashlib.sha256(patch).hexdigest()
+        value = hashlib.sha256(patch).hexdigest()
+        self._check_deadline(deadline)
+        return value
 
     def _linear_objects(
-        self, commits: tuple[str, ...], *, expected_parent: str | None = None
+        self,
+        commits: tuple[str, ...],
+        *,
+        expected_parent: str | None = None,
+        deadline: float,
     ) -> tuple[CommitObject, ...]:
         if not commits:
             raise ValueError("declared commit chain must be nonempty")
-        objects = tuple(self.commit(self._revision(item)) for item in commits)
+        if len(commits) > _MAX_CHAIN_COMMITS:
+            raise ValueError("declared commit chain exceeds supported bound")
+        objects = tuple(
+            self.commit(self._revision(item), _deadline=deadline) for item in commits
+        )
         previous = expected_parent
         if previous is None and objects[0].parents:
             previous = objects[0].parents[0]
         if previous is None:
             raise ValueError("declared source chain is not contiguous from its baseline")
         for item in objects:
+            self._check_deadline(deadline)
             if item.parents != (previous,):
                 raise ValueError("declared commit chain is not contiguous")
             previous = item.revision
         return objects
 
-    def _first_parent_span(self, head: str, count: int) -> tuple[CommitObject, ...]:
+    def _first_parent_span(
+        self, head: str, count: int, *, deadline: float
+    ) -> tuple[CommitObject, ...]:
         if count <= 0:
             raise ValueError("rewritten rebase requires source commits")
+        if count > _MAX_REWRITE_COMMITS:
+            raise ValueError("rewritten rebase commit chain exceeds supported bound")
         reversed_objects: list[CommitObject] = []
-        current = self.commit(head)
+        current = self.commit(head, _deadline=deadline)
         for _ in range(count):
+            self._check_deadline(deadline)
             reversed_objects.append(current)
             if len(current.parents) != 1:
                 raise ValueError("integrated rebase span is not a one-parent chain")
-            current = self.commit(current.parents[0])
+            current = self.commit(current.parents[0], _deadline=deadline)
         return tuple(reversed(reversed_objects))
 
-    def _tree_entry(self, revision: str, path: str) -> tuple[str, str, str] | None:
-        raw = self._run_bytes("ls-tree", "-z", revision, "--", path, max_bytes=1_000_000)
+    def _tree_entry(
+        self, revision: str, path: str, *, deadline: float
+    ) -> tuple[str, str, str] | None:
+        raw = self._run_bytes(
+            "ls-tree",
+            "-z",
+            revision,
+            "--",
+            path,
+            max_bytes=1_000_000,
+            deadline=deadline,
+        )
         if not raw:
             return None
         rows = [row for row in raw.split(b"\0") if row]
@@ -336,41 +433,149 @@ class GitHistory:
             raise UnrecoverableHistory(f"tree entry does not match path: {path}")
         return mode, object_type, object_id
 
-    def _blob(self, object_id: str, *, max_bytes: int) -> bytes:
-        if self._run_text("cat-file", "-t", object_id) != "blob":
+    def _blob_size(self, object_id: str, *, deadline: float) -> int:
+        value = self._run_text("cat-file", "-s", object_id, deadline=deadline)
+        if not value.isdecimal():
+            raise UnrecoverableHistory(f"blob size is malformed: {object_id}")
+        return int(value)
+
+    def _blob(self, object_id: str, *, max_bytes: int, deadline: float) -> bytes:
+        if self._run_text("cat-file", "-t", object_id, deadline=deadline) != "blob":
             raise UnrecoverableHistory(f"object is not a blob: {object_id}")
-        return self._run_bytes("cat-file", "blob", object_id, max_bytes=max_bytes)
+        return self._run_bytes(
+            "cat-file", "blob", object_id, max_bytes=max_bytes, deadline=deadline
+        )
 
     @staticmethod
-    def _line_delta(before: bytes, after: bytes) -> tuple[tuple[str, bytes, bytes], ...]:
-        matcher = difflib.SequenceMatcher(
-            None,
-            before.splitlines(keepends=True),
-            after.splitlines(keepends=True),
-            autojunk=False,
-        )
-        changes = []
-        before_lines = before.splitlines(keepends=True)
-        after_lines = after.splitlines(keepends=True)
-        for tag, left_start, left_end, right_start, right_end in matcher.get_opcodes():
-            if tag != "equal":
-                changes.append(
-                    (
-                        tag,
-                        b"".join(before_lines[left_start:left_end]),
-                        b"".join(after_lines[right_start:right_end]),
-                    )
-                )
-        return tuple(changes)
+    def _digest_value(digest, value: bytes) -> None:
+        digest.update(len(value).to_bytes(8, "big"))
+        digest.update(value)
 
-    def _delta_digest(self, parent: str, commit: str) -> str:
-        paths = self.changed_paths(parent, commit)
+    @staticmethod
+    def _hunk_ranges(patch: bytes) -> tuple[tuple[int, int, int, int], ...]:
+        ranges = []
+        for line in patch.splitlines():
+            match = _HUNK_HEADER.match(line)
+            if match is None:
+                continue
+            old_start = int(match.group(1))
+            old_count = int(match.group(2) or b"1")
+            new_start = int(match.group(3))
+            new_count = int(match.group(4) or b"1")
+            ranges.append((old_start, old_count, new_start, new_count))
+        return tuple(ranges)
+
+    @staticmethod
+    def _line_index(start: int, count: int, length: int) -> int:
+        index = start - 1 if count else start
+        if index < 0 or index + count > length:
+            raise UnrecoverableHistory("Git diff hunk range is malformed")
+        return index
+
+    @classmethod
+    def _unique_hunk_location(
+        cls,
+        lines: tuple[bytes, ...],
+        start: int,
+        count: int,
+        *,
+        budget: _RewriteBudget,
+    ) -> tuple[tuple[bytes, ...], tuple[bytes, ...], tuple[bytes, ...]]:
+        index = cls._line_index(start, count, len(lines))
+        prefix = lines[index - 1 : index] if index else ()
+        changed = lines[index : index + count]
+        suffix = lines[index + count : index + count + 1]
+        needle = prefix + changed + suffix
+        positions = (
+            len(lines) + 1
+            if not needle
+            else max(0, len(lines) - len(needle) + 1)
+        )
+        budget.charge(
+            "search_units",
+            positions * max(1, len(needle)),
+            _MAX_REWRITE_SEARCH_UNITS,
+        )
+        if not needle:
+            matches = positions
+        else:
+            matches = 0
+            for candidate in range(positions):
+                if candidate % 1_024 == 0:
+                    cls._check_deadline(budget.deadline)
+                if lines[candidate : candidate + len(needle)] == needle:
+                    matches += 1
+                    if matches > 1:
+                        break
+        if matches != 1:
+            raise ValueError("rewritten rebase context is ambiguous")
+        return prefix, changed, suffix
+
+    def _diff_for_path(
+        self, parent: str, commit: str, path: str, *, deadline: float
+    ) -> bytes:
+        return self._run_bytes(
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-renames",
+            "--no-indent-heuristic",
+            "--diff-algorithm=myers",
+            "--binary",
+            "--full-index",
+            "--unified=0",
+            "--no-color",
+            "--no-prefix",
+            parent,
+            commit,
+            "--",
+            path,
+            max_bytes=_MAX_REWRITE_DIFF_BYTES,
+            deadline=deadline,
+        )
+
+    def _budgeted_blob(
+        self,
+        entry: tuple[str, str, str] | None,
+        *,
+        budget: _RewriteBudget,
+    ) -> bytes:
+        if entry is None:
+            return b""
+        size = self._blob_size(entry[2], deadline=budget.deadline)
+        if size > _MAX_REWRITE_BLOB_BYTES:
+            raise ValueError("rewritten rebase work budget exceeded: blob_bytes")
+        budget.charge("blob_bytes", size, _MAX_REWRITE_TOTAL_BLOB_BYTES)
+        return self._blob(
+            entry[2], max_bytes=_MAX_REWRITE_BLOB_BYTES, deadline=budget.deadline
+        )
+
+    def _delta_digest(
+        self, parent: str, commit: str, *, budget: _RewriteBudget
+    ) -> _RewriteDelta:
+        paths = self.changed_paths(
+            parent,
+            commit,
+            _deadline=budget.deadline,
+            _max_bytes=_MAX_REWRITE_DIFF_BYTES,
+        )
         if not paths:
             raise ValueError("commit delta is empty")
-        digest = hashlib.sha256()
+        budget.charge("paths", len(paths), _MAX_REWRITE_PATHS)
+        encoded_paths = tuple(path.encode("utf-8") for path in paths)
+        if any(len(path) > _MAX_REWRITE_PATH_BYTES for path in encoded_paths):
+            raise ValueError("rewritten rebase work budget exceeded: path_bytes")
+        budget.charge(
+            "diff_bytes",
+            sum(len(path) + 1 for path in encoded_paths),
+            _MAX_REWRITE_DIFF_BYTES,
+        )
+        proof = hashlib.sha256()
+        action = hashlib.sha256()
         for path in paths:
-            before_entry = self._tree_entry(parent, path)
-            after_entry = self._tree_entry(commit, path)
+            self._check_deadline(budget.deadline)
+            before_entry = self._tree_entry(parent, path, deadline=budget.deadline)
+            after_entry = self._tree_entry(commit, path, deadline=budget.deadline)
             descriptor = (
                 path,
                 before_entry[0] if before_entry else None,
@@ -378,35 +583,87 @@ class GitHistory:
                 before_entry[1] if before_entry else None,
                 after_entry[1] if after_entry else None,
             )
-            digest.update(repr(descriptor).encode("utf-8"))
-            if before_entry and before_entry[1] != "blob":
-                digest.update(before_entry[2].encode("ascii"))
-                before = b""
+            encoded_descriptor = repr(descriptor).encode("utf-8")
+            self._digest_value(proof, encoded_descriptor)
+            self._digest_value(action, encoded_descriptor)
+            if (
+                before_entry is not None and before_entry[1] != "blob"
+            ) or (after_entry is not None and after_entry[1] != "blob"):
+                opaque = repr(
+                    (
+                        before_entry[2] if before_entry else None,
+                        after_entry[2] if after_entry else None,
+                    )
+                ).encode("ascii")
+                self._digest_value(proof, b"object\0" + opaque)
+                self._digest_value(action, b"object\0" + opaque)
+                continue
+
+            before = self._budgeted_blob(before_entry, budget=budget)
+            after = self._budgeted_blob(after_entry, budget=budget)
+            patch = self._diff_for_path(
+                parent, commit, path, deadline=budget.deadline
+            )
+            budget.charge("diff_bytes", len(patch), _MAX_REWRITE_DIFF_BYTES)
+            hunks = self._hunk_ranges(patch)
+            budget.charge("hunks", len(hunks), _MAX_REWRITE_HUNKS)
+            if b"\0" in before or b"\0" in after or (before != after and not hunks):
+                opaque = b"opaque\0" + hashlib.sha256(before).digest()
+                opaque += hashlib.sha256(after).digest()
+                self._digest_value(proof, opaque)
+                self._digest_value(action, opaque)
             else:
-                before = (
-                    self._blob(before_entry[2], max_bytes=16_000_000)
-                    if before_entry
-                    else b""
+                before_lines = tuple(before.splitlines(keepends=True))
+                after_lines = tuple(after.splitlines(keepends=True))
+                budget.charge(
+                    "lines",
+                    len(before_lines) + len(after_lines),
+                    _MAX_REWRITE_LINES,
                 )
-            if after_entry and after_entry[1] != "blob":
-                digest.update(after_entry[2].encode("ascii"))
-                after = b""
-            else:
-                after = (
-                    self._blob(after_entry[2], max_bytes=16_000_000)
-                    if after_entry
-                    else b""
-                )
-            if b"\0" in before or b"\0" in after:
-                digest.update(b"binary\0")
-                digest.update(hashlib.sha256(before).digest())
-                digest.update(hashlib.sha256(after).digest())
-            else:
-                for tag, removed, added in self._line_delta(before, after):
-                    digest.update(tag.encode("ascii") + b"\0")
-                    digest.update(len(removed).to_bytes(8, "big") + removed)
-                    digest.update(len(added).to_bytes(8, "big") + added)
-        return digest.hexdigest()
+                previous_old_end = 0
+                previous_new_end = 0
+                self._digest_value(proof, b"text")
+                self._digest_value(action, b"text")
+                for old_start, old_count, new_start, new_count in hunks:
+                    old_index = self._line_index(
+                        old_start, old_count, len(before_lines)
+                    )
+                    new_index = self._line_index(
+                        new_start, new_count, len(after_lines)
+                    )
+                    if old_index < previous_old_end or new_index < previous_new_end:
+                        raise UnrecoverableHistory("Git diff hunks overlap")
+                    previous_old_end = old_index + old_count
+                    previous_new_end = new_index + new_count
+                    old_prefix, removed, old_suffix = self._unique_hunk_location(
+                        before_lines,
+                        old_start,
+                        old_count,
+                        budget=budget,
+                    )
+                    new_prefix, added, new_suffix = self._unique_hunk_location(
+                        after_lines,
+                        new_start,
+                        new_count,
+                        budget=budget,
+                    )
+                    for value in (
+                        b"hunk",
+                        b"".join(old_prefix),
+                        b"".join(removed),
+                        b"".join(old_suffix),
+                        b"".join(new_prefix),
+                        b"".join(added),
+                        b"".join(new_suffix),
+                    ):
+                        self._digest_value(proof, value)
+                    for value in (
+                        b"change",
+                        b"".join(removed),
+                        b"".join(added),
+                    ):
+                        self._digest_value(action, value)
+        return _RewriteDelta(proof.hexdigest(), action.hexdigest())
 
     def reconstruct(
         self,
@@ -417,7 +674,8 @@ class GitHistory:
         implementation_commits: tuple[str, ...] = (),
         source_commits: tuple[str, ...] = (),
     ) -> Reconstruction:
-        reference = self.commit(integrated_after)
+        deadline = time.monotonic() + self.timeout_seconds
+        reference = self.commit(integrated_after, _deadline=deadline)
         if integration == "unknown":
             raise ValueError("integration method must be proven, not guessed")
 
@@ -426,24 +684,30 @@ class GitHistory:
         if integration == "merge":
             if len(reference.parents) != 2:
                 raise ValueError("merge integration requires exactly two parents")
-            baseline = self.commit(reference.parents[0])
+            baseline = self.commit(reference.parents[0], _deadline=deadline)
             actual_source_head = reference.parents[1]
             if source_head is not None and self._revision(source_head) != actual_source_head:
                 raise ValueError("merge source head does not match second parent")
-            source = self.commit(actual_source_head)
+            source = self.commit(actual_source_head, _deadline=deadline)
             source_tree = source.tree
-            implementation = self._commits_not_in(actual_source_head, baseline.revision)
+            implementation = self._commits_not_in(
+                actual_source_head, baseline.revision, deadline=deadline
+            )
         elif integration == "squash":
             if len(reference.parents) != 1:
                 raise ValueError("squash integration requires one target parent")
             if source_head is None:
                 raise ValueError("squash integration requires a source head")
-            source = self.commit(source_head)
-            baseline = self.commit(reference.parents[0])
+            source = self.commit(source_head, _deadline=deadline)
+            baseline = self.commit(reference.parents[0], _deadline=deadline)
+            if len(source_commits) > _MAX_CHAIN_COMMITS:
+                raise ValueError("declared commit chain exceeds supported bound")
             declared_source = tuple(self._revision(item) for item in source_commits)
             if not declared_source or declared_source[-1] != source.revision:
                 raise ValueError("squash requires the complete declared source chain")
-            self._linear_objects(declared_source, expected_parent=baseline.revision)
+            self._linear_objects(
+                declared_source, expected_parent=baseline.revision, deadline=deadline
+            )
             if source.tree != reference.tree:
                 raise ValueError("squash source tree does not equal integrated tree")
             source_tree = source.tree
@@ -451,39 +715,59 @@ class GitHistory:
         elif integration == "rebase":
             if source_head is None:
                 raise ValueError("rebase integration requires a source head")
+            if len(source_commits) > _MAX_REWRITE_COMMITS:
+                raise ValueError("rewritten rebase commit chain exceeds supported bound")
             declared_source = tuple(self._revision(item) for item in source_commits)
             if not declared_source or declared_source[-1] != self._revision(source_head):
                 raise ValueError("rebase requires the complete declared source chain")
-            source_objects = self._linear_objects(declared_source)
-            integrated_objects = self._first_parent_span(reference.revision, len(declared_source))
-            baseline = self.commit(integrated_objects[0].parents[0])
+            source_objects = self._linear_objects(
+                declared_source, deadline=deadline
+            )
+            integrated_objects = self._first_parent_span(
+                reference.revision, len(declared_source), deadline=deadline
+            )
+            baseline = self.commit(
+                integrated_objects[0].parents[0], _deadline=deadline
+            )
             implementation = tuple(item.revision for item in integrated_objects)
             if implementation == declared_source or any(
                 left == right for left, right in zip(declared_source, implementation)
             ):
                 raise ValueError("rebase must map distinct rewritten commit IDs")
-            source_digests = tuple(
-                self._delta_digest(item.parents[0], item.revision)
+            budget = _RewriteBudget(deadline)
+            source_deltas = tuple(
+                self._delta_digest(item.parents[0], item.revision, budget=budget)
                 for item in source_objects
             )
-            integrated_digests = tuple(
-                self._delta_digest(item.parents[0], item.revision)
+            integrated_deltas = tuple(
+                self._delta_digest(item.parents[0], item.revision, budget=budget)
                 for item in integrated_objects
             )
             if (
-                source_digests != integrated_digests
-                or len(set(source_digests)) != len(source_digests)
+                tuple(item.proof_digest for item in source_deltas)
+                != tuple(item.proof_digest for item in integrated_deltas)
+                or tuple(item.action_digest for item in source_deltas)
+                != tuple(item.action_digest for item in integrated_deltas)
+                or len({item.action_digest for item in source_deltas})
+                != len(source_deltas)
             ):
                 raise ValueError("rewritten rebase delta mapping is ambiguous or mismatched")
-            mapping = tuple(zip(declared_source, implementation, source_digests))
+            mapping = tuple(
+                (source, integrated, delta.proof_digest)
+                for source, integrated, delta in zip(
+                    declared_source, implementation, source_deltas
+                )
+            )
         else:
             if not implementation_commits:
                 raise ValueError(f"{integration} integration requires a declared contiguous span")
+            if len(implementation_commits) > _MAX_CHAIN_COMMITS:
+                raise ValueError("declared commit chain exceeds supported bound")
             implementation = tuple(self._revision(item) for item in implementation_commits)
             if implementation[-1] != reference.revision:
                 raise ValueError("contiguous span must end at the integrated commit")
-            objects = self._linear_objects(implementation)
-            baseline = self.commit(objects[0].parents[0])
+            objects = self._linear_objects(implementation, deadline=deadline)
+            baseline = self.commit(objects[0].parents[0], _deadline=deadline)
 
         return Reconstruction(
             integration=integration,
@@ -494,7 +778,9 @@ class GitHistory:
             baseline_tree=baseline.tree,
             reference_tree=reference.tree,
             source_tree=source_tree,
-            patch_sha256=self._patch_digest(baseline.revision, reference.revision),
+            patch_sha256=self._patch_digest(
+                baseline.revision, reference.revision, deadline=deadline
+            ),
             source_commits=(
                 tuple(item.revision for item in source_objects)
                 if integration == "rebase"
@@ -503,9 +789,16 @@ class GitHistory:
             commit_mapping=mapping,
         )
 
-    def changed_paths(self, baseline: str, reference: str) -> tuple[str, ...]:
-        baseline = self.commit(baseline).revision
-        reference = self.commit(reference).revision
+    def changed_paths(
+        self,
+        baseline: str,
+        reference: str,
+        *,
+        _deadline: float | None = None,
+        _max_bytes: int = 8_000_000,
+    ) -> tuple[str, ...]:
+        baseline = self.commit(baseline, _deadline=_deadline).revision
+        reference = self.commit(reference, _deadline=_deadline).revision
         raw = self._run_bytes(
             "diff",
             "--no-ext-diff",
@@ -516,12 +809,16 @@ class GitHistory:
             baseline,
             reference,
             "--",
-            max_bytes=8_000_000,
+            max_bytes=_max_bytes,
+            deadline=_deadline,
         )
         try:
-            return tuple(item.decode("utf-8") for item in raw.split(b"\0") if item)
+            result = tuple(item.decode("utf-8") for item in raw.split(b"\0") if item)
         except UnicodeDecodeError as exc:
             raise UnrecoverableHistory("changed path is not UTF-8") from exc
+        if _deadline is not None:
+            self._check_deadline(_deadline)
+        return result
 
     def path_object(self, revision: str, path: str) -> str:
         revision = self.commit(revision).revision
@@ -534,14 +831,15 @@ class GitHistory:
         return value
 
     def path_bytes(self, revision: str, path: str, *, max_bytes: int) -> bytes:
-        revision = self.commit(revision).revision
+        deadline = time.monotonic() + self.timeout_seconds
+        revision = self.commit(revision, _deadline=deadline).revision
         parts = PurePosixPath(path).parts
         if not path or path.startswith("/") or ".." in parts or ":" in path:
             raise ValueError("Git path must be repository-relative")
-        entry = self._tree_entry(revision, path)
+        entry = self._tree_entry(revision, path, deadline=deadline)
         if entry is None or entry[1] != "blob":
             raise UnrecoverableHistory(f"path is not an available blob: {path}")
-        return self._blob(entry[2], max_bytes=max_bytes)
+        return self._blob(entry[2], max_bytes=max_bytes, deadline=deadline)
 
     def archive_tree(self, revision: str, *, max_bytes: int) -> bytes:
         revision = self.commit(revision).revision

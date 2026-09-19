@@ -125,6 +125,29 @@ def test_squash_rejects_disconnected_equal_tree_source(tmp_path):
         )
 
 
+def test_squash_rejects_source_rooted_before_advanced_target(tmp_path):
+    """Documents the pilot's intentionally narrow B-rooted squash proof."""
+    from feature_rl.history import GitHistory
+
+    repo = init_repo(tmp_path)
+    commit(repo, "root.txt", "root\n")
+    git(repo, "switch", "-c", "feature")
+    source = commit(repo, "feature.txt", "feature\n")
+    git(repo, "switch", "main")
+    commit(repo, "target.txt", "target advanced\n")
+    git(repo, "merge", "--squash", "feature")
+    git(repo, "commit", "-m", "squashed feature after target advance")
+    integrated = git(repo, "rev-parse", "HEAD")
+
+    with pytest.raises(ValueError, match="contiguous"):
+        GitHistory(repo / ".git").reconstruct(
+            integrated,
+            integration="squash",
+            source_head=source,
+            source_commits=(source,),
+        )
+
+
 def test_linear_requires_exact_contiguous_first_parent_span(tmp_path):
     """Catches accepting interleaved target work inside a declared rebase span."""
     from feature_rl.history import GitHistory
@@ -183,6 +206,31 @@ def test_rebase_maps_distinct_source_commits_to_integrated_span(tmp_path):
     assert len({digest for _, _, digest in result.commit_mapping}) == 2
 
 
+def test_rebase_maps_unique_context_after_line_number_movement(tmp_path):
+    """Allows target movement when the changed semantic location stays unique."""
+    from feature_rl.history import GitHistory
+
+    repo = init_repo(tmp_path)
+    commit(repo, "settings.txt", "header\nold value\nfooter\n")
+    git(repo, "switch", "-c", "feature")
+    source = commit(repo, "settings.txt", "header\nnew value\nfooter\n")
+    git(repo, "switch", "main")
+    commit(repo, "settings.txt", "preface\nheader\nold value\nfooter\n")
+    git(repo, "cherry-pick", source)
+    integrated = git(repo, "rev-parse", "HEAD")
+
+    result = GitHistory(repo / ".git").reconstruct(
+        integrated,
+        integration="rebase",
+        source_head=source,
+        source_commits=(source,),
+    )
+
+    assert result.source_commits == (source,)
+    assert result.implementation_commits == (integrated,)
+    assert result.commit_mapping[0][:2] == (source, integrated)
+
+
 def test_rebase_rejects_reordered_and_whitespace_changed_deltas(tmp_path):
     """Catches patch-id-only binding and interleaved/reordered integrated spans."""
     from feature_rl.history import GitHistory
@@ -236,6 +284,86 @@ def test_rebase_rejects_ambiguous_duplicate_deltas(tmp_path):
             integration="rebase",
             source_head=source_head,
             source_commits=(source_first, source_head),
+        )
+
+
+def test_rebase_rejects_same_edit_at_different_semantic_occurrence(tmp_path):
+    """Catches mapping identical bytes to a different uniquely named section."""
+    from feature_rl.history import GitHistory
+
+    repo = init_repo(tmp_path)
+    commit(repo, "a.txt", "section-one\nx\nsection-two\nx\n")
+    git(repo, "switch", "-c", "feature")
+    source = commit(repo, "a.txt", "section-one\ny\nsection-two\nx\n")
+    git(repo, "switch", "main")
+    commit(repo, "target.txt", "target\n")
+    integrated = commit(repo, "a.txt", "section-one\nx\nsection-two\ny\n")
+
+    with pytest.raises(ValueError, match="mapping|context"):
+        GitHistory(repo / ".git").reconstruct(
+            integrated,
+            integration="rebase",
+            source_head=source,
+            source_commits=(source,),
+        )
+
+
+def test_rebase_repeated_line_proof_rejects_inside_declared_bound(
+    tmp_path, monkeypatch
+):
+    """Catches returning to unbounded SequenceMatcher work on repeated lines."""
+    import difflib
+
+    from feature_rl.history import GitHistory
+
+    def unbounded_matcher_used(*_args, **_kwargs):
+        pytest.fail("rewrite proof used unbounded SequenceMatcher")
+
+    monkeypatch.setattr(difflib, "SequenceMatcher", unbounded_matcher_used)
+    repo = init_repo(tmp_path)
+    repeated = "x\n" * 10_000 + "end\n"
+    commit(repo, "repeated.txt", repeated)
+    git(repo, "switch", "-c", "feature")
+    source = commit(repo, "repeated.txt", "new\n" + repeated)
+    git(repo, "switch", "main")
+    commit(repo, "target.txt", "target\n")
+    git(repo, "cherry-pick", source)
+    integrated = git(repo, "rev-parse", "HEAD")
+
+    with pytest.raises(ValueError, match="ambiguous|work budget"):
+        GitHistory(repo / ".git", timeout_seconds=3).reconstruct(
+            integrated,
+            integration="rebase",
+            source_head=source,
+            source_commits=(source,),
+        )
+
+
+def test_rebase_blob_work_cap_rejects_before_unbounded_matching(
+    tmp_path, monkeypatch
+):
+    """Makes exhaustion of the controller-side rewrite budget explicit."""
+    import importlib
+
+    from feature_rl.history import GitHistory
+
+    git_module = importlib.import_module("feature_rl.history.git")
+    monkeypatch.setattr(git_module, "_MAX_REWRITE_BLOB_BYTES", 8)
+    repo = init_repo(tmp_path)
+    commit(repo, "bounded.txt", "123456789\n")
+    git(repo, "switch", "-c", "feature")
+    source = commit(repo, "bounded.txt", "changed value\n")
+    git(repo, "switch", "main")
+    commit(repo, "target.txt", "target\n")
+    git(repo, "cherry-pick", source)
+    integrated = git(repo, "rev-parse", "HEAD")
+
+    with pytest.raises(ValueError, match="work budget.*blob_bytes"):
+        GitHistory(repo / ".git").reconstruct(
+            integrated,
+            integration="rebase",
+            source_head=source,
+            source_commits=(source,),
         )
 
 
