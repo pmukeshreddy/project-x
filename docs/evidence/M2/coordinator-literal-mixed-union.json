@@ -1,0 +1,19 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "docs/evidence/M2/coordinator-literal-mixed-union.py"
+  ],
+  "environment_override": {
+    "PYTHONPATH": "src"
+  },
+  "recorded_at": "2026-09-19T15:27:26.544794+00:00",
+  "ended_at": "2026-09-19T15:27:26.672561+00:00",
+  "wall_seconds": 0.127670707879588,
+  "exit_status": 0,
+  "script_sha256": "a8ab4a92d6a1db76a4e661c42cb805b64068e12fef3d69ba49d1649c8ce69f91",
+  "stdout": "{\"scope\": \"read-only diagnostic of unfinished round3 source; no provider, runner or native call\", \"source_sha256\": \"22829d5daec2eed4d8fec942ba1c03a6bda33002b56b086616b007e37292762e\", \"input\": {\"mode\": {\"flag\": 1}}, \"precheck_accepted\": true, \"actual_branch\": \"Enabled\", \"actual_flag\": true, \"actual_flag_type\": \"bool\", \"numeric_to_boolean_coercion_observed\": true}\n",
+  "stdout_sha256": "75ab3f0ce7b59fab38ec624eb5b2fdf82836e7b761414f651407192c9c6d3358",
+  "stderr": "",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "interpretation": "A targeted diagnostic of uncommitted code, not native or end-to-end evidence. The observed branch mismatch has been routed to the accountable owner within round3."
+}
