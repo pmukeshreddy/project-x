@@ -1,6 +1,6 @@
 """Durable source delta publication and exact baseline reconstruction."""
 import json
-from feature_rl.artifacts import canonical_json
+from feature_rl.artifacts import canonical_json, ArtifactIntegrityError, ArtifactSizeLimitError
 from feature_rl.contracts import ArtifactRef, Visibility
 from feature_rl.environments import SourceArchive, SourceRejected
 from .source import Submission, apply_delta
@@ -32,6 +32,12 @@ class SubmissionService:
     def resolve(self,submission,baseline,allowed_changes):
         # Import locally to avoid a package-init cycle; parser is inert.
         from feature_rl.verifiers.language import decode_json
+        # B is trusted task material, not part of this candidate's delta. Resolve
+        # it once before candidate parsing and keep its failures outside the
+        # SourceRejected/size-limit category used for measured candidate zeros.
+        try:trusted_baseline=self.source(baseline)
+        except (SourceRejected,ArtifactSizeLimitError) as exc:
+            raise ArtifactIntegrityError('invalid trusted baseline: '+str(exc)) from exc
         ref=ArtifactRef.model_validate(submission)
         if ref.kind!='m4-submission' or ref.encoding!='bytes':raise SourceRejected('M4 submission bytes required')
         data=self.store.get_bytes(ref,max_envelope_bytes=128*1024,max_payload_bytes=65536)
@@ -41,4 +47,4 @@ class SubmissionService:
         if value.changes.kind!='m4-source-delta' or value.changes.encoding!='bytes':raise SourceRejected('source delta bytes required')
         cap=self.policy.max_archive_bytes
         data=self.store.get_bytes(value.changes,max_envelope_bytes=4*((cap+2)//3)+4096,max_payload_bytes=cap)
-        return apply_delta(self.source(baseline),data,value.deletions,allowed_changes,self.policy)
+        return apply_delta(trusted_baseline,data,value.deletions,allowed_changes,self.policy)

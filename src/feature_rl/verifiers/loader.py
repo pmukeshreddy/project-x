@@ -77,6 +77,12 @@ def load_verifier(store,task_ref):
     recipe=_artifact(store,task.environment,EnvironmentRecipe)
     if task.contract!=verifier.contract or plan.contract!=task.contract:raise ValueError('contract reference mismatch')
     if recipe.baseline!=task.baseline:raise ValueError('baseline/recipe mismatch')
+    # M3 enforces this fixed worker envelope, not per-task overrides. A lower
+    # contract grant cannot be implemented by merely shortening the probe command.
+    # Token/tool budgets belong to the solver, so they are not worker resources.
+    for name in ('wall_seconds','cpu_seconds','memory_bytes','pids','disk_bytes','output_bytes'):
+        if getattr(recipe.limits,name)>getattr(contract.episode_limits,name):
+            raise ValueError('runtime recipe exceeds contract '+name)
     if task.adapter_version!=verifier.worker_adapter.version:raise ValueError('adapter version mismatch')
     if verifier.worker_adapter.version!='m4-worker-v1':raise ValueError('unsupported adapter version')
     if verifier.permissions.controller_role!=ActorRole.CONTROLLER:raise ValueError('controller runtime required')

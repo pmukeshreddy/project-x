@@ -1,0 +1,76 @@
+FFFFFF.FFF.                                                              [100%]
+=================================== FAILURES ===================================
+____ test_recipe_cannot_exceed_any_contract_worker_limit[wall_seconds-60.0] ____
+tests/test_grading.py:153: in test_recipe_cannot_exceed_any_contract_worker_limit
+    assert result.disposition==c.Disposition.UNSUPPORTED and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ed_semantics'>
+E     
+E     - unsupported_semantics
+E     + candidate_rejection)
+_____ test_recipe_cannot_exceed_any_contract_worker_limit[cpu_seconds-1.0] _____
+tests/test_grading.py:153: in test_recipe_cannot_exceed_any_contract_worker_limit
+    assert result.disposition==c.Disposition.UNSUPPORTED and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ed_semantics'>
+E     
+E     - unsupported_semantics
+E     + candidate_rejection)
+__ test_recipe_cannot_exceed_any_contract_worker_limit[memory_bytes-67108864] __
+tests/test_grading.py:153: in test_recipe_cannot_exceed_any_contract_worker_limit
+    assert result.disposition==c.Disposition.UNSUPPORTED and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ed_semantics'>
+E     
+E     - unsupported_semantics
+E     + candidate_rejection)
+_________ test_recipe_cannot_exceed_any_contract_worker_limit[pids-8] __________
+tests/test_grading.py:153: in test_recipe_cannot_exceed_any_contract_worker_limit
+    assert result.disposition==c.Disposition.UNSUPPORTED and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ed_semantics'>
+E     
+E     - unsupported_semantics
+E     + candidate_rejection)
+___ test_recipe_cannot_exceed_any_contract_worker_limit[disk_bytes-8388608] ____
+tests/test_grading.py:153: in test_recipe_cannot_exceed_any_contract_worker_limit
+    assert result.disposition==c.Disposition.UNSUPPORTED and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ed_semantics'>
+E     
+E     - unsupported_semantics
+E     + candidate_rejection)
+__ test_recipe_cannot_exceed_any_contract_worker_limit[output_bytes-1048576] ___
+tests/test_grading.py:153: in test_recipe_cannot_exceed_any_contract_worker_limit
+    assert result.disposition==c.Disposition.UNSUPPORTED and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ed_semantics'>
+E     
+E     - unsupported_semantics
+E     + candidate_rejection)
+_ test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero[baseline_format] _
+tests/test_grading.py:194: in test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero
+    assert result.disposition==c.Disposition.INFRASTRUCTURE and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ture_failure'>
+E     
+E     - infrastructure_failure
+E     + candidate_rejection)
+_ test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero[baseline_payload_size] _
+tests/test_grading.py:194: in test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero
+    assert result.disposition==c.Disposition.INFRASTRUCTURE and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ture_failure'>
+E     
+E     - infrastructure_failure
+E     + candidate_rejection)
+_ test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero[baseline_expanded_size] _
+tests/test_grading.py:194: in test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero
+    assert result.disposition==c.Disposition.INFRASTRUCTURE and receipt.reward is None
+E   AssertionError: assert (<Disposition....te_rejection'> == <Disposition....ture_failure'>
+E     
+E     - infrastructure_failure
+E     + candidate_rejection)
+=========================== short test summary info ============================
+FAILED tests/test_grading.py::test_recipe_cannot_exceed_any_contract_worker_limit[wall_seconds-60.0]
+FAILED tests/test_grading.py::test_recipe_cannot_exceed_any_contract_worker_limit[cpu_seconds-1.0]
+FAILED tests/test_grading.py::test_recipe_cannot_exceed_any_contract_worker_limit[memory_bytes-67108864]
+FAILED tests/test_grading.py::test_recipe_cannot_exceed_any_contract_worker_limit[pids-8]
+FAILED tests/test_grading.py::test_recipe_cannot_exceed_any_contract_worker_limit[disk_bytes-8388608]
+FAILED tests/test_grading.py::test_recipe_cannot_exceed_any_contract_worker_limit[output_bytes-1048576]
+FAILED tests/test_grading.py::test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero[baseline_format]
+FAILED tests/test_grading.py::test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero[baseline_payload_size]
+FAILED tests/test_grading.py::test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero[baseline_expanded_size]
+9 failed, 2 passed, 17 deselected in 0.32s

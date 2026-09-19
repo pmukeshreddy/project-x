@@ -1,0 +1,39 @@
+{
+  "scope": "M4 core round-1 P1 resource envelope and P2 trusted-baseline attribution fixes; preflight diagnostics only",
+  "reviewed_core": "02aee5494ba93b195e0b38f9fbc367f06585df5a",
+  "workspace_head_before_fix": "6cbfc5ecfe8859fff05d2f67de77cd40f374eec5",
+  "sources": {
+    "src/feature_rl/verifiers/loader.py": "884cc0ea30b80162038b98171b50d425adc849243d6571589d7bd4104e339b03",
+    "src/feature_rl/submission/service.py": "1a05986c0a291a7f30d026a851091c8cfbfaa1c5057ba251719d86da9b2276f7",
+    "tests/test_grading.py": "9c858fb45586ca7bfba44af5df6c4a9f6003087d1e99147818c222f58b6cc882",
+    "docs/evidence/M4/review-core-round1/test_core_concerns.py": "558dcb080a3dd1731bb3bc413c2771908e359bed932be7b35f39dc75dc7c7839"
+  },
+  "runs": [
+    {
+      "log": "docs/evidence/M4/core-round1-fixes/red.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:tests .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_grading.py -k 'recipe_cannot or recipe_within or trusted_baseline_failures' --tb=short",
+      "exit_status": 1,
+      "sha256": "8a7f26d198d115983d677e049ab53c60ce5a76074b2532d9b29ce3e2041e6df1",
+      "bytes": 5067,
+      "result": "9 failed, 2 passed, 17 deselected in 0.32s"
+    },
+    {
+      "log": "docs/evidence/M4/core-round1-fixes/resource-green.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:tests .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_grading.py -k 'recipe_cannot or recipe_within' --tb=short",
+      "exit_status": 0,
+      "sha256": "8832cc88be7b68040ec76e55ab8431ff9e24f492a9f9e50dc6a760671f0666f6",
+      "bytes": 113,
+      "result": "7 passed, 21 deselected in 0.25s"
+    },
+    {
+      "log": "docs/evidence/M4/core-round1-fixes/focused-green.log",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:tests .venv/bin/python -m pytest -q -s -p no:cacheprovider docs/evidence/M4/review-core-round1/test_core_concerns.py tests/test_grading.py tests/test_submission.py tests/test_verifiers.py --tb=short",
+      "exit_status": 0,
+      "sha256": "d3f324e25525ecb0b50157815ff8cdfecaa925f57ff47b2a50d9d83ff8570f5a",
+      "bytes": 352,
+      "result": "58 passed in 0.53s"
+    }
+  ],
+  "docker_calls": 0,
+  "model_calls": 0
+}
