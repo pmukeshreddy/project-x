@@ -1,0 +1,88 @@
+{
+  "scope": "M6_REGISTRY_INDEPENDENT_REVIEW_TRUSTED_SYNTHETIC_DIAGNOSTICS_NO_FEATURE_EXECUTION",
+  "base": "f4819c9b11ae39862e894fa09a2f4e6b83aecfae",
+  "target": "9497b636548545d9fd54a1f06f1432134dc14cd6",
+  "recorded_at": "2026-09-19T21:23:18.029753+00:00",
+  "diagnostic_execution": {
+    "command": "PYTHONPATH=src .venv/bin/python -",
+    "stdin": "Two-case Python heredoc, retained in reproduce.py with an added descriptive module docstring.",
+    "tool_chunk_id": "7f68f9",
+    "exit_status": 0,
+    "tool_reported_wall_seconds": 2.547437208,
+    "started_at": null,
+    "finished_at": null,
+    "utc_note": "Exact diagnostic start/finish UTC was not instrumented. recorded_at is the later evidence-record creation time.",
+    "stdout": "stdout.txt",
+    "stderr": "No stderr was emitted in the tool output.",
+    "reproduction_file_executed": false,
+    "result": "Both suspected defects reproduced; exit 0 is diagnostic completion, not acceptance.",
+    "state": "Separate TemporaryDirectory stores/databases; context-manager cleanup completed. No task state used."
+  },
+  "source_verification": {
+    "timing": "After the diagnostic; no claim of instrumented before/after hashes for that command.",
+    "all_seven_match_target_and_owner_receipt": true,
+    "files": {
+      "src/feature_rl/registry/__init__.py": {
+        "bytes": 984,
+        "sha256": "c9b303f231a63377f881c70c3a0d58cf4fd778d12c039aa0ccf28d0d448c443a"
+      },
+      "src/feature_rl/registry/core.py": {
+        "bytes": 13497,
+        "sha256": "625dc5dee237befe7db5f15dc5c9b3e2c0134cd0cd9e46e5a338310f03d6736b"
+      },
+      "src/feature_rl/registry/models.py": {
+        "bytes": 5517,
+        "sha256": "c138bad378120deadb1da24e8451ef9261140551058d5efd73fa386c832fe545"
+      },
+      "src/feature_rl/registry/state.py": {
+        "bytes": 15092,
+        "sha256": "0e6c8a3ff745f4a6f5e6289170f6e8d185831dab6f7bbe01e5605e7081cef186"
+      },
+      "src/feature_rl/registry/storage.py": {
+        "bytes": 15833,
+        "sha256": "2cf64d5e70bb614d99c6678a62e949a5302921e97ab88ff7aa3f0c5fb5f8938d"
+      },
+      "tests/test_registry.py": {
+        "bytes": 14681,
+        "sha256": "0a2f38d4cadeb5d4e8def67514f1ecb13002c7c8fff897a995bc3174c51e2795"
+      },
+      "tests/test_registry_durability.py": {
+        "bytes": 6416,
+        "sha256": "d1954202a18eb75fdd592b094f066f3d27a448134beb564b2627de9abb612d34"
+      }
+    },
+    "upstream_files": {
+      "src/feature_rl/artifacts/store.py": {
+        "bytes": 14254,
+        "sha256": "013a793c741b650fcf36f1f7dc223279c0063c7c9d8a101919ad51adb3a80b7c"
+      },
+      "src/feature_rl/contracts/models.py": {
+        "bytes": 31198,
+        "sha256": "e2103bd90901c58e2ce88fa0dad7e6dc87b1181c807ea1482f26d3713a54f3bd"
+      }
+    }
+  },
+  "owner_evidence_checked_without_rerunning_suite": {
+    "receipt": "docs/evidence/M6/registry/verification.json",
+    "receipt_hash": {
+      "bytes": 5675,
+      "sha256": "1d15d106cd3a3fdf00cb82e71771ec93d3c95de5ddabfc0dadf868fd87a7ff9d"
+    },
+    "final_log": "docs/evidence/M6/registry/final-focused.txt",
+    "final_log_hash": {
+      "bytes": 99,
+      "sha256": "24afa18229c007db164bc57d8b9cbb238bfb85d8ddb20baa4e7613e0f294fc96"
+    },
+    "recorded_result": "33 passed in 4.29s; exit 0; 2026-09-19T20:59:05.818211+00:00 through 2026-09-19T20:59:10.337932+00:00; outer 4.5181634170003235s"
+  },
+  "review_evidence_files": {
+    "reproduce.py": {
+      "bytes": 3686,
+      "sha256": "327d023b666a36b0ec98d9ddb7fe927f086e48eda89269d6883a9adcbbd96e5e"
+    },
+    "stdout.txt": {
+      "bytes": 878,
+      "sha256": "8462a5ec786531eecb16227896ee5ff46ec9de0d611b106917c1a9c76417cbb4"
+    }
+  }
+}
