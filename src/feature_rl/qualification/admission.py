@@ -14,7 +14,7 @@ from feature_rl.verifiers.loader import read_local
 from .attestation import SSHHumanVerifier
 from .controls import assess_outcome, validate_control_plan
 from .evidence import (put_record, evidence, collapse_costs, unknown_cost,
-    validate_grade, validate_reset)
+    validate_grade, validate_reset, check_consumed)
 from .models import (QualificationRejected, ReferenceProjection, ReviewRequest,
     RunBinding, QualificationSummary, DetachedAttestation, VerifiedAttestation,
     QualificationPublicationFailed, FrozenPublication)
@@ -45,6 +45,21 @@ def _verifier(service):
     if type(service.attestation_verifier) is not SSHHumanVerifier:
         raise QualificationRejected('unverified_human_review','configured external SSHHumanVerifier is required; callbacks and identity strings are not authentication')
     return service.attestation_verifier
+
+
+def _attestation_inputs(service,attestation_ref,*,register=False):
+    envelope=read_local(service.store,attestation_ref,DetachedAttestation,'m5-sshsig-attestation')
+    for ref,kind in ((envelope.payload,'m5-human-review-payload'),(envelope.signature,'m5-sshsig')):
+        if ref.kind!=kind or ref.encoding!='bytes' or ref.visibility not in {c.Visibility.PRIVATE,c.Visibility.EVALUATION}:
+            raise QualificationRejected('invalid_evidence','exact private attestation payload/signature bytes required')
+    check_consumed(service.registry,(attestation_ref,envelope.payload,envelope.signature),register=register)
+    return envelope
+
+
+def _verification_configuration(service,request_ref,attestation_ref,envelope):
+    return {'version':'m5-human-verification-configuration-v2','configuration':service.configuration.model_dump(mode='json'),
+        'request':request_ref.model_dump(mode='json'),'attestation':attestation_ref.model_dump(mode='json'),
+        'payload':envelope.payload.model_dump(mode='json'),'signature':envelope.signature.model_dump(mode='json')}
 
 
 def _artifact(service,ref,kind):
@@ -143,8 +158,10 @@ def review_context(service,request_ref):
         if (binding.name,binding.task,binding.projection,binding.submission,binding.seed,binding.mode,binding.targets)!=(name,request.task,summary.projection,submission,seed,mode,targets) or (binding.reset is not None)!=reset:
             raise QualificationRejected('invalid_evidence','scheduled run identity or source/projection mismatch')
         job=service.registry.job(binding.grade_job)
-        config={'version':'m5-run-configuration-v1','configuration':service.configuration.model_dump(mode='json'),
+        source_refs=service._source_dependencies(checked,submission)
+        config={'version':'m5-run-configuration-v2','configuration':service.configuration.model_dump(mode='json'),
             'projection':summary.projection.model_dump(mode='json'),'submission':submission.model_dump(mode='json'),
+            'source_dependencies':[ref.model_dump(mode='json') for ref in source_refs],
             'seed':seed,'name':name,'mode':mode,'targets':list(targets),'reset':reset}
         from feature_rl.verifiers.loader import read_bytes
         if read_bytes(service.store,job.spec.configuration,1024*1024,'m5-run-configuration',True)!=canonical_json(config):
@@ -160,7 +177,7 @@ def review_context(service,request_ref):
             if binding.reset not in actual.artifacts:
                 raise QualificationRejected('invalid_evidence','reset was not produced by this selected grade operation')
             validate_reset(service.store,checked,summary.projection,binding.reset,service.grader,seen=seen)
-        outcome=assess_outcome(checked,receipt,mode,targets)
+        outcome=assess_outcome(checked,receipt,mode,targets,store=service.store)
         _gate(service,gate,name,request.task,binding_ref,targets,outcome)
         if name=='baseline_absence':
             health=assess_outcome(checked,receipt,'baseline_health',())
@@ -175,7 +192,11 @@ def review_context(service,request_ref):
 def _verification(service,request_ref,attestation_ref):
     """Bounded, selected native verification attempt. Failed signatures do not consume admission."""
     verifier=_verifier(service)
-    spec=_spec(service,(request_ref,attestation_ref),'m5-human-verification','audit')
+    envelope=_attestation_inputs(service,attestation_ref,register=True)
+    config=put_record(service.store,_verification_configuration(service,request_ref,attestation_ref,envelope),'m5-human-verification-configuration')
+    service.registry.register(config,dependencies=tuple(dict.fromkeys((service.configuration,request_ref,attestation_ref,envelope.payload,envelope.signature))))
+    service.registry.assert_usable(config)
+    spec=_spec(service,(request_ref,attestation_ref),'m5-human-verification','audit',config)
     jobs=[service.registry.job(j) for j in service.registry.trace(request_ref).jobs]
     attempts=[j for j in jobs if j.spec.invocation=='m5-human-verification' and j.spec.inputs[0]==request_ref]
     if not any(j.spec==spec for j in attempts) and len(attempts)>=3:
@@ -202,11 +223,13 @@ def _verification(service,request_ref,attestation_ref):
 
 
 def publish_verification(service,claim,frozen):
-    value={'version':'m5-human-verification-v1','request':frozen['request'].model_dump(mode='json'),
+    envelope=_attestation_inputs(service,frozen['attestation'],register=True)
+    value={'version':'m5-human-verification-v2','request':frozen['request'].model_dump(mode='json'),
         'attestation':frozen['attestation'].model_dump(mode='json'),'verified_at':frozen['recorded_at'].isoformat(),
+        'payload':envelope.payload.model_dump(mode='json'),'signature':envelope.signature.model_dump(mode='json'),
         'verification':frozen['verification'],'failure':frozen['failure']}
     ref=put_record(service.store,value,'m5-human-verification')
-    service.registry.register(ref,dependencies=(frozen['request'],frozen['attestation']))
+    service.registry.register(ref,dependencies=(frozen['request'],frozen['attestation'],envelope.payload,envelope.signature))
     ev=evidence(ref,service.revision,('SSHHumanVerifier.verify',frozen['request'].sha256),scope='real_integration').model_copy(update={'recorded_at':frozen['recorded_at']})
     cost=c.CostRecord(category='verifier',wall_seconds=frozen['wall_seconds'],cpu_seconds=frozen['cpu_seconds'],
         gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='partial',
@@ -238,7 +261,7 @@ def _accept(service,request_ref,attestation_ref):
         return job.result
     if job.state!='queued':service._claim(job)  # Refuse ambiguous redispatch.
     verification,verification_job=_verification(service,request_ref,attestation_ref)
-    envelope=read_local(service.store,attestation_ref,DetachedAttestation,'m5-sshsig-attestation')
+    envelope=_attestation_inputs(service,attestation_ref)
     from feature_rl.verifiers.language import decode_json
     from feature_rl.verifiers.loader import read_bytes
     native=decode_json(read_bytes(service.store,verification.artifacts[0],1024*1024,'m5-human-verification',True),1024*1024)
@@ -259,14 +282,17 @@ def _accept(service,request_ref,attestation_ref):
 
 def publish_admission(service,claim,frozen):
     request,report,_=review_context(service,frozen['request_ref'])
+    envelope=_attestation_inputs(service,frozen['attestation'])
+    if envelope!=frozen['envelope']:
+        raise QualificationRejected('invalid_evidence','retained admission payload/signature changed')
     payload,_=_verifier(service).verify(service.store,frozen['request_ref'],frozen['attestation'],consumed_at=frozen['consumed_at'])
     if request!=frozen['request'] or report!=frozen['report'] or payload!=frozen['payload']:
         raise QualificationRejected('invalid_evidence','retained admission changed its authenticated review package or payload')
-    binding=VerifiedAttestation(request=frozen['request_ref'],attestation=frozen['attestation'],payload=frozen['envelope'].payload,
+    binding=VerifiedAttestation(request=frozen['request_ref'],attestation=frozen['attestation'],payload=envelope.payload,signature=envelope.signature,
         verification=frozen['verification'].artifacts[0],consumed_at=frozen['consumed_at'],
         verification_job=frozen['verification_job'],admission_job=claim.job_id)
     ref=put_record(service.store,binding,'m5-verified-attestation')
-    service.registry.register(ref,dependencies=(binding.request,binding.attestation,binding.payload,binding.verification))
+    service.registry.register(ref,dependencies=(binding.request,binding.attestation,binding.payload,binding.signature,binding.verification))
     ev=evidence(ref,service.revision,('QualificationService.accept',request.task.sha256,request.report.sha256),scope='real_integration').model_copy(update={'recorded_at':frozen['recorded_at']})
     human=c.HumanReview(actor_type='human',human_identity=payload.human_identity,subject_sha256=request.task.sha256,
         decision='approved',evidence=(ev,),attestation=frozen['envelope'].payload)
@@ -293,11 +319,13 @@ def validate_pending_admission(service,result):
     if accepted.disposition!=c.Disposition.SUCCESS or accepted.provenance.producer!='feature_rl.qualification.admission':
         raise QualificationRejected('invalid_evidence','retained successful result is not an M5 admission')
     binding=read_local(service.store,accepted.provenance.inputs[-1],VerifiedAttestation,'m5-verified-attestation')
+    envelope=_attestation_inputs(service,binding.attestation)
+    if binding.payload!=envelope.payload or binding.signature!=envelope.signature:
+        raise QualificationRejected('invalid_evidence','retained consumed signature/payload was substituted')
     request,reviewed,_=review_context(service,binding.request)
     assert_frozen_evidence(reviewed,accepted)
     if accepted.task!=request.task:raise QualificationRejected('invalid_evidence','retained accepted task changed')
     payload,_=_verifier(service).verify(service.store,binding.request,binding.attestation,consumed_at=binding.consumed_at)
-    envelope=read_local(service.store,binding.attestation,DetachedAttestation,'m5-sshsig-attestation')
     if len(accepted.human_reviews)!=1 or binding.payload!=envelope.payload:
         raise QualificationRejected('invalid_evidence','retained human evidence was substituted')
     human=accepted.human_reviews[0]
@@ -319,6 +347,9 @@ def _verify_accepted(service,task_ref,report_ref):
         raise QualificationRejected('invalid_evidence','accepted report lacks actual admission origin')
     reviewed_ref,request_ref,attestation_ref,binding_ref=accepted.provenance.inputs
     binding=read_local(service.store,binding_ref,VerifiedAttestation,'m5-verified-attestation')
+    envelope=_attestation_inputs(service,attestation_ref)
+    if binding.payload!=envelope.payload or binding.signature!=envelope.signature:
+        raise QualificationRejected('invalid_evidence','accepted consumed signature/payload was substituted')
     if (binding.request,binding.attestation)!=(request_ref,attestation_ref):
         raise QualificationRejected('invalid_evidence','accepted attestation selection mismatch')
     selection=_selected(service,binding.admission_job,_spec(service,(request_ref,),'m5-accept'),report_ref)
@@ -334,16 +365,19 @@ def _verify_accepted(service,task_ref,report_ref):
         raise QualificationRejected('invalid_evidence','later task does not reference this exact accepted Q')
     if len(accepted.human_reviews)!=1:
         raise QualificationRejected('invalid_evidence','unexpected human review substitution')
-    native_result=_selected(service,binding.verification_job,_spec(service,(request_ref,attestation_ref),'m5-human-verification','audit'),binding.verification)
+    verification_job=service.registry.job(binding.verification_job)
+    from feature_rl.verifiers.loader import read_bytes
+    if read_bytes(service.store,verification_job.spec.configuration,1024*1024,'m5-human-verification-configuration',True)!=canonical_json(_verification_configuration(service,request_ref,attestation_ref,envelope)):
+        raise QualificationRejected('invalid_evidence','selected verification did not bind the exact consumed payload/signature')
+    native_result=_selected(service,binding.verification_job,_spec(service,(request_ref,attestation_ref),'m5-human-verification','audit',verification_job.spec.configuration),binding.verification)
     if native_result.disposition!=c.Disposition.SUCCESS:
         raise QualificationRejected('unverified_human_review','selected native signature check was not successful')
     from feature_rl.verifiers.language import decode_json
     from feature_rl.verifiers.loader import read_bytes
     native=decode_json(read_bytes(service.store,binding.verification,1024*1024,'m5-human-verification',True),1024*1024)
-    if native.get('verified_at')!=binding.consumed_at.isoformat() or native.get('failure') is not None or native.get('verification',{}).get('human_origin_verified') is not True:
+    if native.get('version')!='m5-human-verification-v2' or native.get('payload')!=envelope.payload.model_dump(mode='json') or native.get('signature')!=envelope.signature.model_dump(mode='json') or native.get('verified_at')!=binding.consumed_at.isoformat() or native.get('failure') is not None or native.get('verification',{}).get('human_origin_verified') is not True:
         raise QualificationRejected('invalid_evidence','consumed challenge time lacks selected native verification')
     payload,verification=_verifier(service).verify(service.store,request_ref,attestation_ref,consumed_at=binding.consumed_at)
-    envelope=read_local(service.store,attestation_ref,DetachedAttestation,'m5-sshsig-attestation')
     if binding.payload!=envelope.payload:
         raise QualificationRejected('invalid_evidence','accepted payload differs from the exact detached attestation')
     human=accepted.human_reviews[0]
@@ -355,5 +389,5 @@ def _verify_accepted(service,task_ref,report_ref):
     incremental=collapse_costs((*native_result.costs,expected_human,unknown_cost('storage','Admission publication and current trust recheck overhead unmeasured')))
     if accepted.costs!=expected_costs or selection.costs!=incremental:
         raise QualificationRejected('invalid_evidence','accepted costs changed authenticated human minutes or reviewed evidence')
-    for ref in (request.task,task_ref,report_ref,reviewed_ref,request_ref,attestation_ref,binding_ref):service.registry.assert_usable(ref)
+    for ref in (request.task,task_ref,report_ref,reviewed_ref,request_ref,attestation_ref,binding_ref,binding.payload,binding.signature):service.registry.assert_usable(ref)
     return accepted

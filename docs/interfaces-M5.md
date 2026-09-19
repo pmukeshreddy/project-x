@@ -74,7 +74,16 @@ targeted omission; diagnosed equivalent exclusions do not count. All nine attack
 are required: forged_verdict, evaluator_detection, hardcoded_inputs,
 skipped_execution, protocol_manipulation, excessive_output, dependency_shadowing,
 path_link and retained_state. Syntax/import/protocol/infrastructure failure does
-not satisfy semantic omission. Alternative author inputs bind B and visible
+not satisfy semantic omission. For targeted semantic coverage, every process-mode
+case must have actual clean adapter evidence with normal exit zero; M4 may still
+correctly classify nonzero process output as completed comparisons for ordinary
+grading or other control modes. A nonzero process comparison alone cannot establish
+a runnable omission and is not relabeled infrastructure. A legitimate missing new
+public symbol must be handled exactly by the fixed adapter and emitted as an
+explicit compared observation with normal completion (for example, `present=false`
+for that exact absent module). Blanket exception handling is not that distinction.
+`assess_outcome(..., store=controller_store)` reads process evidence at this gate;
+missing process evidence fails closed. Alternative author inputs bind B and visible
 contract/public context; independence evidence is required separately and is part
 of the human-reviewed frozen package. Same-author diagnostics cannot claim it.
 
@@ -116,6 +125,20 @@ capability. A process lost before recoverable publication retains unknown attemp
 costs and requires reconciliation. Recovered human-verification audit results are
 followed by the same `accept(request,attestation)` call; they are not admission.
 Current trust/quarantine is checked again before accepted publication is retried.
+
+New `m5-run-configuration-v2` records explicitly contain `source_dependencies`:
+the exact B and the inner `m4-source-delta` that M4 consumes from a valid submission.
+M5 registers/checks those leaves before grade-job enqueue and checks them again on
+reuse/admission. Invalid envelopes that M4 rejects before consuming a changes blob
+remain eligible for source-rejection controls. New verification configurations and
+`m5-human-verification-v2` records bind both detached payload and signature refs;
+ingestion checks their current usability before native verification. Accepted
+`m5-verified-attestation-v2` also contains the signature ref, and accepted/recovery
+consumers check both leaves before trust verification. Registry tracing therefore
+includes their new jobs and downstream records. Existing opaque envelopes and
+Registry dependency declarations are not retrofitted; legacy v1 admission bindings
+cannot satisfy the strengthened gate. These new records require the current M5
+implementation revision and requalification of an eligible package.
 
 Human admission uses an exact concrete `SSHHumanVerifier`, never an arbitrary
 callback or identity string. It accepts `enrollment_path` and

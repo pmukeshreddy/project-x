@@ -156,10 +156,11 @@ class QualificationSummary(StrictModel):
     wall_seconds: Annotated[float,Field(ge=0)] | None=None
 
 class VerifiedAttestation(StrictModel):
-    version: Literal['m5-verified-attestation-v1']='m5-verified-attestation-v1'
+    version: Literal['m5-verified-attestation-v2']='m5-verified-attestation-v2'
     request: ArtifactRef
     attestation: ArtifactRef
     payload: ArtifactRef
+    signature: ArtifactRef
     verification: ArtifactRef
     consumed_at: UTCDateTime
     verification_job: Digest

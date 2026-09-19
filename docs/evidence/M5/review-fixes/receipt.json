@@ -1,0 +1,36 @@
+{
+  "version": "m5-round1-fix-receipt-v1",
+  "reviewed_base": "3cc9f11f4d2665f2872906a8c00521255eb252eb",
+  "review": "docs/reviews/M5-qualification-round1.md",
+  "observed_precommit_head": "8efdc89098a05a9720f8a0882df25c55a8a74c93",
+  "changes": [
+    "P1: actual normal adapter completion required for targeted process semantics; explicit exact absence observations supported; M4 classification unchanged.",
+    "P1: new M5 v2 records freeze source delta and detached payload/signature refs, register/check consumed leaves before use and on reuse; immutable existing Registry declarations not retrofitted."
+  ],
+  "command": [
+    "env",
+    "PYTHONPATH=src",
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/test_qualification_review_fixes.py",
+    "tests/test_qualification_projection.py",
+    "tests/test_qualification_controls.py",
+    "tests/test_qualification_service.py",
+    "tests/test_qualification_admission.py",
+    "tests/test_qualification_recovery.py",
+    "-q"
+  ],
+  "exit_status": 0,
+  "reported": "72 passed in 11.95s",
+  "new_regressions": 13,
+  "logs": {
+    "docs/evidence/M5/review-fixes/final-focused.log": "3fefda82fef3e42ef270986757a15cd0f76857e3b1c9ad002556d23ee276b863",
+    "docs/evidence/M5/review-fixes/focused.log": "bc4a07913de1e07402ebf7b5fda2cacdc97beab209cd75f324dd31accb369eea",
+    "docs/evidence/M5/review-fixes/green-first.log": "3dbdd0b83d9f5825f214f0b7df719b2263e3a5f448c29e80b8a9d00cbeadc3c9",
+    "docs/evidence/M5/review-fixes/red.log": "c45a747f2759f2880ae0e0e41d5dd644c7b7d81cd210276b0e596895ebd57cfa",
+    "docs/evidence/M5/review-fixes/semantic-green.log": "2edfaf37da058816ab0b5620d3ba084755b519048f5749fe1d97eb9229839b23"
+  },
+  "scope": "Synthetic failed observations and actual CAS/Registry data paths only. No Docker, model, key, successful human verification, human approval or repeated retained-artifact matrix.",
+  "independent_delta_review": "pending"
+}

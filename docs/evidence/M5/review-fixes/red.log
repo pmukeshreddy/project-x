@@ -1,0 +1,281 @@
+FFFFFFFFFFF                                                              [100%]
+=================================== FAILURES ===================================
+_ test_process_crash_is_not_semantic_omission_even_when_m4_completed_and_only_f1_failed[SyntaxError: invalid syntax\n] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_process_crash_is_not_sema0')
+stderr = b'SyntaxError: invalid syntax\n'
+
+    @pytest.mark.parametrize('stderr',[b'SyntaxError: invalid syntax\n',b'ModuleNotFoundError: No module named required_dependency\n'])
+    def test_process_crash_is_not_semantic_omission_even_when_m4_completed_and_only_f1_failed(tmp_path,stderr):
+        q,checked,receipt=process_observations(tmp_path,exit_code=1,stderr=stderr)
+>       assert not assess_outcome(checked,receipt,'semantic_negative',('F1',)).passed
+E       AssertionError: assert not True
+E        +  where True = GateOutcome(passed=True, code='accepted', detail='Runnable negative must fail exactly its declared semantic targets').passed
+E        +    where GateOutcome(passed=True, code='accepted', detail='Runnable negative must fail exactly its declared semantic targets') = assess_outcome(namespace(adapter=b'# Synthetic fixed adapter identity; never executed in this test', verifier=namespace(permissions=n...e(requirement_id='F1', mandatory=True),), compatibility_obligations=(namespace(requirement_id='C1', mandatory=True),))), namespace(cases=(CaseResult(case_id='c0', mandatory=True, status='completed', passed=False, assertions=(AssertionResul...e'>, encoding='bytes'), disposition=<Disposition.REJECTED: 'candidate_rejection'>, reason='required comparison failed'), 'semantic_negative', ('F1',))
+
+tests/test_qualification_review_fixes.py:73: AssertionError
+_ test_process_crash_is_not_semantic_omission_even_when_m4_completed_and_only_f1_failed[ModuleNotFoundError: No module named required_dependency\n] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_process_crash_is_not_sema1')
+stderr = b'ModuleNotFoundError: No module named required_dependency\n'
+
+    @pytest.mark.parametrize('stderr',[b'SyntaxError: invalid syntax\n',b'ModuleNotFoundError: No module named required_dependency\n'])
+    def test_process_crash_is_not_semantic_omission_even_when_m4_completed_and_only_f1_failed(tmp_path,stderr):
+        q,checked,receipt=process_observations(tmp_path,exit_code=1,stderr=stderr)
+>       assert not assess_outcome(checked,receipt,'semantic_negative',('F1',)).passed
+E       AssertionError: assert not True
+E        +  where True = GateOutcome(passed=True, code='accepted', detail='Runnable negative must fail exactly its declared semantic targets').passed
+E        +    where GateOutcome(passed=True, code='accepted', detail='Runnable negative must fail exactly its declared semantic targets') = assess_outcome(namespace(adapter=b'# Synthetic fixed adapter identity; never executed in this test', verifier=namespace(permissions=n...e(requirement_id='F1', mandatory=True),), compatibility_obligations=(namespace(requirement_id='C1', mandatory=True),))), namespace(cases=(CaseResult(case_id='c0', mandatory=True, status='completed', passed=False, assertions=(AssertionResul...e'>, encoding='bytes'), disposition=<Disposition.REJECTED: 'candidate_rejection'>, reason='required comparison failed'), 'semantic_negative', ('F1',))
+
+tests/test_qualification_review_fixes.py:73: AssertionError
+_ test_targeted_process_semantics_are_bound_to_actual_normal_completion[1-SyntaxError: invalid syntax\n-False] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_targeted_process_semantic0')
+exit_code = 1, stderr = b'SyntaxError: invalid syntax\n', want = False
+
+    @pytest.mark.parametrize('exit_code,stderr,want',[(1,b'SyntaxError: invalid syntax\n',False),
+        (1,b'ModuleNotFoundError: No module named required_dependency\n',False),
+        (0,b'',True)])
+    def test_targeted_process_semantics_are_bound_to_actual_normal_completion(tmp_path,exit_code,stderr,want):
+        q,checked,receipt=process_observations(tmp_path,exit_code=exit_code,stderr=stderr)
+>       outcome=assess_outcome(checked,receipt,'semantic_negative',('F1',),store=q.store)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: assess_outcome() got an unexpected keyword argument 'store'
+
+tests/test_qualification_review_fixes.py:81: TypeError
+_ test_targeted_process_semantics_are_bound_to_actual_normal_completion[1-ModuleNotFoundError: No module named required_dependency\n-False] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_targeted_process_semantic1')
+exit_code = 1
+stderr = b'ModuleNotFoundError: No module named required_dependency\n'
+want = False
+
+    @pytest.mark.parametrize('exit_code,stderr,want',[(1,b'SyntaxError: invalid syntax\n',False),
+        (1,b'ModuleNotFoundError: No module named required_dependency\n',False),
+        (0,b'',True)])
+    def test_targeted_process_semantics_are_bound_to_actual_normal_completion(tmp_path,exit_code,stderr,want):
+        q,checked,receipt=process_observations(tmp_path,exit_code=exit_code,stderr=stderr)
+>       outcome=assess_outcome(checked,receipt,'semantic_negative',('F1',),store=q.store)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: assess_outcome() got an unexpected keyword argument 'store'
+
+tests/test_qualification_review_fixes.py:81: TypeError
+_ test_targeted_process_semantics_are_bound_to_actual_normal_completion[0--True] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_targeted_process_semantic2')
+exit_code = 0, stderr = b'', want = True
+
+    @pytest.mark.parametrize('exit_code,stderr,want',[(1,b'SyntaxError: invalid syntax\n',False),
+        (1,b'ModuleNotFoundError: No module named required_dependency\n',False),
+        (0,b'',True)])
+    def test_targeted_process_semantics_are_bound_to_actual_normal_completion(tmp_path,exit_code,stderr,want):
+        q,checked,receipt=process_observations(tmp_path,exit_code=exit_code,stderr=stderr)
+>       outcome=assess_outcome(checked,receipt,'semantic_negative',('F1',),store=q.store)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: assess_outcome() got an unexpected keyword argument 'store'
+
+tests/test_qualification_review_fixes.py:81: TypeError
+_ test_exact_absent_new_public_symbol_can_be_an_explicit_successful_adapter_observation _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_exact_absent_new_public_s0')
+
+    def test_exact_absent_new_public_symbol_can_be_an_explicit_successful_adapter_observation(tmp_path):
+        q,checked,receipt=process_observations(tmp_path,exit_code=0,mode='json')
+>       assert assess_outcome(checked,receipt,'semantic_negative',('F1',),store=q.store).passed
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: assess_outcome() got an unexpected keyword argument 'store'
+
+tests/test_qualification_review_fixes.py:88: TypeError
+__ test_run_config_consumes_source_delta_and_quarantine_blocks_selected_reuse __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_run_config_consumes_sourc0')
+
+    def test_run_config_consumes_source_delta_and_quarantine_blocks_selected_reuse(tmp_path):
+        q,checked,projection,submission,delta,parent=source_run(tmp_path)
+        # This synthetic recipe has no runtime policy, so actual M4 returns an
+        # unsupported receipt before any workspace/engine invocation.
+        binding,result,receipt=q._run(checked,projection,submission,11,'fresh_0','positive',(),parent,False,set())
+        assert receipt.disposition==c.Disposition.UNSUPPORTED
+>       trace=q.registry.trace(delta)
+              ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_review_fixes.py:107: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/registry/core.py:239: in trace
+    return self._storage.view(lambda state, _: state.trace(ref))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/registry/storage.py:248: in view
+    return reader(state, events)
+           ^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/registry/core.py:239: in <lambda>
+    return self._storage.view(lambda state, _: state.trace(ref))
+                                               ^^^^^^^^^^^^^^^^
+src/feature_rl/registry/state.py:131: in trace
+    seen, jobs = self.affected(ref)
+                 ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.registry.state.State object at 0x10788eed0>
+root = ArtifactRef(sha256='4d297ccd06d41859a3e40d4508d506ff9137e352e3902c465690cc99979e6c78', kind='m4-source-delta', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, encoding='bytes')
+
+    def affected(self, root):
+        if root.sha256 not in self.artifacts or self.artifacts[root.sha256].ref != root:
+>           raise UnknownIdentity('unregistered exact artifact reference')
+E           feature_rl.registry.models.UnknownIdentity: unregistered exact artifact reference
+
+src/feature_rl/registry/state.py:103: UnknownIdentity
+______ test_quarantined_source_delta_is_rejected_before_grade_job_enqueue ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_quarantined_source_delta_0')
+
+    def test_quarantined_source_delta_is_rejected_before_grade_job_enqueue(tmp_path):
+        q,checked,projection,submission,delta,parent=source_run(tmp_path)
+        q.registry.register(delta)
+        q.registry.quarantine(delta,notice_id='synthetic-before-grade',reason='Synthetic preexisting quarantine',evidence=(delta,))
+        before=q.registry.trace(checked.task_ref).jobs
+>       with pytest.raises(QuarantinedError):q._run(checked,projection,submission,11,'fresh_0','positive',(),parent,False,set())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE QuarantinedError
+
+tests/test_qualification_review_fixes.py:119: Failed
+_ test_failed_verification_records_consumed_leaves_and_quarantine_blocks_reuse[payload] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_failed_verification_recor0')
+leaf = 'payload'
+
+    @pytest.mark.parametrize('leaf',['payload','signature'])
+    def test_failed_verification_records_consumed_leaves_and_quarantine_blocks_reuse(tmp_path,leaf):
+        from feature_rl.qualification.admission import _verification
+        q,request,attestation,payload,signature=failed_attestation(tmp_path)
+        with pytest.raises(QualificationRejected,match='payload schema/origin invalid'):_verification(q,request,attestation)
+        ref=payload if leaf=='payload' else signature
+>       trace=q.registry.trace(ref)
+              ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_review_fixes.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/registry/core.py:239: in trace
+    return self._storage.view(lambda state, _: state.trace(ref))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/registry/storage.py:248: in view
+    return reader(state, events)
+           ^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/registry/core.py:239: in <lambda>
+    return self._storage.view(lambda state, _: state.trace(ref))
+                                               ^^^^^^^^^^^^^^^^
+src/feature_rl/registry/state.py:131: in trace
+    seen, jobs = self.affected(ref)
+                 ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.registry.state.State object at 0x1078ab050>
+root = ArtifactRef(sha256='b70de5f6683d05d60d2317fbe9fc7e3698d2b320542d20cd10fbf6f39a8dde39', kind='m5-human-review-payload', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, encoding='bytes')
+
+    def affected(self, root):
+        if root.sha256 not in self.artifacts or self.artifacts[root.sha256].ref != root:
+>           raise UnknownIdentity('unregistered exact artifact reference')
+E           feature_rl.registry.models.UnknownIdentity: unregistered exact artifact reference
+
+src/feature_rl/registry/state.py:103: UnknownIdentity
+_ test_failed_verification_records_consumed_leaves_and_quarantine_blocks_reuse[signature] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_failed_verification_recor1')
+leaf = 'signature'
+
+    @pytest.mark.parametrize('leaf',['payload','signature'])
+    def test_failed_verification_records_consumed_leaves_and_quarantine_blocks_reuse(tmp_path,leaf):
+        from feature_rl.qualification.admission import _verification
+        q,request,attestation,payload,signature=failed_attestation(tmp_path)
+        with pytest.raises(QualificationRejected,match='payload schema/origin invalid'):_verification(q,request,attestation)
+        ref=payload if leaf=='payload' else signature
+>       trace=q.registry.trace(ref)
+              ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_review_fixes.py:146: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/feature_rl/registry/core.py:239: in trace
+    return self._storage.view(lambda state, _: state.trace(ref))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/registry/storage.py:248: in view
+    return reader(state, events)
+           ^^^^^^^^^^^^^^^^^^^^^
+src/feature_rl/registry/core.py:239: in <lambda>
+    return self._storage.view(lambda state, _: state.trace(ref))
+                                               ^^^^^^^^^^^^^^^^
+src/feature_rl/registry/state.py:131: in trace
+    seen, jobs = self.affected(ref)
+                 ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.registry.state.State object at 0x107718e50>
+root = ArtifactRef(sha256='817947af1afa016d3890b36f5253d2c7dbb9378d2ff755dab168d0b224d98483', kind='m5-sshsig', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, encoding='bytes')
+
+    def affected(self, root):
+        if root.sha256 not in self.artifacts or self.artifacts[root.sha256].ref != root:
+>           raise UnknownIdentity('unregistered exact artifact reference')
+E           feature_rl.registry.models.UnknownIdentity: unregistered exact artifact reference
+
+src/feature_rl/registry/state.py:103: UnknownIdentity
+___ test_signature_quarantine_is_checked_before_native_verification_attempt ____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1241/test_signature_quarantine_is_c0')
+
+    def test_signature_quarantine_is_checked_before_native_verification_attempt(tmp_path):
+        from feature_rl.qualification.admission import _verification
+        q,request,attestation,payload,signature=failed_attestation(tmp_path)
+        q.registry.register(signature)
+        q.registry.quarantine(signature,notice_id='synthetic-before-verify',reason='Synthetic preexisting signature quarantine',evidence=(signature,))
+        before=q.registry.trace(request).jobs
+>       with pytest.raises(QuarantinedError):_verification(q,request,attestation)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_qualification_review_fixes.py:162: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+service = <feature_rl.qualification.service.QualificationService object at 0x107adc050>
+request_ref = ArtifactRef(sha256='d479136dceecaf354548c13272e59eb2493ef3a6ddb730de6726e8d29e35a07a', kind='m5-review-request', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, encoding='bytes')
+attestation_ref = ArtifactRef(sha256='882c97f4641e5b8099b6ecfe57370b018ceaabf8fabd407820d99a4e46b72afa', kind='m5-sshsig-attestation', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, encoding='bytes')
+
+    def _verification(service,request_ref,attestation_ref):
+        """Bounded, selected native verification attempt. Failed signatures do not consume admission."""
+        verifier=_verifier(service)
+        spec=_spec(service,(request_ref,attestation_ref),'m5-human-verification','audit')
+        jobs=[service.registry.job(j) for j in service.registry.trace(request_ref).jobs]
+        attempts=[j for j in jobs if j.spec.invocation=='m5-human-verification' and j.spec.inputs[0]==request_ref]
+        if not any(j.spec==spec for j in attempts) and len(attempts)>=3:
+            raise QualificationRejected('budget_exhausted','at most three distinct human signature-verification attempts per frozen review request')
+        job=service.registry.enqueue(spec)
+        if job.state=='completed':
+            if job.result.disposition!=c.Disposition.SUCCESS:
+                raise QualificationRejected('unverified_human_review',job.result.reason)
+            return job.result,job.job_id
+        claim=service._claim(job);service._intent(claim);started=time.monotonic();cpu=time.process_time()
+        payload=None;verified=None;failure=None
+        try:payload,verified=verifier.verify(service.store,request_ref,attestation_ref)
+        except QualificationRejected as exc:failure={'code':exc.code,'detail':exc.detail,'verification':getattr(exc,'verification',None)}
+        now=datetime.now(timezone.utc)
+        frozen={'request':request_ref,'attestation':attestation_ref,'payload':payload,'verification':verified,
+            'failure':failure,'recorded_at':now,'wall_seconds':max(0.0,time.monotonic()-started),'cpu_seconds':max(0.0,time.process_time()-cpu)}
+        try:result=publish_verification(service,claim,frozen)
+        except QualificationPublicationFailed:raise
+        except Exception as exc:
+            raise QualificationPublicationFailed('retain native verification and costs without signing or re-verifying',
+                pending=FrozenPublication(claim,frozen,'human_verification'),claim=claim) from exc
+>       if result.disposition!=c.Disposition.SUCCESS:raise QualificationRejected('unverified_human_review',result.reason)
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       feature_rl.qualification.models.QualificationRejected: unverified_human_review: unverified_human_review: human payload schema/origin invalid
+
+src/feature_rl/qualification/admission.py:200: QualificationRejected
+=========================== short test summary info ============================
+FAILED tests/test_qualification_review_fixes.py::test_process_crash_is_not_semantic_omission_even_when_m4_completed_and_only_f1_failed[SyntaxError: invalid syntax\n]
+FAILED tests/test_qualification_review_fixes.py::test_process_crash_is_not_semantic_omission_even_when_m4_completed_and_only_f1_failed[ModuleNotFoundError: No module named required_dependency\n]
+FAILED tests/test_qualification_review_fixes.py::test_targeted_process_semantics_are_bound_to_actual_normal_completion[1-SyntaxError: invalid syntax\n-False]
+FAILED tests/test_qualification_review_fixes.py::test_targeted_process_semantics_are_bound_to_actual_normal_completion[1-ModuleNotFoundError: No module named required_dependency\n-False]
+FAILED tests/test_qualification_review_fixes.py::test_targeted_process_semantics_are_bound_to_actual_normal_completion[0--True]
+FAILED tests/test_qualification_review_fixes.py::test_exact_absent_new_public_symbol_can_be_an_explicit_successful_adapter_observation
+FAILED tests/test_qualification_review_fixes.py::test_run_config_consumes_source_delta_and_quarantine_blocks_selected_reuse
+FAILED tests/test_qualification_review_fixes.py::test_quarantined_source_delta_is_rejected_before_grade_job_enqueue
+FAILED tests/test_qualification_review_fixes.py::test_failed_verification_records_consumed_leaves_and_quarantine_blocks_reuse[payload]
+FAILED tests/test_qualification_review_fixes.py::test_failed_verification_records_consumed_leaves_and_quarantine_blocks_reuse[signature]
+FAILED tests/test_qualification_review_fixes.py::test_signature_quarantine_is_checked_before_native_verification_attempt
+11 failed in 4.62s

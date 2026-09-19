@@ -16,6 +16,17 @@ def put_record(store,value,kind):
     return store.put_bytes(canonical_json(value.model_dump(mode='json') if hasattr(value,'model_dump') else value),kind,Visibility.PRIVATE)
 
 
+def check_consumed(registry,refs,*,register=False):
+    """Check exact consumed leaves without rewriting existing dependency declarations."""
+    from feature_rl.registry import UnknownIdentity
+    for ref in dict.fromkeys(refs):
+        try:registry.assert_usable(ref)
+        except UnknownIdentity:
+            if not register:raise
+            registry.register(ref)
+            registry.assert_usable(ref)
+
+
 def unknown_cost(category='verifier',note='M5 controller/publication overhead not measured'):
     return CostRecord(category=category,wall_seconds=None,cpu_seconds=None,gpu_seconds=None,input_tokens=None,
         output_tokens=None,human_minutes=None,usd=None,measurement='unknown',note=note)
@@ -150,6 +161,32 @@ def _assert_case_observation(checked,actual,case,comparison,value,owner):
         raise QualificationRejected('invalid_evidence','completed comparison has invalid raw observation protocol')
     if actual.status!='completed' or tuple(a.passed for a in actual.assertions)!=expected:
         raise QualificationRejected('invalid_evidence','assertion verdict differs from actual closed comparison')
+
+
+def require_semantic_execution(store,checked,receipt):
+    """A compared process crash is not proof of a runnable semantic omission.
+
+    The fixed adapter must report exact declared missing-symbol behavior as a
+    normal compared observation. M4's classification of nonzero process output
+    remains valid for grading and other control modes; this is an M5 coverage
+    requirement, not an infrastructure classification or a stderr heuristic.
+    """
+    comparisons=getattr(checked,'comparisons',())
+    if len(comparisons)!=len(receipt.cases):
+        raise QualificationRejected('invalid_evidence','complete case comparison ledger required for targeted semantics')
+    for actual,comparison in zip(receipt.cases,comparisons):
+        if comparison.mode!='process':continue  # Completed JSON comparisons already require exit zero in M4.
+        if store is None or actual.evidence is None:
+            raise QualificationRejected('invalid_evidence','actual process evidence required for targeted semantic coverage')
+        value=decode_json(read_bytes(store,actual.evidence,32*1024*1024,'environment-execution',True),32*1024*1024)
+        owner=Ownership.model_validate_json(canonical_json(value.get('record')))
+        command=['python','-c',checked.adapter.decode('utf-8')]
+        rows=[row for row in value.get('commands',[]) if row.get('argv',[])[-3:]==command]
+        if value.get('phase')!='execute' or value.get('cleanup_verified') is not True or owner.phase!='removed' or len(rows)!=1 or rows[0].get('argv',[])[-4]!=(owner.container_id or owner.container_name):
+            raise QualificationRejected('invalid_evidence','targeted semantics lack exact clean adapter execution evidence')
+        extra=value.get('extra',{})
+        if rows[0].get('reason')!='exited' or rows[0].get('exit_code')!=0 or extra.get('reason')!='completed' or extra.get('failure_category')!='none' or extra.get('error') is not None:
+            raise QualificationRejected('oracle_disagreement','process case '+actual.case_id+' did not establish normal adapter completion; exact intended absence must be an explicit compared observation')
 
 
 def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):

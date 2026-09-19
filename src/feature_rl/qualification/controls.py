@@ -18,7 +18,7 @@ def disposition_for(issues):
     return Disposition.PROVISIONAL
 
 
-def assess_outcome(checked, receipt, mode, targets):
+def assess_outcome(checked, receipt, mode, targets, *, store=None):
     def outcome(passed,code,detail):return GateOutcome(passed=passed,code=code,detail=detail)
     if not receipt.cleanup_verified or receipt.disposition in {Disposition.INFRASTRUCTURE,Disposition.INVALID,Disposition.UNSUPPORTED} or receipt.reward is None:
         return outcome(False,'environment_failure','Unmeasured or unclean grading cannot settle this gate')
@@ -34,6 +34,10 @@ def assess_outcome(checked, receipt, mode, targets):
     if receipt.reward==1:return outcome(False,'false_acceptance','Known invalid control received a passing grade')
     if mode=='semantic_negative':
         good=compared and bool(targets) and failed==set(targets)
+        if good:
+            from .evidence import require_semantic_execution
+            try:require_semantic_execution(store,checked,receipt)
+            except QualificationRejected as exc:return outcome(False,exc.code,exc.detail)
         return outcome(good,'accepted' if good else 'oracle_disagreement','Runnable negative must fail exactly its declared semantic targets')
     if mode=='source_rejection':
         good=receipt.reason.startswith('source submission rejected:') and all(c.status=='not_run' for c in receipt.cases)

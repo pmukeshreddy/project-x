@@ -8,7 +8,8 @@ from feature_rl.grading import AssertionResult, CaseResult
 def checked():
     feature=SimpleNamespace(requirement_id='feature',mandatory=True)
     compatibility=SimpleNamespace(requirement_id='compat',mandatory=True)
-    return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compatibility,)))
+    return SimpleNamespace(contract=SimpleNamespace(requirements=(feature,),compatibility_obligations=(compatibility,)),
+        comparisons=(SimpleNamespace(mode="json"),SimpleNamespace(mode="json")))
 
 
 def receipt(*,failed=(),status='completed',reward=0):

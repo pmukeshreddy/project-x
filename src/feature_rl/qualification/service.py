@@ -19,7 +19,7 @@ from .models import (QualificationRejected, QualificationPolicy, RepairHistory, 
     CompletionPending, FrozenPublication, GradePending, RunCompletionPending)
 from .projection import derive_reference
 from .controls import assess_outcome, validate_control_plan, validate_repairs
-from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade, validate_reset
+from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade, validate_reset, check_consumed
 
 
 class QualificationService:
@@ -189,7 +189,7 @@ class QualificationService:
                 signature=tuple((item.status,tuple(a.passed for a in item.assertions)) for item in receipt.cases)
                 if seed in signatures and signatures[seed]!=signature:issues.append('flaky_task: repeated reference inputs produced different outcomes')
                 signatures[seed]=signature
-            outcome=assess_outcome(checked,receipt,mode,targets)
+            outcome=assess_outcome(checked,receipt,mode,targets,store=self.store)
             if not outcome.passed:issues.append(outcome.code+': '+name+': '+outcome.detail)
             gate=c.RunAssessment(name=name,subject=task_version,disposition=c.Disposition.SUCCESS if outcome.passed else c.Disposition.REJECTED,
                 passed=outcome.passed,requirement_ids=targets,reason=outcome.detail,
@@ -284,11 +284,31 @@ class QualificationService:
         """Current registry trace, including active defect notices and dependents."""
         return self.registry.trace(task_version)
 
+    def _source_dependencies(self,checked,submission,*,register=False):
+        from feature_rl.submission.source import Submission
+        from feature_rl.verifiers.language import decode_json
+        refs=[checked.task.baseline]
+        value=None
+        if submission.kind=='m4-submission' and submission.encoding=='bytes':
+            # Match M4's controller read permissions; PUBLIC/AUTHORING byte
+            # envelopes can also carry a consumed delta and must not bypass it.
+            try:value=Submission.model_validate_json(canonical_json(decode_json(read_bytes(self.store,submission,65536,'m4-submission'),65536)))
+            except ValueError:pass
+        # Preserve M4 source-rejection controls: malformed/wrong-baseline/wrong-
+        # kind manifests reject before their alleged changes blob is consumed.
+        if value is not None and value.baseline==checked.task.baseline and value.changes.kind=='m4-source-delta' and value.changes.encoding=='bytes':
+            refs.append(value.changes)
+        check_consumed(self.registry,refs,register=register)
+        return tuple(refs)
+
     def _run(self,checked,projection_ref,submission,seed,name,mode,targets,parent_claim,reset,seen):
-        config=put_record(self.store,{'version':'m5-run-configuration-v1','configuration':self.configuration.model_dump(mode='json'),
+        source_refs=self._source_dependencies(checked,submission,register=True)
+        config=put_record(self.store,{'version':'m5-run-configuration-v2','configuration':self.configuration.model_dump(mode='json'),
             'projection':projection_ref.model_dump(mode='json'),'submission':submission.model_dump(mode='json'),
+            'source_dependencies':[ref.model_dump(mode='json') for ref in source_refs],
             'seed':seed,'name':name,'mode':mode,'targets':list(targets),'reset':reset},'m5-run-configuration')
-        self.registry.register(config,dependencies=(self.configuration,projection_ref,submission))
+        self.registry.register(config,dependencies=tuple(dict.fromkeys((self.configuration,projection_ref,submission,*source_refs))))
+        self.registry.assert_usable(config)
         job=self._job(checked.task_ref,'m5-run:'+parent_claim.job_id+':'+name,configuration=config,operation='grade')
         if job.state=='completed':result=job.result
         else:
@@ -318,7 +338,7 @@ class QualificationService:
         binding=RunBinding(name=name,task=checked.task_ref,projection=projection_ref,submission=submission,seed=seed,
             grade=result.artifacts[0],mode=mode,targets=targets,operation_ids=ids,grade_job=job.job_id,reset=reset_refs[0] if reset_refs else None)
         ref=put_record(self.store,binding,'m5-run-binding')
-        self.registry.register(ref,dependencies=tuple(dict.fromkeys((checked.task_ref,projection_ref,submission,*result.artifacts))))
+        self.registry.register(ref,dependencies=tuple(dict.fromkeys((checked.task_ref,projection_ref,submission,*source_refs,config,*result.artifacts))))
         return ref,result,receipt
 
     def _reset(self,checked,projection_ref,submission):
