@@ -412,31 +412,45 @@ def contract() -> None:
         source_roots=("src/click",), forbidden_paths=("tests",), dependencies="forbidden",
         dependency_artifacts=(), additional_artifact_types=(),
     )
+    prior_journals = prior_contract_journals(store)
+    if len(prior_journals) > 2:
+        raise RuntimeError("contract repair budget is exhausted")
+    namespace_size = 4 if len(prior_journals) >= 2 else 8
     draft = build_contract_request(
         request_id="CLICK_CONTRACT_1", response_id="CLICK_CONTRACT_RESPONSE_1",
         prompt_id="CLICK_CONTRACT_PROMPT_1", sources=sources,
-        allowed_requirement_ids=tuple(f"REQ_{index}" for index in range(1, 9)),
+        allowed_requirement_ids=tuple(
+            f"REQ_{index}" for index in range(1, namespace_size + 1)
+        ),
         entry_points=discovered.observation.entry_points,
         supported_observables=discovered.observation.supported_observables,
         allowed_changes=allowed, limits=limits(16_384), seed=0,
     )
-    prior_journals = prior_contract_journals(store)
-    if len(prior_journals) > 2:
-        raise RuntimeError("contract repair budget is exhausted")
     diagnosis = None
     changed_input = None
     label = "contract"
     if prior_journals:
         repair = len(prior_journals)
         label = f"contract-repair-{repair}"
-        diagnosis = (
-            "The previous worker reached the fixed 120-second deadline after emitting "
-            "a long unfinished response."
-        )
-        changed_input = (
-            "Require concise one-sentence fields, combine evidence where possible, and "
-            "exclude commentary while preserving every supported semantic obligation."
-        )
+        if repair == 1:
+            diagnosis = (
+                "The previous worker reached the fixed 120-second deadline after emitting "
+                "a long unfinished response."
+            )
+            changed_input = (
+                "Require concise one-sentence fields, combine evidence where possible, and "
+                "exclude commentary while preserving every supported semantic obligation."
+            )
+        else:
+            diagnosis = (
+                "The first concision repair still reached the fixed deadline after expanding "
+                "all eight namespace IDs into long and duplicative obligations."
+            )
+            changed_input = (
+                "Use at most four total requirement and compatibility IDs, omit duplicate "
+                "semantics, and use one short verbatim quote per evidence link while preserving "
+                "every supported semantic obligation."
+            )
         draft = draft.model_copy(
             update={
                 "request_id": f"CLICK_CONTRACT_REPAIR_{repair}",

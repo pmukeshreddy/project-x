@@ -1,0 +1,21 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 572, in <module>
+    main()
+    ~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 568, in main
+    {"contract": contract, "scenario": scenario}[args.stage]()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/docs/evidence/M2/authoring-production/run.py", line 479, in contract
+    ).generate(
+      ~~~~~~~~^
+        (
+        ^
+    ...<6 lines>...
+        prior_journal_refs=prior_journals,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/requirements/service.py", line 345, in generate
+    raise AuthoringExhausted(GenerationStage.INITIAL_AUTHORING, tuple(journal_refs))
+feature_rl.requirements.service.AuthoringExhausted: initial_authoring exhausted its declared candidate attempts
