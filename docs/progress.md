@@ -34,10 +34,11 @@ Recovery: read this file, docs/interfaces.md if present, latest reports and git 
 
 - Planning baseline committed `767e790`.
 - Task 1 / M0: owner `/root/m0_contracts`, base `767e790`, active. Brief `docs/briefs/M0.md`; report `docs/reports/M0.md`. Shared contracts not yet approved for downstream use.
+- Preflight `/root/execution_preflight` complete: `docs/evidence/preflight.md`. Actual authenticated-home configuration was checked using a loopback capture; zero tool definitions after disabling request-user-input, no inference performed. Earlier empty-CODEX_HOME probe was explicitly corrected as nonrepresentative and must not be reused. Do not repurpose HOME/CODEX_HOME.
 
 ## External gates
 
 - No authoring API-key presence detected in environment. Configured CLI/provider availability under investigation.
-- Darwin arm64 host; Docker CLI present; daemon/isolation availability under investigation.
-- No CUDA device configuration detected; training compute gate under investigation.
+- Docker Desktop was stopped. Coordinator executed `open -a Docker` (exit 0); subsequent `docker info --format '{{json .ServerVersion}}'` returned `27.4.0`. Actual worker isolation remains unverified until M3.
+- Host Apple M4, 16 GiB unified RAM; Docker allocation about 8.2 GB. No CUDA runtime/GPU. User explicitly confirmed no remote compute configured and instructed finishing all independent local work. Do not provision paid compute; CUDA SkyRL/vLLM execution is blocked.
 - Pilot human task review must be an actual human record; model code reviewers cannot sign it.
