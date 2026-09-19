@@ -1,0 +1,17 @@
+{
+  "kind": "coordinator-unit-diagnostic",
+  "factory_revision": "f6b3ef2c0db0f6d492b055a920d29acdf38ebf4f",
+  "command": "PYTHONPATH=src .venv/bin/python -m pytest -q",
+  "working_directory": "/Users/mukeshreddypochamreddy/Desktop/project x",
+  "observed_at_utc": "2026-09-19T09:05:43Z",
+  "started_at_utc": null,
+  "exit_code": 1,
+  "pytest_reported_seconds": 12.09,
+  "passed": 149,
+  "failed": 1,
+  "failed_test": "tests/test_history.py::test_git_runner_cleans_descendants_on_timeout",
+  "failure": "The expected HistoryError matching 'timed out' was raised with timeout_seconds=0.2, but reading timeout-child.pid at test_history.py:429 raised FileNotFoundError. The test did not establish that its child process had started.",
+  "temporary_test_directory": "/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1024/test_git_runner_cleans_descend2",
+  "measurement_limitations": ["UTC start was not captured; observed_at_utc is the clock reading when the completed tool output was collected.", "This receipt records the original tool-observed failure, not a reconstructed successful run."],
+  "disposition": "Owner diagnosis and reviewed correction required before M1 approval."
+}

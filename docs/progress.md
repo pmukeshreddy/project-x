@@ -13,7 +13,7 @@ Recovery: read this file, docs/interfaces.md if present, latest reports and git 
 | Module | Accountable owner | Latest state | Next gate |
 | --- | --- | --- | --- |
 | M0 | `/root/m0_contracts` | Original slice and provenance v2 extension e16493b independently reviewed | Own downstream shared fixes; 124 focused tests reproduced |
-| M1 | `/root/m1_sources` | Fix5587c6b plus cleanupdec8118; Git boundary independently cleared | Corrected real cached run/evidence, then full7-finding re-review |
+| M1 | `/root/m1_sources` | Corrected v2 real intake f6b3ef2; independent full re-review running | Root suite149 pass/1 timeout-fixture startup failure; owner test diagnosis/fix before approval |
 | M2 | `/root/m2_authoring` | Real provider protocol probe passed after one schema repair; no product yet | M1 review, provider implementation/review, later runtime-backed authoring |
 | M3 | `/root/m3_runtime` | Trusted sandbox probe and inert dependency preparation complete; no product code | M2 provider review then lifecycle/baseline implementation |
 | M4 | Unassigned | Scoped brief prepared | Reviewed M2/M3 |
@@ -44,6 +44,8 @@ Recovery: read this file, docs/interfaces.md if present, latest reports and git 
 
 ## Checkpoints
 
+- Current user direction: no remote compute is configured; finish all independent local work. CUDA execution stays externally blocked; this is not permission to stop the provider/runtime/factory/training-adapter/evaluation implementation.
+- M1 v2 evidence checkpoint `f6b3ef2c0db0f6d492b055a920d29acdf38ebf4f`: two timed cached intake runs through product `dec8118` returned identical v2 CandidateRecord `596660eda068ce707ddc3778f2c9aeed24a76453f37a7c74c87bc87183bfdc83` and SourcePair `fd244bdfb9d4a4efcf8db24f550618aa8c539c354dfa7fa78a0f8e2d14bb98a8`, reconstructed provenance, all24 legacy redirect chains explicitly unknown. Root compared both stdout hashes and equal before/after object inventories (20 files/505392 bytes). Full seven-finding re-review assigned to `/root/review_m1` on `52aaf16..f6b3ef2`. Fresh root suite at this HEAD:149 passed/1 failed in12.09s, timeout fixture tried reading a PID before helper startup was established. Exact original failure receipt `docs/evidence/M1/coordinator-v2-final-suite-failure.json`. Owner diagnoses a 0.2-second startup assumption and is preparing a bounded, deterministic test-only readiness fix without weakening the execution timeout or descendant-cleanup assertion. This run is not a passing integration check.
 - Planning baseline committed `767e790`.
 - Task 1 / M0: owner `/root/m0_contracts`, base `767e790`, implementation checkpoint `313a463`, review pending. Brief `docs/briefs/M0.md`; report `docs/reports/M0.md`; 65 tests and wheel import recorded in `docs/evidence/M0/verification.json`. Shared contracts not yet approved for downstream use.
 - Preflight `/root/execution_preflight` complete: `docs/evidence/preflight.md`. Actual authenticated-home configuration was checked using a loopback capture; zero tool definitions after disabling request-user-input, no inference performed. Earlier empty-CODEX_HOME probe was explicitly corrected as nonrepresentative and must not be reused. Do not repurpose HOME/CODEX_HOME.
