@@ -1,0 +1,1069 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review-round2/reproduce-round2.py"
+  ],
+  "event_literals": {
+    "exact_fields": [
+      "identity_validated.protocol_version",
+      "identity_validated.local_files_only",
+      "identity_validated.remote_code",
+      "input_accepted.protocol_version",
+      "input_rejected.protocol_version",
+      "input_rejected.model_load_started",
+      "input_rejected.inference_started",
+      "memory_controls_set.protocol_version",
+      "model_loaded.protocol_version",
+      "model_loaded.fresh_process",
+      "model_loaded.fresh_prompt_cache",
+      "token.protocol_version",
+      "completed.protocol_version",
+      "completed.fresh_process",
+      "completed.fresh_prompt_cache"
+    ],
+    "mutations": [
+      {
+        "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nprotocol_version\n  Value error, expected exact JSON int literal 3 [type=value_error, input_value=3.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "identity_validated",
+        "field": "protocol_version",
+        "raw": 3.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nlocal_files_only\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "identity_validated",
+        "field": "local_files_only",
+        "raw": 1,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nlocal_files_only\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "identity_validated",
+        "field": "local_files_only",
+        "raw": 1.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nremote_code\n  Value error, expected exact JSON bool literal False [type=value_error, input_value=0, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "identity_validated",
+        "field": "remote_code",
+        "raw": 0,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'identity_validated' event violates protocol v3: 1 validation error for IdentityValidated\nremote_code\n  Value error, expected exact JSON bool literal False [type=value_error, input_value=0.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "identity_validated",
+        "field": "remote_code",
+        "raw": 0.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'input_accepted' event violates protocol v3: 1 validation error for InputAccepted\nprotocol_version\n  Value error, expected exact JSON int literal 3 [type=value_error, input_value=3.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "input_accepted",
+        "field": "protocol_version",
+        "raw": 3.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'input_rejected' event violates protocol v3: 1 validation error for InputRejected\nprotocol_version\n  Value error, expected exact JSON int literal 3 [type=value_error, input_value=3.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "input_rejected",
+        "field": "protocol_version",
+        "raw": 3.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'input_rejected' event violates protocol v3: 1 validation error for InputRejected\nmodel_load_started\n  Value error, expected exact JSON bool literal False [type=value_error, input_value=0, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "input_rejected",
+        "field": "model_load_started",
+        "raw": 0,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'input_rejected' event violates protocol v3: 1 validation error for InputRejected\nmodel_load_started\n  Value error, expected exact JSON bool literal False [type=value_error, input_value=0.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "input_rejected",
+        "field": "model_load_started",
+        "raw": 0.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'input_rejected' event violates protocol v3: 1 validation error for InputRejected\ninference_started\n  Value error, expected exact JSON bool literal False [type=value_error, input_value=0, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "input_rejected",
+        "field": "inference_started",
+        "raw": 0,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'input_rejected' event violates protocol v3: 1 validation error for InputRejected\ninference_started\n  Value error, expected exact JSON bool literal False [type=value_error, input_value=0.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "input_rejected",
+        "field": "inference_started",
+        "raw": 0.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'memory_controls_set' event violates protocol v3: 1 validation error for MemoryControlsSet\nprotocol_version\n  Value error, expected exact JSON int literal 3 [type=value_error, input_value=3.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "memory_controls_set",
+        "field": "protocol_version",
+        "raw": 3.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'model_loaded' event violates protocol v3: 1 validation error for ModelLoaded\nprotocol_version\n  Value error, expected exact JSON int literal 3 [type=value_error, input_value=3.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "model_loaded",
+        "field": "protocol_version",
+        "raw": 3.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'model_loaded' event violates protocol v3: 1 validation error for ModelLoaded\nfresh_process\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "model_loaded",
+        "field": "fresh_process",
+        "raw": 1,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'model_loaded' event violates protocol v3: 1 validation error for ModelLoaded\nfresh_process\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "model_loaded",
+        "field": "fresh_process",
+        "raw": 1.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'model_loaded' event violates protocol v3: 1 validation error for ModelLoaded\nfresh_prompt_cache\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "model_loaded",
+        "field": "fresh_prompt_cache",
+        "raw": 1,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'model_loaded' event violates protocol v3: 1 validation error for ModelLoaded\nfresh_prompt_cache\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "model_loaded",
+        "field": "fresh_prompt_cache",
+        "raw": 1.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'token' event violates protocol v3: 1 validation error for TokenEmitted\nprotocol_version\n  Value error, expected exact JSON int literal 3 [type=value_error, input_value=3.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "token",
+        "field": "protocol_version",
+        "raw": 3.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'completed' event violates protocol v3: 1 validation error for Completed\nprotocol_version\n  Value error, expected exact JSON int literal 3 [type=value_error, input_value=3.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "completed",
+        "field": "protocol_version",
+        "raw": 3.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'completed' event violates protocol v3: 1 validation error for Completed\nfresh_process\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "completed",
+        "field": "fresh_process",
+        "raw": 1,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'completed' event violates protocol v3: 1 validation error for Completed\nfresh_process\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "completed",
+        "field": "fresh_process",
+        "raw": 1.0,
+        "raw_type": "float",
+        "rejected": true
+      },
+      {
+        "error": "worker 'completed' event violates protocol v3: 1 validation error for Completed\nfresh_prompt_cache\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "completed",
+        "field": "fresh_prompt_cache",
+        "raw": 1,
+        "raw_type": "int",
+        "rejected": true
+      },
+      {
+        "error": "worker 'completed' event violates protocol v3: 1 validation error for Completed\nfresh_prompt_cache\n  Value error, expected exact JSON bool literal True [type=value_error, input_value=1.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error",
+        "event": "completed",
+        "field": "fresh_prompt_cache",
+        "raw": 1.0,
+        "raw_type": "float",
+        "rejected": true
+      }
+    ],
+    "valid_baselines": [
+      "completed",
+      "identity_validated",
+      "input_accepted",
+      "input_rejected",
+      "memory_controls_set",
+      "model_loaded",
+      "token"
+    ]
+  },
+  "preflight": {
+    "instruction_generation-attempt": {
+      "all_archive_refs_resolved": true,
+      "archive_attempts": [
+        {
+          "bytes": 2103,
+          "kind": "generation-attempt"
+        }
+      ],
+      "backend_verification_calls": 0,
+      "before_archive_names": [],
+      "before_publication_complete": false,
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Execution did not start because declared serialized-input bytes were exceeded; runtime and token costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "final_archive_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639,
+        "status": 1012
+      },
+      "final_error_code": "GenerationInputLimitError",
+      "final_generation_succeeded": false,
+      "final_publication_complete": true,
+      "injected_failure_kind": "generation-attempt",
+      "observed_input_bytes": {
+        "output_schema_json": 189,
+        "request_json": 8382,
+        "templated_prompt_utf8": 8473
+      },
+      "oversized_components": [
+        "request_json",
+        "templated_prompt_utf8"
+      ],
+      "record_request_id_bytes": 10,
+      "request_hash_matches_actual_request": true,
+      "request_id_bytes": 10,
+      "retained_recovery_payload_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639
+      },
+      "stdin_cap_bytes": 4096,
+      "synthetic_runner_calls": 0,
+      "validated_request": true
+    },
+    "instruction_generation-cost": {
+      "all_archive_refs_resolved": true,
+      "archive_attempts": [
+        {
+          "bytes": 2103,
+          "kind": "generation-attempt"
+        },
+        {
+          "bytes": 639,
+          "kind": "generation-preflight"
+        },
+        {
+          "bytes": 304,
+          "kind": "generation-cost"
+        }
+      ],
+      "backend_verification_calls": 0,
+      "before_archive_names": [
+        "attempt",
+        "preflight"
+      ],
+      "before_publication_complete": false,
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Execution did not start because declared serialized-input bytes were exceeded; runtime and token costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "final_archive_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639,
+        "status": 1012
+      },
+      "final_error_code": "GenerationInputLimitError",
+      "final_generation_succeeded": false,
+      "final_publication_complete": true,
+      "injected_failure_kind": "generation-cost",
+      "observed_input_bytes": {
+        "output_schema_json": 189,
+        "request_json": 8382,
+        "templated_prompt_utf8": 8473
+      },
+      "oversized_components": [
+        "request_json",
+        "templated_prompt_utf8"
+      ],
+      "record_request_id_bytes": 10,
+      "request_hash_matches_actual_request": true,
+      "request_id_bytes": 10,
+      "retained_recovery_payload_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639
+      },
+      "stdin_cap_bytes": 4096,
+      "synthetic_runner_calls": 0,
+      "validated_request": true
+    },
+    "instruction_generation-preflight": {
+      "all_archive_refs_resolved": true,
+      "archive_attempts": [
+        {
+          "bytes": 2103,
+          "kind": "generation-attempt"
+        },
+        {
+          "bytes": 639,
+          "kind": "generation-preflight"
+        }
+      ],
+      "backend_verification_calls": 0,
+      "before_archive_names": [
+        "attempt"
+      ],
+      "before_publication_complete": false,
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Execution did not start because declared serialized-input bytes were exceeded; runtime and token costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "final_archive_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639,
+        "status": 1012
+      },
+      "final_error_code": "GenerationInputLimitError",
+      "final_generation_succeeded": false,
+      "final_publication_complete": true,
+      "injected_failure_kind": "generation-preflight",
+      "observed_input_bytes": {
+        "output_schema_json": 189,
+        "request_json": 8382,
+        "templated_prompt_utf8": 8473
+      },
+      "oversized_components": [
+        "request_json",
+        "templated_prompt_utf8"
+      ],
+      "record_request_id_bytes": 10,
+      "request_hash_matches_actual_request": true,
+      "request_id_bytes": 10,
+      "retained_recovery_payload_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639
+      },
+      "stdin_cap_bytes": 4096,
+      "synthetic_runner_calls": 0,
+      "validated_request": true
+    },
+    "instruction_generation-status": {
+      "all_archive_refs_resolved": true,
+      "archive_attempts": [
+        {
+          "bytes": 2103,
+          "kind": "generation-attempt"
+        },
+        {
+          "bytes": 639,
+          "kind": "generation-preflight"
+        },
+        {
+          "bytes": 304,
+          "kind": "generation-cost"
+        },
+        {
+          "bytes": 932,
+          "kind": "generation-status"
+        }
+      ],
+      "backend_verification_calls": 0,
+      "before_archive_names": [
+        "attempt",
+        "cost",
+        "preflight"
+      ],
+      "before_publication_complete": false,
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Execution did not start because declared serialized-input bytes were exceeded; runtime and token costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "final_archive_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639,
+        "status": 1012
+      },
+      "final_error_code": "GenerationInputLimitError",
+      "final_generation_succeeded": false,
+      "final_publication_complete": true,
+      "injected_failure_kind": "generation-status",
+      "observed_input_bytes": {
+        "output_schema_json": 189,
+        "request_json": 8382,
+        "templated_prompt_utf8": 8473
+      },
+      "oversized_components": [
+        "request_json",
+        "templated_prompt_utf8"
+      ],
+      "record_request_id_bytes": 10,
+      "request_hash_matches_actual_request": true,
+      "request_id_bytes": 10,
+      "retained_recovery_payload_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639
+      },
+      "stdin_cap_bytes": 4096,
+      "synthetic_runner_calls": 0,
+      "validated_request": true
+    },
+    "instruction_no_publication_failure": {
+      "all_archive_refs_resolved": true,
+      "archive_attempts": [
+        {
+          "bytes": 2103,
+          "kind": "generation-attempt"
+        },
+        {
+          "bytes": 639,
+          "kind": "generation-preflight"
+        },
+        {
+          "bytes": 304,
+          "kind": "generation-cost"
+        },
+        {
+          "bytes": 932,
+          "kind": "generation-status"
+        }
+      ],
+      "backend_verification_calls": 0,
+      "before_archive_names": [
+        "attempt",
+        "cost",
+        "preflight",
+        "status"
+      ],
+      "before_publication_complete": true,
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Execution did not start because declared serialized-input bytes were exceeded; runtime and token costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "final_archive_bytes": {
+        "attempt": 2103,
+        "cost": 304,
+        "preflight": 639,
+        "status": 932
+      },
+      "final_error_code": "GenerationInputLimitError",
+      "final_generation_succeeded": false,
+      "final_publication_complete": true,
+      "injected_failure_kind": null,
+      "observed_input_bytes": {
+        "output_schema_json": 189,
+        "request_json": 8382,
+        "templated_prompt_utf8": 8473
+      },
+      "oversized_components": [
+        "request_json",
+        "templated_prompt_utf8"
+      ],
+      "record_request_id_bytes": 10,
+      "request_hash_matches_actual_request": true,
+      "request_id_bytes": 10,
+      "retained_recovery_payload_bytes": {},
+      "stdin_cap_bytes": 4096,
+      "synthetic_runner_calls": 0,
+      "validated_request": true
+    },
+    "oversized_identifier_generation-preflight": {
+      "all_archive_refs_resolved": true,
+      "archive_attempts": [
+        {
+          "bytes": 1050670,
+          "kind": "generation-attempt"
+        },
+        {
+          "bytes": 1049215,
+          "kind": "generation-preflight"
+        }
+      ],
+      "backend_verification_calls": 0,
+      "before_archive_names": [
+        "attempt"
+      ],
+      "before_publication_complete": false,
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Execution did not start because declared serialized-input bytes were exceeded; runtime and token costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "final_archive_bytes": {
+        "attempt": 1050670,
+        "cost": 304,
+        "preflight": 1049215,
+        "status": 1049579
+      },
+      "final_error_code": "GenerationInputLimitError",
+      "final_generation_succeeded": false,
+      "final_publication_complete": true,
+      "injected_failure_kind": "generation-preflight",
+      "observed_input_bytes": {
+        "output_schema_json": 189,
+        "request_json": 1049590,
+        "templated_prompt_utf8": 1049678
+      },
+      "oversized_components": [
+        "request_json",
+        "templated_prompt_utf8"
+      ],
+      "record_request_id_bytes": 1048577,
+      "request_hash_matches_actual_request": true,
+      "request_id_bytes": 1048577,
+      "retained_recovery_payload_bytes": {
+        "attempt": 1050670,
+        "cost": 304,
+        "preflight": 1049215
+      },
+      "stdin_cap_bytes": 1048576,
+      "synthetic_runner_calls": 0,
+      "validated_request": true
+    },
+    "oversized_identifier_no_publication_failure": {
+      "all_archive_refs_resolved": true,
+      "archive_attempts": [
+        {
+          "bytes": 1050670,
+          "kind": "generation-attempt"
+        },
+        {
+          "bytes": 1049215,
+          "kind": "generation-preflight"
+        },
+        {
+          "bytes": 304,
+          "kind": "generation-cost"
+        },
+        {
+          "bytes": 1049499,
+          "kind": "generation-status"
+        }
+      ],
+      "backend_verification_calls": 0,
+      "before_archive_names": [
+        "attempt",
+        "cost",
+        "preflight",
+        "status"
+      ],
+      "before_publication_complete": true,
+      "cost": {
+        "category": "authoring",
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "human_minutes": null,
+        "input_tokens": null,
+        "measurement": "unknown",
+        "note": "Execution did not start because declared serialized-input bytes were exceeded; runtime and token costs are unknown.",
+        "output_tokens": null,
+        "usd": null,
+        "wall_seconds": null
+      },
+      "final_archive_bytes": {
+        "attempt": 1050670,
+        "cost": 304,
+        "preflight": 1049215,
+        "status": 1049499
+      },
+      "final_error_code": "GenerationInputLimitError",
+      "final_generation_succeeded": false,
+      "final_publication_complete": true,
+      "injected_failure_kind": null,
+      "observed_input_bytes": {
+        "output_schema_json": 189,
+        "request_json": 1049590,
+        "templated_prompt_utf8": 1049678
+      },
+      "oversized_components": [
+        "request_json",
+        "templated_prompt_utf8"
+      ],
+      "record_request_id_bytes": 1048577,
+      "request_hash_matches_actual_request": true,
+      "request_id_bytes": 1048577,
+      "retained_recovery_payload_bytes": {},
+      "stdin_cap_bytes": 1048576,
+      "synthetic_runner_calls": 0,
+      "validated_request": true
+    }
+  },
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_sha256": {
+    "src/feature_rl/generation/__init__.py": "feab8f63dfd2344003792855341731be6d9125cf707822104b1b8316fcb7c278",
+    "src/feature_rl/generation/_worker.py": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed",
+    "src/feature_rl/generation/backend.py": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647",
+    "src/feature_rl/generation/models.py": "4ee0c21c3c8e8bb2abc9bb6e6c2b4b0229573733ce7fc61359affa9b22669305",
+    "src/feature_rl/generation/protocol.py": "dcc6361d6c1807353f34ba47a34816b3a4748f5fb2ee12daddaacb0d32824f7b",
+    "src/feature_rl/generation/provider.py": "a66692e5d808946928245669f74d6b03be9b926f91c26d139291dc96549fdc7b",
+    "src/feature_rl/generation/runner.py": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+  },
+  "recorded_at": "2026-09-19T15:02:04.254649+00:00",
+  "reviewed_revision": "3f859ca991c8965fda48e9d95588e9be12b0fdab",
+  "scope": "unit_diagnostic; test doubles and real ArtifactStore; no subprocess/model/inference",
+  "structured_content": {
+    "flat_correct": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "parsed_content": {
+        "flag": true,
+        "version": 3
+      },
+      "raw_content": {
+        "flag": true,
+        "version": 3
+      },
+      "record_success": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "flag": {
+            "const": true,
+            "title": "Flag",
+            "type": "boolean"
+          },
+          "version": {
+            "const": 3,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "flag",
+          "version"
+        ],
+        "title": "FlatLiterals",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    },
+    "flat_float_integer_rejected": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "error": "model response has wrong literal JSON type at $.version",
+      "raw_content": {
+        "flag": true,
+        "version": 3.0
+      },
+      "record_success": false,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "flag": {
+            "const": true,
+            "title": "Flag",
+            "type": "boolean"
+          },
+          "version": {
+            "const": 3,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "flag",
+          "version"
+        ],
+        "title": "FlatLiterals",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    },
+    "flat_numeric_boolean_rejected": {
+      "accepted": false,
+      "accepted_response_usage": false,
+      "all_archive_refs_resolved": true,
+      "error": "model response has wrong literal JSON type at $.flag",
+      "raw_content": {
+        "flag": 1,
+        "version": 3
+      },
+      "record_success": false,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "flag": {
+            "const": true,
+            "title": "Flag",
+            "type": "boolean"
+          },
+          "version": {
+            "const": 3,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "flag",
+          "version"
+        ],
+        "title": "FlatLiterals",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    },
+    "patterned_mapping_correct": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "parsed_content": {
+        "flags": {
+          "k_flag": true
+        }
+      },
+      "raw_content": {
+        "flags": {
+          "k_flag": true
+        }
+      },
+      "record_success": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "flags": {
+            "patternProperties": {
+              "^k_": {
+                "const": true,
+                "type": "boolean"
+              }
+            },
+            "title": "Flags",
+            "type": "object"
+          }
+        },
+        "required": [
+          "flags"
+        ],
+        "title": "PatternedMapping",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    },
+    "patterned_mapping_numeric_boolean_STILL_ACCEPTED": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "parsed_content": {
+        "flags": {
+          "k_flag": true
+        }
+      },
+      "raw_content": {
+        "flags": {
+          "k_flag": 1
+        }
+      },
+      "record_success": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "flags": {
+            "patternProperties": {
+              "^k_": {
+                "const": true,
+                "type": "boolean"
+              }
+            },
+            "title": "Flags",
+            "type": "object"
+          }
+        },
+        "required": [
+          "flags"
+        ],
+        "title": "PatternedMapping",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    },
+    "union_disabled_correct": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "parsed_content": {
+        "mode": {
+          "flag": false
+        }
+      },
+      "raw_content": {
+        "mode": {
+          "flag": false
+        }
+      },
+      "record_success": true,
+      "schema": {
+        "$defs": {
+          "Disabled": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": false,
+                "title": "Flag",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "flag"
+            ],
+            "title": "Disabled",
+            "type": "object"
+          },
+          "Enabled": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": true,
+                "title": "Flag",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "flag"
+            ],
+            "title": "Enabled",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Enabled"
+              },
+              {
+                "$ref": "#/$defs/Disabled"
+              }
+            ],
+            "title": "Mode"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "NestedUnion",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    },
+    "union_enabled_correct": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "parsed_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "raw_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "record_success": true,
+      "schema": {
+        "$defs": {
+          "Disabled": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": false,
+                "title": "Flag",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "flag"
+            ],
+            "title": "Disabled",
+            "type": "object"
+          },
+          "Enabled": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": true,
+                "title": "Flag",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "flag"
+            ],
+            "title": "Enabled",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Enabled"
+              },
+              {
+                "$ref": "#/$defs/Disabled"
+              }
+            ],
+            "title": "Mode"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "NestedUnion",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    },
+    "union_numeric_boolean_STILL_ACCEPTED": {
+      "accepted": true,
+      "accepted_response_usage": true,
+      "all_archive_refs_resolved": true,
+      "parsed_content": {
+        "mode": {
+          "flag": true
+        }
+      },
+      "raw_content": {
+        "mode": {
+          "flag": 1
+        }
+      },
+      "record_success": true,
+      "schema": {
+        "$defs": {
+          "Disabled": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": false,
+                "title": "Flag",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "flag"
+            ],
+            "title": "Disabled",
+            "type": "object"
+          },
+          "Enabled": {
+            "additionalProperties": false,
+            "properties": {
+              "flag": {
+                "const": true,
+                "title": "Flag",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "flag"
+            ],
+            "title": "Enabled",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Enabled"
+              },
+              {
+                "$ref": "#/$defs/Disabled"
+              }
+            ],
+            "title": "Mode"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "NestedUnion",
+        "type": "object"
+      },
+      "synthetic_runner_calls": 1
+    }
+  }
+}

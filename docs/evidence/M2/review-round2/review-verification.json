@@ -1,0 +1,142 @@
+{
+  "current_version_native_gate": "unexecuted, coordinator pending after review clearance",
+  "diagnostic_command": [
+    "env",
+    "PYTHONPATH=src:tests",
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/review-round2/reproduce-round2.py"
+  ],
+  "diagnostic_exit_status_meaning": "Assertions matched the recorded outcomes, including the two remaining defects; not provider approval.",
+  "diagnostic_files": {
+    "reproduce-round2.py": {
+      "bytes": 13172,
+      "sha256": "7124ca379588e819d327f4bec9562f4ca6d368b4215564134a0413d98930ff9a"
+    },
+    "round2-diagnostics.json": {
+      "bytes": 35111,
+      "sha256": "48bea19cd39209eb0fc220f4d0b1851a0aed65345d8167af057c86865bcee14b"
+    },
+    "round2-diagnostics.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "native_inference_calls": 0,
+  "observed_diagnostic_exit_status": 0,
+  "owner_receipt_path": "docs/evidence/M2/provider-v3-fixround2-verification.json",
+  "owner_receipt_sha256": "78b1c25067cbd89c58c999e5bca5314921fc03957b9d3128c79a00c44b25a6be",
+  "owner_test_outputs": [
+    {
+      "name": "focused",
+      "owner_recorded_exit_status": 0,
+      "reviewer_reran": false,
+      "stderr": {
+        "bytes": 0,
+        "matches_owner_receipt": true,
+        "path": "docs/evidence/M2/provider-v3-fixround2-focused-tests.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 99,
+        "matches_owner_receipt": true,
+        "path": "docs/evidence/M2/provider-v3-fixround2-focused-tests.stdout",
+        "sha256": "bb4bad8bee596a906435c3176637189a53c1bc20b22f1c537b6944e8d255e06c"
+      }
+    },
+    {
+      "name": "full",
+      "owner_recorded_exit_status": 0,
+      "reviewer_reran": false,
+      "stderr": {
+        "bytes": 0,
+        "matches_owner_receipt": true,
+        "path": "docs/evidence/M2/provider-v3-fixround2-full-tests.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 261,
+        "matches_owner_receipt": true,
+        "path": "docs/evidence/M2/provider-v3-fixround2-full-tests.stdout",
+        "sha256": "167840761d7af7b1f4ad18704323f04cf532e3df54c74b94884f578e80005e6e"
+      }
+    }
+  ],
+  "preservation_check": {
+    "command": [
+      "git",
+      "diff",
+      "--exit-code",
+      "3f859ca991c8965fda48e9d95588e9be12b0fdab",
+      "--",
+      "src/feature_rl/generation",
+      "tests/test_generation.py",
+      "docs/interfaces-M2.md",
+      "docs/reports/M2-provider.md",
+      "docs/reviews/M2-provider.md",
+      "docs/reviews/M2-provider-round1.md",
+      "docs/evidence/M2/review",
+      "docs/evidence/M2/review-round1"
+    ],
+    "observed_exit_status": 0,
+    "stderr_bytes": 0,
+    "stdout_bytes": 0
+  },
+  "previous_reviewed_product_revision": "7239379ebf6921fd816b1bded9bb07a685b84c1a",
+  "producer": "independent M2 reviewer /root/review_m2_provider",
+  "product_and_test_verification": {
+    "src/feature_rl/generation/__init__.py": {
+      "bytes": 1327,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "feab8f63dfd2344003792855341731be6d9125cf707822104b1b8316fcb7c278"
+    },
+    "src/feature_rl/generation/_worker.py": {
+      "bytes": 11650,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed"
+    },
+    "src/feature_rl/generation/backend.py": {
+      "bytes": 11173,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647"
+    },
+    "src/feature_rl/generation/models.py": {
+      "bytes": 7737,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "4ee0c21c3c8e8bb2abc9bb6e6c2b4b0229573733ce7fc61359affa9b22669305"
+    },
+    "src/feature_rl/generation/protocol.py": {
+      "bytes": 3797,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "dcc6361d6c1807353f34ba47a34816b3a4748f5fb2ee12daddaacb0d32824f7b"
+    },
+    "src/feature_rl/generation/provider.py": {
+      "bytes": 48867,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "a66692e5d808946928245669f74d6b03be9b926f91c26d139291dc96549fdc7b"
+    },
+    "src/feature_rl/generation/runner.py": {
+      "bytes": 9828,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+    },
+    "tests/test_generation.py": {
+      "bytes": 40357,
+      "matches_owner_receipt": true,
+      "matches_reviewed_commit": true,
+      "sha256": "4afe06c99fd5a6b0ccd23cba1f48af0b8c7a0efac127d38456311f9af0b1561f"
+    }
+  },
+  "recorded_at": "2026-09-19T15:03:37.881252+00:00",
+  "remote_compute_calls": 0,
+  "reviewed_product_revision": "3f859ca991c8965fda48e9d95588e9be12b0fdab",
+  "scope": "round-2 changed provider scope; narrow unit diagnostic; no subprocess/model/native inference",
+  "whole_suites_rerun": 0
+}
