@@ -1,0 +1,13 @@
+{
+  "revision": "313a463",
+  "scope": "unit_diagnostic",
+  "command": "PYTHONPATH=src .venv/bin/python -m pytest -q",
+  "exit_status": 0,
+  "stdout": "65 passed in 0.22s",
+  "source_diff_check": {
+    "command": "git diff --check -- src tests pyproject.toml docs/interfaces.md",
+    "exit_status": 0,
+    "stdout": ""
+  },
+  "claims": "Coordinator confirmed current committed code tests only; no historical execution, real grading or training implied. Independent review pending."
+}
