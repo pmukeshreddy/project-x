@@ -1,0 +1,9 @@
+{
+  "source": "docs/progress.md",
+  "preserved_as": "docs/history/progress-through-840e114.md",
+  "integration_revision": "840e11407d6c0c15548678fef2f2102dd58d100e",
+  "recorded_at": "2026-09-19T16:26:38.613136+00:00",
+  "bytes": 34402,
+  "sha256": "44d62d9333d4460e554ffadd65688ee5262467b572e09c0359253c16a4583e5b",
+  "preservation": "Exact prior bytes; compact current ledger supersedes active-state statements only."
+}
