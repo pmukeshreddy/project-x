@@ -1,0 +1,22 @@
+{
+  "scope": "unit_diagnostic",
+  "producer": "root coordinator",
+  "factory_revision": "c2bbd3d8b6c3303402bf63aae6bd4309ab81e2eb",
+  "revision_after": "c2bbd3d8b6c3303402bf63aae6bd4309ab81e2eb",
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q"
+  ],
+  "environment_overrides": {
+    "PYTHONPATH": "src"
+  },
+  "started_at_utc": "2026-09-19T09:34:02.601864+00:00",
+  "finished_at_utc": "2026-09-19T09:34:19.895644+00:00",
+  "wall_seconds": 17.293719792040065,
+  "deadline_seconds": 120,
+  "exit_status": 0,
+  "stdout_sha256": "8b7a5f87c0a88e44575fd0af4aaa205bbaa1e067d43d9e5e7f6cb140978fb6ad",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

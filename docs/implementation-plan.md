@@ -80,10 +80,10 @@ These are instance methods on configured services, not globals with hidden state
 
 ### Task 2: M1 intake, reconstruction and partitioning
 
-- [ ] Archive actual Click PR 3228/linked request metadata, licensing, timestamps and available edit-history status. Publish capability matrix before collection.
-- [ ] Tests exercise merge parents, squash proof, linear/rebase spans, ambiguous/interleaved/unrecoverable history, edited request labels, fork/backport/descendant split closure.
-- [ ] Implement Git graph reconstruction, file classification, immutable source archives and source evidence; no historical imports/build hooks on host. Demonstrate the actual B/H pair with logs. Keep privileged H separate from authoring view.
-- [ ] Independent review and integrated validation.
+- [x] Archive actual Click PR 3228/linked request metadata, licensing, timestamps and available edit-history status. Publish capability matrix before collection.
+- [x] Tests exercise merge parents, squash proof, linear/rebase spans, ambiguous/interleaved/unrecoverable history, edited request labels, fork/backport/descendant split closure.
+- [x] Implement Git graph reconstruction, file classification, immutable source archives and source evidence; no historical imports/build hooks on host. Demonstrate the actual B/H pair with logs. Keep privileged H separate from authoring view.
+- [x] Independent review and integrated validation. Scoped review PASS,155 coordinator tests and current-revision repeated Click intake at `c2bbd3d`; conservative supported topology and provisional task status remain explicit.
 
 ### Task 3: M2 configured provider slice
 

@@ -1,0 +1,25 @@
+{
+  "scope": "real_integration",
+  "producer": "root coordinator",
+  "factory_revision": "c2bbd3d8b6c3303402bf63aae6bd4309ab81e2eb",
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+    "docs/evidence/M1/run_real_intake.py",
+    "--workspace",
+    ".",
+    "--factory-revision",
+    "c2bbd3d8b6c3303402bf63aae6bd4309ab81e2eb",
+    "--recorded-at",
+    "2026-09-19T09:35:26.709993Z"
+  ],
+  "environment_overrides": {
+    "PYTHONPATH": "src"
+  },
+  "started_at_utc": "2026-09-19T09:35:28.710818+00:00",
+  "finished_at_utc": "2026-09-19T09:35:30.700101+00:00",
+  "wall_seconds": 1.9892862918786705,
+  "deadline_seconds": 60,
+  "exit_status": 0,
+  "stdout_sha256": "deca99ae7076bef8636a8b755832ad6a8df2ab9b91503f1bf9e0a6cadb0b2ea7",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
