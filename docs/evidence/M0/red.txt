@@ -1,0 +1,283 @@
+FFFFFFFFFFFFFF                                                           [100%]
+=================================== FAILURES ===================================
+_______ test_bytes_roundtrip_metadata_identity_and_concurrent_duplicates _______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-960/test_bytes_roundtrip_metadata_0')
+
+    def test_bytes_roundtrip_metadata_identity_and_concurrent_duplicates(tmp_path):
+>       m,c=api(); store=m.ArtifactStore(tmp_path,c.ActorRole.CONTROLLER)
+            ^^^^^
+
+tests/test_artifacts.py:15: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        m=importlib.import_module('feature_rl.artifacts')
+>       assert hasattr(m,'ArtifactStore'), 'M0 immutable store is not implemented'
+E       AssertionError: M0 immutable store is not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.artifacts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/artifacts']>, 'ArtifactStore')
+
+tests/test_artifacts.py:9: AssertionError
+_______________ test_read_checks_digest_metadata_and_visibility ________________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-960/test_read_checks_digest_metada0')
+
+    def test_read_checks_digest_metadata_and_visibility(tmp_path):
+>       m,c=api(); store=m.ArtifactStore(tmp_path,c.ActorRole.CONTROLLER)
+            ^^^^^
+
+tests/test_artifacts.py:26: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        m=importlib.import_module('feature_rl.artifacts')
+>       assert hasattr(m,'ArtifactStore'), 'M0 immutable store is not implemented'
+E       AssertionError: M0 immutable store is not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.artifacts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/artifacts']>, 'ArtifactStore')
+
+tests/test_artifacts.py:9: AssertionError
+____________ test_symlinks_and_interrupted_publication_fail_closed _____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-960/test_symlinks_and_interrupted_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108da2060>
+
+    def test_symlinks_and_interrupted_publication_fail_closed(tmp_path,monkeypatch):
+>       m,c=api(); store=m.ArtifactStore(tmp_path/'store',c.ActorRole.CONTROLLER)
+            ^^^^^
+
+tests/test_artifacts.py:41: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        m=importlib.import_module('feature_rl.artifacts')
+>       assert hasattr(m,'ArtifactStore'), 'M0 immutable store is not implemented'
+E       AssertionError: M0 immutable store is not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.artifacts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/artifacts']>, 'ArtifactStore')
+
+tests/test_artifacts.py:9: AssertionError
+_____________________ test_store_root_symlink_is_rejected ______________________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-960/test_store_root_symlink_is_rej0')
+
+    def test_store_root_symlink_is_rejected(tmp_path):
+>       m,c=api(); (tmp_path/'target').mkdir(); (tmp_path/'link').symlink_to(tmp_path/'target')
+            ^^^^^
+
+tests/test_artifacts.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        m=importlib.import_module('feature_rl.artifacts')
+>       assert hasattr(m,'ArtifactStore'), 'M0 immutable store is not implemented'
+E       AssertionError: M0 immutable store is not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.artifacts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/artifacts']>, 'ArtifactStore')
+
+tests/test_artifacts.py:9: AssertionError
+____________ test_unknown_and_coerced_reference_values_are_rejected ____________
+
+    def test_unknown_and_coerced_reference_values_are_rejected():
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+__________ test_cost_does_not_coerce_or_accept_nonfinite_values[nan] ___________
+
+bad = nan
+
+    @pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf'),True,'1.0',-1])
+    def test_cost_does_not_coerce_or_accept_nonfinite_values(bad):
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+__________ test_cost_does_not_coerce_or_accept_nonfinite_values[inf] ___________
+
+bad = inf
+
+    @pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf'),True,'1.0',-1])
+    def test_cost_does_not_coerce_or_accept_nonfinite_values(bad):
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+__________ test_cost_does_not_coerce_or_accept_nonfinite_values[-inf] __________
+
+bad = -inf
+
+    @pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf'),True,'1.0',-1])
+    def test_cost_does_not_coerce_or_accept_nonfinite_values(bad):
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+__________ test_cost_does_not_coerce_or_accept_nonfinite_values[True] __________
+
+bad = True
+
+    @pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf'),True,'1.0',-1])
+    def test_cost_does_not_coerce_or_accept_nonfinite_values(bad):
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+__________ test_cost_does_not_coerce_or_accept_nonfinite_values[1.0] ___________
+
+bad = '1.0'
+
+    @pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf'),True,'1.0',-1])
+    def test_cost_does_not_coerce_or_accept_nonfinite_values(bad):
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+___________ test_cost_does_not_coerce_or_accept_nonfinite_values[-1] ___________
+
+bad = -1
+
+    @pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf'),True,'1.0',-1])
+    def test_cost_does_not_coerce_or_accept_nonfinite_values(bad):
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+___________ test_unknown_cost_is_explicit_and_success_needs_evidence ___________
+
+    def test_unknown_cost_is_explicit_and_success_needs_evidence():
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+_____________________ test_models_cannot_sign_human_review _____________________
+
+    def test_models_cannot_sign_human_review():
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+_____________________ test_requirement_requires_grounding ______________________
+
+    def test_requirement_requires_grounding():
+>       m=api()
+          ^^^^^
+
+tests/test_contracts.py:66: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+        module = importlib.import_module('feature_rl.contracts')
+>       assert hasattr(module, 'ArtifactRef'), 'M0 strict contracts are not implemented'
+E       AssertionError: M0 strict contracts are not implemented
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' (namespace) from ['/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts']>, 'ArtifactRef')
+
+tests/test_contracts.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_artifacts.py::test_bytes_roundtrip_metadata_identity_and_concurrent_duplicates
+FAILED tests/test_artifacts.py::test_read_checks_digest_metadata_and_visibility
+FAILED tests/test_artifacts.py::test_symlinks_and_interrupted_publication_fail_closed
+FAILED tests/test_artifacts.py::test_store_root_symlink_is_rejected - Asserti...
+FAILED tests/test_contracts.py::test_unknown_and_coerced_reference_values_are_rejected
+FAILED tests/test_contracts.py::test_cost_does_not_coerce_or_accept_nonfinite_values[nan]
+FAILED tests/test_contracts.py::test_cost_does_not_coerce_or_accept_nonfinite_values[inf]
+FAILED tests/test_contracts.py::test_cost_does_not_coerce_or_accept_nonfinite_values[-inf]
+FAILED tests/test_contracts.py::test_cost_does_not_coerce_or_accept_nonfinite_values[True]
+FAILED tests/test_contracts.py::test_cost_does_not_coerce_or_accept_nonfinite_values[1.0]
+FAILED tests/test_contracts.py::test_cost_does_not_coerce_or_accept_nonfinite_values[-1]
+FAILED tests/test_contracts.py::test_unknown_cost_is_explicit_and_success_needs_evidence
+FAILED tests/test_contracts.py::test_models_cannot_sign_human_review - Assert...
+FAILED tests/test_contracts.py::test_requirement_requires_grounding - Asserti...
+14 failed in 0.45s

@@ -1,0 +1,73 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "pytest",
+      "-q"
+    ],
+    "utc": "2026-09-19T07:35:10.334288+00:00",
+    "exit_status": 0,
+    "stdout": ".................................................................        [100%]\n65 passed in 0.22s\n",
+    "stderr": "",
+    "revision": "d3c63082f1d9ca0cd87614efacd3408d3967c182",
+    "working_tree": "M0 uncommitted checkpoint"
+  },
+  {
+    "command": [
+      "uv",
+      "build",
+      "--wheel"
+    ],
+    "utc": "2026-09-19T07:35:10.799104+00:00",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Building wheel...\nSuccessfully built dist/feature_rl-0.1.0-py3-none-any.whl\n",
+    "revision": "d3c63082f1d9ca0cd87614efacd3408d3967c182",
+    "working_tree": "M0 uncommitted checkpoint"
+  },
+  {
+    "command": [
+      "uv",
+      "venv",
+      "/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/m0-wheel-o6gphsjm/venv",
+      "--python",
+      "3.13.7"
+    ],
+    "utc": "2026-09-19T07:35:10.832031+00:00",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Using CPython 3.13.7 interpreter at: /opt/homebrew/opt/python@3.13/bin/python3.13\nCreating virtual environment at: /var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/m0-wheel-o6gphsjm/venv\nActivate with: source /var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/m0-wheel-o6gphsjm/venv/bin/activate\n",
+    "revision": "d3c63082f1d9ca0cd87614efacd3408d3967c182",
+    "working_tree": "M0 uncommitted checkpoint"
+  },
+  {
+    "command": [
+      "uv",
+      "pip",
+      "install",
+      "--python",
+      "/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/m0-wheel-o6gphsjm/venv/bin/python",
+      "/Users/mukeshreddypochamreddy/Desktop/project x/dist/feature_rl-0.1.0-py3-none-any.whl"
+    ],
+    "utc": "2026-09-19T07:35:11.204064+00:00",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Using Python 3.13.7 environment at: /private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/m0-wheel-o6gphsjm/venv\nResolved 6 packages in 309ms\nPrepared 1 package in 5ms\nInstalled 6 packages in 6ms\n + annotated-types==0.8.0\n + feature-rl==0.1.0 (from file:///Users/mukeshreddypochamreddy/Desktop/project%20x/dist/feature_rl-0.1.0-py3-none-any.whl)\n + pydantic==2.13.5\n + pydantic-core==2.46.5\n + typing-extensions==4.16.0\n + typing-inspection==0.4.4\n",
+    "revision": "d3c63082f1d9ca0cd87614efacd3408d3967c182",
+    "working_tree": "M0 uncommitted checkpoint"
+  },
+  {
+    "command": [
+      "/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/m0-wheel-o6gphsjm/venv/bin/python",
+      "-c",
+      "from feature_rl.artifacts import ArtifactStore; from feature_rl.contracts import ARTIFACT_TYPES; import feature_rl; print(feature_rl.__file__); print(\"registered artifacts:\", len(ARTIFACT_TYPES))"
+    ],
+    "utc": "2026-09-19T07:35:11.732791+00:00",
+    "exit_status": 0,
+    "stdout": "/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/m0-wheel-o6gphsjm/venv/lib/python3.13/site-packages/feature_rl/__init__.py\nregistered artifacts: 11\n",
+    "stderr": "",
+    "revision": "d3c63082f1d9ca0cd87614efacd3408d3967c182",
+    "working_tree": "M0 uncommitted checkpoint"
+  }
+]

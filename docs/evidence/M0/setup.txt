@@ -1,0 +1,85 @@
+Using CPython 3.12.12
+Creating virtual environment at: .venv
+Resolved 12 packages in 211ms
+   Building feature-rl @ file:///Users/mukeshreddypochamreddy/Desktop/project%20x
+  × Failed to build `feature-rl @
+  │ file:///Users/mukeshreddypochamreddy/Desktop/project%20x`
+  ├─▶ The build backend returned an error
+  ╰─▶ Call to `hatchling.build.build_editable` failed (exit status: 1)
+
+      [stderr]
+      Traceback (most recent call last):
+        File "<string>", line 11, in <module>
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/build.py",
+      line 83, in build_editable
+          return os.path.basename(next(builder.build(directory=wheel_directory,
+      versions=["editable"])))
+      
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/builders/plugin/interface.py",
+      line 166, in build
+          artifact = version_api[version](directory, **build_data)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/builders/wheel.py",
+      line 548, in build_editable
+          return self.build_editable_detection(directory, **build_data)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/builders/wheel.py",
+      line 560, in build_editable_detection
+          for included_file in self.recurse_selected_project_files():
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/builders/plugin/interface.py",
+      line 191, in recurse_selected_project_files
+          if self.config.only_include:
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/functools.py",
+      line 998, in __get__
+          val = self.func(instance)
+                ^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/builders/config.py",
+      line 718, in only_include
+          only_include = only_include_config.get("only-include",
+      self.default_only_include()) or self.packages
+      
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/builders/wheel.py",
+      line 294, in default_only_include
+          return self.default_file_selection_options.only_include
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/functools.py",
+      line 998, in __get__
+          val = self.func(instance)
+                ^^^^^^^^^^^^^^^^^^^
+        File
+      "/Users/mukeshreddypochamreddy/.cache/uv/builds-v0/.tmpXHaH0I/lib/python3.12/site-packages/hatchling/builders/wheel.py",
+      line 282, in default_file_selection_options
+          raise ValueError(message)
+      ValueError: Unable to determine which files to ship
+      inside the wheel using the following heuristics:
+      https://hatch.pypa.io/latest/plugins/builder/wheel/#default-file-selection
+
+      The most likely cause of this is that there is no directory that matches
+      the name of your project (feature_rl).
+
+      At least one file selection option must be defined
+      in the `tool.hatch.build.targets.wheel` table, see:
+      https://hatch.pypa.io/latest/config/build/
+
+      As an example, if you intend to ship a directory named `foo` that
+      resides within a `src` directory located at the root of your project,
+      you can define the following:
+
+      [tool.hatch.build.targets.wheel]
+      packages = ["src/foo"]
+
+      hint: This usually indicates a problem with the package or the build
+      environment.

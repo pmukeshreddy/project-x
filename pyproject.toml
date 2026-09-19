@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling==1.32.3"]
+build-backend = "hatchling.build"
+
+[project]
+name = "feature-rl"
+version = "0.1.0"
+description = "Evidence-backed feature environment construction and learning"
+requires-python = ">=3.11"
+dependencies = ["pydantic==2.13.5"]
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/feature_rl"]

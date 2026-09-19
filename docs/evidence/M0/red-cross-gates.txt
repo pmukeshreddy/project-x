@@ -1,0 +1,539 @@
+.........................FFFFFFFFFFF..........F...                       [100%]
+=================================== FAILURES ===================================
+___ test_all_artifact_kinds_round_trip_typed_and_immutable[CandidateRecord] ____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_0')
+kind = 'CandidateRecord'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 11 validation errors for CandidateRecord
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       request_lineage
+E         Input should be a valid array [type=tuple_type, input_value=['request-1'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       sources
+E         Input should be a valid array [type=tuple_type, input_value=[{'url': 'https://example...ia_type': 'text/plain'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       license.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       commits.implementation_commits
+E         Input should be a valid array [type=tuple_type, input_value=['bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       commits.parents
+E         Input should be a valid array [type=tuple_type, input_value=['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       commits.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       screening.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+______ test_all_artifact_kinds_round_trip_typed_and_immutable[SourcePair] ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_1')
+kind = 'SourcePair'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 10 validation errors for SourcePair
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       relationship.implementation_commits
+E         Input should be a valid array [type=tuple_type, input_value=['bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       relationship.parents
+E         Input should be a valid array [type=tuple_type, input_value=['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       relationship.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       changed_files
+E         Input should be a valid array [type=tuple_type, input_value=[{'path': 'src/cli.py', '...'rationale': 'feature'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       admissible_cutoff
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-01T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       verification
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+_ test_all_artifact_kinds_round_trip_typed_and_immutable[RequirementContract] __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_2')
+kind = 'RequirementContract'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 13 validation errors for RequirementContract
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       entry_points
+E         Input should be a valid array [type=tuple_type, input_value=['CLI'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       requirements
+E         Input should be a valid array [type=tuple_type, input_value=[{'requirement_id': 'R1',...e': 'CLI error output'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       compatibility_obligations
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       ambiguities
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.source_roots
+E         Input should be a valid array [type=tuple_type, input_value=['src/'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.forbidden_paths
+E         Input should be a valid array [type=tuple_type, input_value=['.git/'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.dependency_artifacts
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.additional_artifact_types
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       public_checks
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+_____ test_all_artifact_kinds_round_trip_typed_and_immutable[ScenarioPlan] _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_3')
+kind = 'ScenarioPlan'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 7 validation errors for ScenarioPlan
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       mandatory_requirement_ids
+E         Input should be a valid array [type=tuple_type, input_value=['R1'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       scenarios
+E         Input should be a valid array [type=tuple_type, input_value=[{'scenario_id': 'S1', 'r...t'}, 'reset_needs': []}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       seed_policy.seeds
+E         Input should be a valid array [type=tuple_type, input_value=[13], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+__ test_all_artifact_kinds_round_trip_typed_and_immutable[EnvironmentRecipe] ___
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_4')
+kind = 'EnvironmentRecipe'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 11 validation errors for EnvironmentRecipe
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       dependencies
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       setup
+E         Input should be a valid array [type=tuple_type, input_value=[{'argv': ['python', '--v...'timeout_seconds': 5.0}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       reset
+E         Input should be a valid array [type=tuple_type, input_value=[{'argv': ['python', '--v...'timeout_seconds': 5.0}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       services
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       neutral_repairs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       environment
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       randomness.seeds
+E         Input should be a valid array [type=tuple_type, input_value=[13], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+____ test_all_artifact_kinds_round_trip_typed_and_immutable[VerifierBundle] ____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_5')
+kind = 'VerifierBundle'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 15 validation errors for VerifierBundle
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       cases
+E         Input should be a valid array [type=tuple_type, input_value=[{'case_id': 'C1', 'requi...s'}, 'mandatory': True}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       completion_manifest
+E         Input should be a valid array [type=tuple_type, input_value=['C1'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       worker_adapter.supported_observables
+E         Input should be a valid array [type=tuple_type, input_value=['stderr'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       worker_adapter.limitations
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       public_examples
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       controls
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       permissions.worker_inputs
+E         Input should be a valid array [type=tuple_type, input_value=[{'sha256': 'aaaaaaaaaaaa...', 'encoding': 'bytes'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       permissions.submission_policy.source_roots
+E         Input should be a valid array [type=tuple_type, input_value=['src/'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       permissions.submission_policy.forbidden_paths
+E         Input should be a valid array [type=tuple_type, input_value=['.git/'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       permissions.submission_policy.dependency_artifacts
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       permissions.submission_policy.additional_artifact_types
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+______ test_all_artifact_kinds_round_trip_typed_and_immutable[TaskBundle] ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_6')
+kind = 'TaskBundle'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 6 validation errors for TaskBundle
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       request_lineage
+E         Input should be a valid array [type=tuple_type, input_value=['request-1'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       solver_view.public_checks
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+_ test_all_artifact_kinds_round_trip_typed_and_immutable[QualificationReport] __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_7')
+kind = 'QualificationReport'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 9 validation errors for QualificationReport
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       controls
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       fresh_runs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       interrupted_reset_runs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       human_reviews
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       rejection_reasons
+E         Input should be a valid array [type=tuple_type, input_value=['not executed'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+____ test_all_artifact_kinds_round_trip_typed_and_immutable[RolloutRecord] _____
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_8')
+kind = 'RolloutRecord'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 7 validation errors for RolloutRecord
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       seeds.seeds
+E         Input should be a valid array [type=tuple_type, input_value=[13], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       steps
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       grading_evidence
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+__ test_all_artifact_kinds_round_trip_typed_and_immutable[TrainingCheckpoint] __
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_9')
+kind = 'TrainingCheckpoint'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 9 validation errors for TrainingCheckpoint
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       configuration.tasks
+E         Input should be a valid array [type=tuple_type, input_value=[{'sha256': 'aaaaaaaaaaaa...e', 'encoding': 'json'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       configuration.seeds.seeds
+E         Input should be a valid array [type=tuple_type, input_value=[13], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       consumed_tasks
+E         Input should be a valid array [type=tuple_type, input_value=[{'sha256': 'aaaaaaaaaaaa...e', 'encoding': 'json'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       update_evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       reload_evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+___ test_all_artifact_kinds_round_trip_typed_and_immutable[EvaluationReport] ___
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_all_artifact_kinds_round_10')
+kind = 'EvaluationReport'
+
+    @pytest.mark.parametrize('kind',ARTIFACT_KINDS)
+    def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
+        value=examples()[kind]
+>       artifact=getattr(c,kind).model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 12 validation errors for EvaluationReport
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       configuration.tasks
+E         Input should be a valid array [type=tuple_type, input_value=[{'sha256': 'aaaaaaaaaaaa...e', 'encoding': 'json'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       configuration.arms
+E         Input should be a valid array [type=tuple_type, input_value=[{'arm': 'A', 'policy': {...training_config': None}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       configuration.seeds.seeds
+E         Input should be a valid array [type=tuple_type, input_value=[13], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       frozen_task_roster
+E         Input should be a valid array [type=tuple_type, input_value=[{'sha256': 'aaaaaaaaaaaa...e', 'encoding': 'json'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       trials
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       paired_metrics
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       audits
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       limitations
+E         Input should be a valid array [type=tuple_type, input_value=['not executed'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:48: ValidationError
+_____________ test_public_artifact_cannot_embed_private_references _____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-963/test_public_artifact_cannot_em0')
+
+    def test_public_artifact_cannot_embed_private_references(tmp_path):
+        value=examples()['RequirementContract']; value['visibility']='public'
+>       artifact=c.RequirementContract.model_validate_json(json.dumps(value))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 13 validation errors for RequirementContract
+E       provenance.created_at
+E         Input should be a valid datetime [type=datetime_type, input_value='2026-09-19T00:00:00Z', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/datetime_type
+E       provenance.inputs
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       provenance.evidence
+E         Input should be a valid array [type=tuple_type, input_value=[{'producer': 'pytest', '...pe': 'unit_diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       costs
+E         Input should be a valid array [type=tuple_type, input_value=[{'category': 'constructi... this unit diagnostic'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       entry_points
+E         Input should be a valid array [type=tuple_type, input_value=['CLI'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       requirements
+E         Input should be a valid array [type=tuple_type, input_value=[{'requirement_id': 'R1',...e': 'CLI error output'}], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       compatibility_obligations
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       ambiguities
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.source_roots
+E         Input should be a valid array [type=tuple_type, input_value=['src/'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.forbidden_paths
+E         Input should be a valid array [type=tuple_type, input_value=['.git/'], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.dependency_artifacts
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       allowed_changes.additional_artifact_types
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+E       public_checks
+E         Input should be a valid array [type=tuple_type, input_value=[], input_type=list]
+E           For further information visit https://errors.pydantic.dev/2.13/v/tuple_type
+
+tests/test_contracts_examples.py:76: ValidationError
+=========================== short test summary info ============================
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[CandidateRecord]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[SourcePair]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[RequirementContract]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[ScenarioPlan]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[EnvironmentRecipe]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[VerifierBundle]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[TaskBundle]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[QualificationReport]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[RolloutRecord]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[TrainingCheckpoint]
+FAILED tests/test_contracts_examples.py::test_all_artifact_kinds_round_trip_typed_and_immutable[EvaluationReport]
+FAILED tests/test_contracts_examples.py::test_public_artifact_cannot_embed_private_references
+12 failed, 38 passed in 0.17s

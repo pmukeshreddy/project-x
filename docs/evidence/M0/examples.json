@@ -1,0 +1,1331 @@
+{
+  "CandidateRecord": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "CandidateRecord",
+    "repository_url": "https://example.test/repo",
+    "repository_family": "family",
+    "request_lineage": [
+      "request-1"
+    ],
+    "partition": "train",
+    "sources": [
+      {
+        "url": "https://example.test/issue/1",
+        "content": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "source",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        "retrieved_at": "2026-09-19T00:00:00Z",
+        "published_at": null,
+        "edited_at": null,
+        "edit_history": "unavailable",
+        "media_type": "text/plain"
+      }
+    ],
+    "license": {
+      "spdx_id": null,
+      "license_text": null,
+      "status": "unknown",
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "commits": {
+      "integration": "merge",
+      "target_before": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "integrated_after": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "implementation_commits": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "parents": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "screening": {
+      "disposition": "provisional",
+      "reason": "unit diagnostic",
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    }
+  },
+  "SourcePair": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "SourcePair",
+    "candidate": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "CandidateRecord",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "baseline_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "reference_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "baseline": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "public",
+      "encoding": "bytes"
+    },
+    "reference": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "bytes"
+    },
+    "relationship": {
+      "integration": "merge",
+      "target_before": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "integrated_after": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "implementation_commits": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "parents": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "changed_files": [
+      {
+        "path": "src/cli.py",
+        "category": "implementation",
+        "rationale": "feature"
+      }
+    ],
+    "admissible_cutoff": "2026-09-01T00:00:00Z",
+    "verification": [
+      {
+        "producer": "pytest",
+        "command": [
+          "pytest"
+        ],
+        "recorded_at": "2026-09-19T00:00:00Z",
+        "exit_status": 0,
+        "artifacts": [
+          {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          }
+        ],
+        "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope": "unit_diagnostic"
+      }
+    ]
+  },
+  "RequirementContract": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "RequirementContract",
+    "visible_request": "Add command suggestions",
+    "capability": "Suggestions",
+    "entry_points": [
+      "CLI"
+    ],
+    "requirements": [
+      {
+        "requirement_id": "R1",
+        "statement": "Add suggestions",
+        "mandatory": true,
+        "evidence": [
+          {
+            "source": {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            },
+            "locator": "issue body",
+            "quote": "Add suggestions",
+            "provenance_label": "historical_request"
+          }
+        ],
+        "observable": "CLI error output"
+      }
+    ],
+    "compatibility_obligations": [],
+    "ambiguities": [],
+    "allowed_changes": {
+      "source_roots": [
+        "src/"
+      ],
+      "forbidden_paths": [
+        ".git/"
+      ],
+      "dependencies": "forbidden",
+      "dependency_artifacts": [],
+      "additional_artifact_types": []
+    },
+    "public_checks": [],
+    "episode_limits": {
+      "wall_seconds": 30.0,
+      "cpu_seconds": 15.0,
+      "memory_bytes": 1024,
+      "pids": 10,
+      "output_bytes": 1024,
+      "disk_bytes": 4096,
+      "tool_calls": 10,
+      "input_tokens": 100,
+      "output_tokens": 100
+    },
+    "provenance_label": "historical_request"
+  },
+  "ScenarioPlan": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "ScenarioPlan",
+    "contract": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "RequirementContract",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "mandatory_requirement_ids": [
+      "R1"
+    ],
+    "scenarios": [
+      {
+        "scenario_id": "S1",
+        "requirement_ids": [
+          "R1"
+        ],
+        "preconditions": [
+          "command exists"
+        ],
+        "actions": [
+          "invoke typo"
+        ],
+        "observations": [
+          "stderr"
+        ],
+        "expected_relation": "suggests command",
+        "input_domain": "one edit typo",
+        "oracle_origin": {
+          "source": {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          "locator": "issue body",
+          "quote": "Add suggestions",
+          "provenance_label": "historical_request"
+        },
+        "reset_needs": []
+      }
+    ],
+    "seed_policy": {
+      "algorithm": "python-random-v1",
+      "seeds": [
+        13
+      ],
+      "same_cases_within_group": true
+    }
+  },
+  "EnvironmentRecipe": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "EnvironmentRecipe",
+    "image_digest": "python@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "interpreter_version": "3.13.7",
+    "dependencies": [],
+    "setup": [
+      {
+        "argv": [
+          "python",
+          "--version"
+        ],
+        "working_directory": "/workspace",
+        "timeout_seconds": 5.0
+      }
+    ],
+    "reset": [
+      {
+        "argv": [
+          "python",
+          "--version"
+        ],
+        "working_directory": "/workspace",
+        "timeout_seconds": 5.0
+      }
+    ],
+    "services": [],
+    "limits": {
+      "wall_seconds": 30.0,
+      "cpu_seconds": 15.0,
+      "memory_bytes": 1024,
+      "pids": 10,
+      "output_bytes": 1024,
+      "disk_bytes": 4096,
+      "tool_calls": 10,
+      "input_tokens": 100,
+      "output_tokens": 100
+    },
+    "neutral_repairs": [],
+    "locale": "C.UTF-8",
+    "timezone": "UTC",
+    "environment": [],
+    "randomness": {
+      "algorithm": "python-random-v1",
+      "seeds": [
+        13
+      ],
+      "same_cases_within_group": true
+    },
+    "network_policy": "none",
+    "baseline": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "public",
+      "encoding": "bytes"
+    }
+  },
+  "VerifierBundle": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "VerifierBundle",
+    "contract": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "RequirementContract",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "scenario_plan": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "ScenarioPlan",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "cases": [
+      {
+        "case_id": "C1",
+        "requirement_ids": [
+          "R1"
+        ],
+        "inputs": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "source",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        "comparison": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "source",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        "mandatory": true
+      }
+    ],
+    "completion_manifest": [
+      "C1"
+    ],
+    "worker_adapter": {
+      "code": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "public",
+        "encoding": "bytes"
+      },
+      "version": "1",
+      "supported_observables": [
+        "stderr"
+      ],
+      "limitations": []
+    },
+    "public_examples": [],
+    "controls": [],
+    "permissions": {
+      "controller_role": "controller",
+      "worker_inputs": [
+        {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "source",
+          "schema_version": 1,
+          "visibility": "public",
+          "encoding": "bytes"
+        }
+      ],
+      "output_limit_bytes": 1024,
+      "submission_policy": {
+        "source_roots": [
+          "src/"
+        ],
+        "forbidden_paths": [
+          ".git/"
+        ],
+        "dependencies": "forbidden",
+        "dependency_artifacts": [],
+        "additional_artifact_types": []
+      }
+    }
+  },
+  "TaskBundle": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "TaskBundle",
+    "state": "built",
+    "partition": "train",
+    "repository_family": "family",
+    "request_lineage": [
+      "request-1"
+    ],
+    "source_pair": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "SourcePair",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "baseline": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "public",
+      "encoding": "bytes"
+    },
+    "solver_view": {
+      "instruction": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "public",
+        "encoding": "bytes"
+      },
+      "workspace": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "public",
+        "encoding": "bytes"
+      },
+      "public_checks": [],
+      "runtime_manifest": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "public",
+        "encoding": "bytes"
+      },
+      "inventory": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "public",
+        "encoding": "bytes"
+      }
+    },
+    "contract": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "RequirementContract",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "environment": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "EnvironmentRecipe",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "adapter_version": "1",
+    "private_oracle": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "VerifierBundle",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "reference_solution": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "bytes"
+    },
+    "qualification": null
+  },
+  "QualificationReport": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "QualificationReport",
+    "task": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "TaskBundle",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "disposition": "provisional",
+    "baseline_health": null,
+    "baseline_absence": null,
+    "reference_run": null,
+    "controls": [],
+    "fresh_runs": [],
+    "interrupted_reset_runs": [],
+    "human_reviews": [],
+    "rejection_reasons": [
+      "not executed"
+    ],
+    "repair_attempts": 0,
+    "policy_version": "pilot-v1"
+  },
+  "RolloutRecord": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "RolloutRecord",
+    "run_id": "run-1",
+    "task": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "TaskBundle",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "policy": {
+      "identity": {
+        "provider": "unit",
+        "model": "fixture",
+        "revision": "1",
+        "weights": null,
+        "tokenizer_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "policy_version": "p1",
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "seed": 13,
+      "system_prompt": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "public",
+        "encoding": "bytes"
+      },
+      "harness_version": "1",
+      "require_token_probabilities": true
+    },
+    "limits": {
+      "wall_seconds": 30.0,
+      "cpu_seconds": 15.0,
+      "memory_bytes": 1024,
+      "pids": 10,
+      "output_bytes": 1024,
+      "disk_bytes": 4096,
+      "tool_calls": 10,
+      "input_tokens": 100,
+      "output_tokens": 100
+    },
+    "seeds": {
+      "algorithm": "python-random-v1",
+      "seeds": [
+        13
+      ],
+      "same_cases_within_group": true
+    },
+    "steps": [],
+    "submission": null,
+    "stopping_reason": "infrastructure_failure",
+    "disposition": "infrastructure_failure",
+    "reward": null,
+    "grading_evidence": [],
+    "training_eligible": false
+  },
+  "TrainingCheckpoint": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "TrainingCheckpoint",
+    "weights": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "bytes"
+    },
+    "optimizer_state": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "bytes"
+    },
+    "reference_checkpoint": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "source",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "bytes"
+    },
+    "data_position": 0,
+    "policy_version": "p1",
+    "configuration": {
+      "initial_policy": {
+        "identity": {
+          "provider": "unit",
+          "model": "fixture",
+          "revision": "1",
+          "weights": null,
+          "tokenizer_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "policy_version": "p1",
+        "temperature": 1.0,
+        "top_p": 1.0,
+        "seed": 13,
+        "system_prompt": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "source",
+          "schema_version": 1,
+          "visibility": "public",
+          "encoding": "bytes"
+        },
+        "harness_version": "1",
+        "require_token_probabilities": true
+      },
+      "reference_checkpoint": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "tasks": [
+        {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "TaskBundle",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "json"
+        }
+      ],
+      "limits": {
+        "wall_seconds": 30.0,
+        "cpu_seconds": 15.0,
+        "memory_bytes": 1024,
+        "pids": 10,
+        "output_bytes": 1024,
+        "disk_bytes": 4096,
+        "tool_calls": 10,
+        "input_tokens": 100,
+        "output_tokens": 100
+      },
+      "seeds": {
+        "algorithm": "python-random-v1",
+        "seeds": [
+          13
+        ],
+        "same_cases_within_group": true
+      },
+      "algorithm": "grpo",
+      "group_size": 4,
+      "max_updates": 1,
+      "learning_rate": 0.0001,
+      "framework": "unit fixture",
+      "framework_version": "1",
+      "backend_version": "1",
+      "budget_usd": null
+    },
+    "consumed_tasks": [
+      {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "TaskBundle",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "json"
+      }
+    ],
+    "optimizer_steps": 0,
+    "update_evidence": [
+      {
+        "producer": "pytest",
+        "command": [
+          "pytest"
+        ],
+        "recorded_at": "2026-09-19T00:00:00Z",
+        "exit_status": 0,
+        "artifacts": [
+          {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          }
+        ],
+        "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope": "unit_diagnostic"
+      }
+    ],
+    "reload_evidence": [
+      {
+        "producer": "pytest",
+        "command": [
+          "pytest"
+        ],
+        "recorded_at": "2026-09-19T00:00:00Z",
+        "exit_status": 0,
+        "artifacts": [
+          {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          }
+        ],
+        "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope": "unit_diagnostic"
+      }
+    ]
+  },
+  "EvaluationReport": {
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "unit fixture",
+      "producer_version": "1",
+      "created_at": "2026-09-19T00:00:00Z",
+      "inputs": [],
+      "evidence": [
+        {
+          "producer": "pytest",
+          "command": [
+            "pytest"
+          ],
+          "recorded_at": "2026-09-19T00:00:00Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "construction",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Not measured in this unit diagnostic"
+      }
+    ],
+    "kind": "EvaluationReport",
+    "configuration": {
+      "tasks": [
+        {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "TaskBundle",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "json"
+        }
+      ],
+      "arms": [
+        {
+          "arm": "A",
+          "policy": {
+            "identity": {
+              "provider": "unit",
+              "model": "fixture",
+              "revision": "1",
+              "weights": null,
+              "tokenizer_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "policy_version": "p1",
+            "temperature": 1.0,
+            "top_p": 1.0,
+            "seed": 13,
+            "system_prompt": {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "kind": "source",
+              "schema_version": 1,
+              "visibility": "public",
+              "encoding": "bytes"
+            },
+            "harness_version": "1",
+            "require_token_probabilities": true
+          },
+          "checkpoint": {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "kind": "source",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          "training_config": null
+        }
+      ],
+      "limits": {
+        "wall_seconds": 30.0,
+        "cpu_seconds": 15.0,
+        "memory_bytes": 1024,
+        "pids": 10,
+        "output_bytes": 1024,
+        "disk_bytes": 4096,
+        "tool_calls": 10,
+        "input_tokens": 100,
+        "output_tokens": 100
+      },
+      "seeds": {
+        "algorithm": "python-random-v1",
+        "seeds": [
+          13
+        ],
+        "same_cases_within_group": true
+      },
+      "partition": "locked_test",
+      "harness_version": "1",
+      "checkpoint_selection_rule": "frozen before test",
+      "invalid_trial_rule": "report all assigned",
+      "metric": "pass_at_1",
+      "episodes_per_trial": 1,
+      "frozen_roster": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "preregistration": {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "source",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      }
+    },
+    "frozen_task_roster": [
+      {
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "TaskBundle",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "json"
+      }
+    ],
+    "trials": [],
+    "paired_metrics": [],
+    "audits": [],
+    "disposition": "provisional",
+    "limitations": [
+      "not executed"
+    ]
+  }
+}

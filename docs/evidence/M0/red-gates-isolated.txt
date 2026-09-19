@@ -1,0 +1,28 @@
+...............................................F.F                       [100%]
+=================================== FAILURES ===================================
+_________ test_successful_qualification_rejects_recorded_failed_gates __________
+
+    def test_successful_qualification_rejects_recorded_failed_gates():
+        value=examples()['QualificationReport']
+        run=dict(name='gate',subject=ref(),disposition='invalid_measurement',passed=False,requirement_ids=['R1'],reason='failed',evidence=[evidence()])
+        review=dict(actor_type='human',human_identity='claimed human',subject_sha256='a'*64,decision='rejected',evidence=[evidence()],attestation=ref())
+        value.update(disposition='success',baseline_health=run,baseline_absence=run,reference_run=run,controls=[run],fresh_runs=[run]*3,interrupted_reset_runs=[run]*3,human_reviews=[review])
+>       with pytest.raises(ValidationError): c.QualificationReport.model_validate_json(json.dumps(value))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+tests/test_contracts_examples.py:85: Failed
+_____________ test_training_rejects_mismatched_policy_token_trace ______________
+
+    def test_training_rejects_mismatched_policy_token_trace():
+        value=examples()['RolloutRecord'];value.update(disposition='success',reward=1,grading_evidence=[evidence()],training_eligible=True)
+        value['steps']=[dict(index=0,action=ref(),observation=ref(),evidence=[evidence()],token_trace=dict(context_token_ids=[1],sampled_token_ids=[2],behavior_log_probabilities=[-0.5],assistant_loss_mask=[True],policy_version='old'))]
+>       with pytest.raises(ValidationError): c.RolloutRecord.model_validate_json(json.dumps(value))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+tests/test_contracts_examples.py:96: Failed
+=========================== short test summary info ============================
+FAILED tests/test_contracts_examples.py::test_successful_qualification_rejects_recorded_failed_gates
+FAILED tests/test_contracts_examples.py::test_training_rejects_mismatched_policy_token_trace
+2 failed, 48 passed in 0.14s

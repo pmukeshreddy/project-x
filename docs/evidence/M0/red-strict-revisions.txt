@@ -1,0 +1,68 @@
+........F.........................FF.F.........................          [100%]
+=================================== FAILURES ===================================
+_____ test_atomic_crash_leaves_no_readable_partial_object_and_retry_works ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-966/test_atomic_crash_leaves_no_re0')
+
+    def test_atomic_crash_leaves_no_readable_partial_object_and_retry_works(tmp_path):
+        import subprocess,sys
+        m,c=api()
+        code='''from pathlib import Path
+    import os,sys
+    from feature_rl.artifacts import ArtifactStore
+    from feature_rl.contracts import ActorRole, Visibility
+    store=ArtifactStore(Path(sys.argv[1]),ActorRole.CONTROLLER)
+    os.link=lambda *a,**k: os._exit(19)
+    store.put_bytes(b'crash data','source',Visibility.PUBLIC)
+    '''
+        child=subprocess.run([sys.executable,'-c',code,str(tmp_path)],capture_output=True,text=True)
+>       assert child.returncode==19,child.stderr
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 3, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 19
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "from pathlib import ...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_artifacts.py:86: AssertionError
+_ test_evidence_revision_is_an_exact_git_digest[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa] _
+
+bad_revision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+    @pytest.mark.parametrize('bad_revision',['a'*41,'a'*63,' '*40])
+    def test_evidence_revision_is_an_exact_git_digest(bad_revision):
+        m=api(); data=evidence()|{'revision':bad_revision}
+>       with pytest.raises(ValidationError): m.EvidenceRecord.model_validate_json(json.dumps(data))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+tests/test_contracts.py:85: Failed
+_ test_evidence_revision_is_an_exact_git_digest[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa] _
+
+bad_revision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+    @pytest.mark.parametrize('bad_revision',['a'*41,'a'*63,' '*40])
+    def test_evidence_revision_is_an_exact_git_digest(bad_revision):
+        m=api(); data=evidence()|{'revision':bad_revision}
+>       with pytest.raises(ValidationError): m.EvidenceRecord.model_validate_json(json.dumps(data))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+tests/test_contracts.py:85: Failed
+_______________ test_evidence_requires_utc_and_nonempty_producer _______________
+
+    def test_evidence_requires_utc_and_nonempty_producer():
+        m=api()
+        for update in ({'recorded_at':'2026-09-19T00:00:00'}, {'recorded_at':'2026-09-19T00:00:00+01:00'},{'producer':'   '}):
+>           with pytest.raises(ValidationError):m.EvidenceRecord.model_validate_json(json.dumps(evidence()|update))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE ValidationError
+
+tests/test_contracts.py:91: Failed
+=========================== short test summary info ============================
+FAILED tests/test_artifacts.py::test_atomic_crash_leaves_no_readable_partial_object_and_retry_works
+FAILED tests/test_contracts.py::test_evidence_revision_is_an_exact_git_digest[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
+FAILED tests/test_contracts.py::test_evidence_revision_is_an_exact_git_digest[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
+FAILED tests/test_contracts.py::test_evidence_requires_utc_and_nonempty_producer
+4 failed, 59 passed in 0.17s

@@ -1,0 +1,53 @@
+........F.............................FF.........................        [100%]
+=================================== FAILURES ===================================
+_____ test_atomic_crash_leaves_no_readable_partial_object_and_retry_works ______
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-968/test_atomic_crash_leaves_no_re0')
+
+    def test_atomic_crash_leaves_no_readable_partial_object_and_retry_works(tmp_path):
+        import subprocess,sys
+        m,c=api()
+        code='''from pathlib import Path
+    import os,sys
+    from feature_rl.artifacts import ArtifactStore
+    from feature_rl.contracts import ActorRole, Visibility
+    store=ArtifactStore(Path(sys.argv[1]),ActorRole.CONTROLLER)
+    os.link=lambda *a,**k: os._exit(19)
+    store.put_bytes(b'crash data','source',Visibility.PUBLIC)
+    '''
+        child=subprocess.run([sys.executable,'-c',code,str(tmp_path)],capture_output=True,text=True)
+>       assert child.returncode==19,child.stderr
+E       AssertionError: Traceback (most recent call last):
+E           File "<string>", line 3, in <module>
+E             from feature_rl.artifacts import ArtifactStore
+E         ModuleNotFoundError: No module named 'feature_rl'
+E         
+E       assert 1 == 19
+E        +  where 1 = CompletedProcess(args=['/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python', '-c', "from pathlib import ...n <module>\n    from feature_rl.artifacts import ArtifactStore\nModuleNotFoundError: No module named \'feature_rl\'\n').returncode
+
+tests/test_artifacts.py:86: AssertionError
+_________ test_grade_request_rejects_boolean_seed_and_wrong_task_kind __________
+
+    def test_grade_request_rejects_boolean_seed_and_wrong_task_kind():
+        m=api()
+>       assert hasattr(m,'GradeRequest'), 'shared operation requests missing'
+E       AssertionError: shared operation requests missing
+E       assert False
+E        +  where False = hasattr(<module 'feature_rl.contracts' from '/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/contracts/__init__.py'>, 'GradeRequest')
+
+tests/test_contracts.py:96: AssertionError
+________ test_success_cannot_be_signed_by_only_failed_command_evidence _________
+
+    def test_success_cannot_be_signed_by_only_failed_command_evidence():
+        m=api()
+        data=dict(operation='grade',disposition='success',artifacts=[ref()],evidence=[evidence()|{'exit_status':1}],costs=[cost()],reason='claimed success')
+>       with pytest.raises(ValidationError):m.OperationResult.model_validate_json(json.dumps(data))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+tests/test_contracts.py:106: Failed
+=========================== short test summary info ============================
+FAILED tests/test_artifacts.py::test_atomic_crash_leaves_no_readable_partial_object_and_retry_works
+FAILED tests/test_contracts.py::test_grade_request_rejects_boolean_seed_and_wrong_task_kind
+FAILED tests/test_contracts.py::test_success_cannot_be_signed_by_only_failed_command_evidence
+3 failed, 62 passed in 0.17s

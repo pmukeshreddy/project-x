@@ -1,0 +1,21 @@
+Using CPython 3.13.7 interpreter at: /opt/homebrew/opt/python@3.13/bin/python3.13
+Removed virtual environment at: .venv
+Creating virtual environment at: .venv
+Resolved 12 packages in 0.57ms
+   Building feature-rl @ file:///Users/mukeshreddypochamreddy/Desktop/project%20x
+Downloading pydantic-core (1.8MiB)
+      Built feature-rl @ file:///Users/mukeshreddypochamreddy/Desktop/project%20x
+ Downloaded pydantic-core
+Prepared 2 packages in 300ms
+Installed 11 packages in 21ms
+ + annotated-types==0.8.0
+ + feature-rl==0.1.0 (from file:///Users/mukeshreddypochamreddy/Desktop/project%20x)
+ + iniconfig==2.3.0
+ + packaging==26.3
+ + pluggy==1.6.0
+ + pydantic==2.13.5
+ + pydantic-core==2.46.5
+ + pygments==2.21.0
+ + pytest==9.1.1
+ + typing-extensions==4.16.0
+ + typing-inspection==0.4.4
