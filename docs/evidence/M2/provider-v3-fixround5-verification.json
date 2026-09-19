@@ -1,0 +1,238 @@
+{
+  "assigned_base_revision": "840e11407d6c0c15548678fef2f2102dd58d100e",
+  "commands": [
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py",
+        "-k",
+        "numeric_literal_callback_dependencies or numeric_literal_model_sets or other_unsupported_numeric_literal_structures or string_literal_schema"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 1,
+      "finished_at_utc": "2026-09-19T16:28:49.901136+00:00",
+      "name": "red",
+      "started_at_utc": "2026-09-19T16:28:49.192381+00:00",
+      "stderr": "docs/evidence/M2/provider-v3-fixround5-red-tests.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround5-red-tests.stdout",
+      "stdout_bytes": 123272,
+      "stdout_sha256": "42b7ba2810bbc2754a85d938125af722fb35a2eaf452c41255605c9c8b32c142"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py",
+        "-k",
+        "non_json_native_literal_refuses_before_execution"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 1,
+      "finished_at_utc": "2026-09-19T16:33:02.563497+00:00",
+      "name": "decimal_red",
+      "started_at_utc": "2026-09-19T16:33:02.197546+00:00",
+      "stderr": "docs/evidence/M2/provider-v3-fixround5-decimal-red-tests.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround5-decimal-red-tests.stdout",
+      "stdout_bytes": 1314,
+      "stdout_sha256": "b7b24f25147ee2b005d67b54794d70b80edba46d56bf1c0b4a5d969063458a80"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "finished_at_utc": "2026-09-19T16:34:06.668048+00:00",
+      "name": "pre_extra_focused",
+      "started_at_utc": "2026-09-19T16:34:05.599230+00:00",
+      "stderr": "docs/evidence/M2/provider-v3-fixround5-pre-extra-focused-tests.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround5-pre-extra-focused-tests.stdout",
+      "stdout_bytes": 179,
+      "stdout_sha256": "bcd888f70bb3d6476f20a400ac052bdf0082ca7c9ce5e1f62f9476ea79cb4de4"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "finished_at_utc": "2026-09-19T16:34:25.386929+00:00",
+      "name": "pre_extra_full",
+      "started_at_utc": "2026-09-19T16:34:06.668413+00:00",
+      "stderr": "docs/evidence/M2/provider-v3-fixround5-pre-extra-full-tests.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround5-pre-extra-full-tests.stdout",
+      "stdout_bytes": 341,
+      "stdout_sha256": "c2ebcf4145aedffb668cc0a83a3af55dedc4953acd2db45a6998c38f2109308f"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py",
+        "-k",
+        "numeric_literal_extra_allow_models_refuse_before_execution"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 1,
+      "finished_at_utc": "2026-09-19T16:36:54.346278+00:00",
+      "name": "extra_allow_red",
+      "started_at_utc": "2026-09-19T16:36:53.781168+00:00",
+      "stderr": "docs/evidence/M2/provider-v3-fixround5-extra-allow-red-tests.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround5-extra-allow-red-tests.stdout",
+      "stdout_bytes": 3654,
+      "stdout_sha256": "396d8c9640acb516c0eae4283b2144280b12708b8ace3dfa07bcbc0af4c19cae"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "finished_at_utc": "2026-09-19T16:37:49.549086+00:00",
+      "name": "focused",
+      "started_at_utc": "2026-09-19T16:37:47.982782+00:00",
+      "stderr": "docs/evidence/M2/provider-v3-fixround5-focused-tests.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround5-focused-tests.stdout",
+      "stdout_bytes": 179,
+      "stdout_sha256": "9c33149b6e0063f1df9ff2c783620787538d7ef645aa18b6a0945a96e414bc07"
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "environment_overrides": {
+        "PYTHONPATH": "src"
+      },
+      "exit_status": 0,
+      "finished_at_utc": "2026-09-19T16:38:08.148553+00:00",
+      "name": "full",
+      "started_at_utc": "2026-09-19T16:37:49.549533+00:00",
+      "stderr": "docs/evidence/M2/provider-v3-fixround5-full-tests.stderr",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v3-fixround5-full-tests.stdout",
+      "stdout_bytes": 341,
+      "stdout_sha256": "a023ab9acb3a742c6ac231eff8c175f89023c1f415ff13eb98f5d73d7f49d786"
+    }
+  ],
+  "committed_product_revision": null,
+  "downloads": 0,
+  "excluded_unowned_paths": [
+    "docs/briefs/M2-provider-round5.md",
+    "docs/decisions/M2-literal-validation.md",
+    "docs/evidence/M2/coordinator-*",
+    "docs/evidence/M2/owner-transfer-*",
+    "docs/progress.md"
+  ],
+  "historical_or_candidate_execution_calls": 0,
+  "limitations": [
+    "This precommit receipt binds final working-tree source, tests and documents plus separate RED, pre-extra correction and final stdout/stderr logs; it does not claim a committed source revision.",
+    "No MLX model was loaded; no native inference, remote compute, download, dependency install, or historical/candidate execution occurred in fix round 5.",
+    "Numeric or Boolean Literal schemas are restricted to the documented callback-free structural subset; unsupported Literal values, callbacks/lifecycle, hash-sensitive containers, non-string dictionary keys, extra-allow models and unknown core forms refuse before backend verification.",
+    "Independent scoped re-review, a fresh coordinator full suite and the coordinator current-source native verification remain pending.",
+    "Full M2 remains partial until runtime-backed contract and scenario authoring is implemented and reviewed."
+  ],
+  "native_inference_calls": 0,
+  "product_and_test_inventory": {
+    "src/feature_rl/generation/__init__.py": {
+      "bytes": 1405,
+      "sha256": "5e9bdf9393c7b51b7e0b827806e3ade99ac6ca6cd49fa80a74bca7161a1d9950"
+    },
+    "src/feature_rl/generation/_worker.py": {
+      "bytes": 11650,
+      "sha256": "7d1f4b8f656e40fb2b4a5a2113be19d3061aeb95b751cd249dc29a50bafa76ed"
+    },
+    "src/feature_rl/generation/backend.py": {
+      "bytes": 11173,
+      "sha256": "2afdb650da53e1cc38df27bfa005d736c88921261001e63000df14b372191647"
+    },
+    "src/feature_rl/generation/models.py": {
+      "bytes": 7960,
+      "sha256": "589a7b61153ffef51c55a46a2d6ef3f12724fe91481900200518e5797d0000dc"
+    },
+    "src/feature_rl/generation/protocol.py": {
+      "bytes": 3857,
+      "sha256": "de8dd55d2e031393d7355b80ef598fb78c929e3255d41d2703fa3e704ab97c10"
+    },
+    "src/feature_rl/generation/provider.py": {
+      "bytes": 55379,
+      "sha256": "dec64bb8b8ed0983faf426664a875fb5bea408f3108c0d5a5abf30b0bb5314e9"
+    },
+    "src/feature_rl/generation/runner.py": {
+      "bytes": 9828,
+      "sha256": "b4d8b842c9b2a15ccd4b2e96bbbb8f7d89ea2785085947e5a8d24974fb382f3e"
+    },
+    "tests/test_generation.py": {
+      "bytes": 69918,
+      "sha256": "918225a1f826986e65255b0a292ba6659b7186e5b53de9e81c243da870026769"
+    }
+  },
+  "product_document_inventory": {
+    "docs/interfaces-M2.md": {
+      "bytes": 14088,
+      "sha256": "27ffc0a07c8e1465fc11fa0c5524b1e75e178b17d555033b9216aa559ebd3ae9"
+    },
+    "docs/reports/M2-provider.md": {
+      "bytes": 3383,
+      "sha256": "d2cab10c2f92e24ea720c7c039a22ed5b5f9ab1bd086ded8240557ee7958bbfb"
+    }
+  },
+  "protocol_version": 3,
+  "recorded_at_utc": "2026-09-19T16:38:29.244031+00:00",
+  "remote_compute_calls": 0,
+  "schema_version": 1,
+  "scope": "round5_red_pre_correction_and_final_test_verification",
+  "workspace_head_at_verification": "e4ce1b932699325b571579a3792147ed658aebbe"
+}

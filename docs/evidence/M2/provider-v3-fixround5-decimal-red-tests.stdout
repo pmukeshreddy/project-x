@@ -1,0 +1,23 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_non_json_native_literal_refuses_before_execution _____________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1101/test_non_json_native_literal_r0')
+
+    def test_non_json_native_literal_refuses_before_execution(tmp_path):
+        baseline = UnsupportedDecimalLiteralContent.model_validate_json(b'{"value":1}')
+        assert baseline.value == Decimal("1")
+        backend = NeverVerifiedBackend()
+        runner = FakeRunner()
+        store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+>       with pytest.raises(
+            GenerationProviderError, match="unsupported Literal value types"
+        ) as caught:
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'unsupported Literal value types'
+E         Actual message: 'schema refusal must precede backend verification'
+
+tests/test_generation.py:1247: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_generation.py::test_non_json_native_literal_refuses_before_execution
+1 failed, 93 deselected in 0.18s

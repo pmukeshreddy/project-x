@@ -7,12 +7,16 @@ import hashlib
 import os
 import sys
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Literal
 from unittest.mock import patch
 
 import pytest
 from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
     Field,
     PlainValidator,
     ValidationInfo,
@@ -21,6 +25,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import PydanticOmit, core_schema
 
 from feature_rl.artifacts import ArtifactStore
 from feature_rl.contracts import (
@@ -471,7 +476,7 @@ class NestedScalarUnionContent(StrictModel):
 
 
 class JsonModeLiteralContent(StrictModel):
-    flag: Literal[True]
+    flag: Literal["ready"]
 
     @model_validator(mode="after")
     def require_json_mode(self, info: ValidationInfo):
@@ -545,6 +550,131 @@ class ReferencedBeforeContent(StrictModel):
     flag: Literal[True]
     first: ReferencedBeforeLeaf
     second: ReferencedBeforeLeaf
+
+
+class NormalizedInteger:
+    @classmethod
+    def __get_pydantic_core_schema__(cls, _source, _handler):
+        return core_schema.chain_schema(
+            [
+                core_schema.no_info_after_validator_function(
+                    int, core_schema.str_schema()
+                ),
+                core_schema.int_schema(),
+            ]
+        )
+
+
+class AfterChainNumericLiteralContent(StrictModel):
+    flag: Literal[True]
+    number: NormalizedInteger
+
+
+class AfterChainStringLiteralContent(StrictModel):
+    flag: Literal["ready"]
+    number: NormalizedInteger
+
+
+OMIT_CALLBACKS: list[str] = []
+
+
+def _omit_skip(value):
+    OMIT_CALLBACKS.append(value)
+    if value == "skip":
+        raise PydanticOmit
+    return value
+
+
+class OmitNumericLiteralContent(StrictModel):
+    flag: Literal[True]
+    values: Annotated[
+        list[Annotated[str, AfterValidator(_omit_skip)]], Field(max_length=1)
+    ]
+
+
+class OmitStringLiteralContent(StrictModel):
+    flag: Literal["ready"]
+    values: Annotated[
+        list[Annotated[str, AfterValidator(_omit_skip)]], Field(max_length=1)
+    ]
+
+
+class GuardedSetLeaf(StrictModel):
+    flag: Literal[True]
+    label: str
+
+
+class GuardedModelSetContent(StrictModel):
+    values: Annotated[set[GuardedSetLeaf], Field(min_length=2)]
+
+
+class GuardedModelFrozenSetContent(StrictModel):
+    values: Annotated[frozenset[GuardedSetLeaf], Field(min_length=2)]
+
+
+class GuardedSetPayload(StrictModel):
+    values: Annotated[set[GuardedSetLeaf], Field(min_length=2)]
+
+
+class GuardedFrozenSetPayload(StrictModel):
+    values: Annotated[frozenset[GuardedSetLeaf], Field(min_length=2)]
+
+
+class NestedGuardedModelSetContent(StrictModel):
+    payload: GuardedSetPayload
+
+
+class NestedGuardedModelFrozenSetContent(StrictModel):
+    payload: GuardedFrozenSetPayload
+
+
+class NumericLiteralDefaultContent(StrictModel):
+    flag: Literal[True]
+    marker: str = "generated"
+
+
+class NumericKeyLiteralMappingContent(StrictModel):
+    flags: dict[int, Literal[True]]
+
+
+class UnsupportedDecimalLiteralContent(StrictModel):
+    value: Literal[Decimal("1")]
+
+
+class ExtraAllowLeaf(BaseModel):
+    model_config = ConfigDict(strict=True, extra="allow")
+    x: int
+
+
+class ExtraAllowNestedContent(StrictModel):
+    flag: Literal[True]
+    item: ExtraAllowLeaf
+
+
+class ExtraAllowRootContent(StrictModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="allow")
+    flag: Literal[True]
+    x: int
+
+
+class ExtraIgnoreLeaf(BaseModel):
+    model_config = ConfigDict(strict=True, extra="ignore")
+    x: int
+
+
+class ExtraIgnoreNestedContent(StrictModel):
+    flag: Literal[True]
+    item: ExtraIgnoreLeaf
+
+
+class ExtraForbidLeaf(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+    x: int
+
+
+class ExtraForbidNestedContent(StrictModel):
+    flag: Literal[True]
+    item: ExtraForbidLeaf
 
 
 class PatternedLiteralContent(StrictModel):
@@ -957,11 +1087,11 @@ def test_provider_exact_literal_validation_preserves_json_enum_transport(tmp_pat
     assert result.content.recorded_at == datetime(2026, 9, 19, 10, tzinfo=timezone.utc)
 
 
-def test_literal_prevalidation_does_not_run_defaults_or_post_init(tmp_path):
+def test_string_literal_original_validation_runs_defaults_and_post_init_once(tmp_path):
     lifecycle = []
 
     class LifecycleLiteralContent(StrictModel):
-        flag: Literal[True]
+        flag: Literal["ready"]
         marker: str = Field(
             default_factory=lambda: lifecycle.append("default") or "generated"
         )
@@ -971,7 +1101,7 @@ def test_literal_prevalidation_does_not_run_defaults_or_post_init(tmp_path):
 
     events = [json.loads(line) for line in worker_events().splitlines()]
     envelope = json.loads(events[-1]["output_text"])
-    envelope["content"] = {"flag": True}
+    envelope["content"] = {"flag": "ready"}
     events[-1]["output_text"] = json.dumps(envelope)
     result = LocalGenerationProvider(
         backend=FakeBackend(),
@@ -984,11 +1114,14 @@ def test_literal_prevalidation_does_not_run_defaults_or_post_init(tmp_path):
     assert lifecycle == ["default", "post_init"]
 
 
-def test_literal_revalidation_preserves_strict_json_callback_mode(tmp_path):
-    assert JsonModeLiteralContent.model_validate_json(b'{"flag":true}').flag is True
+def test_string_literal_original_validation_preserves_json_callback_mode(tmp_path):
+    assert (
+        JsonModeLiteralContent.model_validate_json(b'{"flag":"ready"}').flag
+        == "ready"
+    )
     events = [json.loads(line) for line in worker_events().splitlines()]
     envelope = json.loads(events[-1]["output_text"])
-    envelope["content"] = {"flag": True}
+    envelope["content"] = {"flag": "ready"}
     events[-1]["output_text"] = json.dumps(envelope)
     result = LocalGenerationProvider(
         backend=FakeBackend(),
@@ -997,7 +1130,230 @@ def test_literal_revalidation_preserves_strict_json_callback_mode(tmp_path):
             stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
         ),
     ).generate(request(), JsonModeLiteralContent)
-    assert result.content.flag is True
+    assert result.content.flag == "ready"
+
+
+def test_string_literal_schema_preserves_after_chain_callback(tmp_path):
+    raw = {"flag": "ready", "number": "3"}
+    baseline = AfterChainStringLiteralContent.model_validate_json(json.dumps(raw))
+    assert baseline.number == 3
+    assert type(baseline.number) is int
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = raw
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), AfterChainStringLiteralContent)
+    assert result.content.number == 3
+    assert type(result.content.number) is int
+
+
+def test_string_literal_schema_runs_omitting_callback_once(tmp_path):
+    raw = {"flag": "ready", "values": ["skip", "keep"]}
+    OMIT_CALLBACKS.clear()
+    baseline = OmitStringLiteralContent.model_validate_json(json.dumps(raw))
+    assert baseline.values == ["keep"]
+    assert OMIT_CALLBACKS == ["skip", "keep"]
+    OMIT_CALLBACKS.clear()
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = raw
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), OmitStringLiteralContent)
+    assert result.content.values == ["keep"]
+    assert OMIT_CALLBACKS == ["skip", "keep"]
+
+
+@pytest.mark.parametrize(
+    ("schema", "raw", "expected"),
+    [
+        (
+            AfterChainNumericLiteralContent,
+            {"flag": True, "number": "3"},
+            lambda value: value.number == 3,
+        ),
+        (
+            OmitNumericLiteralContent,
+            {"flag": True, "values": ["skip", "keep"]},
+            lambda value: value.values == ["keep"],
+        ),
+    ],
+)
+def test_numeric_literal_callback_dependencies_refuse_before_execution(
+    tmp_path, schema, raw, expected
+):
+    baseline = schema.model_validate_json(json.dumps(raw))
+    assert expected(baseline)
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    with pytest.raises(
+        GenerationProviderError, match="numeric or Boolean Literal"
+    ) as caught:
+        LocalGenerationProvider(
+            backend=backend, archive=store.put_bytes, runner=runner
+        ).generate(request(), schema)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
+
+
+def _guarded_set_raw(*, nested, equal):
+    labels = ("same", "same") if equal else ("first", "second")
+    values = [{"flag": True, "label": label} for label in labels]
+    return {"payload": {"values": values}} if nested else {"values": values}
+
+
+@pytest.mark.parametrize(
+    ("schema", "nested"),
+    [
+        (GuardedModelSetContent, False),
+        (GuardedModelFrozenSetContent, False),
+        (NestedGuardedModelSetContent, True),
+        (NestedGuardedModelFrozenSetContent, True),
+    ],
+)
+@pytest.mark.parametrize("equal", [False, True])
+def test_numeric_literal_model_sets_refuse_before_hash_sensitive_restoration(
+    tmp_path, schema, nested, equal
+):
+    raw = _guarded_set_raw(nested=nested, equal=equal)
+    if equal:
+        with pytest.raises(ValidationError, match="at least 2 items"):
+            schema.model_validate_json(json.dumps(raw))
+    else:
+        baseline = schema.model_validate_json(json.dumps(raw))
+        values = baseline.payload.values if nested else baseline.values
+        assert len(values) == 2
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    with pytest.raises(
+        GenerationProviderError, match="hash-sensitive"
+    ) as caught:
+        LocalGenerationProvider(
+            backend=backend, archive=store.put_bytes, runner=runner
+        ).generate(request(), schema)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
+
+
+@pytest.mark.parametrize(
+    ("schema", "raw"),
+    [
+        (NumericLiteralDefaultContent, {"flag": True}),
+        (NumericKeyLiteralMappingContent, {"flags": {"1": True}}),
+    ],
+)
+def test_other_unsupported_numeric_literal_structures_refuse_before_execution(
+    tmp_path, schema, raw
+):
+    schema.model_validate_json(json.dumps(raw))
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    with pytest.raises(GenerationProviderError) as caught:
+        LocalGenerationProvider(
+            backend=backend, archive=store.put_bytes, runner=runner
+        ).generate(request(), schema)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
+
+
+def test_non_json_native_literal_refuses_before_execution(tmp_path):
+    baseline = UnsupportedDecimalLiteralContent.model_validate_json(b'{"value":1}')
+    assert baseline.value == Decimal("1")
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    with pytest.raises(
+        GenerationProviderError, match="unsupported Literal value types"
+    ) as caught:
+        LocalGenerationProvider(
+            backend=backend, archive=store.put_bytes, runner=runner
+        ).generate(request(), UnsupportedDecimalLiteralContent)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
+
+
+@pytest.mark.parametrize(
+    ("schema", "raw", "extra"),
+    [
+        (
+            ExtraAllowNestedContent,
+            {"flag": True, "item": {"x": 1, "y": 2}},
+            lambda value: value.item.__pydantic_extra__,
+        ),
+        (
+            ExtraAllowRootContent,
+            {"flag": True, "x": 1, "y": 2},
+            lambda value: value.__pydantic_extra__,
+        ),
+    ],
+)
+def test_numeric_literal_extra_allow_models_refuse_before_execution(
+    tmp_path, schema, raw, extra
+):
+    baseline = schema.model_validate_json(json.dumps(raw))
+    assert extra(baseline) == {"y": 2}
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    with pytest.raises(
+        GenerationProviderError, match="extra='allow'"
+    ) as caught:
+        LocalGenerationProvider(
+            backend=backend, archive=store.put_bytes, runner=runner
+        ).generate(request(), schema)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
+
+
+@pytest.mark.parametrize(
+    ("schema", "raw"),
+    [
+        (ExtraIgnoreNestedContent, {"flag": True, "item": {"x": 1, "y": 2}}),
+        (ExtraForbidNestedContent, {"flag": True, "item": {"x": 1}}),
+    ],
+)
+def test_numeric_literal_nested_models_preserve_ignore_and_forbid_extra_modes(
+    tmp_path, schema, raw
+):
+    baseline = schema.model_validate_json(json.dumps(raw))
+    assert baseline.item.x == 1
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = raw
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), schema)
+    assert result.content.item.x == 1
+    assert result.content.item.__pydantic_extra__ is None
 
 
 def test_unsupported_literal_schema_refuses_before_backend_execution(tmp_path):
@@ -1007,7 +1363,9 @@ def test_unsupported_literal_schema_refuses_before_backend_execution(tmp_path):
     provider = LocalGenerationProvider(
         backend=backend, archive=store.put_bytes, runner=runner
     )
-    with pytest.raises(GenerationProviderError, match="plain custom validator") as caught:
+    with pytest.raises(
+        GenerationProviderError, match="numeric or Boolean Literal"
+    ) as caught:
         provider.generate(request(), UnsupportedPlainLiteralContent)
     assert backend.verify_calls == 0
     assert runner.calls == []
@@ -1026,7 +1384,7 @@ def test_literal_union_with_branch_callback_refuses_before_backend_execution(tmp
         backend=backend, archive=store.put_bytes, runner=runner
     )
     with pytest.raises(
-        GenerationProviderError, match="custom validator in a union alternative"
+        GenerationProviderError, match="numeric or Boolean Literal"
     ) as caught:
         provider.generate(request(), CallbackUnionContent)
     assert backend.verify_calls == 0
@@ -1070,7 +1428,7 @@ def test_callback_sensitive_literal_schemas_refuse_before_backend_execution(
         backend=backend, archive=store.put_bytes, runner=runner
     )
     with pytest.raises(
-        GenerationProviderError, match="cannot preserve callback or lifecycle semantics"
+        GenerationProviderError, match="numeric or Boolean Literal"
     ) as caught:
         provider.generate(request(), schema)
     assert backend.verify_calls == 0

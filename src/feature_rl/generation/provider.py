@@ -442,48 +442,58 @@ def _observed_usage(raw: bytes, request: GenerationRequest | None = None) -> dic
     return observed
 
 
-def _contains_literal_schema(value: object) -> bool:
+def _literal_schema_requirements(value: object) -> tuple[bool, bool]:
+    """Return whether exact guarding is needed and unsupported values are present."""
     if isinstance(value, dict):
-        return value.get("type") == "literal" or any(
-            _contains_literal_schema(member) for member in value.values()
-        )
+        guarded = False
+        unsupported = False
+        if value.get("type") == "literal":
+            for candidate in value["expected"]:
+                if isinstance(candidate, Enum):
+                    unsupported |= type(candidate.value) is not str
+                elif candidate is None or type(candidate) is str:
+                    continue
+                elif type(candidate) in {bool, int, float}:
+                    guarded = True
+                else:
+                    unsupported = True
+        for member in value.values():
+            child_guarded, child_unsupported = _literal_schema_requirements(member)
+            guarded |= child_guarded
+            unsupported |= child_unsupported
+        return guarded, unsupported
     if isinstance(value, (list, tuple)):
-        return any(_contains_literal_schema(member) for member in value)
-    return False
+        guarded = False
+        unsupported = False
+        for member in value:
+            child_guarded, child_unsupported = _literal_schema_requirements(member)
+            guarded |= child_guarded
+            unsupported |= child_unsupported
+        return guarded, unsupported
+    return False, False
 
 
-_SUPPORTED_LITERAL_CORE_FORMS = frozenset(
+_SUPPORTED_GUARDED_LITERAL_CORE_FORMS = frozenset(
     {
         "any",
         "bool",
         "bytes",
-        "chain",
         "date",
         "datetime",
         "decimal",
-        "default",
         "definition-ref",
         "definitions",
         "dict",
         "enum",
         "float",
-        "frozenset",
-        "function-after",
-        "function-before",
-        "function-plain",
-        "function-wrap",
         "int",
-        "json-or-python",
-        "lax-or-strict",
         "list",
         "literal",
         "model",
         "model-field",
         "model-fields",
-        "no-info",
         "none",
         "nullable",
-        "set",
         "str",
         "tagged-union",
         "time",
@@ -493,7 +503,6 @@ _SUPPORTED_LITERAL_CORE_FORMS = frozenset(
         "typed-dict-field",
         "union",
         "uuid",
-        "with-info",
     }
 )
 
@@ -523,6 +532,39 @@ def _literal_schema_features(value: object) -> set[str]:
     return features
 
 
+def _guarded_literal_has_non_string_dict_key(value: object) -> bool:
+    if isinstance(value, dict):
+        if value.get("type") == "dict":
+            keys_schema = value.get("keys_schema")
+            if not isinstance(keys_schema, dict) or keys_schema.get("type") != "str":
+                return True
+        return any(
+            _guarded_literal_has_non_string_dict_key(member)
+            for member in value.values()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(_guarded_literal_has_non_string_dict_key(member) for member in value)
+    return False
+
+
+def _guarded_literal_has_extra_allow_model(value: object) -> bool:
+    if isinstance(value, dict):
+        if value.get("type") == "model":
+            config = value.get("config")
+            if (
+                isinstance(config, dict)
+                and config.get("extra_fields_behavior") == "allow"
+            ):
+                return True
+        return any(
+            _guarded_literal_has_extra_allow_model(member)
+            for member in value.values()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(_guarded_literal_has_extra_allow_model(member) for member in value)
+    return False
+
+
 def _exact_literal_value(value: object, expected: tuple[object, ...]) -> object:
     json_expected = tuple(
         candidate.value if isinstance(candidate, Enum) else candidate
@@ -546,19 +588,19 @@ def _literal_precheck_schema(
     if not isinstance(value, dict):
         return value
     kind = value.get("type")
-    if kind in {"function-before", "function-after", "function-wrap"}:
-        return _literal_precheck_schema(value["schema"], dummy_models)
-    if kind == "function-plain":
+    if kind in {
+        "default",
+        "function-before",
+        "function-after",
+        "function-wrap",
+        "function-plain",
+    }:
         raise GenerationSchemaUnsupportedError(
-            "output schema with Literals cannot use a plain custom validator"
+            "numeric or Boolean Literal exact validation cannot strip callbacks or defaults"
         )
-    if kind in {"dataclass", "call"}:
+    if kind in {"dataclass", "call", "set", "frozenset"}:
         raise GenerationSchemaUnsupportedError(
-            f"output schema with Literals cannot use core schema form {kind!r}"
-        )
-    if kind == "default":
-        return core_schema.with_default_schema(
-            _literal_precheck_schema(value["schema"], dummy_models), default=None
+            f"numeric or Boolean Literal exact validation cannot use core schema form {kind!r}"
         )
     transformed = {
         key: _literal_precheck_schema(member, dummy_models)
@@ -571,16 +613,15 @@ def _literal_precheck_schema(
             transformed,
         )
     if kind == "model":
-        if value.get("custom_init"):
+        if value.get("custom_init") or value.get("post_init") is not None:
             raise GenerationSchemaUnsupportedError(
-                "output schema with Literals cannot use a custom model initializer"
+                "numeric or Boolean Literal exact validation cannot use model lifecycle hooks"
             )
         original = value["cls"]
         if original not in dummy_models:
             dummy_models[original] = type(f"ExactLiteral{original.__name__}", (), {})
         transformed["cls"] = dummy_models[original]
         transformed["metadata"] = {}
-        transformed.pop("post_init", None)
         transformed.pop("generic_origin", None)
     return transformed
 
@@ -603,9 +644,7 @@ def _restore_literal_models(
         return instance
     if isinstance(value, dict):
         return {
-            _restore_literal_models(key, original_by_dummy): _restore_literal_models(
-                member, original_by_dummy
-            )
+            key: _restore_literal_models(member, original_by_dummy)
             for key, member in value.items()
         }
     if isinstance(value, list):
@@ -614,26 +653,16 @@ def _restore_literal_models(
         return tuple(
             _restore_literal_models(member, original_by_dummy) for member in value
         )
-    if isinstance(value, set):
-        return {_restore_literal_models(member, original_by_dummy) for member in value}
-    if isinstance(value, frozenset):
-        return frozenset(
-            _restore_literal_models(member, original_by_dummy) for member in value
-        )
     return value
 
 
 @dataclass(frozen=True)
 class _LiteralPrevalidator:
-    schema: type[StrictModel]
     validator: SchemaValidator
     original_by_dummy: dict[type, type[StrictModel]]
-    requires_revalidation: bool
 
     def validate_json(self, data: bytes) -> StrictModel:
         checked = self.validator.validate_json(data)
-        if self.requires_revalidation:
-            return self.schema.model_validate_json(data)
         return _restore_literal_models(checked, self.original_by_dummy)
 
 
@@ -641,52 +670,41 @@ def _build_literal_prevalidator(
     schema: type[StrictModel],
 ) -> _LiteralPrevalidator | None:
     core = schema.__pydantic_core_schema__
-    if not _contains_literal_schema(core):
+    guarded, unsupported_literal = _literal_schema_requirements(core)
+    if unsupported_literal:
+        raise GenerationSchemaUnsupportedError(
+            "output schema contains unsupported Literal value types; only JSON-native "
+            "str, null, bool, int and float values or string-valued enums are supported"
+        )
+    if not guarded:
         return None
     try:
         features = _literal_schema_features(core)
-        unknown = {
-            feature
-            for feature in features
-            if feature not in _SUPPORTED_LITERAL_CORE_FORMS
-            and feature not in {"custom-init", "default-factory", "post-init"}
-        }
-        if unknown:
+        unsupported = features - _SUPPORTED_GUARDED_LITERAL_CORE_FORMS
+        if features & {"set", "frozenset"}:
             raise GenerationSchemaUnsupportedError(
-                "output schema with Literals uses unsupported core schema forms: "
-                + ", ".join(sorted(unknown))
+                "numeric or Boolean Literal exact validation cannot reconstruct "
+                "hash-sensitive set or frozenset values"
             )
-        if "function-plain" in features:
+        if _guarded_literal_has_non_string_dict_key(core):
             raise GenerationSchemaUnsupportedError(
-                "output schema with Literals cannot use a plain custom validator"
+                "numeric or Boolean Literal exact validation supports only string-keyed dictionaries"
             )
-        if features & {"function-before", "function-wrap"}:
+        if _guarded_literal_has_extra_allow_model(core):
             raise GenerationSchemaUnsupportedError(
-                "output schema with Literals cannot preserve callback or lifecycle "
-                "semantics for before/wrap validators"
+                "numeric or Boolean Literal exact validation cannot reconstruct models "
+                "with extra='allow'"
             )
-        if features & {"custom-init", "dataclass", "call"}:
+        if unsupported:
             raise GenerationSchemaUnsupportedError(
-                "output schema with Literals cannot preserve custom initialization semantics"
-            )
-        revalidation_features = features & {
-            "default",
-            "default-factory",
-            "function-after",
-            "post-init",
-        }
-        if features & {"union", "tagged-union"} and revalidation_features:
-            raise GenerationSchemaUnsupportedError(
-                "output schema with Literals cannot preserve callback or lifecycle semantics: "
-                "custom validator in a union alternative"
+                "numeric or Boolean Literal exact validation does not support core schema forms: "
+                + ", ".join(sorted(unsupported))
             )
         dummy_models: dict[type, type] = {}
         validator = SchemaValidator(_literal_precheck_schema(core, dummy_models))
         return _LiteralPrevalidator(
-            schema=schema,
             validator=validator,
             original_by_dummy={dummy: original for original, dummy in dummy_models.items()},
-            requires_revalidation=bool(revalidation_features),
         )
     except GenerationSchemaUnsupportedError:
         raise

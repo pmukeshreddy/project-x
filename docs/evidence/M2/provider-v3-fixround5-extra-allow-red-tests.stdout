@@ -1,0 +1,81 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_numeric_literal_extra_allow_models_refuse_before_execution[ExtraAllowNestedContent-raw0-<lambda>] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1105/test_numeric_literal_extra_all0')
+schema = <class 'test_generation.ExtraAllowNestedContent'>
+raw = {'flag': True, 'item': {'x': 1, 'y': 2}}
+extra = <function <lambda> at 0x109b15ee0>
+
+    @pytest.mark.parametrize(
+        ("schema", "raw", "extra"),
+        [
+            (
+                ExtraAllowNestedContent,
+                {"flag": True, "item": {"x": 1, "y": 2}},
+                lambda value: value.item.__pydantic_extra__,
+            ),
+            (
+                ExtraAllowRootContent,
+                {"flag": True, "x": 1, "y": 2},
+                lambda value: value.__pydantic_extra__,
+            ),
+        ],
+    )
+    def test_numeric_literal_extra_allow_models_refuse_before_execution(
+        tmp_path, schema, raw, extra
+    ):
+        baseline = schema.model_validate_json(json.dumps(raw))
+        assert extra(baseline) == {"y": 2}
+        backend = NeverVerifiedBackend()
+        runner = FakeRunner()
+        store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+>       with pytest.raises(
+            GenerationProviderError, match="extra='allow'"
+        ) as caught:
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: "extra='allow'"
+E         Actual message: 'schema refusal must precede backend verification'
+
+tests/test_generation.py:1320: AssertionError
+_ test_numeric_literal_extra_allow_models_refuse_before_execution[ExtraAllowRootContent-raw1-<lambda>] _
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1105/test_numeric_literal_extra_all1')
+schema = <class 'test_generation.ExtraAllowRootContent'>
+raw = {'flag': True, 'x': 1, 'y': 2}, extra = <function <lambda> at 0x109b15f80>
+
+    @pytest.mark.parametrize(
+        ("schema", "raw", "extra"),
+        [
+            (
+                ExtraAllowNestedContent,
+                {"flag": True, "item": {"x": 1, "y": 2}},
+                lambda value: value.item.__pydantic_extra__,
+            ),
+            (
+                ExtraAllowRootContent,
+                {"flag": True, "x": 1, "y": 2},
+                lambda value: value.__pydantic_extra__,
+            ),
+        ],
+    )
+    def test_numeric_literal_extra_allow_models_refuse_before_execution(
+        tmp_path, schema, raw, extra
+    ):
+        baseline = schema.model_validate_json(json.dumps(raw))
+        assert extra(baseline) == {"y": 2}
+        backend = NeverVerifiedBackend()
+        runner = FakeRunner()
+        store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+>       with pytest.raises(
+            GenerationProviderError, match="extra='allow'"
+        ) as caught:
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: "extra='allow'"
+E         Actual message: 'schema refusal must precede backend verification'
+
+tests/test_generation.py:1320: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_generation.py::test_numeric_literal_extra_allow_models_refuse_before_execution[ExtraAllowNestedContent-raw0-<lambda>]
+FAILED tests/test_generation.py::test_numeric_literal_extra_allow_models_refuse_before_execution[ExtraAllowRootContent-raw1-<lambda>]
+2 failed, 96 deselected in 0.29s
