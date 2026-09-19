@@ -1,0 +1,25 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-B",
+    "docs/evidence/M2/coordinator-round5-literal-domain.py"
+  ],
+  "PYTHONPATH": "src",
+  "started_at": "2026-09-19T16:32:41.658569+00:00",
+  "ended_at": "2026-09-19T16:32:41.839380+00:00",
+  "wall_seconds": 0.18052462488412857,
+  "exit_status": 0,
+  "scope": "Working-source schema admission diagnostic; not complete provider verification",
+  "outputs": {
+    "stdout": {
+      "path": "docs/evidence/M2/coordinator-round5-literal-domain.stdout",
+      "bytes": 1201,
+      "sha256": "ffdf9197baaa49abbf0362e768fec853e810dff9137b847fba305574c8677cac"
+    },
+    "stderr": {
+      "path": "docs/evidence/M2/coordinator-round5-literal-domain.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

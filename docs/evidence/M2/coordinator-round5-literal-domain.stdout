@@ -1,0 +1,52 @@
+{
+  "backend_calls": 0,
+  "json_schema": {
+    "additionalProperties": false,
+    "properties": {
+      "value": {
+        "const": "1",
+        "title": "Value",
+        "type": "string"
+      }
+    },
+    "required": [
+      "value"
+    ],
+    "title": "DecimalLiteral",
+    "type": "object"
+  },
+  "native_calls": 0,
+  "ordinary_json_results": [
+    {
+      "accepted": true,
+      "raw": "{\"value\":1}",
+      "value_repr": "Decimal('1')",
+      "value_type": "Decimal"
+    },
+    {
+      "accepted": true,
+      "raw": "{\"value\":1.0}",
+      "value_repr": "Decimal('1')",
+      "value_type": "Decimal"
+    },
+    {
+      "accepted": false,
+      "error_type": "ValidationError",
+      "raw": "{\"value\":\"1\"}"
+    },
+    {
+      "accepted": true,
+      "raw": "{\"value\":true}",
+      "value_repr": "Decimal('1')",
+      "value_type": "Decimal"
+    }
+  ],
+  "preflight": {
+    "admitted": true,
+    "guard_present": false
+  },
+  "recorded_at": "2026-09-19T16:32:41.825434+00:00",
+  "runner_calls": 0,
+  "scope": "narrow trusted schema diagnostic, working source; not a full-provider or native result",
+  "source_sha256": "6b246acc9372a281dbe150868c6ee2d98e272a0c7a249085d5240fab7518bebe"
+}
