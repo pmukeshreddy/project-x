@@ -517,6 +517,8 @@ def contract() -> None:
         "contract_usage": result.generation.usage.model_dump(mode="json"),
         "contract_measurement": measurement,
         "native_calls": len(result.journal_refs),
+        "candidate_repairs_used": 1 + len(prior_journals),
+        "candidate_repair_budget": 4,
         "license_prompted": False,
     }
     write_json(STATE_PATH, state)
@@ -526,12 +528,17 @@ def contract() -> None:
 
 def scenario() -> None:
     state = json.loads(STATE_PATH.read_text())
-    if state.get("native_calls") != 1 or state.get("scenario"):
-        raise RuntimeError("scenario requires exactly one completed contract call")
+    if state.get("native_calls") not in {1, 2, 3} or state.get("scenario"):
+        raise RuntimeError("scenario requires a completed contract within its attempt budget")
+    if state.get("candidate_repairs_used") != 3:
+        raise RuntimeError("scenario requires the retained M3 and contract repair accounting")
     store = ArtifactStore(STORE_PATH, ActorRole.CONTROLLER)
     refs = {name: ref(value) for name, value in state["refs"].items()}
     discovery_ref = ref(state["discovery"])
-    sources = tuple(GroundedSource.model_validate(item) for item in state["sources"])
+    sources = tuple(
+        GroundedSource.model_validate_json(canonical_json(item))
+        for item in state["sources"]
+    )
     contract_ref = ref(state["contract"])
     contract_value = store.get_artifact(contract_ref, max_envelope_bytes=512 * 1024)
     tokenizer, backend = tokenizer_and_backend()
@@ -539,6 +546,13 @@ def scenario() -> None:
         request_id="CLICK_SCENARIOS_1", response_id="CLICK_SCENARIOS_RESPONSE_1",
         prompt_id="CLICK_SCENARIOS_PROMPT_1", contract=contract_value,
         contract_ref=contract_ref, sources=sources, limits=limits(16_384), seed=0,
+    )
+    draft = draft.model_copy(
+        update={
+            "instruction": draft.instruction
+            + " Use concise one-sentence fields, one short verbatim oracle quote per scenario, "
+            "and no duplicate scenarios while preserving every mandatory behavior."
+        }
     )
     frozen, measurement = measure(tokenizer, draft, ScenarioPlanProposal, "scenario")
     provenance = Provenance(
@@ -554,7 +568,7 @@ def scenario() -> None:
         seed_policy=SeedPolicy(algorithm="PYTHONHASHSEED", seeds=(0,), same_cases_within_group=True),
         visibility=Visibility.EVALUATION,
         provenance=provenance,
-        costs=(fixed_cost("scenario_design", "Generation cost is appended by the service."),),
+        costs=(fixed_cost("authoring", "Generation cost is appended by the service."),),
     )
     result = ScenarioAuthoringService(
         provider=LocalGenerationProvider(backend=backend, archive=store.put_bytes),
@@ -567,7 +581,7 @@ def scenario() -> None:
             "scenario_generation_record": result.generation.record.model_dump(mode="json"),
             "scenario_usage": result.generation.usage.model_dump(mode="json"),
             "scenario_measurement": measurement,
-            "native_calls": 2,
+            "native_calls": state["native_calls"] + 1,
         }
     )
     write_json(STATE_PATH, state)
