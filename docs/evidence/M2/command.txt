@@ -1,0 +1,36 @@
+/usr/bin/perl -e 'alarm 120; exec @ARGV' /opt/homebrew/bin/codex exec \
+  -C <fresh-empty-staging> \
+  --skip-git-repo-check \
+  --ephemeral \
+  --sandbox read-only \
+  --ignore-user-config \
+  --ignore-rules \
+  --strict-config \
+  --disable shell_tool \
+  --disable unified_exec \
+  --disable apps \
+  --disable hooks \
+  --disable multi_agent \
+  --disable browser_use \
+  --disable computer_use \
+  --disable in_app_browser \
+  --disable image_generation \
+  --disable plugins \
+  --disable remote_plugin \
+  --disable skill_search \
+  --disable skill_mcp_dependency_install \
+  --disable workspace_dependencies \
+  --disable tool_suggest \
+  --disable goals \
+  --disable memories \
+  --disable sleep_tool \
+  --disable view_image \
+  --disable default_mode_request_user_input \
+  -c 'tools.experimental_request_user_input.enabled=false' \
+  -c 'web_search="disabled"' \
+  -c 'model_reasoning_effort="low"' \
+  --model gpt-5.6-luna \
+  --json \
+  --output-schema <fresh-empty-staging>/smoke-output.schema.json \
+  --color never \
+  - < <fresh-empty-staging>/smoke-input.txt

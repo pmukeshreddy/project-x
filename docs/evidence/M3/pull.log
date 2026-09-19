@@ -1,0 +1,15 @@
+$ docker --config .feature-rl/research/M3/docker-client --host unix:///Users/mukeshreddypochamreddy/.docker/run/docker.sock pull --platform linux/arm64 python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333
+docker.io/library/python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333: Pulling from library/python
+9ed2bd026f9c: Pulling fs layer
+e7149a79e79b: Pulling fs layer
+98a88de3b9e6: Pulling fs layer
+333125b5cee9: Pulling fs layer
+98a88de3b9e6: Download complete
+e7149a79e79b: Download complete
+9ed2bd026f9c: Download complete
+333125b5cee9: Download complete
+Digest: sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333
+Status: Downloaded newer image for python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333
+docker.io/library/python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333
+
+exit=0 elapsed=3.6803147080354393

@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a0b8b0-a4d9-7a83-b602-7435c930ebff"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"ok\":true,\"nonce\":\"M2_PROVIDER_SMOKE_V1\"}"}}
+{"type":"turn.completed","usage":{"input_tokens":5821,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":25,"reasoning_output_tokens":0}}

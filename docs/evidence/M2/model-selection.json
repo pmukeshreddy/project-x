@@ -1,0 +1,14 @@
+{
+  "source": "actual-home .codex/models_cache.json",
+  "source_fields_retained": ["client_version", "fetched_at", "models[].slug", "models[].display_name", "models[].visibility", "models[].supported_in_api", "models[].supported_reasoning_levels"],
+  "client_version": "0.154.0",
+  "cache_fetched_at": "2026-09-19T08:00:55.577408Z",
+  "selected_model": "gpt-5.6-luna",
+  "selected_display_name": "GPT-5.6-Luna",
+  "selected_visibility": "list",
+  "selected_supported_in_api": true,
+  "selected_reasoning_effort": "low",
+  "selected_reasoning_effort_was_listed": true,
+  "selection_reason": "Locally cached permitted metadata lists this explicit model as visible and API-supported; the smoke is intentionally tiny.",
+  "secret_values_retained": false
+}

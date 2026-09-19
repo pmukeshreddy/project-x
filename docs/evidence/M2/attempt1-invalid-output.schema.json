@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "nonce"],
+  "properties": {
+    "ok": {"const": true},
+    "nonce": {"const": "M2_PROVIDER_SMOKE_V1"}
+  }
+}

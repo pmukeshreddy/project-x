@@ -1,0 +1,2 @@
+This is a bounded provider-protocol smoke test, not feature generation or training.
+Return one JSON object that satisfies the supplied schema. Set ok to true and nonce to M2_PROVIDER_SMOKE_V1. Do not call or request any tool.

@@ -1,0 +1,52 @@
+{
+  "recorded_at": "2026-09-19T08:03:20Z",
+  "git_revision_at_probe": "0dc354797016b6f2f9ccbbb03c923876e769d378",
+  "cli": "/opt/homebrew/bin/codex",
+  "cli_version": "codex-cli 0.154.0",
+  "model_configured": "gpt-5.6-luna",
+  "model_backend_version_reported": null,
+  "reasoning_effort": "low",
+  "attempts": [
+    {
+      "number": 1,
+      "staging_directory": "/private/tmp/feature-rl-m2-provider.XlxbI9",
+      "staging_files": ["smoke-input.txt", "smoke-output.schema.json"],
+      "wall_seconds_observed_by_command_runner": 2.21619775,
+      "deadline_seconds": 120,
+      "exit_status": 1,
+      "result": "invalid_json_schema",
+      "inference_completed": false,
+      "usage_reported": false,
+      "schema_sha256": "5f24ed6426e64aef4336bc03830e2678336a114aadc1c671e181b3e91ac34a7b"
+    },
+    {
+      "number": 2,
+      "staging_directory": "/private/tmp/feature-rl-m2-provider-repair.b3T38C",
+      "staging_files": ["smoke-input.txt", "smoke-output.schema.json"],
+      "wall_seconds_observed_by_command_runner": 3.118234125,
+      "deadline_seconds": 120,
+      "exit_status": 0,
+      "result": "success",
+      "inference_completed": true,
+      "usage_reported": true,
+      "schema_sha256": "cfe5365f37e41bb6c64960513364b207272ddecf5b5e867fc4729fb0cfb7d651"
+    }
+  ],
+  "input": {
+    "bytes": 226,
+    "sha256": "3a71dc8f5e71b6bdb6bb38b986d478d5e72fd7e22f6ba2720f3c03b0c6a214df"
+  },
+  "usage": {
+    "input_tokens": 5821,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 25,
+    "reasoning_output_tokens": 0
+  },
+  "billed_cost_usd": null,
+  "billed_cost_status": "unknown_subscription_cost_not_reported_by_cli",
+  "forbidden_event_count": 0,
+  "output_schema_valid": true,
+  "output_bytes": 43,
+  "probe_disposition": "provider_protocol_smoke_passed_with_one_diagnosed_schema_repair"
+}
