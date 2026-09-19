@@ -20,7 +20,7 @@ Recovery: read this file, docs/interfaces.md if present, latest reports and git 
 | M5 | Unassigned | Scoped brief prepared | Reviewed M4 and real controls |
 | M6 | Unassigned | Scoped brief prepared | Reviewed M0-M5 |
 | M7 | `/root/m7_learning` | Pinned-source compatibility audit complete; no product yet | Real runner, training code/diagnostics; CUDA execution externally blocked |
-| M8 | Unassigned | Scoped brief prepared | Reviewed upstream, independent data/checkpoints for empirical runs |
+| M8 | `/root/m8_evaluation` | Bounded external-baseline metadata/license investigation active; no product or test data | Reviewed upstream, independent data/checkpoints for empirical runs |
 
 ## Decisions
 
@@ -61,6 +61,7 @@ Recovery: read this file, docs/interfaces.md if present, latest reports and git 
 - M2 probe actual result: gpt-5.6-luna, Codex0.154.0, tool-free configuration, first HTTP400 invalid JSON Schema then one typed-schema repair; second call exit0 in3.118s, input5821/output25 tokens, no forbidden events. Backend weight revision and billed USD not exposed and remain unknown. Docs/evidence/M2 contains full traces/config/status. This is provider feasibility, not feature construction or training.
 - M7 future accountable owner `/root/m7_learning` assigned bounded read-only source audit of pinned SkyRL/Harbor interfaces and artifact transfers while M1 review proceeds. No installation, product implementation, model download or CUDA execution authorized in this investigation. Handoff report will be `docs/evidence/M7/compatibility.md`; actual adapter implementation waits for reviewed upstream modules.
 - M7 source handoff complete: `docs/evidence/M7/compatibility.md`, 59 hashed source records, line excerpts, deferred exact import/CUDA allocation smoke (not executed). Root independently verified all59 hashes and shell syntax, exit0; `docs/evidence/M7/coordinator-verification.json`. Stock framework requires explicit validity/group/loss/seed/sync/checkpoint and source-transfer adapters; neither source inspection nor the proposed command is runtime/training evidence. Owner remains available for product slices after upstream review.
+- M8 future accountable owner `/root/m8_evaluation` assigned bounded read-only external baseline release/license/schema metadata audit (`docs/evidence/M8/baseline-feasibility.md`). No task solutions, locked-test cases, dataset payloads, package installs or experiment execution. This is independent feasibility research while M0/M1 review fixes proceed; product implementation waits for reviewed upstream APIs.
 - M1 owner `/root/m1_sources` assigned bounded read-only Click source investigation only, report `docs/evidence/M1/investigation.md`. Product implementation awaits approved M0.
 
 ## External gates
