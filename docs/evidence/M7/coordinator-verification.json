@@ -1,0 +1,27 @@
+{
+  "time": {
+    "current_time": "2026-09-19 08:27:33 UTC"
+  },
+  "results": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "05b1f3",
+        "wall_time_seconds": 0.000001917,
+        "exit_code": 0,
+        "original_token_count": 25,
+        "output": "{\"scope\": \"source_hash_verification_only\", \"records_verified\": 59, \"upstream_code_executed\": false}\n"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "343100",
+        "wall_time_seconds": 0.000002459,
+        "exit_code": 0,
+        "original_token_count": 0,
+        "output": ""
+      }
+    }
+  ]
+}
