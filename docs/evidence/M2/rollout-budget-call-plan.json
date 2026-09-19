@@ -1,0 +1,36 @@
+{
+  "declared_before_real_calls": true,
+  "provider": "existing ChatGPT-authenticated Codex CLI subscription",
+  "cli_version": "0.154.0",
+  "model": "gpt-5.6-luna",
+  "reasoning_effort": "low",
+  "project_doc_max_bytes": 0,
+  "deadline_seconds_each": 20,
+  "combined_stdout_stderr_cap_bytes_each": 1048576,
+  "attempts": [
+    {
+      "number": 1,
+      "purpose": "test sampled-token cutoff with prefill excluded from accounting",
+      "rollout_budget": {
+        "limit_tokens": 32,
+        "prefill_token_weight": 0.0,
+        "sampling_token_weight": 1.0,
+        "reminder_at_remaining_tokens": [16]
+      },
+      "expected": "budget-limited failure before the schema-forced response completes",
+      "run": true
+    },
+    {
+      "number": 2,
+      "purpose": "conditional control using the same prompt/schema above the observed sampled usage",
+      "rollout_budget": {
+        "limit_tokens": 1024,
+        "prefill_token_weight": 0.0,
+        "sampling_token_weight": 1.0,
+        "reminder_at_remaining_tokens": [512]
+      },
+      "expected": "schema-valid completion below the declared weighted limit",
+      "run": "only after attempt 1 is diagnosed and only if needed to characterize enforcement"
+    }
+  ]
+}

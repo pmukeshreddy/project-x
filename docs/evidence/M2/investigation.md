@@ -51,3 +51,5 @@ The successful remote trace's absence of tool events proves that no tool execute
 ## Handoff gate
 
 Provider implementation and the Click contract remain intentionally deferred until M1 review handoff. This probe supports an implementation using this exact restricted profile, complete event auditing, strict schema validation, deadline/output bounds, and explicit unknown billed cost. The production provider must preserve request/response archives and reject malformed output, forbidden events, missing/invalid usage, truncation, nonzero exit, and any reported model mismatch.
+
+The later bounded budget qualification is recorded in `rollout-budget-qualification.md`. It found that Codex CLI 0.154.0's experimental `rollout_budget` emits a complete over-budget response before its failure event and sends no provider-side output-token limit. It cannot supply the requested hard token cutoff; only wall/byte bounds and retrospective rejection are supported by the observed path.

@@ -1,0 +1,43 @@
+{
+  "attempt": 1,
+  "model": "gpt-5.6-luna",
+  "reasoning_effort": "low",
+  "project_doc_max_bytes": 0,
+  "home_and_codex_home_inherited_unchanged": true,
+  "deadline_seconds": 20.0,
+  "combined_output_cap_bytes": 1048576,
+  "rollout_budget": {
+    "limit_tokens": 32,
+    "prefill_token_weight": 0.0,
+    "sampling_token_weight": 1.0,
+    "reminder_at_remaining_tokens": [16]
+  },
+  "prompt": {
+    "bytes": 190,
+    "sha256": "bb7cd1356d20ef8efa8be7980a562de0b8055a0d3546352651b9acdb2e62cff2"
+  },
+  "schema": {
+    "bytes": 488,
+    "sha256": "62796d8b303ae637c3ee51809cf8cbaa99e7aef3d0ee5fe3b836947a94ce47d0"
+  },
+  "staging_directory": "/private/tmp/feature-rl-m2-rollout-budget-1.snbx1z0b",
+  "staging_files": ["rollout-budget-output.schema.json", "rollout-budget-prompt.txt"],
+  "execution": {
+    "termination": "process_exit",
+    "exit_status": 1,
+    "wall_seconds": 5.2222010002005845,
+    "stdout_bytes": 607,
+    "stderr_bytes": 0,
+    "combined_output_bytes": 607
+  },
+  "event_types": ["thread.started", "turn.started", "item.completed", "error", "turn.failed"],
+  "raw_events": [
+    {"type":"thread.started","thread_id":"01a0b8fd-66a7-7063-97d9-9217553d4df0"},
+    {"type":"turn.started"},
+    {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"payload\":\"3a71dc8f5e71b6bdb6bb38b986d478d5e72fd7e22f6ba2720f3c03b0c6a214dfcfe5365f37e41bb6c64960513364b207272ddecf5b5e867fc4729fb0cfb7d6515f24ed6426e64aef4336bc03830e2678336a114aadc1c671e181b3e91ac34a7b4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc\"}"}},
+    {"type":"error","message":"shared rollout token budget exhausted"},
+    {"type":"turn.failed","error":{"message":"shared rollout token budget exhausted"}}
+  ],
+  "usage": null,
+  "diagnosis": "The complete schema-forced agent message was emitted before the budget error; no terminal usage was exposed. This is not a hard output cutoff."
+}

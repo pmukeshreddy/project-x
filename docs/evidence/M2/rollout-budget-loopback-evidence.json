@@ -1,0 +1,65 @@
+{
+  "scope": "credential-free request capture against loopback only",
+  "cli_version": "0.154.0",
+  "model": "gpt-5.6-luna",
+  "home_and_codex_home_inherited_unchanged": true,
+  "authorization_headers_inspected_or_retained": false,
+  "real_provider_contacted": false,
+  "deadline_seconds_each": 20,
+  "request_body_cap_bytes": 1048576,
+  "combined_stdout_stderr_cap_bytes": 1048576,
+  "harness_iterations": [
+    {
+      "number": 1,
+      "result": "timeout_before_response capture",
+      "cause": "handler supported only POST with Content-Length, while the custom provider first issued GET /v1/models"
+    },
+    {
+      "number": 2,
+      "result": "timeout_before_response capture",
+      "cause": "chunked request decoding was added, but GET /v1/models was still unsupported"
+    },
+    {
+      "number": 3,
+      "result": "no response-body capture",
+      "cause": "GET /v1/models returned HTTP 501; timeout reporting established that this model-list request blocked the later POST"
+    },
+    {
+      "number": 4,
+      "result": "POST /v1/responses captured after serving a local model list",
+      "cause": "capture succeeded; the CLI then received an intentional HTTP 400 stop response"
+    },
+    {
+      "number": 5,
+      "result": "POST /v1/responses captured with a staged project-document canary",
+      "cause": "final version-specific project_doc_max_bytes=0 verification"
+    }
+  ],
+  "final_capture": {
+    "staging_directory": "/private/tmp/feature-rl-m2-budget-loopback.12h6_dzf",
+    "staging_files": ["AGENTS.md", "smoke-input.txt", "smoke-output.schema.json"],
+    "project_doc_max_bytes": 0,
+    "project_doc_canary": "M2_PROJECT_DOC_ZERO_CANARY_7f6f43d0",
+    "request_method": "POST",
+    "request_path": "/v1/responses",
+    "request_body_bytes": 29712,
+    "request_body_sha256": "ce3aa1421b60e6b6cbd2ac0bb4a4c608327b34caadc4f3821d29842e0c600497",
+    "top_level_keys": ["client_metadata", "include", "input", "model", "parallel_tool_calls", "prompt_cache_key", "reasoning", "store", "stream", "text", "tool_choice"],
+    "model": "gpt-5.6-luna",
+    "input_item_count": 6,
+    "top_level_tool_count": 0,
+    "has_top_level_max_output_tokens": false,
+    "rollout_budget_or_generation_limit_fields": [],
+    "incidental_nested_token_key": "$.input[0].tools[0].tools[1].parameters.properties.max_tokens",
+    "incidental_nested_token_key_context": "text embedded in client instructions for a disabled/inert tool surface, not a provider generation parameter",
+    "project_doc_canary_hits": 0,
+    "agents_filename_hits": 0,
+    "agents_instruction_marker_hits": 0,
+    "workspace_path_hits": 0,
+    "cli_exit_status": 1,
+    "cli_exit_reason": "intentional loopback HTTP 400 capture stop",
+    "stdout_events": ["thread.started", "item.completed", "turn.started", "error", "turn.failed"],
+    "terminal_usage": null
+  },
+  "interpretation": "In this installed client, rollout_budget was not serialized as a provider-side output-token limit. project_doc_max_bytes=0 suppressed the staged project instruction canary in this capture."
+}

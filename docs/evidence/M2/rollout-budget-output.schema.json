@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payload"],
+  "properties": {
+    "payload": {
+      "type": "string",
+      "const": "3a71dc8f5e71b6bdb6bb38b986d478d5e72fd7e22f6ba2720f3c03b0c6a214dfcfe5365f37e41bb6c64960513364b207272ddecf5b5e867fc4729fb0cfb7d6515f24ed6426e64aef4336bc03830e2678336a114aadc1c671e181b3e91ac34a7b4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc"
+    }
+  }
+}

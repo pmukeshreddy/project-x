@@ -1,0 +1,1 @@
+This is a bounded rollout-budget protocol qualification, not feature generation or training. Return exactly the JSON object required by the supplied schema. Do not call or request any tool.

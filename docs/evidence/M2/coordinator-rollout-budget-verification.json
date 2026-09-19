@@ -1,0 +1,12 @@
+{
+  "scope": "evidence_consistency_check",
+  "producer": "root coordinator",
+  "recorded_at_utc": "2026-09-19T09:41:09.116726+00:00",
+  "validated": "Predeclared configurations, prompt/schema bytes and hashes, bounded timings/output, identical complete response before low-budget failure, successful control usage above low budget, and harness Python syntax.",
+  "low_budget": 32,
+  "control_output_tokens": 189,
+  "control_reasoning_output_tokens": 21,
+  "identical_message_bytes": 270,
+  "conclusion": "The observed low-budget response completes before client budget failure. No provider hard cutoff is demonstrated; exact internal budget-unit overshoot remains unknown.",
+  "new_inference_calls": 0
+}

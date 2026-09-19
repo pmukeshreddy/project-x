@@ -6,7 +6,7 @@ Date: 2026-09-19 UTC. This was source/configuration inspection only. It made no 
 
 Codex CLI 0.154.0 does not expose a stable, documented per-request input-token or output-token hard-cap option through `codex exec`. The M2 provider can enforce a process wall deadline and local byte limits, and it can validate reported token usage after a successful turn. Post-completion validation is not a hard token cap.
 
-An experimental `rollout_budget` exists, but it is off by default and marked **under development** in the installed CLI. It tracks a weighted combination of prefill and sampled tokens rather than exposing an output-only maximum. Its runtime cutoff and overshoot behavior have not been qualified, and this preparation was forbidden from making a model call. It therefore cannot yet satisfy the production hard-budget gate.
+An experimental `rollout_budget` exists, but it is off by default and marked **under development** in the installed CLI. It tracks a weighted combination of prefill and sampled tokens rather than exposing an output-only maximum. The subsequent authorized qualification in `rollout-budget-qualification.md` found that the client emitted a complete response before reporting exhaustion. It therefore does not satisfy the production hard-budget gate.
 
 ## Installed 0.154.0 evidence
 
@@ -58,4 +58,4 @@ The stable provider path can truthfully enforce:
 
 The byte and wall controls limit host resources and retained artifacts. They do not guarantee that provider-side token generation stopped at an exact requested count. A successful response whose terminal usage exceeds `ResourceLimits.input_tokens` or `ResourceLimits.output_tokens` must be rejected as a budget violation; that rejection is retrospective.
 
-Production hard token enforcement remains a provider gate. Before experimental `rollout_budget` can be used, a separately authorized bounded qualification must prove the exact 0.154.0 strict-config shape, emitted events/status, cutoff point, overshoot bound, interaction with structured output, and complete usage accounting under the same actual-home tool-free profile. Until then M2 must neither invent a `model_max_tokens` setting nor label post-completion usage checks as a hard cap.
+The previous read-only preparation subtask prohibited model calls; it was a scope limit, not a new user-permission requirement. The already authorized follow-up qualified the exact 0.154.0 strict-config shape under the same actual-home tool-free profile. `rollout_budget` did not add a provider-side output-token field, and the 32-unit attempt emitted the full response before failing. Its precise internal overshoot is unreported. Production hard token enforcement is therefore explicitly unavailable through this provider path. M2 must neither invent a `model_max_tokens` setting nor label post-completion usage checks or the experimental failure as a hard cap.
