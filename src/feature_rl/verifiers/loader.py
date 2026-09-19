@@ -71,19 +71,25 @@ def _validate_operands(assertion,inp,cmp):
 
 def load_verifier(store,task_ref):
     task=_artifact(store,task_ref,TaskBundle)
-    contract=_artifact(store,task.contract,RequirementContract)
     verifier=_artifact(store,task.private_oracle,VerifierBundle)
+    if task.adapter_version!=verifier.worker_adapter.version:raise ValueError('adapter version mismatch')
+    contract,plan,recipe,adapter,inputs,comparisons=validate_verifier_bundle(
+        store,verifier,contract_ref=task.contract,environment=task.environment,baseline=task.baseline)
+    return LoadedVerifier(task_ref,task,contract,plan,verifier,recipe,adapter,inputs,comparisons)
+
+
+def validate_verifier_bundle(store,verifier,*,contract_ref,environment,baseline):
+    """Same mechanical validation during construction and grading; no Task/H needed."""
+    verifier=VerifierBundle.model_validate(verifier)
+    contract=_artifact(store,contract_ref,RequirementContract)
     plan=_artifact(store,verifier.scenario_plan,ScenarioPlan)
-    recipe=_artifact(store,task.environment,EnvironmentRecipe)
-    if task.contract!=verifier.contract or plan.contract!=task.contract:raise ValueError('contract reference mismatch')
-    if recipe.baseline!=task.baseline:raise ValueError('baseline/recipe mismatch')
-    # M3 enforces this fixed worker envelope, not per-task overrides. A lower
-    # contract grant cannot be implemented by merely shortening the probe command.
-    # Token/tool budgets belong to the solver, so they are not worker resources.
+    recipe=_artifact(store,environment,EnvironmentRecipe)
+    if contract_ref!=verifier.contract or plan.contract!=contract_ref:raise ValueError('contract reference mismatch')
+    if recipe.baseline!=baseline:raise ValueError('baseline/recipe mismatch')
+    # M3's fixed worker recipe cannot silently exceed the contract grant.
     for name in ('wall_seconds','cpu_seconds','memory_bytes','pids','disk_bytes','output_bytes'):
         if getattr(recipe.limits,name)>getattr(contract.episode_limits,name):
             raise ValueError('runtime recipe exceeds contract '+name)
-    if task.adapter_version!=verifier.worker_adapter.version:raise ValueError('adapter version mismatch')
     if verifier.worker_adapter.version!='m4-worker-v1':raise ValueError('unsupported adapter version')
     if verifier.permissions.controller_role!=ActorRole.CONTROLLER:raise ValueError('controller runtime required')
     if verifier.permissions.submission_policy!=contract.allowed_changes:raise ValueError('submission policy mismatch')
@@ -135,7 +141,7 @@ def load_verifier(store,task_ref):
     adapter=read_bytes(store,verifier.worker_adapter.code,65536,'m4-worker-adapter',private=True)
     if not adapter or b'\x00' in adapter:raise ValueError('empty or invalid adapter source')
     adapter.decode('utf-8')  # Inert text only. Do not compile/import it on this host.
-    return LoadedVerifier(task_ref,task,contract,plan,verifier,recipe,adapter,tuple(inputs),tuple(comparisons))
+    return contract,plan,recipe,adapter,tuple(inputs),tuple(comparisons)
 
 
 def materialize_manifest(checked,seed):
