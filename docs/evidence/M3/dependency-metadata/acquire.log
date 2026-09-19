@@ -1,0 +1,6 @@
+pytest 9.0.2 bytes 374801 requires_python >=3.10 requires_dist ['colorama>=0.4; sys_platform == "win32"', 'exceptiongroup>=1; python_version < "3.11"', 'iniconfig>=1.0.1', 'packaging>=22', 'pluggy<2,>=1.5', 'pygments>=2.7.2', 'tomli>=1; python_version < "3.11"', 'argcomplete; extra == "dev"', 'attrs>=19.2; extra == "dev"', 'hypothesis>=3.56; extra == "dev"', 'mock; extra == "dev"', 'requests; extra == "dev"', 'setuptools; extra == "dev"', 'xmlschema; extra == "dev"']
+iniconfig 2.3.0 bytes 7484 requires_python >=3.10 requires_dist []
+packaging 26.0 bytes 74366 requires_python >=3.8 requires_dist []
+pluggy 1.6.0 bytes 20538 requires_python >=3.9 requires_dist ['pre-commit; extra == "dev"', 'tox; extra == "dev"', 'pytest; extra == "testing"', 'pytest-benchmark; extra == "testing"', 'coverage; extra == "testing"']
+pygments 2.20.0 bytes 1231151 requires_python >=3.9 requires_dist ["colorama>=0.4.6; extra == 'windows-terminal'"]
+artifact_count 10 download_bytes 1740581 wheel_bytes 1708340

@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M3/dependencies/acquire-backend.py", line 25, in <module>
+    coretext=field('.dist-info/METADATA');wheeltext=field('.dist-info/WHEEL')
+  File "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M3/dependencies/acquire-backend.py", line 23, in field
+    assert len(names)==1 and names[0].file_size<1024*1024
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

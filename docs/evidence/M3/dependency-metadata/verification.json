@@ -1,0 +1,180 @@
+{
+  "status": "pass_static_integrity_and_dependency_closure_only",
+  "utc": "2026-09-19T08:42:09.618596+00:00",
+  "parser": {
+    "name": "packaging",
+    "version": "26.3",
+    "origin": "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/lib/python3.13/site-packages/packaging/__init__.py",
+    "note": "Existing trusted host parser; acquired wheels were not imported or installed."
+  },
+  "target": {
+    "python_full_version": "3.12.14",
+    "python_version": "3.12",
+    "sys_platform": "linux",
+    "platform_system": "Linux",
+    "platform_machine": "aarch64",
+    "implementation_name": "cpython",
+    "extra": ""
+  },
+  "decisions": [
+    {
+      "package": "pytest",
+      "requirement": "colorama>=0.4; sys_platform == \"win32\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "exceptiongroup>=1; python_version < \"3.11\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "iniconfig>=1.0.1",
+      "active": true,
+      "selected": "2.3.0"
+    },
+    {
+      "package": "pytest",
+      "requirement": "packaging>=22",
+      "active": true,
+      "selected": "26.0"
+    },
+    {
+      "package": "pytest",
+      "requirement": "pluggy<2,>=1.5",
+      "active": true,
+      "selected": "1.6.0"
+    },
+    {
+      "package": "pytest",
+      "requirement": "pygments>=2.7.2",
+      "active": true,
+      "selected": "2.20.0"
+    },
+    {
+      "package": "pytest",
+      "requirement": "tomli>=1; python_version < \"3.11\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "argcomplete; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "attrs>=19.2; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "hypothesis>=3.56; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "mock; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "requests; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "setuptools; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pytest",
+      "requirement": "xmlschema; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pluggy",
+      "requirement": "pre-commit; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pluggy",
+      "requirement": "tox; extra == \"dev\"",
+      "active": false
+    },
+    {
+      "package": "pluggy",
+      "requirement": "pytest; extra == \"testing\"",
+      "active": false
+    },
+    {
+      "package": "pluggy",
+      "requirement": "pytest-benchmark; extra == \"testing\"",
+      "active": false
+    },
+    {
+      "package": "pluggy",
+      "requirement": "coverage; extra == \"testing\"",
+      "active": false
+    },
+    {
+      "package": "pygments",
+      "requirement": "colorama>=0.4.6; extra == 'windows-terminal'",
+      "active": false
+    },
+    {
+      "lock_parent": "pytest",
+      "lock_requirement": {
+        "name": "colorama",
+        "marker": "sys_platform == 'win32'"
+      },
+      "active": false
+    },
+    {
+      "lock_parent": "pytest",
+      "lock_requirement": {
+        "name": "exceptiongroup",
+        "marker": "python_full_version < '3.11'"
+      },
+      "active": false
+    },
+    {
+      "lock_parent": "pytest",
+      "lock_requirement": {
+        "name": "iniconfig"
+      },
+      "active": true
+    },
+    {
+      "lock_parent": "pytest",
+      "lock_requirement": {
+        "name": "packaging"
+      },
+      "active": true
+    },
+    {
+      "lock_parent": "pytest",
+      "lock_requirement": {
+        "name": "pluggy"
+      },
+      "active": true
+    },
+    {
+      "lock_parent": "pytest",
+      "lock_requirement": {
+        "name": "pygments"
+      },
+      "active": true
+    },
+    {
+      "lock_parent": "pytest",
+      "lock_requirement": {
+        "name": "tomli",
+        "marker": "python_full_version < '3.11'"
+      },
+      "active": false
+    }
+  ],
+  "wheel_count": 6,
+  "wheel_bytes": 1753266,
+  "runtime_execution": false
+}
