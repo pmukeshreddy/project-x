@@ -6,7 +6,9 @@ from typing import Annotated, Literal
 
 from pydantic import BeforeValidator, Field
 
-from feature_rl.contracts import Digest, Identifier, NonnegativeFloat, NonnegativeInt, StrictModel
+from feature_rl.contracts import Digest, NonnegativeFloat, NonnegativeInt, StrictModel
+
+from .models import GenerationIdentifier
 
 PROTOCOL_VERSION = 3
 
@@ -29,9 +31,9 @@ ExactFalse = Annotated[Literal[False], BeforeValidator(_exact_literal(False))]
 
 class EventIdentity(StrictModel):
     protocol_version: ExactProtocolVersion
-    request_id: Identifier
-    response_id: Identifier
-    prompt_id: Identifier
+    request_id: GenerationIdentifier
+    response_id: GenerationIdentifier
+    prompt_id: GenerationIdentifier
 
 
 class IdentityValidated(EventIdentity):

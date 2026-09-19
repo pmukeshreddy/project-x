@@ -2,6 +2,7 @@
 
 from .models import (
     AuthoringContext,
+    GENERATION_IDENTIFIER_MAX_LENGTH,
     GenerationCallRecord,
     GenerationAttemptMetadata,
     GenerationLimits,
@@ -34,6 +35,7 @@ __all__ = [
     "BackendConfig",
     "BoundedProcessRunner",
     "GenerationLimits",
+    "GENERATION_IDENTIFIER_MAX_LENGTH",
     "GenerationCallRecord",
     "GenerationAttemptMetadata",
     "GenerationProviderError",

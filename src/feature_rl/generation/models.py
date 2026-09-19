@@ -19,6 +19,11 @@ from feature_rl.contracts import (
     Visibility,
 )
 
+GENERATION_IDENTIFIER_MAX_LENGTH = 128
+GenerationIdentifier = Annotated[
+    Identifier, Field(max_length=GENERATION_IDENTIFIER_MAX_LENGTH)
+]
+
 
 class GenerationStage(str, Enum):
     DISCOVERY = "discovery"
@@ -69,9 +74,9 @@ def _fixed_identifier(value: str) -> bool:
 
 
 class GenerationRequest(StrictModel):
-    request_id: Identifier
-    response_id: Identifier
-    prompt_id: Identifier
+    request_id: GenerationIdentifier
+    response_id: GenerationIdentifier
+    prompt_id: GenerationIdentifier
     stage: GenerationStage
     system_prompt: Text
     instruction: Text
@@ -156,8 +161,8 @@ class GenerationUsage(StrictModel):
 class GenerationCallRecord(StrictModel):
     attempt_id: Identifier
     recorded_at: UTCDateTime
-    request_id: Identifier
-    response_id: Identifier
+    request_id: GenerationIdentifier
+    response_id: GenerationIdentifier
     success: bool
     generation_succeeded: bool
     publication_complete: bool
@@ -170,9 +175,9 @@ class GenerationAttemptMetadata(StrictModel):
     recorded_at: UTCDateTime
     producer: Literal["feature_rl.generation.LocalGenerationProvider"]
     protocol_version: Literal[3]
-    request_id: Identifier
-    response_id: Identifier
-    prompt_id: Identifier
+    request_id: GenerationIdentifier
+    response_id: GenerationIdentifier
+    prompt_id: GenerationIdentifier
     request_sha256: Digest
     output_schema_sha256: Digest
     source_sha256: dict[str, Digest]

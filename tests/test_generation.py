@@ -8,14 +8,20 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
+from pydantic import Field, PlainValidator, ValidationError, model_validator
 
 from feature_rl.artifacts import ArtifactStore
-from feature_rl.contracts import ActorRole, ArtifactRef, StrictModel, Visibility
+from feature_rl.contracts import (
+    ActorRole,
+    ArtifactRef,
+    StrictModel,
+    UTCDateTime,
+    Visibility,
+)
 from feature_rl.generation import (
     AuthoringContext,
     BackendConfigurationError,
@@ -171,6 +177,46 @@ def test_request_actual_serialization_is_strict_and_stable():
     assert decoded["contexts"][0]["source"]["visibility"] == "authoring"
     with pytest.raises(ValidationError):
         GenerationRequest.model_validate(decoded | {"unexpected": True})
+
+
+def test_generation_identity_lengths_and_public_boundary_revalidation():
+    values = request().model_dump()
+    for field in ("request_id", "response_id", "prompt_id"):
+        with pytest.raises(ValidationError):
+            GenerationRequest.model_validate(values | {field: "R" * 129})
+    with pytest.raises(ValidationError):
+        GenerationRequest.model_validate(values | {"request_id": "R" * 1_048_577})
+    maximum = GenerationRequest.model_validate(
+        values
+        | {
+            "request_id": "R" * 128,
+            "response_id": "S" * 128,
+            "prompt_id": "P" * 128,
+        }
+    )
+    assert len(maximum.request_id) == len(maximum.response_id) == len(maximum.prompt_id) == 128
+
+    runner = FakeRunner()
+    archive_calls = []
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=lambda *args: archive_calls.append(args),
+        runner=runner,
+    )
+    base = request()
+    constructed_baseline = GenerationRequest.model_construct(**base.__dict__)
+    assert GenerationRequest.model_validate(constructed_baseline) == base
+    bypassed_requests = (
+        base.model_copy(update={"request_id": "R" * 129}),
+        GenerationRequest.model_construct(
+            **(base.__dict__ | {"prompt_id": "P" * 129})
+        ),
+    )
+    for bypassed in bypassed_requests:
+        with pytest.raises(ValidationError):
+            provider.generate(bypassed, SmokeContent)
+    assert archive_calls == []
+    assert runner.calls == []
 
 
 MODEL_FILES = (
@@ -382,6 +428,59 @@ class NestedLiteralContent(StrictModel):
     leaf: LiteralLeaf
 
 
+class EnabledLiteral(StrictModel):
+    flag: Literal[True]
+
+
+class DisabledLiteral(StrictModel):
+    flag: Literal[False]
+
+
+class UnionLiteralContent(StrictModel):
+    mode: EnabledLiteral | DisabledLiteral
+
+
+class NumberAlternative(StrictModel):
+    flag: int
+
+
+class MixedLiteralContent(StrictModel):
+    mode: EnabledLiteral | NumberAlternative
+
+
+class EnumLiteralContent(StrictModel):
+    visibility: Literal[Visibility.AUTHORING]
+    values: tuple[str, ...]
+    recorded_at: UTCDateTime
+
+
+class DeclinedLiteralAlternative(StrictModel):
+    flag: Literal[True]
+
+    @model_validator(mode="after")
+    def decline(self):
+        raise ValueError("declined alternative")
+
+
+class AllowedBooleanAlternative(StrictModel):
+    flag: bool
+
+
+class CallbackUnionContent(StrictModel):
+    mode: DeclinedLiteralAlternative | AllowedBooleanAlternative
+
+
+class PatternedLiteralContent(StrictModel):
+    flags: dict[Annotated[str, Field(pattern=r"^k_")], Literal[True]]
+
+
+class UnsupportedPlainLiteralContent(StrictModel):
+    flag: Annotated[
+        Literal[True],
+        PlainValidator(lambda value: value, json_schema_input_type=Literal[True]),
+    ]
+
+
 class FakeBackend:
     python_executable = Path(sys.executable)
     model_directory = Path("/explicit/model")
@@ -407,6 +506,15 @@ class FakeBackend:
             model_manifest_sha256="697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0",
             dependency_manifest_sha256="d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831",
         )
+
+
+class NeverVerifiedBackend(FakeBackend):
+    def __init__(self):
+        self.verify_calls = 0
+
+    def verify(self):
+        self.verify_calls += 1
+        raise AssertionError("schema refusal must precede backend verification")
 
 
 def worker_events(*, event_override=None, truncated=False):
@@ -643,6 +751,154 @@ def test_provider_preserves_exact_nested_literal_json_types(tmp_path):
 
 
 @pytest.mark.parametrize(
+    ("schema", "valid_values", "invalid_value"),
+    [
+        (
+            UnionLiteralContent,
+            ({"mode": {"flag": True}}, {"mode": {"flag": False}}),
+            {"mode": {"flag": 1}},
+        ),
+        (
+            PatternedLiteralContent,
+            ({"flags": {"k_flag": True}},),
+            {"flags": {"k_flag": 1}},
+        ),
+    ],
+)
+def test_provider_exact_literal_validation_follows_actual_schema_paths(
+    tmp_path, schema, valid_values, invalid_value
+):
+    for index, content in enumerate(valid_values):
+        events = [json.loads(line) for line in worker_events().splitlines()]
+        envelope = json.loads(events[-1]["output_text"])
+        envelope["content"] = content
+        events[-1]["output_text"] = json.dumps(envelope)
+        result = LocalGenerationProvider(
+            backend=FakeBackend(),
+            archive=ArtifactStore(tmp_path / f"valid-{index}", ActorRole.AUTHOR).put_bytes,
+            runner=FakeRunner(
+                stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+            ),
+        ).generate(request(), schema)
+        assert result.content.model_dump(mode="json") == content
+
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = invalid_value
+    events[-1]["output_text"] = json.dumps(envelope)
+    provider = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "invalid", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    )
+    with pytest.raises(GenerationProviderError, match="literal JSON type"):
+        provider.generate(request(), schema)
+
+
+def test_provider_exact_literal_validation_returns_the_branch_that_checked_raw_types(
+    tmp_path,
+):
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = {"mode": {"flag": 1}}
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), MixedLiteralContent)
+    assert isinstance(result.content.mode, NumberAlternative)
+    assert type(result.content.mode.flag) is int
+    assert result.content.model_dump_json() == '{"mode":{"flag":1}}'
+
+
+def test_provider_exact_literal_validation_preserves_json_enum_transport(tmp_path):
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = {
+        "visibility": "authoring",
+        "values": ["alpha", "beta"],
+        "recorded_at": "2026-09-19T10:00:00Z",
+    }
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), EnumLiteralContent)
+    assert result.content.visibility is Visibility.AUTHORING
+    assert result.content.values == ("alpha", "beta")
+    assert result.content.recorded_at == datetime(2026, 9, 19, 10, tzinfo=timezone.utc)
+
+
+def test_literal_prevalidation_does_not_run_defaults_or_post_init(tmp_path):
+    lifecycle = []
+
+    class LifecycleLiteralContent(StrictModel):
+        flag: Literal[True]
+        marker: str = Field(
+            default_factory=lambda: lifecycle.append("default") or "generated"
+        )
+
+        def model_post_init(self, _context):
+            lifecycle.append("post_init")
+
+    events = [json.loads(line) for line in worker_events().splitlines()]
+    envelope = json.loads(events[-1]["output_text"])
+    envelope["content"] = {"flag": True}
+    events[-1]["output_text"] = json.dumps(envelope)
+    result = LocalGenerationProvider(
+        backend=FakeBackend(),
+        archive=ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR).put_bytes,
+        runner=FakeRunner(
+            stdout=("\n".join(json.dumps(item) for item in events) + "\n").encode()
+        ),
+    ).generate(request(), LifecycleLiteralContent)
+    assert result.content.marker == "generated"
+    assert lifecycle == ["default", "post_init"]
+
+
+def test_unsupported_literal_schema_refuses_before_backend_execution(tmp_path):
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    provider = LocalGenerationProvider(
+        backend=backend, archive=store.put_bytes, runner=runner
+    )
+    with pytest.raises(GenerationProviderError, match="plain custom validator") as caught:
+        provider.generate(request(), UnsupportedPlainLiteralContent)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.success is False
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+    assert caught.value.record.archives.keys() == set(ARCHIVE_NAMES)
+
+
+def test_literal_union_with_branch_callback_refuses_before_backend_execution(tmp_path):
+    baseline = CallbackUnionContent.model_validate_json(b'{"mode":{"flag":true}}')
+    assert isinstance(baseline.mode, AllowedBooleanAlternative)
+    backend = NeverVerifiedBackend()
+    runner = FakeRunner()
+    store = ArtifactStore(tmp_path / "objects", ActorRole.AUTHOR)
+    provider = LocalGenerationProvider(
+        backend=backend, archive=store.put_bytes, runner=runner
+    )
+    with pytest.raises(
+        GenerationProviderError, match="custom validator in a union alternative"
+    ) as caught:
+        provider.generate(request(), CallbackUnionContent)
+    assert backend.verify_calls == 0
+    assert runner.calls == []
+    assert caught.value.record.error_code == "GenerationSchemaUnsupportedError"
+
+
+@pytest.mark.parametrize(
     ("event_index", "field", "wrong_value"),
     [
         (0, "protocol_version", 3.0),
@@ -658,6 +914,9 @@ def test_event_protocol_rejects_numeric_equivalents_for_literals(
     event_index, field, wrong_value
 ):
     events = [json.loads(line) for line in worker_events().splitlines()]
+    events[0]["prompt_sha256"] = "a" * 64
+    events[0]["worker_source_sha256"] = "b" * 64
+    assert _decode_event(json.dumps(events[event_index])).event == events[event_index]["event"]
     events[event_index][field] = wrong_value
     with pytest.raises(ValueError, match="protocol v3"):
         _decode_event(json.dumps(events[event_index]))
@@ -866,10 +1125,16 @@ def test_archive_failure_retains_outcome_and_replays_without_execution(tmp_path)
     assert set(recovered.archives) == set(ARCHIVE_NAMES)
 
 
-def oversized_request() -> GenerationRequest:
+def oversized_request(*, maximum_ids=False) -> GenerationRequest:
+    updates = {"instruction": "Attributable diagnostic instruction. " * 200}
+    if maximum_ids:
+        updates |= {
+            "request_id": "R" * 128,
+            "response_id": "S" * 128,
+            "prompt_id": "P" * 128,
+        }
     return GenerationRequest.model_validate(
-        request(generation_limits=limits(stdin_bytes=4096)).model_dump()
-        | {"instruction": "Attributable diagnostic instruction. " * 200}
+        request(generation_limits=limits(stdin_bytes=4096)).model_dump() | updates
     )
 
 
@@ -929,7 +1194,7 @@ def test_oversized_preflight_publication_failure_replays_without_execution(tmp_p
         backend=FakeBackend(), archive=fail_preflight_once, runner=runner
     )
     with pytest.raises(GenerationProviderError, match="archive publication failed") as caught:
-        provider.generate(oversized_request(), SmokeContent)
+        provider.generate(oversized_request(maximum_ids=True), SmokeContent)
     assert runner.calls == []
     assert caught.value.record.archives.keys() == {"attempt"}
     assert caught.value.recovery is not None
@@ -942,3 +1207,4 @@ def test_oversized_preflight_publication_failure_replays_without_execution(tmp_p
     assert recovered.publication_complete is True
     assert recovered.error_code == "GenerationInputLimitError"
     assert set(recovered.archives) == {"attempt", "preflight", "cost", "status"}
+    assert max(len(store.get_bytes(ref)) for ref in recovered.archives.values()) < 4096

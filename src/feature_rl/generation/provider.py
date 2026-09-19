@@ -10,10 +10,12 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Callable
 
 from pydantic import ValidationError
+from pydantic_core import SchemaValidator, core_schema
 
 from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import ArtifactRef, CostRecord, StrictModel, Visibility
@@ -82,6 +84,10 @@ class GenerationProviderError(RuntimeError):
 
 class GenerationInputLimitError(ValueError):
     """A validated request cannot fit its declared serialized-input boundary."""
+
+
+class GenerationSchemaUnsupportedError(ValueError):
+    """The pinned exact-Literal prevalidator cannot preserve a schema form."""
 
 
 @dataclass(frozen=True)
@@ -436,110 +442,185 @@ def _observed_usage(raw: bytes, request: GenerationRequest | None = None) -> dic
     return observed
 
 
-def _resolve_local_schema_ref(schema: dict, definitions: dict) -> dict:
-    reference = schema.get("$ref")
-    if not isinstance(reference, str):
-        return schema
-    prefix = "#/$defs/"
-    if not reference.startswith(prefix) or reference[len(prefix):] not in definitions:
-        raise ValueError("output schema contains an unsupported reference")
-    return definitions[reference[len(prefix):]]
-
-
-def _raw_json_type_matches(value: object, schema: dict, definitions: dict) -> bool:
-    schema = _resolve_local_schema_ref(schema, definitions)
-    declared = schema.get("type")
-    if isinstance(declared, list):
-        return any(
-            _raw_json_type_matches(value, {"type": member}, definitions)
-            for member in declared
+def _contains_literal_schema(value: object) -> bool:
+    if isinstance(value, dict):
+        return value.get("type") == "literal" or any(
+            _contains_literal_schema(member) for member in value.values()
         )
-    checks = {
-        "null": lambda: value is None,
-        "boolean": lambda: type(value) is bool,
-        "integer": lambda: type(value) is int,
-        "number": lambda: type(value) in {int, float},
-        "string": lambda: type(value) is str,
-        "array": lambda: type(value) is list,
-        "object": lambda: type(value) is dict,
+    if isinstance(value, (list, tuple)):
+        return any(_contains_literal_schema(member) for member in value)
+    return False
+
+
+def _contains_custom_validator(value: object) -> bool:
+    if isinstance(value, dict):
+        return value.get("type") in {
+            "function-before",
+            "function-after",
+            "function-wrap",
+            "function-plain",
+        } or any(_contains_custom_validator(member) for member in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_contains_custom_validator(member) for member in value)
+    return False
+
+
+def _union_has_custom_validator(value: object) -> bool:
+    if isinstance(value, dict):
+        if value.get("type") in {"union", "tagged-union"}:
+            choices = value.get("choices", ())
+            alternatives = choices.values() if isinstance(choices, dict) else choices
+            if any(_contains_custom_validator(choice) for choice in alternatives):
+                return True
+        return any(_union_has_custom_validator(member) for member in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_union_has_custom_validator(member) for member in value)
+    return False
+
+
+def _exact_literal_value(value: object, expected: tuple[object, ...]) -> object:
+    json_expected = tuple(
+        candidate.value if isinstance(candidate, Enum) else candidate
+        for candidate in expected
+    )
+    equal_values = [candidate for candidate in json_expected if value == candidate]
+    if equal_values and not any(
+        type(value) is type(candidate) and value == candidate for candidate in equal_values
+    ):
+        raise ValueError("wrong literal JSON type")
+    return value
+
+
+def _literal_precheck_schema(
+    value: object, dummy_models: dict[type, type]
+) -> object:
+    if isinstance(value, list):
+        return [_literal_precheck_schema(member, dummy_models) for member in value]
+    if isinstance(value, tuple):
+        return tuple(_literal_precheck_schema(member, dummy_models) for member in value)
+    if not isinstance(value, dict):
+        return value
+    kind = value.get("type")
+    if kind in {"function-before", "function-after", "function-wrap"}:
+        return _literal_precheck_schema(value["schema"], dummy_models)
+    if kind == "function-plain":
+        raise GenerationSchemaUnsupportedError(
+            "output schema with Literals cannot use a plain custom validator"
+        )
+    if kind in {"dataclass", "call"}:
+        raise GenerationSchemaUnsupportedError(
+            f"output schema with Literals cannot use core schema form {kind!r}"
+        )
+    if kind == "default":
+        return core_schema.with_default_schema(
+            _literal_precheck_schema(value["schema"], dummy_models), default=None
+        )
+    transformed = {
+        key: _literal_precheck_schema(member, dummy_models)
+        for key, member in value.items()
     }
-    return declared not in checks or checks[declared]()
+    if kind == "literal":
+        expected = tuple(value["expected"])
+        return core_schema.no_info_before_validator_function(
+            lambda raw, expected=expected: _exact_literal_value(raw, expected),
+            transformed,
+        )
+    if kind == "model":
+        if value.get("custom_init"):
+            raise GenerationSchemaUnsupportedError(
+                "output schema with Literals cannot use a custom model initializer"
+            )
+        original = value["cls"]
+        if original not in dummy_models:
+            dummy_models[original] = type(f"ExactLiteral{original.__name__}", (), {})
+        transformed["cls"] = dummy_models[original]
+        transformed["metadata"] = {}
+        transformed.pop("post_init", None)
+        transformed.pop("generic_origin", None)
+    return transformed
 
 
-def _check_literal_json_types(
-    value: object,
-    schema: dict,
-    definitions: dict,
-    *,
-    path: str = "$",
-) -> None:
-    """Reject equality-based Literal coercion before Pydantic converts JSON values."""
-    schema = _resolve_local_schema_ref(schema, definitions)
-    if "const" in schema:
-        expected = schema["const"]
-        if value == expected and type(value) is not type(expected):
-            raise ValueError(f"model response has wrong literal JSON type at {path}")
-    if isinstance(schema.get("enum"), list):
-        equal = [expected for expected in schema["enum"] if value == expected]
-        if equal and not any(type(value) is type(expected) for expected in equal):
-            raise ValueError(f"model response has wrong literal JSON type at {path}")
+def _restore_literal_models(
+    value: object, original_by_dummy: dict[type, type[StrictModel]]
+) -> object:
+    original = original_by_dummy.get(type(value))
+    if original is not None:
+        fields_set = value.__pydantic_fields_set__
+        restored = {
+            name: _restore_literal_models(getattr(value, name), original_by_dummy)
+            for name in fields_set
+        }
+        instance = original.__new__(original)
+        object.__setattr__(instance, "__dict__", restored)
+        object.__setattr__(instance, "__pydantic_fields_set__", set(fields_set))
+        object.__setattr__(instance, "__pydantic_extra__", None)
+        object.__setattr__(instance, "__pydantic_private__", None)
+        return instance
+    if isinstance(value, dict):
+        return {
+            _restore_literal_models(key, original_by_dummy): _restore_literal_models(
+                member, original_by_dummy
+            )
+            for key, member in value.items()
+        }
+    if isinstance(value, list):
+        return [_restore_literal_models(member, original_by_dummy) for member in value]
+    if isinstance(value, tuple):
+        return tuple(
+            _restore_literal_models(member, original_by_dummy) for member in value
+        )
+    if isinstance(value, set):
+        return {_restore_literal_models(member, original_by_dummy) for member in value}
+    if isinstance(value, frozenset):
+        return frozenset(
+            _restore_literal_models(member, original_by_dummy) for member in value
+        )
+    return value
 
-    alternatives = schema.get("anyOf") or schema.get("oneOf")
-    if isinstance(alternatives, list):
-        applicable = [
-            branch for branch in alternatives
-            if isinstance(branch, dict) and _raw_json_type_matches(value, branch, definitions)
-        ]
-        if applicable:
-            errors = []
-            for branch in applicable:
-                try:
-                    _check_literal_json_types(value, branch, definitions, path=path)
-                    break
-                except ValueError as error:
-                    errors.append(error)
-            else:
-                raise errors[0]
-        else:
-            for branch in alternatives:
-                if isinstance(branch, dict):
-                    _check_literal_json_types(value, branch, definitions, path=path)
 
-    for branch in schema.get("allOf", ()):
-        if isinstance(branch, dict):
-            _check_literal_json_types(value, branch, definitions, path=path)
-    if type(value) is dict:
-        properties = schema.get("properties", {})
-        if isinstance(properties, dict):
-            for name, child_schema in properties.items():
-                if name in value and isinstance(child_schema, dict):
-                    _check_literal_json_types(
-                        value[name], child_schema, definitions, path=f"{path}.{name}"
-                    )
-        additional = schema.get("additionalProperties")
-        if isinstance(additional, dict):
-            for name in value.keys() - properties.keys():
-                _check_literal_json_types(
-                    value[name], additional, definitions, path=f"{path}.{name}"
-                )
-    elif type(value) is list:
-        prefix_items = schema.get("prefixItems", ())
-        for index, child_schema in enumerate(prefix_items):
-            if index < len(value) and isinstance(child_schema, dict):
-                _check_literal_json_types(
-                    value[index], child_schema, definitions, path=f"{path}[{index}]"
-                )
-        items = schema.get("items")
-        if isinstance(items, dict):
-            start = len(prefix_items) if isinstance(prefix_items, list) else 0
-            for index in range(start, len(value)):
-                _check_literal_json_types(
-                    value[index], items, definitions, path=f"{path}[{index}]"
-                )
+@dataclass(frozen=True)
+class _LiteralPrevalidator:
+    schema: type[StrictModel]
+    validator: SchemaValidator
+    original_by_dummy: dict[type, type[StrictModel]]
+
+    def validate_json(self, data: bytes) -> StrictModel:
+        checked = self.validator.validate_json(data)
+        selected = _restore_literal_models(checked, self.original_by_dummy)
+        return self.schema.model_validate(selected)
+
+
+def _build_literal_prevalidator(
+    schema: type[StrictModel],
+) -> _LiteralPrevalidator | None:
+    core = schema.__pydantic_core_schema__
+    if not _contains_literal_schema(core):
+        return None
+    try:
+        if _union_has_custom_validator(core):
+            raise GenerationSchemaUnsupportedError(
+                "output schema with Literals cannot use a custom validator in a union alternative"
+            )
+        dummy_models: dict[type, type] = {}
+        validator = SchemaValidator(_literal_precheck_schema(core, dummy_models))
+        return _LiteralPrevalidator(
+            schema=schema,
+            validator=validator,
+            original_by_dummy={dummy: original for original, dummy in dummy_models.items()},
+        )
+    except GenerationSchemaUnsupportedError:
+        raise
+    except Exception as error:
+        raise GenerationSchemaUnsupportedError(
+            f"exact Literal validation cannot preserve this output schema: {error}"
+        ) from error
 
 
 def _parse_envelope(
-    output_text: str, request: GenerationRequest, schema: type[StrictModel]
+    output_text: str,
+    request: GenerationRequest,
+    schema: type[StrictModel],
+    literal_prevalidator: _LiteralPrevalidator | None = None,
 ) -> StrictModel:
     try:
         envelope = _json_no_duplicates(output_text)
@@ -559,12 +640,21 @@ def _parse_envelope(
         raise ValueError("model response requirement provenance is malformed")
     if not set(requirement_ids).issubset(request.allowed_requirement_ids):
         raise ValueError("model response cites an unknown requirement ID")
-    json_schema = schema.model_json_schema()
-    _check_literal_json_types(
-        envelope["content"], json_schema, json_schema.get("$defs", {})
+    content_json = canonical_json(envelope["content"])
+    validator = (
+        literal_prevalidator
+        if literal_prevalidator is not None
+        else _build_literal_prevalidator(schema)
     )
+    if validator is not None:
+        try:
+            return validator.validate_json(content_json)
+        except ValidationError as error:
+            raise ValueError(
+                "model response content violates exact literal JSON types"
+            ) from error
     try:
-        return schema.model_validate_json(canonical_json(envelope["content"]))
+        return schema.model_validate_json(content_json)
     except ValidationError as error:
         raise ValueError("model response content violates its strict schema") from error
 
@@ -586,6 +676,7 @@ class LocalGenerationProvider:
     ) -> GenerationResult:
         if not isinstance(request, GenerationRequest):
             raise TypeError("request must be a validated GenerationRequest")
+        request = GenerationRequest.model_validate(request)
         if not isinstance(output_schema, type) or not issubclass(output_schema, StrictModel):
             raise TypeError("output schema must be a StrictModel subclass")
         visibility = (
@@ -882,7 +973,9 @@ class LocalGenerationProvider:
         observed_usage = _observed_usage(b"", request)
         content: StrictModel | None = None
         error: Exception | None = None
+        literal_prevalidator: _LiteralPrevalidator | None = None
         try:
+            literal_prevalidator = _build_literal_prevalidator(output_schema)
             verified = self._backend.verify()
             worker_input = canonical_json(
                 {
@@ -952,7 +1045,9 @@ class LocalGenerationProvider:
                 prompt_sha256=prompt_sha256,
                 worker_source_sha256=worker_source_sha256,
             )
-            content = _parse_envelope(output_text, request, output_schema)
+            content = _parse_envelope(
+                output_text, request, output_schema, literal_prevalidator
+            )
         except Exception as caught:  # Every failure is archived below before it escapes.
             error = caught
 
