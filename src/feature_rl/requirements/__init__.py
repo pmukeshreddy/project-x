@@ -15,6 +15,7 @@ from .models import (
 )
 from .service import (
     AuthoringExhausted,
+    AuthoringJournalPublicationPending,
     AuthoringPublicationPending,
     ContractAuthoringResult,
     ContractAuthoringService,
@@ -32,6 +33,7 @@ from .retrieval import (
 
 __all__ = [
     "AuthoringExhausted",
+    "AuthoringJournalPublicationPending",
     "AuthoringPublicationPending",
     "AuthoringEvidenceResolver",
     "BaselineRetriever",

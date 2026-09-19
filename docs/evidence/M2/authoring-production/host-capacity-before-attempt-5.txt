@@ -1,0 +1,26 @@
+2026-09-19T21:06:29Z
+Darwin dhcp-10-84-46-109.wireless.buffalo.edu 25.3.0 Darwin Kernel Version 25.3.0: Wed Jan 28 20:49:24 PST 2026; root:xnu-12377.81.4~5/RELEASE_ARM64_T8132 arm64
+hw.memsize: 17179869184
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                              171578.
+Pages active:                            199388.
+Pages inactive:                          173210.
+Pages speculative:                        27680.
+Pages throttled:                              0.
+Pages wired down:                        157182.
+Pages purgeable:                           2960.
+"Translation faults":               10265618714.
+Pages copy-on-write:                  401536240.
+Pages zero filled:                   3469899752.
+Pages reactivated:                   2201796260.
+Pages purged:                         289817787.
+File-backed pages:                       125825.
+Anonymous pages:                         274453.
+Pages stored in compressor:             1159959.
+Pages occupied by compressor:            278230.
+Decompressions:                      2229989420.
+Compressions:                        2497401571.
+Pageins:                              213041144.
+Pageouts:                               6814158.
+Swapins:                               35642332.
+Swapouts:                              39288363.

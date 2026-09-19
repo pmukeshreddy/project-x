@@ -1762,8 +1762,10 @@ def test_archive_failure_retains_outcome_and_replays_without_execution(tmp_path)
     assert failure.cost.output_tokens == 1
     assert failure.usage_observation["token_ids"] == [100]
 
-    recovered = failure.replay_publication(store.put_bytes)
+    recovered_result = failure.replay_result(store.put_bytes)
+    recovered = recovered_result.record
     assert len(runner.calls) == 1
+    assert recovered_result.content == SmokeContent(ok=True, nonce="unit")
     assert recovered.success is True
     assert recovered.publication_complete is True
     assert set(recovered.archives) == set(ARCHIVE_NAMES)

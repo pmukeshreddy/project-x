@@ -81,6 +81,11 @@ class GenerationProviderError(RuntimeError):
             raise RuntimeError("this provider failure has no pending archive publication")
         return self.recovery.replay(archive)
 
+    def replay_result(self, archive: ArchiveWriter) -> GenerationResult:
+        if self.recovery is None:
+            raise RuntimeError("this provider failure has no pending archive publication")
+        return self.recovery.replay_result(archive)
+
 
 class GenerationInputLimitError(ValueError):
     """A validated request cannot fit its declared serialized-input boundary."""
@@ -115,6 +120,8 @@ class GenerationPublicationRecovery:
     cost: CostRecord | None
     response: dict | None
     usage_observation: dict | None
+    content: StrictModel | None
+    usage: GenerationUsage | None
 
     def replay(self, archive: ArchiveWriter) -> GenerationCallRecord:
         refs = dict(self.published_refs)
@@ -180,6 +187,17 @@ class GenerationPublicationRecovery:
             publication_complete=True,
             error_code=self.underlying_error_code,
             archives=refs,
+        )
+
+    def replay_result(self, archive: ArchiveWriter) -> GenerationResult:
+        if not self.generation_succeeded or self.content is None or self.usage is None or self.cost is None:
+            raise RuntimeError("pending publication does not contain a successful generation result")
+        record = self.replay(archive)
+        return GenerationResult(
+            content=self.content,
+            usage=self.usage,
+            cost=self.cost,
+            record=record,
         )
 
 
@@ -923,6 +941,8 @@ class LocalGenerationProvider:
                     cost=preflight_cost,
                     response=preflight,
                     usage_observation=None,
+                    content=None,
+                    usage=None,
                 )
                 record = GenerationCallRecord(
                     attempt_id=attempt_id,
@@ -968,6 +988,8 @@ class LocalGenerationProvider:
                 cost=cost,
                 response=None,
                 usage_observation=None,
+                content=None,
+                usage=None,
             )
             record = GenerationCallRecord(
                 attempt_id=attempt_id,
@@ -1031,6 +1053,8 @@ class LocalGenerationProvider:
                     cost=preflight_cost,
                     response=preflight,
                     usage_observation=None,
+                    content=None,
+                    usage=None,
                 )
                 record = GenerationCallRecord(
                     attempt_id=attempt_id,
@@ -1279,6 +1303,8 @@ class LocalGenerationProvider:
                 cost=cost,
                 response=response_payload,
                 usage_observation=observed_usage,
+                content=content,
+                usage=usage,
             )
             record = GenerationCallRecord(
                 attempt_id=attempt_id,

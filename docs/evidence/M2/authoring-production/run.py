@@ -530,8 +530,9 @@ def scenario() -> None:
     state = json.loads(STATE_PATH.read_text())
     if state.get("native_calls") not in {1, 2, 3} or state.get("scenario"):
         raise RuntimeError("scenario requires a completed contract within its attempt budget")
-    if state.get("candidate_repairs_used") != 3:
-        raise RuntimeError("scenario requires the retained M3 and contract repair accounting")
+    repairs_used = state.get("candidate_repairs_used")
+    if type(repairs_used) is not int or repairs_used not in {1, 2, 3}:
+        raise RuntimeError("scenario requires valid retained aggregate candidate-repair accounting")
     store = ArtifactStore(STORE_PATH, ActorRole.CONTROLLER)
     refs = {name: ref(value) for name, value in state["refs"].items()}
     discovery_ref = ref(state["discovery"])

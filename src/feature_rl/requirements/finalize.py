@@ -49,6 +49,18 @@ class ContractFinalizer:
         inputs = ContractFinalizationInputs.model_validate(inputs)
         sources = tuple(GroundedSource.model_validate(source) for source in sources)
         _catalog(sources)
+        request_sources = [source for source in sources if source.role == "request"]
+        if len(request_sources) != 1:
+            raise GroundingError("exactly one resolved authoring request is required")
+        request_source = request_sources[0]
+        if (
+            request_source.text != inputs.visible_request
+            or request_source.provenance_label != inputs.provenance_label
+            or request_source.source not in inputs.provenance.inputs
+        ):
+            raise GroundingError(
+                "visible request or provenance differs from resolved authoring evidence"
+            )
         runtime_sources = [
             source for source in sources if source.source == inputs.runtime_discovery
         ]

@@ -25,11 +25,12 @@ from feature_rl.generation.provider import GenerationProviderError
 from feature_rl.requirements import (
     AuthoringExhausted,
     AuthoringEvidenceResolver,
+    AuthoringJournalPublicationPending,
     AuthoringPublicationPending,
     GenerationCandidate,
     GroundedSource,
 )
-from feature_rl.requirements.service import contexts_from_sources
+from feature_rl.requirements.service import contexts_from_sources, semantic_request_sha256
 
 from .finalize import ScenarioFinalizer, ScenarioJoinError
 from .models import ScenarioFinalizationInputs, ScenarioPlanProposal
@@ -132,7 +133,8 @@ class ScenarioAuthoringService:
         self.revision = revision
         self.evidence_scope = evidence_scope
 
-    def _validate_prior(self, refs: tuple[ArtifactRef, ...]) -> None:
+    def _validate_prior(self, refs: tuple[ArtifactRef, ...]) -> tuple[str, ...]:
+        semantic_hashes = []
         for index, ref in enumerate(refs, 1):
             if (
                 ref.kind != "scenario-authoring-journal"
@@ -152,8 +154,11 @@ class ScenarioAuthoringService:
                 entry.get("attempt_index") != index
                 or entry.get("stage") != GenerationStage.SCENARIO_PLANNING.value
                 or entry.get("status") != "rejected"
+                or not isinstance(entry.get("semantic_request_sha256"), str)
             ):
                 raise ValueError("prior scenario journal is not a sequential rejected attempt")
+            semantic_hashes.append(entry["semantic_request_sha256"])
+        return tuple(semantic_hashes)
 
     def _validate_plan(
         self,
@@ -163,7 +168,25 @@ class ScenarioAuthoringService:
         prior_journal_refs: tuple[ArtifactRef, ...],
         sources: tuple[GroundedSource, ...],
     ) -> None:
-        self._validate_prior(prior_journal_refs)
+        prior_semantic_hashes = self._validate_prior(prior_journal_refs)
+        expected_source_refs = {
+            artifact
+            for artifact in contract.provenance.inputs
+            if artifact.kind in {
+                "authoring-request",
+                "source-archive",
+                "click-runtime-discovery",
+            }
+        }
+        actual_source_refs = {source.source for source in sources}
+        if actual_source_refs != expected_source_refs:
+            raise ValueError("scenario evidence set differs from the frozen contract inputs")
+        request_sources = [source for source in sources if source.role == "request"]
+        if len(request_sources) != 1 or (
+            request_sources[0].text != contract.visible_request
+            or request_sources[0].provenance_label != contract.provenance_label
+        ):
+            raise ValueError("scenario request evidence differs from the frozen contract")
         if not candidates or len(candidates) + len(prior_journal_refs) > 3:
             raise ValueError("scenario authoring permits one initial attempt and at most two repairs")
         if not prior_journal_refs and candidates[0].diagnosis is not None:
@@ -204,6 +227,11 @@ class ScenarioAuthoringService:
             )
         if len(identities) != len(candidates):
             raise ValueError("scenario candidate request identities must be unique")
+        semantic_hashes = prior_semantic_hashes + tuple(
+            semantic_request_sha256(candidate.request) for candidate in candidates
+        )
+        if any(left == right for left, right in zip(semantic_hashes, semantic_hashes[1:])):
+            raise ValueError("a scenario repair must change meaningful request input")
 
     def _journal_payload(self, candidate, index, *, status, error, result):
         record = result.record if result is not None else getattr(error, "record", None)
@@ -214,6 +242,7 @@ class ScenarioAuthoringService:
             "request_sha256": hashlib.sha256(
                 canonical_json(candidate.request.model_dump(mode="json"))
             ).hexdigest(),
+            "semantic_request_sha256": semantic_request_sha256(candidate.request),
             "status": status,
             "diagnosis": candidate.diagnosis,
             "changed_input": candidate.changed_input,
@@ -238,6 +267,7 @@ class ScenarioAuthoringService:
         sources: tuple[GroundedSource, ...],
         *,
         prior_journal_refs: tuple[ArtifactRef, ...] = (),
+        recovered_result: GenerationResult | None = None,
     ) -> ScenarioAuthoringResult:
         candidates = tuple(GenerationCandidate.model_validate(item) for item in candidates)
         prior_journal_refs = tuple(ArtifactRef.model_validate(ref) for ref in prior_journal_refs)
@@ -246,12 +276,34 @@ class ScenarioAuthoringService:
         resolved = self.store.get_artifact(inputs.contract, max_envelope_bytes=512 * 1024)
         if not isinstance(resolved, RequirementContract):
             raise ScenarioJoinError("frozen contract reference did not resolve to RequirementContract")
+        contract_observables = {
+            requirement.observable
+            for requirement in resolved.requirements + resolved.compatibility_obligations
+        }
+        if set(inputs.supported_observables) != contract_observables:
+            raise ScenarioJoinError(
+                "scenario observables differ from the frozen contract requirements"
+            )
         self._validate_plan(candidates, inputs.contract, resolved, prior_journal_refs, sources)
+        if recovered_result is not None:
+            recovered_result = GenerationResult.model_validate(recovered_result)
+            if len(candidates) != 1 or not (
+                recovered_result.record.success
+                and recovered_result.record.generation_succeeded
+                and recovered_result.record.publication_complete
+                and recovered_result.record.request_id == candidates[0].request.request_id
+                and recovered_result.record.response_id == candidates[0].request.response_id
+            ):
+                raise ValueError("recovered scenario generation result identity is invalid")
         journal_refs = list(prior_journal_refs)
         for index, candidate in enumerate(candidates, len(prior_journal_refs) + 1):
             result = None
             try:
-                result = self.provider.generate(candidate.request, ScenarioPlanProposal)
+                result = (
+                    recovered_result
+                    if recovered_result is not None
+                    else self.provider.generate(candidate.request, ScenarioPlanProposal)
+                )
                 proposal = ScenarioPlanProposal.model_validate(result.content)
                 artifacts = tuple(result.record.archives.values())
                 if not result.record.success or not result.record.publication_complete or not artifacts:
@@ -283,9 +335,27 @@ class ScenarioAuthoringService:
                     expected_contract=inputs.contract,
                 )
             except (GenerationProviderError, ValidationError, ScenarioJoinError, ValueError) as error:
-                journal_refs.append(
-                    self._journal(candidate, index, status="rejected", error=error, result=result)
+                if isinstance(error, GenerationProviderError) and error.record.generation_succeeded:
+                    raise
+                journal_payload = self._journal_payload(
+                    candidate, index, status="rejected", error=error, result=result
                 )
+                try:
+                    journal = self.store.put_bytes(
+                        journal_payload, "scenario-authoring-journal", Visibility.PRIVATE
+                    )
+                except Exception as publication_error:
+                    raise AuthoringJournalPublicationPending(
+                        prior_journal_refs=tuple(journal_refs),
+                        journal_payload=journal_payload,
+                        journal_kind="scenario-authoring-journal",
+                        journal_visibility=Visibility.PRIVATE,
+                        rejected_error=f"{type(error).__name__}: {error}",
+                        publication_error=(
+                            f"{type(publication_error).__name__}: {publication_error}"
+                        ),
+                    ) from publication_error
+                journal_refs.append(journal)
                 continue
             journal_payload = self._journal_payload(
                 candidate, index, status="accepted", error=None, result=result

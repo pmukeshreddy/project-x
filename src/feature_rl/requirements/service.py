@@ -57,6 +57,13 @@ class AuthoringExhausted(RuntimeError):
         self.journal_refs = journal_refs
 
 
+def semantic_request_sha256(request: GenerationRequest) -> str:
+    payload = request.model_dump(
+        mode="json", exclude={"request_id", "response_id", "prompt_id"}
+    )
+    return hashlib.sha256(canonical_json(payload)).hexdigest()
+
+
 @dataclass(frozen=True)
 class ContractAuthoringResult:
     contract: RequirementContract
@@ -90,6 +97,31 @@ class AuthoringPublicationPending(RuntimeError):
         )
         artifact = store.put_artifact(self.artifact)
         return artifact, self.prior_journal_refs + (journal,)
+
+
+@dataclass(frozen=True)
+class AuthoringJournalPublicationPending(RuntimeError):
+    """A rejected attempt journal can be published before any later model call."""
+
+    prior_journal_refs: tuple[ArtifactRef, ...]
+    journal_payload: bytes
+    journal_kind: str
+    journal_visibility: Visibility
+    rejected_error: str
+    publication_error: str
+
+    def __post_init__(self):
+        RuntimeError.__init__(
+            self,
+            "rejected authoring attempt journal publication failed: "
+            + self.publication_error,
+        )
+
+    def replay(self, store: ArtifactStore) -> tuple[ArtifactRef, ...]:
+        journal = store.put_bytes(
+            self.journal_payload, self.journal_kind, self.journal_visibility
+        )
+        return self.prior_journal_refs + (journal,)
 
 
 def build_contract_request(
@@ -196,6 +228,7 @@ class ContractAuthoringService:
             "request_sha256": hashlib.sha256(
                 canonical_json(candidate.request.model_dump(mode="json"))
             ).hexdigest(),
+            "semantic_request_sha256": semantic_request_sha256(candidate.request),
             "status": status,
             "diagnosis": candidate.diagnosis,
             "changed_input": candidate.changed_input,
@@ -213,7 +246,8 @@ class ContractAuthoringService:
             Visibility.AUTHORING,
         )
 
-    def _validate_prior(self, refs: tuple[ArtifactRef, ...]) -> None:
+    def _validate_prior(self, refs: tuple[ArtifactRef, ...]) -> tuple[str, ...]:
+        semantic_hashes = []
         for index, ref in enumerate(refs, 1):
             if (
                 ref.kind != "contract-authoring-journal"
@@ -233,8 +267,11 @@ class ContractAuthoringService:
                 entry.get("attempt_index") != index
                 or entry.get("stage") != GenerationStage.INITIAL_AUTHORING.value
                 or entry.get("status") != "rejected"
+                or not isinstance(entry.get("semantic_request_sha256"), str)
             ):
                 raise ValueError("prior contract journal is not a sequential rejected attempt")
+            semantic_hashes.append(entry["semantic_request_sha256"])
+        return tuple(semantic_hashes)
 
     def _validate_plan(
         self,
@@ -242,7 +279,7 @@ class ContractAuthoringService:
         prior_journal_refs: tuple[ArtifactRef, ...],
         sources: tuple[GroundedSource, ...],
     ) -> None:
-        self._validate_prior(prior_journal_refs)
+        prior_semantic_hashes = self._validate_prior(prior_journal_refs)
         if not candidates or len(candidates) + len(prior_journal_refs) > 3:
             raise ValueError("contract authoring permits one initial attempt and at most two repairs")
         if not prior_journal_refs and candidates[0].diagnosis is not None:
@@ -257,6 +294,11 @@ class ContractAuthoringService:
             for candidate in candidates
         ):
             raise ValueError("contract candidates must use initial_authoring")
+        semantic_hashes = prior_semantic_hashes + tuple(
+            semantic_request_sha256(candidate.request) for candidate in candidates
+        )
+        if any(left == right for left, right in zip(semantic_hashes, semantic_hashes[1:])):
+            raise ValueError("a contract repair must change meaningful request input")
         expected_contexts = contexts_from_sources(sources)
         if any(candidate.request.contexts != expected_contexts for candidate in candidates):
             raise ValueError("contract request contexts differ from resolved evidence")
@@ -274,6 +316,7 @@ class ContractAuthoringService:
         sources: tuple[GroundedSource, ...],
         *,
         prior_journal_refs: tuple[ArtifactRef, ...] = (),
+        recovered_result: GenerationResult | None = None,
     ) -> ContractAuthoringResult:
         candidates = tuple(GenerationCandidate.model_validate(item) for item in candidates)
         prior_journal_refs = tuple(ArtifactRef.model_validate(ref) for ref in prior_journal_refs)
@@ -283,11 +326,25 @@ class ContractAuthoringService:
             raise
         self._validate_plan(candidates, prior_journal_refs, sources)
         inputs = ContractFinalizationInputs.model_validate(inputs)
+        if recovered_result is not None:
+            recovered_result = GenerationResult.model_validate(recovered_result)
+            if len(candidates) != 1 or not (
+                recovered_result.record.success
+                and recovered_result.record.generation_succeeded
+                and recovered_result.record.publication_complete
+                and recovered_result.record.request_id == candidates[0].request.request_id
+                and recovered_result.record.response_id == candidates[0].request.response_id
+            ):
+                raise ValueError("recovered contract generation result identity is invalid")
         journal_refs = list(prior_journal_refs)
         for index, candidate in enumerate(candidates, len(prior_journal_refs) + 1):
             result = None
             try:
-                result = self.provider.generate(candidate.request, RequirementContractProposal)
+                result = (
+                    recovered_result
+                    if recovered_result is not None
+                    else self.provider.generate(candidate.request, RequirementContractProposal)
+                )
                 proposal = RequirementContractProposal.model_validate(result.content)
                 artifacts = tuple(result.record.archives.values())
                 if not result.record.success or not result.record.publication_complete or not artifacts:
@@ -313,9 +370,27 @@ class ContractAuthoringService:
                 )
                 contract = ContractFinalizer().finalize(proposal, final_inputs, sources)
             except (GenerationProviderError, ValidationError, GroundingError, ValueError) as error:
-                journal_refs.append(
-                    self._journal(candidate, index, status="rejected", error=error, result=result)
+                if isinstance(error, GenerationProviderError) and error.record.generation_succeeded:
+                    raise
+                journal_payload = self._journal_payload(
+                    candidate, index, status="rejected", error=error, result=result
                 )
+                try:
+                    journal = self.store.put_bytes(
+                        journal_payload, "contract-authoring-journal", Visibility.AUTHORING
+                    )
+                except Exception as publication_error:
+                    raise AuthoringJournalPublicationPending(
+                        prior_journal_refs=tuple(journal_refs),
+                        journal_payload=journal_payload,
+                        journal_kind="contract-authoring-journal",
+                        journal_visibility=Visibility.AUTHORING,
+                        rejected_error=f"{type(error).__name__}: {error}",
+                        publication_error=(
+                            f"{type(publication_error).__name__}: {publication_error}"
+                        ),
+                    ) from publication_error
+                journal_refs.append(journal)
                 continue
             journal_payload = self._journal_payload(
                 candidate, index, status="accepted", error=None, result=result
