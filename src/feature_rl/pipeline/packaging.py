@@ -205,6 +205,13 @@ def assemble(store, registry, inputs):
         registry.register(ref)
         registry.assert_usable(ref)
     instruction, runtime, checks, check_data = public_values(store, resolved)
+    # Generated payloads must satisfy the same bounds as inspect_package before
+    # a successful outcome is frozen. Recovery reuses these exact bytes.
+    if len(instruction) > MAX_DOCUMENT or len(runtime) > MAX_DOCUMENT:
+        raise BuildRejected('solver component document byte limit')
+    workspace = resolved.source.to_tar()
+    if len(workspace) > resolved.policy.max_archive_bytes:
+        raise BuildRejected('solver workspace archive byte limit')
     files = package_files(resolved.source, instruction, runtime, check_data)
     if len(files) > 2100 or sum(len(entry.data) for entry in files.values()) > resolved.policy.max_staging_bytes:
         raise BuildRejected('aggregate solver package bounds')
@@ -213,12 +220,15 @@ def assemble(store, registry, inputs):
         raise BuildRejected('solver package archive byte limit')
     # Only these explicitly constructed payloads receive PUBLIC visibility.
     instruction_ref = store.put_bytes(instruction, 'm6-instruction', c.Visibility.PUBLIC)
-    workspace_ref = store.put_bytes(resolved.source.to_tar(), 'source-archive', c.Visibility.PUBLIC)
+    workspace_ref = store.put_bytes(workspace, 'source-archive', c.Visibility.PUBLIC)
     runtime_ref = store.put_bytes(runtime, 'm6-runtime-manifest', c.Visibility.PUBLIC)
     package_ref = store.put_bytes(package, 'm6-solver-package', c.Visibility.PUBLIC)
     inventory = SolverInventory(archive=package_ref, archive_sha256=hashlib.sha256(package).hexdigest(),
         components=(instruction_ref, workspace_ref, runtime_ref, *checks), files=inventory_entries(files))
-    inventory_ref = store.put_bytes(canonical_json(document(inventory)), 'm6-solver-inventory', c.Visibility.PUBLIC)
+    inventory_bytes = canonical_json(document(inventory))
+    if len(inventory_bytes) > MAX_DOCUMENT:
+        raise BuildRejected('solver inventory byte limit')
+    inventory_ref = store.put_bytes(inventory_bytes, 'm6-solver-inventory', c.Visibility.PUBLIC)
     view = c.SolverView(instruction=instruction_ref, workspace=workspace_ref, runtime_manifest=runtime_ref,
                         public_checks=checks, inventory=inventory_ref)
     return view, package_ref, resolved.dependencies

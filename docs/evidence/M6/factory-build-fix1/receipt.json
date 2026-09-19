@@ -1,0 +1,33 @@
+{
+  "diagnostic_only": true,
+  "observed_head": "f70c406d7a876405060a43d61ba3db0893803971",
+  "source_hashes_before": {
+    "src/feature_rl/pipeline/packaging.py": "2f753070c68edc390c9f06cea3cdb88f8f32eda003b924ec5ca44832ad26f0b4",
+    "src/feature_rl/pipeline/build.py": "fa3f7b435fdc2533db1e4ac6f0ce7877c445d5243bf5fd7b46ab7584ab248fa5",
+    "src/feature_rl/pipeline/models.py": "b3f0b53ebca6a930380beffdecabf569a324f3222858d1975ae79fa3311f80ee",
+    "tests/test_factory.py": "5632f510c15afc5999849611fd2a4731d36c269125a6887ab12f371ce18ba0bb"
+  },
+  "started_at": "2026-09-19T22:29:57.258808+00:00",
+  "red_observation": {
+    "command": ".venv/bin/python -m pytest -q tests/test_factory.py::test_oversized_inventory_fails_before_freeze_and_replays_accounting",
+    "exit_code": 1,
+    "pytest_seconds": 2.01,
+    "cause": "BuildRecoveryRequired after frozen outcome; inventory envelope 1499527 > 1402200 bytes"
+  },
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_factory.py"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 8.234433459118009,
+  "ended_at": "2026-09-19T22:30:05.493384+00:00",
+  "source_hashes_after": {
+    "src/feature_rl/pipeline/packaging.py": "2f753070c68edc390c9f06cea3cdb88f8f32eda003b924ec5ca44832ad26f0b4",
+    "src/feature_rl/pipeline/build.py": "fa3f7b435fdc2533db1e4ac6f0ce7877c445d5243bf5fd7b46ab7584ab248fa5",
+    "src/feature_rl/pipeline/models.py": "b3f0b53ebca6a930380beffdecabf569a324f3222858d1975ae79fa3311f80ee",
+    "tests/test_factory.py": "5632f510c15afc5999849611fd2a4731d36c269125a6887ab12f371ce18ba0bb"
+  }
+}

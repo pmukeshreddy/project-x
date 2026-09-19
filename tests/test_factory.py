@@ -146,6 +146,47 @@ def test_build_freezes_complete_safe_package_and_idempotent_root(tmp_path, monke
         builder.solver_package(task_ref)
 
 
+def test_oversized_inventory_fails_before_freeze_and_replays_accounting(tmp_path, monkeypatch):
+    # Actual review trigger: all input count/path/archive/request bounds pass,
+    # but the generated inventory exceeds its 1 MiB consumer document limit.
+    files = {
+        'src/click/__init__.py': SourceFile(b'# inert diagnostic\n', False),
+        'pyproject.toml': SourceFile(
+            b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\n'
+            b'requires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n', False),
+    }
+    prefix = 'src/' + 'a' * 150 + '/' + 'b' * 150 + '/' + 'c' * 150 + '/'
+    files.update({prefix + f'f{index:04}.py': SourceFile(b'# inert\n', False) for index in range(1900)})
+    _, store, reg, builder, inputs, *_ = fixture(
+        tmp_path, monkeypatch, archive=SourceArchive(files).to_tar(), files=tuple(files))
+    published = []
+    put_bytes = store.put_bytes
+
+    def record_publication(data, kind, visibility):
+        published.append(kind)
+        return put_bytes(data, kind, visibility)
+
+    monkeypatch.setattr(store, 'put_bytes', record_publication)
+    result = builder.build(inputs, owner='diagnostic', claim_key='inventory-bound')
+    assert result.disposition == c.Disposition.UNSUPPORTED
+    assert 'solver inventory byte limit' in result.reason
+    assert [ref.kind for ref in result.artifacts] == ['m6-failed-build']
+    assert 'm6-frozen-build' not in published and 'm6-solver-inventory' not in published
+    completed = next(event for event in reg.events() if event.action == 'complete')
+    job_id = completed.data['claim']['job_id']
+    claim = reg.attempts(job_id)[0].claim
+    account = reg.accounting(job_id)
+    assert account.unobserved_attempts == () and len(account.observations) == 1
+    assert account.observations[0].observation.revision == 2
+    assert result.costs == account.observations[0].observation.costs
+    assert result.costs[0].measurement == 'partial' and result.costs[0].wall_seconds > 0
+    assert result.costs[1].measurement == 'unknown'
+    before = reg.events()
+    assert builder.recover(claim) == result
+    assert builder.build(inputs, owner='diagnostic', claim_key='completed-replay') == result
+    assert reg.events() == before and reg.accounting(job_id) == account
+
+
 @pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'scenario', 'public-check'])
 def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeypatch, drift):
     m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
