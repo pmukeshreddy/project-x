@@ -39,6 +39,8 @@ Recovery: read this file, docs/interfaces.md if present, latest reports and git 
 - M0 fix round 1 checkpoint `583d963`: 99 tests reported. Coordinator found new stop-status regression before re-review: limit/malformed-action stops forced reward zero despite spec requiring grading the available artifact (which may pass). Returned to owner for supplemental focused fix; not approved.
 - Task 1: complete (commits `767e790..cb53f99`, independent review clean). Fix round 1: all three original findings addressed plus root-discovered ordinary-stop regression corrected. `docs/reviews/M0-round1.md` passes spec/quality; coordinator independently ran 103 tests, exit0, at `cb53f99`. M0 owner remains `/root/m0_contracts` for shared interfaces/config changes.
 - Task 2 / M1 implementation authorized against `cb53f99`; owner `/root/m1_sources`. Read-only proof recovered B `19fd4d6e18bc9fce451f92f422696b11169faa57`, H `831c8f0948af519e45b90801d7430ff25451f972`, squash proof with identical PR-head/H trees. Provenance remains reconstructed specification due unavailable historical body-edit proof. Actual implemented intake/reconstruction and review still pending.
+- M1 actual dispatch base is `bd1361f` (docs-only advance after M0 `cb53f99`).
+- M3 owner `/root/m3_runtime` assigned bounded trusted Docker/image/security probe research only; no product or historical execution yet. Report `docs/evidence/M3/investigation.md`; implementation awaits M1/M2 provider gates. Existing user Docker assets must remain untouched.
 - M1 owner `/root/m1_sources` assigned bounded read-only Click source investigation only, report `docs/evidence/M1/investigation.md`. Product implementation awaits approved M0.
 
 ## External gates
