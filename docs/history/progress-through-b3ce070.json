@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-09-19T10:05:35.509869+00:00",
+  "revision": "b3ce070804bb7be49c735986a5332a61e9292dd9",
+  "source": "docs/progress.md",
+  "archive": "docs/history/progress-through-b3ce070.md",
+  "sha256": "a7adc6f4a4f8ece0d8c9cfc3ed293dda0ac5e2731928ee8aee7ea68e29f89a84",
+  "bytes": 27264,
+  "reason": "Preserve the complete earlier ledger while shortening the active recovery entry point; no evidence removed."
+}
