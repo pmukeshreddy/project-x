@@ -1,0 +1,7 @@
+command: git diff --check bd1361f..HEAD -- src tests
+exit_status: 0
+stdout: <empty>
+
+command: git diff --cached --check
+exit_status: 0
+stdout: <empty>
