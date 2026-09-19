@@ -1,0 +1,73 @@
+{
+  "base_revision": "98b5af5d63d336477b72f2aa4ecbc0add584e4fa",
+  "commit_binding_status": "precommit inventory; coordinator must bind the reviewed commit revision separately",
+  "committed_product_revision": null,
+  "inference_performed": false,
+  "producer": "M2 owner precommit protocol-v2 verification",
+  "product_hash_inventory": {
+    "src/feature_rl/generation/__init__.py": {
+      "bytes": 1178,
+      "sha256": "36fdcdbf5f639728b686471c5c8d73def3fb9131a2229aa487b01ea8e3722d18"
+    },
+    "src/feature_rl/generation/_worker.py": {
+      "bytes": 10335,
+      "sha256": "54124d294d035665ba44dce9d83affce0c8f9de510cbb2fc476c8406f6620af2"
+    },
+    "src/feature_rl/generation/backend.py": {
+      "bytes": 11002,
+      "sha256": "73f5d42e3ad0f68751c5f4b64cb69f992fe82e1cc8e578895d2291f3535adfbb"
+    },
+    "src/feature_rl/generation/models.py": {
+      "bytes": 6887,
+      "sha256": "05d5fd5e28add74c2daefdd6b8393285004dfb6e7c376db3a9bf89c846d0c5c3"
+    },
+    "src/feature_rl/generation/provider.py": {
+      "bytes": 22084,
+      "sha256": "70837132298c2dcdd652706f6f0eb39a117e0c85d8be131b667f0ae0e0b923da"
+    },
+    "src/feature_rl/generation/runner.py": {
+      "bytes": 8118,
+      "sha256": "aa9a838f01bbf5cca25d0d52bb518814383ca7edd0c5de417a1c4e4d8dc672d0"
+    },
+    "tests/test_generation.py": {
+      "bytes": 19049,
+      "sha256": "25f3e71a90e5d0ffbcc29c6753a853265e39ea295d87b3ad5bbeae8ec4d518da"
+    }
+  },
+  "recorded_at": "2026-09-19T10:26:13.632017Z",
+  "runs": [
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_generation.py"
+      ],
+      "exit_status": 0,
+      "name": "focused",
+      "stderr": "docs/evidence/M2/provider-v2-focused-tests.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v2-focused-tests.stdout",
+      "stdout_sha256": "a1e273a73eb201f745d6c38b321f3f02f52968f578342d72d20202bc7194c4ac"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "exit_status": 0,
+      "name": "full",
+      "stderr": "docs/evidence/M2/provider-v2-full-tests.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "docs/evidence/M2/provider-v2-full-tests.stdout",
+      "stdout_sha256": "991201dc47c881776378dceee8ddb07445c98ed77e0f5e973471caeaedbb2c63"
+    }
+  ]
+}

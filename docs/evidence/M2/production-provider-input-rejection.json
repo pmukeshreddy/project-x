@@ -1,0 +1,358 @@
+{
+  "archives": {
+    "cost": {
+      "category": "authoring",
+      "cpu_seconds": 1.9607089999999998,
+      "gpu_seconds": null,
+      "human_minutes": null,
+      "input_tokens": null,
+      "measurement": "partial",
+      "note": "Local execution: wall/CPU and accepted token counts are measured when present; GPU time, energy, human time and currency cost are unknown. No remote API was used.",
+      "output_tokens": null,
+      "usd": null,
+      "wall_seconds": 2.4046842081006616
+    },
+    "events": [
+      {
+        "config_sha256": "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849",
+        "dependency_versions": {
+          "annotated-doc": "0.0.5",
+          "anyio": "4.15.1",
+          "certifi": "2026.7.22",
+          "click": "8.5.0",
+          "filelock": "4.0.1",
+          "fsspec": "2026.9.0",
+          "h11": "0.16.0",
+          "hf-xet": "1.6.0",
+          "httpcore": "1.0.9",
+          "httpx": "0.28.1",
+          "huggingface-hub": "1.32.0",
+          "idna": "3.20",
+          "jinja2": "3.1.6",
+          "markdown-it-py": "4.2.0",
+          "markupsafe": "3.0.3",
+          "mdurl": "0.1.2",
+          "mlx": "0.32.2",
+          "mlx-lm": "0.31.3",
+          "mlx-metal": "0.32.2",
+          "numpy": "2.5.3",
+          "packaging": "26.3",
+          "protobuf": "7.36.2",
+          "pygments": "2.21.0",
+          "pyyaml": "6.0.3",
+          "regex": "2026.9.10",
+          "rich": "15.0.0",
+          "safetensors": "0.8.0",
+          "sentencepiece": "0.2.2",
+          "shellingham": "1.5.4",
+          "tokenizers": "0.23.2",
+          "tqdm": "4.70.1",
+          "transformers": "5.17.0",
+          "typer": "0.27.2",
+          "typing-extensions": "4.16.0"
+        },
+        "event": "identity_validated",
+        "local_files_only": true,
+        "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+        "remote_code": false,
+        "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+        "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+      },
+      {
+        "actual_input_tokens": 381,
+        "event": "input_rejected",
+        "inference_started": false,
+        "max_input_tokens": 16,
+        "model_load_started": false
+      }
+    ],
+    "options": {
+      "limits": {
+        "cpu_seconds": 120,
+        "declared_memory_ceiling_bytes": 5368709120,
+        "file_size_bytes": 1048576,
+        "input_tokens": 16,
+        "measurement_profile": "tiny_smoke_2048x128",
+        "mlx_cache_limit_bytes": 0,
+        "mlx_memory_guideline_bytes": 3758096384,
+        "mlx_wired_limit_bytes": 3758096384,
+        "output_bytes": 1048576,
+        "output_tokens": 16,
+        "physical_footprint_kill_bytes": 4294967296,
+        "physical_footprint_poll_seconds": 0.02,
+        "stdin_bytes": 1048576,
+        "wall_seconds": 120.0
+      },
+      "model": {
+        "file_count": 11,
+        "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+        "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+        "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "total_bytes": 2278969697,
+        "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"
+      },
+      "resource_enforcement": {
+        "cpu": "kernel_rlimit_cpu",
+        "file_size": "kernel_rlimit_fsize",
+        "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+        "wall": "external_monotonic_deadline"
+      },
+      "seed": 0
+    },
+    "provenance": {
+      "allowed_requirement_ids": [
+        "M2_SMOKE_REQUIREMENT_1"
+      ],
+      "expected_source_ids": [
+        "M2_SMOKE_SOURCE_1"
+      ],
+      "observed": false
+    },
+    "request": {
+      "allowed_requirement_ids": [
+        "M2_SMOKE_REQUIREMENT_1"
+      ],
+      "contexts": [
+        {
+          "context_id": "M2_SMOKE_SOURCE_1",
+          "locator": "synthetic.smoke",
+          "provenance_label": "historical_request",
+          "role": "request",
+          "source": {
+            "encoding": "bytes",
+            "kind": "request-snapshot",
+            "schema_version": 1,
+            "sha256": "652a2381b58f0ee51a33cc8cfba37409a0e4d85113301b9ea5113ccf526945d0",
+            "visibility": "authoring"
+          },
+          "text": "Synthetic provider boundary check. Return BLUE and nonce M2-PROD-1."
+        }
+      ],
+      "instruction": "Return status BLUE and nonce M2-PROD-1 in the required envelope.",
+      "limits": {
+        "cpu_seconds": 120,
+        "declared_memory_ceiling_bytes": 5368709120,
+        "file_size_bytes": 1048576,
+        "input_tokens": 16,
+        "measurement_profile": "tiny_smoke_2048x128",
+        "mlx_cache_limit_bytes": 0,
+        "mlx_memory_guideline_bytes": 3758096384,
+        "mlx_wired_limit_bytes": 3758096384,
+        "output_bytes": 1048576,
+        "output_tokens": 16,
+        "physical_footprint_kill_bytes": 4294967296,
+        "physical_footprint_poll_seconds": 0.02,
+        "stdin_bytes": 1048576,
+        "wall_seconds": 120.0
+      },
+      "prompt_id": "M2_PROD_REJECT_PROMPT",
+      "request_id": "M2_PROD_INPUT_REJECTION",
+      "response_id": "M2_PROD_REJECT_RESPONSE",
+      "seed": 0,
+      "stage": "initial_authoring",
+      "system_prompt": "Emit one JSON object only. Copy all required identifiers exactly."
+    },
+    "response": {
+      "exit_status": 65,
+      "stderr_base64": "",
+      "stdout_base64": "eyJjb25maWdfc2hhMjU2IjogIjU3NDM0OWU1YTM0MzIzNjU0NmZkYTU1ZTQ3NDRhNzZlMTgxZjUzNDE4MmQ3ZGM2MGZmMWJhZDdlN2E1MDI4NDkiLCAiZGVwZW5kZW5jeV92ZXJzaW9ucyI6IHsiYW5ub3RhdGVkLWRvYyI6ICIwLjAuNSIsICJhbnlpbyI6ICI0LjE1LjEiLCAiY2VydGlmaSI6ICIyMDI2LjcuMjIiLCAiY2xpY2siOiAiOC41LjAiLCAiZmlsZWxvY2siOiAiNC4wLjEiLCAiZnNzcGVjIjogIjIwMjYuOS4wIiwgImgxMSI6ICIwLjE2LjAiLCAiaGYteGV0IjogIjEuNi4wIiwgImh0dHBjb3JlIjogIjEuMC45IiwgImh0dHB4IjogIjAuMjguMSIsICJodWdnaW5nZmFjZS1odWIiOiAiMS4zMi4wIiwgImlkbmEiOiAiMy4yMCIsICJqaW5qYTIiOiAiMy4xLjYiLCAibWFya2Rvd24taXQtcHkiOiAiNC4yLjAiLCAibWFya3Vwc2FmZSI6ICIzLjAuMyIsICJtZHVybCI6ICIwLjEuMiIsICJtbHgiOiAiMC4zMi4yIiwgIm1seC1sbSI6ICIwLjMxLjMiLCAibWx4LW1ldGFsIjogIjAuMzIuMiIsICJudW1weSI6ICIyLjUuMyIsICJwYWNrYWdpbmciOiAiMjYuMyIsICJwcm90b2J1ZiI6ICI3LjM2LjIiLCAicHlnbWVudHMiOiAiMi4yMS4wIiwgInB5eWFtbCI6ICI2LjAuMyIsICJyZWdleCI6ICIyMDI2LjkuMTAiLCAicmljaCI6ICIxNS4wLjAiLCAic2FmZXRlbnNvcnMiOiAiMC44LjAiLCAic2VudGVuY2VwaWVjZSI6ICIwLjIuMiIsICJzaGVsbGluZ2hhbSI6ICIxLjUuNCIsICJ0b2tlbml6ZXJzIjogIjAuMjMuMiIsICJ0cWRtIjogIjQuNzAuMSIsICJ0cmFuc2Zvcm1lcnMiOiAiNS4xNy4wIiwgInR5cGVyIjogIjAuMjcuMiIsICJ0eXBpbmctZXh0ZW5zaW9ucyI6ICI0LjE2LjAifSwgImV2ZW50IjogImlkZW50aXR5X3ZhbGlkYXRlZCIsICJsb2NhbF9maWxlc19vbmx5IjogdHJ1ZSwgIm1vZGVsX2lkIjogIm1seC1jb21tdW5pdHkvUXdlbjMtNEItSW5zdHJ1Y3QtMjUwNy00Yml0IiwgInJlbW90ZV9jb2RlIjogZmFsc2UsICJyZXZpc2lvbiI6ICI1MGQ0Mjc3NTZjNmIxYjJmZTBjMGExMGY2N2ZiZGExZmM4ZTgyYzFiIiwgInRva2VuaXplcl9zaGEyNTYiOiAiYWViMTMzMDdhNzFhY2Q4ZmU4MTg2MWQ5NGFkNTRhYjY4OWRmNzczMzE4ODA5ZWVkM2NiZTc5NGI0NDkyZGFlNCIsICJ3ZWlnaHRzX3NoYTI1NiI6ICIyYTczYzZjMjQ4NjAxYWI5MDRlMDM1NTQ4YWJkOGU2YWJiNjVlYTI3ZGNiNWYzNDJmYjBhODkxMGViNDQxNzNmIn0KeyJhY3R1YWxfaW5wdXRfdG9rZW5zIjogMzgxLCAiZXZlbnQiOiAiaW5wdXRfcmVqZWN0ZWQiLCAiaW5mZXJlbmNlX3N0YXJ0ZWQiOiBmYWxzZSwgIm1heF9pbnB1dF90b2tlbnMiOiAxNiwgIm1vZGVsX2xvYWRfc3RhcnRlZCI6IGZhbHNlfQo=",
+      "termination": "process_exit"
+    },
+    "retrieval": {
+      "contexts": [
+        {
+          "context_id": "M2_SMOKE_SOURCE_1",
+          "locator": "synthetic.smoke",
+          "provenance_label": "historical_request",
+          "role": "request",
+          "source": {
+            "encoding": "bytes",
+            "kind": "request-snapshot",
+            "schema_version": 1,
+            "sha256": "652a2381b58f0ee51a33cc8cfba37409a0e4d85113301b9ea5113ccf526945d0",
+            "visibility": "authoring"
+          },
+          "text": "Synthetic provider boundary check. Return BLUE and nonce M2-PROD-1."
+        }
+      ]
+    },
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "nonce": {
+          "const": "M2-PROD-1",
+          "title": "Nonce",
+          "type": "string"
+        },
+        "status": {
+          "const": "BLUE",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "nonce"
+      ],
+      "title": "SmokeContent",
+      "type": "object"
+    },
+    "status": {
+      "archive_refs": {
+        "cost": {
+          "encoding": "bytes",
+          "kind": "generation-cost",
+          "schema_version": 1,
+          "sha256": "d5e52e9ba7aae64d06973c449fec878e97a47fdbceb7e38bad190702913440ee",
+          "visibility": "authoring"
+        },
+        "events": {
+          "encoding": "bytes",
+          "kind": "generation-events",
+          "schema_version": 1,
+          "sha256": "476077939de698d9bc2f5eee8de70f9eec710c22d6ba85e0c3eafb4d3e05a21a",
+          "visibility": "authoring"
+        },
+        "options": {
+          "encoding": "bytes",
+          "kind": "generation-options",
+          "schema_version": 1,
+          "sha256": "e27b7e5f051b22e77d19418d628e0369a842b502b9391263bb749303a59ce665",
+          "visibility": "authoring"
+        },
+        "provenance": {
+          "encoding": "bytes",
+          "kind": "generation-provenance",
+          "schema_version": 1,
+          "sha256": "348712ef4428df0ce46f70d495d0beb7c60fabfbb90e5016b0345171a2dc0629",
+          "visibility": "authoring"
+        },
+        "request": {
+          "encoding": "bytes",
+          "kind": "generation-request",
+          "schema_version": 1,
+          "sha256": "6ad4ead66d732fbb2fd49177226b9272fa9304b83cb3d785b95aaebd9b82ac9a",
+          "visibility": "authoring"
+        },
+        "response": {
+          "encoding": "bytes",
+          "kind": "generation-response",
+          "schema_version": 1,
+          "sha256": "3418c6f5cd9676dec273338cacb7f189c16bacc8445845a21b56b9b9aaa53145",
+          "visibility": "authoring"
+        },
+        "retrieval": {
+          "encoding": "bytes",
+          "kind": "generation-retrieval",
+          "schema_version": 1,
+          "sha256": "ecd2b548ee15beedcc58bfe6bfbb01bec9fda8814b69ffba795685f9ded105fa",
+          "visibility": "authoring"
+        },
+        "schema": {
+          "encoding": "bytes",
+          "kind": "generation-schema",
+          "schema_version": 1,
+          "sha256": "3030f94dc9dbd0110e71aee83a57b4d6237ba04d3846459ecdb31cb626be7abd",
+          "visibility": "authoring"
+        },
+        "usage": {
+          "encoding": "bytes",
+          "kind": "generation-usage",
+          "schema_version": 1,
+          "sha256": "c533e15d8eb27465ea223256bc6fa7780a8098f5b84dab9e098556cf697eb40a",
+          "visibility": "authoring"
+        }
+      },
+      "error": "worker exited with status 65",
+      "error_type": "ValueError",
+      "request_id": "M2_PROD_INPUT_REJECTION",
+      "response_id": "M2_PROD_REJECT_RESPONSE",
+      "success": false
+    },
+    "usage": {
+      "available": false
+    }
+  },
+  "expected_rejection": true,
+  "mode": "reject-input",
+  "provider_error": "worker exited with status 65",
+  "record": {
+    "archives": {
+      "cost": {
+        "encoding": "bytes",
+        "kind": "generation-cost",
+        "schema_version": 1,
+        "sha256": "d5e52e9ba7aae64d06973c449fec878e97a47fdbceb7e38bad190702913440ee",
+        "visibility": "authoring"
+      },
+      "events": {
+        "encoding": "bytes",
+        "kind": "generation-events",
+        "schema_version": 1,
+        "sha256": "476077939de698d9bc2f5eee8de70f9eec710c22d6ba85e0c3eafb4d3e05a21a",
+        "visibility": "authoring"
+      },
+      "options": {
+        "encoding": "bytes",
+        "kind": "generation-options",
+        "schema_version": 1,
+        "sha256": "e27b7e5f051b22e77d19418d628e0369a842b502b9391263bb749303a59ce665",
+        "visibility": "authoring"
+      },
+      "provenance": {
+        "encoding": "bytes",
+        "kind": "generation-provenance",
+        "schema_version": 1,
+        "sha256": "348712ef4428df0ce46f70d495d0beb7c60fabfbb90e5016b0345171a2dc0629",
+        "visibility": "authoring"
+      },
+      "request": {
+        "encoding": "bytes",
+        "kind": "generation-request",
+        "schema_version": 1,
+        "sha256": "6ad4ead66d732fbb2fd49177226b9272fa9304b83cb3d785b95aaebd9b82ac9a",
+        "visibility": "authoring"
+      },
+      "response": {
+        "encoding": "bytes",
+        "kind": "generation-response",
+        "schema_version": 1,
+        "sha256": "3418c6f5cd9676dec273338cacb7f189c16bacc8445845a21b56b9b9aaa53145",
+        "visibility": "authoring"
+      },
+      "retrieval": {
+        "encoding": "bytes",
+        "kind": "generation-retrieval",
+        "schema_version": 1,
+        "sha256": "ecd2b548ee15beedcc58bfe6bfbb01bec9fda8814b69ffba795685f9ded105fa",
+        "visibility": "authoring"
+      },
+      "schema": {
+        "encoding": "bytes",
+        "kind": "generation-schema",
+        "schema_version": 1,
+        "sha256": "3030f94dc9dbd0110e71aee83a57b4d6237ba04d3846459ecdb31cb626be7abd",
+        "visibility": "authoring"
+      },
+      "status": {
+        "encoding": "bytes",
+        "kind": "generation-status",
+        "schema_version": 1,
+        "sha256": "fb3dd512f76fde15818afebbd3de82c08d74c53132b953921c2528be9182cf76",
+        "visibility": "authoring"
+      },
+      "usage": {
+        "encoding": "bytes",
+        "kind": "generation-usage",
+        "schema_version": 1,
+        "sha256": "c533e15d8eb27465ea223256bc6fa7780a8098f5b84dab9e098556cf697eb40a",
+        "visibility": "authoring"
+      }
+    },
+    "error_code": "ValueError",
+    "request_id": "M2_PROD_INPUT_REJECTION",
+    "response_id": "M2_PROD_REJECT_RESPONSE",
+    "success": false
+  }
+}
