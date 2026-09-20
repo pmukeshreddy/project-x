@@ -35,10 +35,15 @@ class PreparedGroup:
 
 
 class TrainingDataGate:
-    def __init__(self, *, store, admit: Callable[[ArtifactRef], TaskBundle], grader_revision: str):
+    def __init__(self, *, store, admit: Callable[[ArtifactRef], TaskBundle], grader_revision: str, runner=None):
         if not callable(admit) or len(grader_revision) not in (40, 64) or any(c not in '0123456789abcdef' for c in grader_revision):
             raise ValueError('Authoritative release resolver and exact grader revision required')
         self.store, self._admit, self.grader_revision = store, admit, grader_revision
+        if runner is not None:
+            from feature_rl.agents import AgentRunner
+            if type(runner) is not AgentRunner or runner.store is not store:
+                raise TypeError('Actual same-store AgentRunner required for controller invalidation receipts')
+        self.runner = runner
 
     def admit_task(self, ref: ArtifactRef) -> TaskBundle:
         admitted = self._admit(ref)
@@ -59,12 +64,18 @@ class TrainingDataGate:
     def _episode_grade(self, record, case_seed):
         """Bind controller-owned M4 evidence, including pre-execution outcomes.
 
-        A null reward is not evidence of invalidity. Until a runner-specific
-        invalidation receipt is integrated, exclusions also require an M4 receipt.
+        A null reward is not evidence of invalidity. Exclusions require either
+        an exact selected runner controller outcome or an M4 receipt.
         Scope describes how the outcome was established; it is never promoted.
         """
         if record.reward is None and record.disposition not in (Disposition.INVALID, Disposition.INFRASTRUCTURE):
             raise ValueError('Unmeasured candidate outcome must be finalized before group preparation')
+        if self.runner is not None:
+            outcome = self.runner.validate_record(record)
+            if outcome.case_seed != case_seed:
+                raise ValueError('Runner controller outcome has a different assigned case seed')
+            if record.reward is None:
+                return  # Exact selected controller outcome establishes pre-grade invalidity.
         evidence = [e for e in record.grading_evidence if e.producer == 'feature_rl.grading']
         refs = {ref for e in evidence for ref in e.artifacts if ref.kind == 'm4-grade-receipt'}
         if len(refs) != 1 or record.submission is None:

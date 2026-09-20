@@ -1,0 +1,601 @@
+{
+  "label": "TEST ONLY scripted M7 worker/limit/saved-source diagnostic; no model or human approval",
+  "state": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M7/runner-8682cab506bd4e88838b5b0177219c4d",
+  "original_cas": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M6/fixture-runtime-b13724fc39834225bbe263556d481695/store",
+  "scope": "unit_diagnostic",
+  "human_approval": false,
+  "model_calls": 0,
+  "training_eligible": false,
+  "started_at": "2026-09-19T23:53:22.348233+00:00",
+  "source_hashes": {
+    "src/feature_rl/agents/runner.py": "d164d8166bcdfb780c2b63bf827de816eb615303f418a841337cca12b06b3cd0",
+    "src/feature_rl/agents/backend.py": "e4feaea0e9bfaeadef59dc938fcff14c0c83ef330ca02c2d87b343973fe8af96",
+    "src/feature_rl/agents/protocol.py": "d1f3a43015ff0ef3bdaeeab3f7a99fb59751dbac448705aee74ae0e0f19d0e92",
+    "src/feature_rl/agents/__init__.py": "1bbde47b5c667086b93dfd6ed8d779c42fccbfa5b4bb9aea052b3623076ca1c6"
+  },
+  "unmodified_M5_denial": "QualificationRejected: unverified_human_review: configured external SSHHumanVerifier is required; callbacks and identity strings are not authentication",
+  "admission_denial": {
+    "operation": "run",
+    "disposition": "invalid_measurement",
+    "artifacts": [
+      {
+        "sha256": "eaea68870163cd06eb88ccb6f74e851c42cc7e5144db51144a65d5c2f8d1fea5",
+        "kind": "RolloutRecord",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "json"
+      },
+      {
+        "sha256": "9154cdd9f8ac3293619952b491781b660ee8fd7e68611b1d3d5ce3bcbd94be63",
+        "kind": "m7-frozen-run",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      }
+    ],
+    "evidence": [
+      {
+        "producer": "feature_rl.agents",
+        "command": [
+          "AgentRunner.run",
+          "d7adcb042e42c9b1280b6800694a4b8e09dda5c7963f8736465fda0f604a5c71",
+          "259b16c9faf122474ecd548e342987098aa4ba5ddd7c217c6fd33986f109b875",
+          "19"
+        ],
+        "recorded_at": "2026-09-19T23:53:25.558889Z",
+        "exit_status": 1,
+        "artifacts": [
+          {
+            "sha256": "b921d10e09f1846cbf4ac2efd9547690894a03876e274ee8064f39cbacd7bef6",
+            "kind": "m7-controller-outcome",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          }
+        ],
+        "revision": "02e1e26d60aa75976619ca9bbdb6e7eb44475578",
+        "scope": "unit_diagnostic"
+      }
+    ],
+    "costs": [
+      {
+        "category": "rollout",
+        "wall_seconds": 0.13793062488548458,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "storage",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "storage",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      }
+    ],
+    "reason": "Completed immutable agent episode; invalid_measurement"
+  },
+  "run": {
+    "operation": "run",
+    "disposition": "success",
+    "artifacts": [
+      {
+        "sha256": "a169bf7bfecab51c283ecc02580355ca3f88f08ff6960ec245899e163e003979",
+        "kind": "RolloutRecord",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "json"
+      },
+      {
+        "sha256": "5476aa1f6d25939b337691b98f2d03b9fa7c53bf31ebca705a45b175e72b5ae0",
+        "kind": "m7-frozen-run",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      }
+    ],
+    "evidence": [
+      {
+        "producer": "feature_rl.agents",
+        "command": [
+          "AgentRunner.run",
+          "64d490cb39a5f9e0e6f9ca1f33947956f50909a0f981f387ae02808f73d61b80",
+          "51a2f18bb1e7ab00403ebe6b790d9197dcafae10e551eceec894e04fa9b73b10",
+          "19"
+        ],
+        "recorded_at": "2026-09-19T23:54:23.395157Z",
+        "exit_status": 0,
+        "artifacts": [
+          {
+            "sha256": "16e8dd81a25078012b8cac3c5c148f65c24c83d884652bfbfe2fc7fd16682ef1",
+            "kind": "m7-controller-outcome",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          }
+        ],
+        "revision": "02e1e26d60aa75976619ca9bbdb6e7eb44475578",
+        "scope": "unit_diagnostic"
+      }
+    ],
+    "costs": [
+      {
+        "category": "storage",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "execution",
+        "wall_seconds": 2.8325490828137845,
+        "cpu_seconds": 1.039368,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "rollout",
+        "wall_seconds": 1.7999904230237007e-05,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": 1,
+        "output_tokens": 1,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "rollout",
+        "wall_seconds": 25.414331874111667,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "storage",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "construction",
+        "wall_seconds": 4.661537500098348,
+        "cpu_seconds": 1.914524,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "execution",
+        "wall_seconds": 12.462724916869774,
+        "cpu_seconds": 5.026181,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "verifier",
+        "wall_seconds": 0.14880687417462468,
+        "cpu_seconds": 0.9085260000000019,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      }
+    ],
+    "reason": "Completed immutable agent episode; success"
+  },
+  "rollout": {
+    "kind": "RolloutRecord",
+    "schema_version": 1,
+    "visibility": "private",
+    "provenance": {
+      "producer": "feature_rl.agents",
+      "producer_version": "02e1e26d60aa75976619ca9bbdb6e7eb44475578",
+      "created_at": "2026-09-19T23:54:23.395157Z",
+      "inputs": [
+        {
+          "sha256": "51a2f18bb1e7ab00403ebe6b790d9197dcafae10e551eceec894e04fa9b73b10",
+          "kind": "TaskBundle",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "json"
+        },
+        {
+          "sha256": "d3dd6a0c9c4b5c2806a9ec7e93a9f66b1314a25c70426ec9e6c0687c278bcdfe",
+          "kind": "m7-run-input",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        {
+          "sha256": "169106812d09a09e612fed3a4a6e8d5a0229decebf1c275d32c9b48d9d5ab0ed",
+          "kind": "m7-runner-config",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        {
+          "sha256": "16e8dd81a25078012b8cac3c5c148f65c24c83d884652bfbfe2fc7fd16682ef1",
+          "kind": "m7-controller-outcome",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        }
+      ],
+      "evidence": [
+        {
+          "producer": "feature_rl.agents",
+          "command": [
+            "AgentRunner.run",
+            "64d490cb39a5f9e0e6f9ca1f33947956f50909a0f981f387ae02808f73d61b80",
+            "51a2f18bb1e7ab00403ebe6b790d9197dcafae10e551eceec894e04fa9b73b10",
+            "19"
+          ],
+          "recorded_at": "2026-09-19T23:54:23.395157Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "16e8dd81a25078012b8cac3c5c148f65c24c83d884652bfbfe2fc7fd16682ef1",
+              "kind": "m7-controller-outcome",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "02e1e26d60aa75976619ca9bbdb6e7eb44475578",
+          "scope": "unit_diagnostic"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "category": "execution",
+        "wall_seconds": 2.8325490828137845,
+        "cpu_seconds": 1.039368,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "rollout",
+        "wall_seconds": 1.7999904230237007e-05,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": 1,
+        "output_tokens": 1,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "rollout",
+        "wall_seconds": 25.414331874111667,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "storage",
+        "wall_seconds": null,
+        "cpu_seconds": null,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "unknown",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "construction",
+        "wall_seconds": 4.661537500098348,
+        "cpu_seconds": 1.914524,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "execution",
+        "wall_seconds": 12.462724916869774,
+        "cpu_seconds": 5.026181,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      },
+      {
+        "category": "verifier",
+        "wall_seconds": 0.14880687417462468,
+        "cpu_seconds": 0.9085260000000019,
+        "gpu_seconds": null,
+        "input_tokens": null,
+        "output_tokens": null,
+        "human_minutes": null,
+        "usd": null,
+        "measurement": "partial",
+        "note": "Actual phase costs aggregated by category; unknown dimensions retained. Raw phase receipt preserves attribution."
+      }
+    ],
+    "run_id": "64d490cb39a5f9e0e6f9ca1f33947956f50909a0f981f387ae02808f73d61b80",
+    "task": {
+      "sha256": "51a2f18bb1e7ab00403ebe6b790d9197dcafae10e551eceec894e04fa9b73b10",
+      "kind": "TaskBundle",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "json"
+    },
+    "policy": {
+      "identity": {
+        "provider": "unit-diagnostic",
+        "model": "scripted-one-shot",
+        "revision": "1",
+        "weights": null,
+        "tokenizer_digest": null
+      },
+      "policy_version": "m7-scripted-diagnostic",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "seed": 101,
+      "system_prompt": {
+        "sha256": "8552598250de6d0c55c4dd2746f796f13aa4ef8a3f1516faf0e2823880a7aee9",
+        "kind": "system-prompt",
+        "schema_version": 1,
+        "visibility": "public",
+        "encoding": "bytes"
+      },
+      "harness_version": "feature-rl-source-v1",
+      "require_token_probabilities": false
+    },
+    "limits": {
+      "wall_seconds": 120.0,
+      "cpu_seconds": 60.0,
+      "memory_bytes": 536870912,
+      "pids": 64,
+      "output_bytes": 2097152,
+      "disk_bytes": 134217728,
+      "tool_calls": 100,
+      "input_tokens": 1,
+      "output_tokens": 1
+    },
+    "seeds": {
+      "algorithm": "m4-sha256-v1",
+      "seeds": [
+        19
+      ],
+      "same_cases_within_group": true
+    },
+    "steps": [
+      {
+        "index": 0,
+        "action": {
+          "sha256": "644707530907d0edb5b8f6268aa7929e2fbe5e84bd7d7d1c18183e0460335c0a",
+          "kind": "m7-action",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        "observation": {
+          "sha256": "1a63bc0c6c33f0a783a44a4ca2c0e1581cdd70d98dad04fbd47e0b32b99a9cfe",
+          "kind": "m7-observation",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        "token_trace": null,
+        "evidence": [
+          {
+            "producer": "feature_rl.agents",
+            "command": [
+              "AgentRunner.turn",
+              "64d490cb39a5f9e0e6f9ca1f33947956f50909a0f981f387ae02808f73d61b80",
+              "0"
+            ],
+            "recorded_at": "2026-09-19T23:53:50.933464Z",
+            "exit_status": 0,
+            "artifacts": [
+              {
+                "sha256": "576662eb80e9dfd4b58904cbe4ff5896f0e4b37321059d14e4a25b5e61542dd7",
+                "kind": "m7-phase-intent",
+                "schema_version": 1,
+                "visibility": "private",
+                "encoding": "bytes"
+              },
+              {
+                "sha256": "8829ba6e3928a6b165622d933ce300cb1b0e1287c821fff46c9a6c02046ac04d",
+                "kind": "m7-phase-intent",
+                "schema_version": 1,
+                "visibility": "private",
+                "encoding": "bytes"
+              },
+              {
+                "sha256": "f1d1b17cc0ad6a9f6568ab76eceb1ef06f9325a87262ea2f76133fd405d4ebd8",
+                "kind": "environment-execution",
+                "schema_version": 1,
+                "visibility": "private",
+                "encoding": "bytes"
+              }
+            ],
+            "revision": "02e1e26d60aa75976619ca9bbdb6e7eb44475578",
+            "scope": "unit_diagnostic"
+          }
+        ]
+      }
+    ],
+    "submission": {
+      "sha256": "7ed23d979f869d76107f1f6aef3c98d8f6183d2fcf98c6badd6340027b38956d",
+      "kind": "m4-submission",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "bytes"
+    },
+    "stopping_reason": "token_limit",
+    "disposition": "success",
+    "reward": 1,
+    "grading_evidence": [
+      {
+        "producer": "feature_rl.grading",
+        "command": [
+          "GradingService.grade",
+          "51a2f18bb1e7ab00403ebe6b790d9197dcafae10e551eceec894e04fa9b73b10",
+          "7ed23d979f869d76107f1f6aef3c98d8f6183d2fcf98c6badd6340027b38956d",
+          "19"
+        ],
+        "recorded_at": "2026-09-19T23:54:17.629520Z",
+        "exit_status": 0,
+        "artifacts": [
+          {
+            "sha256": "b7c0a0622239ac8ade8ce41831a2d549602e96ea3298ef2fec655970fdcd7c0c",
+            "kind": "m4-grade-receipt",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          {
+            "sha256": "8dacde47260808a8bd5ebf1b9a5a7645d259d071d99a4880767628256373c4bc",
+            "kind": "environment-execution",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          {
+            "sha256": "cef47ec0eeb1292a94fa7433538769d0d0a95020a427bcb38cc502ee366c4d45",
+            "kind": "environment-execution",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          {
+            "sha256": "bf75d78e76642b2ff70314507ebca06a1bdcd3b9091bcc8759fcbfdd1b7f8c74",
+            "kind": "environment-execution",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          {
+            "sha256": "a3988e10c92553605b472afd95ab87d00dd17d76d8227cb7c5f74212c7bf9f9f",
+            "kind": "environment-execution",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          }
+        ],
+        "revision": "c7a2edb387409dc3f0555453918419edf15cd275",
+        "scope": "real_integration"
+      },
+      {
+        "producer": "feature_rl.agents",
+        "command": [
+          "AgentRunner.run",
+          "64d490cb39a5f9e0e6f9ca1f33947956f50909a0f981f387ae02808f73d61b80",
+          "51a2f18bb1e7ab00403ebe6b790d9197dcafae10e551eceec894e04fa9b73b10",
+          "19"
+        ],
+        "recorded_at": "2026-09-19T23:54:23.395157Z",
+        "exit_status": 0,
+        "artifacts": [
+          {
+            "sha256": "16e8dd81a25078012b8cac3c5c148f65c24c83d884652bfbfe2fc7fd16682ef1",
+            "kind": "m7-controller-outcome",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          }
+        ],
+        "revision": "02e1e26d60aa75976619ca9bbdb6e7eb44475578",
+        "scope": "unit_diagnostic"
+      }
+    ],
+    "training_eligible": false
+  },
+  "fresh_reset": {
+    "artifact": {
+      "sha256": "919ac17123f8c7d7cef33914a8df6c1d5741d06670f2b2bf2470733c506aceb1",
+      "kind": "source-archive",
+      "schema_version": 1,
+      "visibility": "private",
+      "encoding": "bytes"
+    },
+    "raw_sha256": "b193c21dbaa557ef09c046a861812f4ea568adc514d808c69da38ee5266a142f",
+    "tree_sha256": "685589cf2e12e5506f6b3371793a8dbcd451da4b6da1dee3af97f29d7e62cfa2",
+    "version": 0,
+    "saved_at": "2026-09-19T23:54:33.458312+00:00"
+  },
+  "status": "passed",
+  "backend_calls": 1,
+  "grade_case_count": 3,
+  "original_registry_unchanged": true,
+  "finished_at": "2026-09-19T23:54:33.585027+00:00"
+}
