@@ -84,6 +84,7 @@ class ArmProtocol(c.StrictModel):
     action_format: c.Identifier
     optimizer_family: c.Identifier
     harness_version: c.Text
+    training_sources: tuple[c.ArtifactRef, ...] = ()
     training_budget: BudgetLimit | None
     development_budget: BudgetLimit
 

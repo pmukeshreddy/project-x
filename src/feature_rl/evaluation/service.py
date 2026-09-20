@@ -7,19 +7,25 @@ import uuid
 
 from feature_rl import contracts as c
 from feature_rl.agents import AgentRunner
+from feature_rl.agents.protocol import ACTION_FORMAT, HARNESS, validate_protocol
 from feature_rl.agents.runner import aggregate, cost
 from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl.environments import EnvironmentRuntime
 from feature_rl.grading import GradingService
-from feature_rl.pipeline import ReleasedTaskResolver, TaskBuilder, TaskLifecycle
+from feature_rl.pipeline import Factory, ReleasedTaskResolver, TaskBuilder, TaskLifecycle
+from feature_rl.pipeline.construction import ConstructionResult
 from feature_rl.qualification.evidence import unknown_cost
 from feature_rl.registry import Claim, CostObservation, JobSpec, Registry
-from feature_rl.training.factory import NativeHandle, NativeSessionFactory
+from feature_rl.training.factory import (
+    NativeHandle, NativeSessionFactory, NativeStartupRecoveryRequired,
+)
 from feature_rl.training.checkpoints import validate_selected_checkpoint
+from feature_rl.training.native import NativeSettings, OPTIMIZER_FAMILY
 from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_local
 
 from .freeze import validate_preregistration
+from .adaptation import AdaptationBatch, ExternalCorpusAdapter, ExternalOriginMapping
 from .models import ArmProtocol, EvaluationPreregistration, FrozenRoster
 from .statistics import summarize_trials
 
@@ -56,6 +62,7 @@ class EvaluationService:
         self, *, store: ArtifactStore, registry: Registry, revision: str,
         evidence_scope: str = "real_integration", runner: AgentRunner | None = None,
         native_factory: NativeSessionFactory | None = None,
+        factory: Factory | None = None,
         lifecycle: TaskLifecycle | ReleasedTaskResolver | None = None,
         builder: TaskBuilder | None = None, runtime: EnvironmentRuntime | None = None,
         grader: GradingService | None = None,
@@ -80,6 +87,8 @@ class EvaluationService:
                 raise TypeError("real evaluation requires the inert M7 NativeSessionFactory")
             if (
                 native_factory.store is not store or native_factory.registry is not registry
+                or type(factory) is not Factory or factory.store is not store
+                or factory.registry is not registry
                 or type(lifecycle) not in (TaskLifecycle, ReleasedTaskResolver)
                 or lifecycle.store is not store or lifecycle.registry is not registry
                 or type(builder) is not TaskBuilder or builder.store is not store or builder.registry is not registry
@@ -89,9 +98,11 @@ class EvaluationService:
                 raise TypeError("real evaluation requires actual same-store M3/M4/M6 services")
         self.store, self.registry, self.runner = store, registry, runner
         self.native_factory = native_factory
+        self.factory = factory
         self.lifecycle, self.builder, self.runtime, self.grader = lifecycle, builder, runtime, grader
         self.revision, self.evidence_scope = revision, evidence_scope
-        self._handles: dict[str, tuple[NativeHandle, str]] = {}
+        self._handles: dict[str, tuple[NativeHandle, Claim, str]] = {}
+        self._opening: dict[str, tuple[Claim, str]] = {}
         self._active_job: str | None = None
 
     def _execution_identity(self):
@@ -105,8 +116,175 @@ class EvaluationService:
             "grader_revision": self.grader.revision,
         }
 
+    def _construction_root(self, reference):
+        receipt = read_local(
+            self.store, reference, ConstructionResult, "m6-construction-result",
+        )
+        job = self.registry.job(receipt.claim.job_id)
+        attempts = self.registry.attempts(job.job_id)
+        completed = tuple(
+            item for item in attempts
+            if item.claim == receipt.claim and item.state == "completed"
+        )
+        if (
+            len(completed) != 1 or job.state != "completed" or job.result is None
+            or job.spec.operation != "construct" or job.spec.invocation != "m6-construct"
+            or job.spec.implementation != receipt.revision
+            or len(job.spec.inputs) != 3 or job.spec.inputs[2] != receipt.request
+            or receipt.disposition != c.Disposition.SUCCESS
+            or receipt.build_job is None or receipt.build_result is None
+            or receipt.history is None
+            or receipt.build_result.disposition != c.Disposition.SUCCESS
+            or receipt.build_result.operation != "construct"
+            or len(receipt.build_result.artifacts) != 1
+        ):
+            raise EvaluationRejected("training source lacks a selected successful M6 construction")
+        task = receipt.build_result.artifacts[0]
+        if task.kind != "TaskBundle":
+            raise EvaluationRejected("selected construction output is not a TaskBundle")
+        bundle = self.store.get_artifact(task)
+        if (
+            type(bundle) is not c.TaskBundle or bundle.state != c.TaskState.BUILT
+            or bundle.qualification is not None
+        ):
+            raise EvaluationRejected("selected construction output is not a typed TaskBundle")
+        pair = self.store.get_artifact(bundle.source_pair)
+        if type(pair) is not c.SourcePair or pair.candidate != job.spec.inputs[0]:
+            raise EvaluationRejected("selected construction differs from its candidate source pair")
+        expected = (task, receipt.history, reference)
+        if (
+            job.result.operation != "construct"
+            or job.result.disposition != receipt.disposition
+            or job.result.artifacts != expected
+            or job.result.reason != receipt.reason
+            or job.result.costs != receipt.costs
+        ):
+            raise EvaluationRejected("M6 construction receipt differs from its selected result")
+        child = self.registry.job(receipt.build_job)
+        if (
+            child.state != "completed" or child.result != receipt.build_result
+            or child.spec.operation != "construct"
+        ):
+            raise EvaluationRejected("M6 construction lacks its selected builder result")
+        return task, receipt.history, pair.candidate, job.spec.inputs[1]
+
+    def _built_roots(self, released_refs):
+        roots = []
+        for reference in released_refs:
+            released = self.lifecycle.resolve_released(reference)
+            if released.qualification is None:
+                raise EvaluationRejected("released training task lacks qualification")
+            report = self.store.get_artifact(released.qualification)
+            if type(report) is not c.QualificationReport:
+                raise EvaluationRejected("released training task lacks a typed qualification report")
+            built = self.store.get_artifact(report.task)
+            if type(built) is not c.TaskBundle or built.state != c.TaskState.BUILT:
+                raise EvaluationRejected("released training task does not resolve to BUILT T0")
+            roots.append(report.task)
+        return tuple(roots)
+
+    def _training_origins(self, protocols, actual_training):
+        if protocols["A"].training_sources or protocols["B"].training_sources:
+            raise EvaluationRejected("starting and SFT arms cannot claim RL construction origins")
+        external = protocols["C"].training_sources
+        if len(external) != 1 or external[0].kind != "m8-external-adaptation-batch":
+            raise EvaluationRejected("external RL arm requires one frozen external adaptation batch")
+        self.registry.assert_usable(external[0])
+        batch = read_local(
+            self.store, external[0], AdaptationBatch, "m8-external-adaptation-batch",
+        )
+        if (
+            batch.funnel.disposition != c.Disposition.SUCCESS
+            or batch.funnel.local_partition != c.Partition.TRAIN
+            or batch.funnel.source_frame != batch.source_frame
+            or any(
+                stage.rejected or stage.invalid or stage.accepted != len(batch.items)
+                for stage in batch.funnel.stages
+            )
+        ):
+            raise EvaluationRejected("external adaptation funnel is incomplete or not training-assigned")
+        adapter = ExternalCorpusAdapter(
+            store=self.store, factory=self.factory,
+            configuration=batch.configuration, revision=self.revision,
+        )
+        if (
+            batch.configuration != adapter.configuration_ref
+            or batch.source_frame != adapter.configuration.source_frame
+            or batch.funnel.corpus_id != adapter.configuration.dataset_id
+            or batch.funnel.release_revision != adapter.configuration.release_revision
+            or batch.funnel.upstream_split != adapter.configuration.upstream_split
+            or batch.funnel.license_constraint != adapter.configuration.dataset_license
+            or tuple(item.row for item in batch.items) != adapter.configuration.rows
+            or tuple(item.origin_mapping for item in batch.items)
+            != adapter.configuration.origin_mappings
+        ):
+            raise EvaluationRejected("external adaptation batch changed its frozen configuration/frame")
+        assignments = {item.row: item for item in adapter.frame.assignments}
+        external_tasks, external_receipts = [], []
+        for item, mapping_ref, build_inputs in zip(
+            batch.items, adapter.configuration.origin_mappings,
+            adapter.configuration.construction_inputs,
+        ):
+            try:
+                raw, row = adapter._row(item.row)
+                mapping = read_local(
+                    self.store, mapping_ref, ExternalOriginMapping, "m8-external-origin",
+                )
+                candidate, pair = adapter._validated(
+                    item.row, raw, row, mapping_ref, mapping,
+                    assignments[item.row], build_inputs,
+                )
+            except (KeyError, ValueError, OSError) as exc:
+                raise EvaluationRejected("external adaptation origin failed inert revalidation") from exc
+            if (
+                item.candidate is None or item.source_pair is None
+                or item.candidate != mapping.candidate
+                or item.source_pair != mapping.source_pair
+                or candidate != self.store.get_artifact(item.candidate)
+                or pair != self.store.get_artifact(item.source_pair)
+                or item.source_only_allowlist != (
+                    mapping.authoring_request, mapping.authoring_baseline,
+                    mapping.authoring_license,
+                )
+            ):
+                raise EvaluationRejected("external adaptation item differs from its authenticated M1 origin")
+            receipts = tuple(
+                ref for ref in item.construction_result
+                if ref.kind == "m6-construction-result"
+            )
+            if item.disposition != c.Disposition.SUCCESS or len(receipts) != 1:
+                raise EvaluationRejected("external adaptation item lacks one successful construction")
+            task, history, construction_candidate, construction_source = self._construction_root(
+                receipts[0]
+            )
+            if (
+                construction_candidate != mapping.candidate
+                or item.source_result != (construction_source,)
+                or item.construction_result != (task, history, receipts[0])
+            ):
+                raise EvaluationRejected("external adaptation item changed its selected construction roots")
+            external_tasks.append(task)
+            external_receipts.append(receipts[0])
+        factory_receipts = protocols["D"].training_sources
+        if not factory_receipts or any(
+            ref.kind != "m6-construction-result" for ref in factory_receipts
+        ):
+            raise EvaluationRejected("factory RL arm requires selected M6 construction roots")
+        factory_tasks = tuple(self._construction_root(ref)[0] for ref in factory_receipts)
+        external_tasks = tuple(external_tasks)
+        if (
+            external_tasks != self._built_roots(actual_training["C"][0].tasks)
+            or factory_tasks != self._built_roots(actual_training["D"][0].tasks)
+        ):
+            raise EvaluationRejected("RL training tasks differ from their frozen dataset origins")
+        if set(external_tasks) & set(factory_tasks) or set(external_receipts) & set(factory_receipts):
+            raise EvaluationRejected("external and factory RL origins overlap")
+
     def _freeze(self, config):
-        config = c.EvaluationConfig.model_validate(config)
+        if isinstance(config, c.EvaluationConfig):
+            config = c.EvaluationConfig.model_validate_json(config.model_dump_json())
+        else:
+            config = c.EvaluationConfig.model_validate_json(canonical_json(config))
         roster = read_local(self.store, config.frozen_roster, FrozenRoster, "m8-frozen-roster")
         preregistration = read_local(
             self.store, config.preregistration, EvaluationPreregistration, "m8-preregistration",
@@ -125,9 +303,32 @@ class EvaluationService:
                         "released task differs from its frozen source/partition assignment"
                     )
             protocols = {item.arm: item for item in preregistration.arms}
+            try:
+                for protocol in protocols.values():
+                    validate_protocol(
+                        self.store, protocol.tools, action_format=protocol.action_format,
+                    )
+            except ValueError as exc:
+                raise EvaluationRejected(
+                    "frozen tools/actions differ from the actual runner protocol"
+                ) from exc
+            if (
+                preregistration.harness_version != HARNESS
+                or any(
+                    protocol.harness_version != HARNESS
+                    or protocol.policy.harness_version != HARNESS
+                    or protocol.action_format != ACTION_FORMAT
+                    or protocol.optimizer_family != OPTIMIZER_FAMILY
+                    for protocol in protocols.values()
+                )
+            ):
+                raise EvaluationRejected(
+                    "frozen declarations differ from the actual runner protocol"
+                )
             bootstrap = self.native_factory.training_configuration.initial_policy
             if (
                 protocols["A"].checkpoint != protocols["A"].policy.identity.weights
+                or protocols["A"].policy != bootstrap
                 or protocols["A"].checkpoint != bootstrap.identity.weights
                 or any(
                     item.policy.identity.model != bootstrap.identity.model
@@ -137,6 +338,7 @@ class EvaluationService:
                 )
             ):
                 raise EvaluationRejected("frozen arms differ from the native bootstrap model boundary")
+            actual_training = {}
             for arm in ("B", "C", "D"):
                 protocol = protocols[arm]
                 checkpoint = validate_selected_checkpoint(
@@ -152,13 +354,29 @@ class EvaluationService:
                     or checkpoint.weights != protocol.policy.identity.weights
                     or checkpoint.policy_version != protocol.policy.policy_version
                     or checkpoint.configuration.algorithm != expected_algorithm
-                    or checkpoint.configuration.initial_policy.identity.weights != protocols["A"].checkpoint
+                    or checkpoint.configuration.initial_policy != protocols["A"].policy
                     or checkpoint.reference_checkpoint != self.native_factory.training_configuration.reference_checkpoint
                     or not checkpoint.consumed_tasks
                 ):
                     raise EvaluationRejected(
                         "trained arm differs from its selected M7 checkpoint/configuration"
                     )
+                request = decode_json(
+                    self.store.get_bytes(
+                        requests[0], max_envelope_bytes=8 * 1024 * 1024,
+                        max_payload_bytes=4 * 1024 * 1024,
+                    ),
+                    4 * 1024 * 1024,
+                )
+                if type(request) is not dict:
+                    raise EvaluationRejected("selected M7 training request is not an object")
+                try:
+                    settings = NativeSettings.model_validate_json(
+                        canonical_json(request.get("settings"))
+                    )
+                except ValueError as exc:
+                    raise EvaluationRejected("selected M7 request has invalid native settings") from exc
+                actual_training[arm] = (checkpoint.configuration, settings)
                 for task_ref in checkpoint.configuration.tasks:
                     source = frozen_sources.get(task_ref)
                     if source is None or source.partition != c.Partition.TRAIN:
@@ -176,6 +394,51 @@ class EvaluationService:
                         )
                 if any(ref not in checkpoint.configuration.tasks for ref in checkpoint.consumed_tasks):
                     raise EvaluationRejected("checkpoint consumed a task outside its frozen training configuration")
+            def shared_config(value):
+                controls = value.model_dump(mode="json")
+                return {
+                    key: item for key, item in controls.items()
+                    if key not in {"algorithm", "tasks"}
+                }
+
+            if len({
+                canonical_json(shared_config(actual_training[arm][0]))
+                for arm in ("B", "C", "D")
+            }) != 1:
+                raise EvaluationRejected("trained arms differ in shared TrainingConfig controls")
+            shared_settings = (
+                "tokenizer_sha256", "num_gpus", "max_seq_len", "groups_per_update",
+                "mini_batch_groups", "probe_tokens", "probe_output_tokens",
+                "probe_timeout_seconds", "max_groups", "max_wall_seconds",
+            )
+            if any(
+                len({getattr(actual_training[arm][1], field) for arm in ("B", "C", "D")}) != 1
+                for field in shared_settings
+            ):
+                raise EvaluationRejected("trained arms differ in shared native resource controls")
+            if any(
+                len({getattr(actual_training[arm][1], field) for arm in ("C", "D")}) != 1
+                for field in ("clip_epsilon", "kl_coefficient")
+            ):
+                raise EvaluationRejected("RL arms differ in native clipping or KL controls")
+            for arm in ("B", "C", "D"):
+                training, settings = actual_training[arm]
+                budget = protocols[arm].training_budget
+                if budget.max_updates != training.max_updates:
+                    raise EvaluationRejected(
+                        "declared update budget differs from selected training run"
+                    )
+                if arm in ("C", "D"):
+                    actual_rollouts = settings.max_groups * training.group_size
+                    if (
+                        budget.max_rollouts != actual_rollouts
+                        or budget.max_assistant_tokens
+                        != actual_rollouts * training.limits.output_tokens
+                    ):
+                        raise EvaluationRejected(
+                            "declared RL rollout/token budget differs from native bounds"
+                        )
+            self._training_origins(protocols, actual_training)
         roster_dependencies = tuple(dict.fromkeys((
             *roster.locked_tasks, roster.test_source_frame, roster.exclusions,
             *(item.evidence for item in roster.sources), *(item.evidence for item in roster.relations),
@@ -187,6 +450,7 @@ class EvaluationService:
             *(item.training_config for item in preregistration.arms if item.training_config is not None),
             *(item.initial_checkpoint for item in preregistration.arms),
             *(item.tools for item in preregistration.arms),
+            *(ref for item in preregistration.arms for ref in item.training_sources),
             *(item.policy.system_prompt for item in preregistration.arms),
         )))
         self.registry.register(config.preregistration, dependencies=prereg_dependencies)
@@ -362,13 +626,19 @@ class EvaluationService:
         return self._publish_execution(claim, configuration, trials, results, ())
 
     def _native_execution(self, claim, config, roster, preregistration, configuration):
+        if claim.job_id in self._opening:
+            raise EvaluationRecoveryRequired(
+                "retained unpublished native startup requires cleanup before recovery", claim,
+            )
         startup_index = sum(
             row.observation.source == "m7-native-startup"
             for row in self.registry.accounting(claim.job_id).observations
         )
         startup_key = f"{claim.attempt_id}:m8-native:{startup_index}"
+        self._opening[claim.job_id] = (claim, startup_key)
         handle = self.native_factory.create(claim, startup_key=startup_key)
-        self._handles[claim.job_id] = (handle, startup_key)
+        del self._opening[claim.job_id]
+        self._handles[claim.job_id] = (handle, claim, startup_key)
         self._active_job = claim.job_id
         try:
             runner = AgentRunner(
@@ -402,20 +672,64 @@ class EvaluationService:
                         results_by_id[trial.trial_id] = result
             ordered = tuple(trials_by_id[item.trial_id] for item in preregistration.trials)
             ordered_results = tuple(results_by_id[item.trial_id] for item in preregistration.trials)
-            return self._publish_execution(claim, configuration, ordered, ordered_results, activations)
-        finally:
-            retained = self._handles.get(claim.job_id)
-            if retained is not None:
-                self.native_factory.close(retained[0], claim, shutdown_key=retained[1] + ":shutdown")
-                del self._handles[claim.job_id]
+            execution = self._publish_execution(
+                claim, configuration, ordered, ordered_results, activations,
+            )
+        except BaseException as error:
+            try:
+                self._close_handle(claim.job_id)
+            except BaseException as cleanup:
+                error.native_cleanup_error = cleanup
+            raise
+        self._close_handle(claim.job_id)
+        return execution
+
+    def _close_handle(self, job_id):
+        retained = self._handles.get(job_id)
+        if retained is None:
+            return None
+        handle, claim, startup_key = retained
+        receipt, _ = self.native_factory.close(
+            handle, claim, shutdown_key=startup_key + ":shutdown",
+        )
+        del self._handles[job_id]
+        return receipt
+
+    def close(self):
+        """Close every retained native startup/session without initializing anything."""
+        if self.native_factory is None:
+            return ()
+        receipts, errors = [], []
+        for job_id in tuple(self._handles):
+            try:
+                receipt = self._close_handle(job_id)
+            except BaseException as exc:
+                errors.append(exc)
+                continue
+            if receipt is not None:
+                receipts.append(receipt)
+        for job_id, (claim, startup_key) in tuple(self._opening.items()):
+            try:
+                receipt, _ = self.native_factory.close_startup(
+                    claim, startup_key=startup_key,
+                    shutdown_key=startup_key + ":startup-abort",
+                )
+            except NativeStartupRecoveryRequired:
+                del self._opening[job_id]
+                continue
+            except BaseException as exc:
+                errors.append(exc)
+                continue
+            del self._opening[job_id]
+            receipts.append(receipt)
+        if errors:
+            if len(errors) > 1:
+                errors[0].native_cleanup_errors = tuple(errors[1:])
+            raise errors[0]
+        return tuple(receipts)
 
     def _finish_native_cleanup(self, claim):
-        retained = self._handles.get(claim.job_id)
-        if retained is not None:
-            self.native_factory.close(
-                retained[0], claim, shutdown_key=retained[1] + ":shutdown",
-            )
-            del self._handles[claim.job_id]
+        self._close_handle(claim.job_id)
         observations = self.registry.accounting(claim.job_id).observations
         startups = {
             row.observation.upstream_attempt_id
@@ -475,7 +789,11 @@ class EvaluationService:
             ), costs=costs, configuration=config,
             frozen_task_roster=(config.frozen_roster, config.preregistration), trials=execution.trials,
             paired_metrics=statistics.metrics, audits=(), disposition=disposition,
-            limitations=statistics.limitations,
+            limitations=(
+                *statistics.limitations,
+                *(("Native training GPU-seconds and USD remain unverified because those cost dimensions are unmetered.",)
+                  if self.evidence_scope == "real_integration" else ()),
+            ),
         )
         report_ref = self.store.put_artifact(report)
         self.registry.register(
