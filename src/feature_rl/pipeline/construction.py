@@ -25,6 +25,18 @@ class ConstructionRequest(c.StrictModel):
     builder_job: JobSpec | None
 
 
+class ConstructionRequestV2(ConstructionRequest):
+    version: Literal['m6-construction-request-v2']='m6-construction-request-v2'
+    history: c.ArtifactRef
+
+
+def read_construction_request(store,ref):
+    import json
+    raw=read_bytes(store,ref,MAX_DOCUMENT,kind='m6-construction-request')
+    cls=ConstructionRequestV2 if json.loads(raw).get('version')=='m6-construction-request-v2' else ConstructionRequest
+    return read_record(store,ref,cls,'m6-construction-request')
+
+
 class ConstructionResult(c.StrictModel):
     version: Literal['m6-construction-result-v1']='m6-construction-result-v1'
     claim: Claim
@@ -97,6 +109,11 @@ def construct(factory,candidate,inputs):
         if inputs is not None:inputs=checked(BuildInputs,inputs)
         child=None if inputs is None else factory.builder.job_spec(inputs)
         request=ConstructionRequest(candidate=candidate,source=source_result.artifacts[0],inputs=inputs,builder_job=child)
+        if inputs is not None:
+            from .authoring_history import selected_history
+            history=selected_history(factory,request)
+            if history is not None:
+                request=ConstructionRequestV2(**request.model_dump(exclude={'version'}),history=history)
         request_ref=put(factory,request,'m6-construction-request',dependencies=references(document(request)))
         job=factory.registry.enqueue(spec(factory,request_ref,request))
         if job.state=='completed':return job.result
@@ -114,7 +131,7 @@ def validated_request(factory,claim):
     if not any(a.claim==claim for a in factory.registry.attempts(job.job_id)) or len(job.spec.inputs)!=3:
         raise ValueError('construction claim is unknown')
     ref=job.spec.inputs[2]
-    request=read_record(factory.store,ref,ConstructionRequest,'m6-construction-request')
+    request=read_construction_request(factory.store,ref)
     if job.spec!=spec(factory,ref,request):raise ValueError('construction belongs to another Factory configuration')
     source=read_source_disposition(factory.store,request.source)
     source_job=factory.registry.job(source.claim.job_id)
@@ -176,7 +193,7 @@ def execute(factory,claim,request_ref,request,*,recovery):
         disposition=result.disposition;reason=result.reason
         if disposition==c.Disposition.SUCCESS:
             factory.builder.solver_package(result.artifacts[0])
-            history=incomplete_history(factory,request)
+            history=request.history if isinstance(request,ConstructionRequestV2) else incomplete_history(factory,request)
     receipt=ConstructionResult(claim=claim,request=request_ref,
         build_job=None if result is None else identity(request.builder_job),build_result=result,history=history,
         disposition=disposition,reason=reason,costs=costs(None if recovery else max(0.0,time.monotonic()-started-child_elapsed)),
@@ -199,7 +216,8 @@ def validate_result(factory,payload,claim):
     elif receipt.build_job is not None or receipt.disposition==c.Disposition.SUCCESS:
         raise ValueError('construction success lacks selected builder result')
     if receipt.disposition==c.Disposition.SUCCESS:
-        if receipt.history!=incomplete_history(factory,request):raise ValueError('construction repair history changed')
+        history=request.history if isinstance(request,ConstructionRequestV2) else incomplete_history(factory,request)
+        if receipt.history!=history:raise ValueError('construction repair history changed')
         factory.builder.solver_package(receipt.build_result.artifacts[0])
     elif receipt.history is not None:raise ValueError('failed construction cannot select successful build history')
     return job,receipt

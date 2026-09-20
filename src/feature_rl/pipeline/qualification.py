@@ -3,7 +3,7 @@ from feature_rl import contracts as c
 from feature_rl.qualification import QualificationPolicy, QualificationService, ReviewRequest
 from .packaging import checked, read_record, typed
 from .lifecycle import AdmissionRejected, TaskLifecycle
-from .construction import ConstructionResult, ConstructionRequest
+from .construction import ConstructionResult, read_construction_request
 
 
 def template(factory):
@@ -32,7 +32,7 @@ def construction_history(factory,task_ref):
         if len(job.result.artifacts)!=3 or len(job.spec.inputs)!=3:
             raise AdmissionRejected('Factory construction selected result has invalid shape')
         receipt=read_record(factory.store,job.result.artifacts[2],ConstructionResult,'m6-construction-result')
-        request=read_record(factory.store,receipt.request,ConstructionRequest,'m6-construction-request')
+        request=read_construction_request(factory.store,receipt.request)
         if (receipt.claim.job_id!=job_id or receipt.revision!=job.spec.implementation
                 or receipt.request!=job.spec.inputs[2] or request.candidate!=pair.candidate
                 or job.spec.inputs[:2]!=(request.candidate,request.source)

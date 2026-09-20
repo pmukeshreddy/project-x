@@ -198,7 +198,7 @@ result = factory.construct(candidate_ref, inputs=build_inputs)
 
 `construct(candidate: ArtifactRef, *, inputs: BuildInputs | None = None) -> OperationResult` consumes the selected source prerequisite before actual TaskBuilder assembly. It returns that exact rejected/unresolved source result without entering the builder. Eligible source with missing inputs returns a selected `blocked_dependency` construct result; it manufactures no contract/scenario/verifier/root. Supplied inputs must bind the exact `SourcePair.candidate`. The Registry parent job has `operation='construct'`, `invocation='m6-construct'` and inputs `(candidate_ref, source_disposition_ref, construction_request_ref)`. Its opaque request/configuration/result refs explicitly declare consumed dependencies.
 
-The selected parent result contains the actual builder task and an evidenced M5 `RepairHistory`; currently this retains known M3 neutral repairs and remains incomplete until authentic generation-attempt history is imported. Parent costs represent incremental controller/publication work; source and builder costs remain in their own selected jobs. `m6-construction-result` binds the parent claim, request, selected child job/result, history, exact costs, disposition, reason and revision.
+The selected parent result contains the actual builder task and an evidenced M5 `RepairHistory`. Direct externally authored inputs retain known M3 neutral repairs and remain incomplete. The authoring join below can freeze the complete declared controller scope. Parent costs represent incremental controller/publication work; source and builder costs remain in their own selected jobs. `m6-construction-result` binds the parent claim, request, selected child job/result, history, exact costs, disposition, reason and revision.
 
 `TaskBuilder.job_spec(inputs) -> JobSpec` freezes the builder's actual existing input/policy CAS identities without enqueueing or assembly. Factory uses this exact public method for deterministic child recovery. `Factory.recover(parent_claim)` reuses a completed/frozen child, preserves unknown builder attempts, and never fabricates execution results. `FactoryUpstreamPending` retains an actual `BuildPublicationFailed`; `Factory.retry_publication(pending)` delegates to the actual builder replay before completing the parent. Parent `FactoryPublicationFailed` retains its own exact result bytes. Historical completion readback is distinct from current consumer admission.
 
@@ -250,3 +250,72 @@ BuildInputs separately. `main` emits typed operation JSON and nonzero failures.
 Publication exceptions additionally emit an exact private ordinary-JSON recovery
 receipt to stderr before exit. It is not an executable object loader or another
 ledger. Native/authoring and remaining M7/M8 commands are subsequent actual joins.
+
+# Actual M2/M4 authoring and retained history
+
+```python
+from feature_rl.pipeline import (Factory, AuthoringSettings, AuthoringBatch,
+    AuthoringCaps, AuthoringCall, ResolverInputs, ControlPlan, ControlSlot)
+factory = Factory(store=store, registry=registry, revision=revision,
+                  builder=builder, authoring=settings)
+factory.author(candidate_ref, *, call: AuthoringCall) -> OperationResult
+factory.import_rejected_authoring(candidate_ref, *, call: AuthoringCall,
+                                 journal_refs: tuple[ArtifactRef, ...]) -> OperationResult
+```
+
+`AuthoringSettings` binds actual `BackendConfig`, `m2_revision`, `m4_revision`,
+`evidence_scope` and an `AuthoringBatch`. Batch fields are exact `candidates`,
+`candidate_caps`, `batch_caps`, and retained `calibration_evidence`. Both cap sets
+declare input/output tokens, wall/CPU seconds, provider command count, memory bytes
+and `spend_usd`. Null USD explicitly declares unpriced local compute and leaves
+monetary comparison verification unavailable. A finite cap rejects without the
+actual missing currency meter. Cumulative full-call reservations are not refunded
+by failed attempts; larger known actual use is retained. Same-batch dispatch is
+serialized. Memory is a peak ceiling, not a sum of sequential allocations; the
+actual M2 monitor retains its documented sampling/termination limitations.
+Controller/storage overhead stays separately unknown rather than becoming zero.
+
+`AuthoringCall` contains exact SourcePair, PreparedEnvironment, ResolverInputs,
+actual M2 `GenerationCandidate`, `sources`, and one actual M2/M4 finalization input:
+`ContractFinalizationInputs`, `ScenarioFinalizationInputs`,
+`CheckerFinalizationInputs` or `ControlFinalizationInputs`. Controls also supply
+the frozen `ControlPlan` and, for adversarial roles, its named `attack`. A control
+slot is category + sorted mandatory requirement IDs + attack; changing control IDs
+does not create another initial role. The candidate's first plan cannot change.
+
+The Registry jobs are `construct` / `m6-author:<lane>`, each with one possible
+provider dispatch. Provider archive callbacks reconcile an attributable unknown
+intent, then real original costs and exact archive refs. The returned artifacts
+are `(actual_authored_artifact, m6_authoring_receipt)` or just the receipt for a
+rejected call. `read_authoring_receipt` is available from `pipeline.authoring`.
+Completed results are historical readback, not current admission. Publication
+requires exact selected accounting, prior lane journals, provider archives,
+output provenance and current dependency usability. Recovery never infers again;
+`AuthoringPending` retains actual M2/M4 publication capability for
+`Factory.retry_publication`, and `Factory.recover(claim)` uses a retained provider
+status or frozen result. Missing status remains explicit unknown work.
+
+Repair mappings are contract → `authoring`, scenario → `scenarios`, and checker,
+control and alternative → shared `verifier`. Maximum two repairs per stage and
+four per candidate include actual M3 neutral repairs. Every retry needs a recorded
+diagnosis and meaningful request change; IDs do not count as changes.
+
+Supported complete order: contract → scenario → controls/alternative → final
+checker with the actual `ControlRecord.control` values in its inputs → construct.
+The final checker ref must be the selected author output. An unauthenticated later
+`attach_controls` derivation remains incomplete. Construction request V2 freezes
+history before building, including all initial and repaired calls and current
+terminal outputs; V1 bytes/readback are preserved. Complete means the explicitly
+frozen `factory-controlled-after-source-disposition` scope, not an assertion that
+no work happened outside the controller. A changed frozen history requires a new
+construction selection; it is never retrofitted into a completed request.
+
+Retained import is inert and supports complete rejected M2 contract/scenario
+chains. It validates original requests and archives, derives semantic identity
+from exact bytes when a legacy journal omitted that field, and preserves those
+legacy bytes. It never invokes a provider/finalizer or grants source admission.
+Each original provider attempt is charged once; overlapping source aggregate
+authoring costs or conflicting prior lane allocation require reconciliation.
+Imported/external history remains incomplete. Real Click's three failed calls are
+retained with source scope review still provisional and contract repair allowance
+exhausted; see `docs/evidence/M6/authoring/click-import.json`.

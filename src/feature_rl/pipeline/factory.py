@@ -75,7 +75,7 @@ def source_decision(candidate):
 
 
 class Factory:
-    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None, qualification=None):
+    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None, qualification=None, authoring=None):
         if (not isinstance(store, ArtifactStore) or store.role != c.ActorRole.CONTROLLER
                 or not isinstance(registry, Registry) or registry.store is not store):
             raise TypeError('Factory requires the same actual controller store and Registry')
@@ -91,6 +91,8 @@ class Factory:
                 or qualification.store is not store or qualification.registry is not registry):
             raise TypeError('Factory qualification must be the actual same-store M5 service')
         self.qualification=qualification
+        from .authoring_models import AuthoringSettings
+        self.authoring=None if authoring is None else checked(AuthoringSettings,authoring)
         self.source_configuration = store.put_bytes(self._source_policy(revision),
             'm6-source-policy', c.Visibility.PRIVATE)
         registry.register(self.source_configuration)
@@ -98,6 +100,14 @@ class Factory:
     def construct(self, candidate: c.ArtifactRef, *, inputs: BuildInputs | None=None) -> c.OperationResult:
         from .construction import construct
         return construct(self,candidate,inputs)
+
+    def author(self, candidate: c.ArtifactRef, *, call) -> c.OperationResult:
+        from .authoring import author
+        return author(self,candidate,call)
+
+    def import_rejected_authoring(self, candidate: c.ArtifactRef, *, call, journal_refs) -> c.OperationResult:
+        from .authoring_import import import_rejected
+        return import_rejected(self,candidate,call,journal_refs)
 
     def qualify(self, task_ref: c.ArtifactRef, *, policy=None) -> c.OperationResult:
         from .qualification import qualify
@@ -250,6 +260,9 @@ class Factory:
     def recover(self, claim: Claim) -> c.OperationResult:
         claim = checked(Claim,claim)
         job = self.registry.job(claim.job_id)
+        if job.spec.invocation.startswith('m6-author:'):
+            from .authoring import recover
+            return recover(self,claim)
         if job.spec.invocation=='m6-construct':
             from .construction import recover
             return recover(self,claim)
@@ -266,6 +279,8 @@ class Factory:
         return self._finish_source(receipt,refs[0])
 
     def retry_publication(self, pending: FactoryPublicationFailed) -> c.OperationResult:
+        from .authoring import AuthoringPending, retry
+        if type(pending) is AuthoringPending:return retry(self,pending)
         if type(pending) is FactoryUpstreamPending:
             from .construction import retry_build
             return retry_build(self,pending)
@@ -274,6 +289,9 @@ class Factory:
             raise ValueError('invalid retained Factory source publication')
         if pending.kind=='m6-construction-result':
             from .construction import publish
+            return publish(self,pending.payload,pending.claim)
+        if pending.kind=='m6-authoring-receipt':
+            from .authoring import publish
             return publish(self,pending.payload,pending.claim)
         if pending.kind!='m6-source-disposition': raise ValueError('unknown Factory publication kind')
         return self._publish_source(pending.payload,pending.claim)
