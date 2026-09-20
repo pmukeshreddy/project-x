@@ -10,7 +10,6 @@ from feature_rl import contracts as c
 from feature_rl.environments import SourceArchive, SourceFile, SandboxPolicy
 from feature_rl.environments.archive import safe_path
 from feature_rl.environments.profiles import validate_recipe_profile
-from feature_rl.environments.candidates import read_catalog
 from feature_rl.submission.source import validate_rules
 from .models import BuildInputs, BuildRejected, InventoryEntry, SolverInventory
 
@@ -114,10 +113,10 @@ def resolve(store, inputs):
     if inputs.environment.policy not in recipe.provenance.inputs:
         raise BuildRejected('runtime recipe omits its exact policy')
     validate_recipe_profile(recipe, policy, store)
-    catalog=read_catalog(store,recipe.dependency_catalog,policy)
-    dependency_artifacts={wheel.artifact for wheel in catalog.wheels}
-    if not set(allowed.dependency_artifacts) <= dependency_artifacts:
-        raise BuildRejected('dependency allowlist contains artifacts outside the frozen catalog')
+    for ref in allowed.dependency_artifacts:
+        if ref.visibility not in (c.Visibility.AUTHORING, c.Visibility.PUBLIC):
+            raise BuildRejected('dependency allowlist requires authoring/public wheel bytes')
+        read_bytes(store, ref, policy.max_staging_bytes, kind='dependency-wheel')
     raw = read_bytes(store, pair.baseline, policy.max_archive_bytes, kind='source-archive')
     source = SourceArchive.read(raw, policy)
     # M3 bounds and rejects links; additionally reject ambiguous regular-file names
@@ -136,8 +135,8 @@ def resolve(store, inputs):
     profile.validate_source(source)
     read_bytes(store, pair.reference, policy.max_archive_bytes, kind='source-archive')
     dependencies = tuple(dict.fromkeys((inputs.source_pair, pair.candidate, inputs.contract, inputs.scenario_plan,
-        inputs.verifier, inputs.environment.recipe, inputs.environment.policy, recipe.dependency_catalog,
-        pair.baseline, pair.reference)))
+        inputs.verifier, inputs.environment.recipe, inputs.environment.policy,
+        pair.baseline, pair.reference, *allowed.dependency_artifacts)))
     return Resolved(pair, candidate, contract, plan, verifier, recipe, policy, source, dependencies)
 
 
@@ -167,10 +166,6 @@ def public_values(store, resolved):
     image = validate_runtime_image(recipe, resolved.policy, store)
     runtime.update(host_requirements=document(image.host_requirements),
                    runtime_image_context_sha256=image.context_sha256)
-    catalog=read_catalog(store,recipe.dependency_catalog,resolved.policy)
-    runtime['dependency_catalog']={'artifact':document(recipe.dependency_catalog),'wheels':[
-        {'name':wheel.pin.name,'version':wheel.pin.version,'filename':wheel.pin.filename,
-         'sha256':wheel.pin.sha256,'artifact':document(wheel.artifact)} for wheel in catalog.wheels]}
     checks = tuple(dict.fromkeys((*contract.public_checks, *resolved.verifier.public_examples)))
     if len(checks) > 64:
         raise BuildRejected('public-check count limit')

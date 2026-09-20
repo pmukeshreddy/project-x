@@ -14,7 +14,7 @@ class DockerUnavailable(EnvironmentError): pass
 class CleanupUnverified(EnvironmentError): pass
 class SourceUnavailable(EnvironmentError): pass
 class DependencyUnavailable(EnvironmentError):
-    """Trusted offline catalog cannot establish a reproducible candidate closure."""
+    """Trusted resolution cannot establish a reproducible candidate dependency closure."""
 class CpuBudgetExceeded(EnvironmentError): pass
 class EvidencePublicationFailed(EnvironmentError):
     """Bounded pending publication; no execution rerun is needed to retry storage."""

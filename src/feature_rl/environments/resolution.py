@@ -58,7 +58,7 @@ for path in sorted(wheelhouse.iterdir()):
  name,version,build,wheel_tags=parse_wheel_filename(path.name)
  if not tags.intersection(wheel_tags) or name in seen:raise RuntimeError('incompatible/duplicate dependency wheel')
  seen.add(name);data=path.read_bytes();total+=len(data)
- if total>settings['max_bytes'] or len(pins)>=64:raise RuntimeError('dependency capture exceeds bound')
+ if total>settings['max_bytes']:raise RuntimeError('dependency capture exceeds bound')
  digest=hashlib.sha256(data).hexdigest()
  allowed=settings.get('dependency_hashes',{}).get(name)
  if allowed and digest not in allowed:raise RuntimeError('dependency disagrees with repository lock hash: '+name)

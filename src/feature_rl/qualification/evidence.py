@@ -225,7 +225,6 @@ def reset_probe(source,rules,profile):
 
 def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
     """Rejoin timeout, dirty saved source, restored source and independent workspace."""
-    from feature_rl.environments import SourceRejected, DependencyUnavailable
     from feature_rl.environments.models import SavedSource, SandboxPolicy
     from feature_rl.verifiers.loader import read_local
     from .models import ResetReceipt, ReferenceProjection
@@ -248,12 +247,13 @@ def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
         raise QualificationRejected('invalid_evidence','reset interruption did not observe the exact saved diagnostic mutation')
     raw_resolution=value.get('extra',{}).get('dependency_resolution')
     if raw_resolution is None:
-        # A repair command may use baseline tools when the dirty declarations
-        # are incomplete; do not treat it as a successfully resolved build.
-        from feature_rl.environments.candidates import candidate_resolution
-        try:candidate_resolution(store,prepared,checked.recipe,policy,dirty,checked.contract.allowed_changes)
-        except (SourceRejected,DependencyUnavailable):pass
-        else:raise QualificationRejected('invalid_evidence','development fallback had resolvable declarations')
+        # The controller captured this resolution failure before starting the
+        # offline development sandbox. Evidence replay must never contact PyPI.
+        failure=value.get('extra',{}).get('dependency_failure')
+        if (not isinstance(failure,dict) or failure.get('type') not in {'SourceRejected','DependencyUnavailable'}
+                or failure.get('source_tree_sha256')!=dirty.tree_sha256
+                or not isinstance(failure.get('reason'),str) or not failure['reason']):
+            raise QualificationRejected('invalid_evidence','development fallback lacks its controller dependency failure')
         dependency_binding='baseline-tools'
     else:
         resolution_ref=ArtifactRef.model_validate_json(canonical_json(raw_resolution))

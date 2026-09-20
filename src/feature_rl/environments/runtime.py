@@ -50,13 +50,12 @@ def failure(exc):
 
 
 class EnvironmentRuntime:
-    def __init__(self,*,store:ArtifactStore,engine:DockerEngine,revision:str,dependency_catalog=None):
+    def __init__(self,*,store:ArtifactStore,engine:DockerEngine,revision:str):
         if engine.policy.profile is not None and not getattr(engine,'qualified',False):raise PolicyRejected('production boundary qualification required')
         if not isinstance(store,ArtifactStore) or store.role!=ActorRole.CONTROLLER:raise PolicyRejected('controller store required')
         if len(revision) not in (40,64) or any(c not in '0123456789abcdef' for c in revision):raise PolicyRejected('implementation revision required')
         self.store=store;self.engine=engine;self.policy=engine.policy;self.base_policy=engine.policy;self.revision=revision
         self.profile=self.policy.profile
-        self.dependency_catalog=dependency_catalog
         if engine.qualified:self._publish_qualification()
     def _publish_qualification(self):
         self.qualification_ref=self.publish(self.engine.qualification,'sandbox-qualification')
@@ -72,12 +71,12 @@ class EnvironmentRuntime:
             self.engine.qualify_boundary(image=policy.image)
         self.policy=policy;self.profile=policy.profile
         self._publish_qualification()
-    def prepare_repository(self,baseline,*,source_evidence,extra_roots=(),dependency_sources=()):
+    def prepare_repository(self,baseline,*,source_evidence,extra_roots=()):
         from .resolution import resolve_repository
         source=self.source(baseline)
         policy,pins=resolve_repository(self,source,extra_roots=extra_roots)
         self.bind_policy(policy)
-        return self.create_recipe(baseline,pins,source_evidence=source_evidence,dependency_sources=dependency_sources)
+        return self.create_recipe(baseline,pins,source_evidence=source_evidence)
     def publish(self,value,kind,visibility=Visibility.PRIVATE):
         data=canonical_json(value)
         if len(data)>64*1024*1024:raise EnvironmentError('evidence publication limit')
@@ -94,27 +93,22 @@ class EnvironmentRuntime:
         return SourceArchive.read(self.read_bytes(ref,self.policy.max_archive_bytes),self.policy)
     def dependency_bytes(self,pins):
         return dependency_files(self.store,pins,self.policy)
-    def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord,dependency_sources=()):
+    def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
         from .images import prepare_runtime_image, validate_baseline
         baseline=ArtifactRef.model_validate(baseline);pins=tuple(DependencyPin.model_validate(x) for x in pins)
         if self.profile is None or not self.engine.qualified:raise PolicyRejected('resolved qualified runtime required')
         source=self.source(baseline);self.profile.validate_source(source);self.dependency_bytes(pins)
         if baseline.visibility not in {Visibility.AUTHORING,Visibility.PUBLIC}:raise PolicyRejected('B-only recipe requires authoring/public baseline')
-        from .catalog import prepare_catalog
-        from .candidates import read_catalog
-        catalog,catalog_evidence=prepare_catalog(self,source,pins,
-            dependency_sources=tuple(self.source(ref) for ref in dependency_sources))
-        catalog_wheels=tuple(item.artifact for item in read_catalog(self.store,catalog,self.policy).wheels)
         image,image_ref=prepare_runtime_image(self,pins)
         construction_evidence=validate_baseline(self,image,baseline,source)
         p=self.policy;policy_ref=self.publish(p.model_dump(mode='json'),'sandbox-policy',Visibility.AUTHORING)
         now=datetime.now(timezone.utc)
         repairs=self.profile.neutral_repairs
         recipe=EnvironmentRecipe(kind='EnvironmentRecipe',schema_version=1,visibility=Visibility.AUTHORING,
-            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=tuple(dict.fromkeys((baseline,policy_ref,catalog,catalog_evidence,image_ref,image.context,*(() if self.profile.resolution is None else (self.profile.resolution,)),*catalog_wheels))),evidence=(source_evidence,
+            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=tuple(dict.fromkeys((baseline,policy_ref,image_ref,image.context,*(() if self.profile.resolution is None else (self.profile.resolution,)),*(pin.artifact for pin in pins)))),evidence=(source_evidence,
                 EvidenceRecord(producer='feature_rl.environments runtime image construction',command=('build pinned runtime image','verify offline baseline dependency closure'),recorded_at=now,exit_status=0,artifacts=(image_ref,construction_evidence),revision=self.revision,scope='real_integration'))),
             costs=(CostRecord(category='construction',wall_seconds=None,cpu_seconds=None,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='unknown',note='Recipe publication; execution measured separately'),),
-            image_digest=image.image_digest,runtime_image=image_ref,dependency_catalog=catalog,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.setup,reset=self.profile.setup,services=(),
+            image_digest=image.image_digest,runtime_image=image_ref,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.setup,reset=self.profile.setup,services=(),
             limits=ResourceLimits(wall_seconds=p.lifecycle_seconds,cpu_seconds=p.cpu_seconds,memory_bytes=p.memory_bytes,pids=p.pids,output_bytes=p.output_bytes,disk_bytes=p.disk_bytes,tool_calls=100,input_tokens=1,output_tokens=1),
             neutral_repairs=repairs,locale='C.UTF-8',timezone='UTC',environment=tuple(EnvironmentVariable(name=k,value=v) for k,v in self.profile.environment),
             randomness=SeedPolicy(algorithm='PYTHONHASHSEED',seeds=(0,),same_cases_within_group=True),network_policy='none',baseline=baseline)
@@ -130,36 +124,68 @@ class EnvironmentRuntime:
         if bind:self.bind_policy(policy)
         return recipe
     def candidate_dependencies(self,prepared,source,rules):
-        """Freeze a candidate build input; never change the task or its recipe."""
-        from .candidates import candidate_identity, candidate_resolution
+        """Resolve on the controller, then freeze a reusable offline build input."""
+        from .catalog import RegistryCatalog
+        from .candidates import (DependencyResolution, _candidate_inputs,
+            _resolution, _solve, read_dependency_resolution, resolution_identity)
         recipe=self.recipe(prepared,bind=False)
         policy=SandboxPolicy.model_validate_json(self.read_bytes(prepared.policy,131072))
-        identity=candidate_identity(self.store,prepared,recipe,policy,source,rules)
-        name='candidate-dependencies-'+identity+'.json'
+        metadata,rules,environment,manifests,digest,identity,request_identity=_candidate_inputs(
+            self.store,prepared,recipe,policy,source,rules)
+        candidate_name='candidate-dependencies-'+identity+'.json'
+        request_name='dependency-request-'+request_identity+'.json'
+
+        def cached_reference(name):
+            try:
+                value=self.engine.state.read(name)
+            except FileNotFoundError:
+                return None
+            except (ValueError,RecursionError) as exc:
+                raise PolicyRejected('corrupt candidate dependency cache pointer') from exc
+            try:
+                return ArtifactRef.model_validate_json(canonical_json(value))
+            except (ValueError,TypeError,RecursionError) as exc:
+                raise PolicyRejected('invalid candidate dependency cache pointer') from exc
+        # Serialize acquisition and publication, including concurrent submissions.
+        # The request points permanently to its snapshot-qualified resolution;
+        # replay never consults current registry state or downloads a wheel again.
         with self.engine.state.lock():
-            try:cached=self.engine.state.read(name)
-            except FileNotFoundError:cached=None
-        if cached is not None:
-            ref=ArtifactRef.model_validate_json(canonical_json(cached))
-            value=self.read_candidate_dependencies(ref,prepared,source,rules)
-            return ref,value
-        value=candidate_resolution(self.store,prepared,recipe,policy,source,rules)
-        if value.identity!=identity:raise PolicyRejected('candidate resolution identity changed')
-        ref=self.publish(value.model_dump(mode='json'),'candidate-dependency-resolution')
-        with self.engine.state.lock():
-            try:cached=self.engine.state.read(name)
-            except FileNotFoundError:self.engine.state.write(name,ref.model_dump(mode='json'))
+            self.engine._require_clean_owned_state()
+            cached=cached_reference(candidate_name)
+            if cached is not None:
+                return cached,self.read_candidate_dependencies(cached,prepared,source,rules)
+            cached=cached_reference(request_name)
+            if cached is None:
+                available=tuple(dict.fromkeys((*[pin.artifact for pin in recipe.dependencies],
+                                                *rules.dependency_artifacts)))
+                registry=RegistryCatalog(self,policy,request_identity,available=available)
+                selected=_solve(registry.options,metadata,policy.profile,rules,recipe,environment,
+                                policy,check_deadline=registry.check_deadline)
+                snapshot=registry.freeze()
+                frozen=DependencyResolution(request_identity=request_identity,index_snapshot=snapshot,
+                    identity=resolution_identity(request_identity,snapshot),
+                    wheels=tuple(wheel.item for wheel in selected) if selected is not None else (),
+                    failure='no-compatible-closure' if selected is None else None)
+                lock_ref=self.publish(frozen.model_dump(mode='json'),'dependency-resolution',Visibility.AUTHORING)
+                self.engine.state.write('dependency-resolution-'+frozen.identity+'.json',lock_ref.model_dump(mode='json'))
+                self.engine.state.write(request_name,lock_ref.model_dump(mode='json'))
+                if selected is None:
+                    raise DependencyUnavailable('trusted registry snapshot has no compatible complete dependency closure')
             else:
-                if cached!=ref.model_dump(mode='json'):
-                    raise PolicyRejected('candidate dependency cache contains conflicting resolutions')
-        return ref,value
+                lock_ref=cached
+                _,selected=read_dependency_resolution(self.store,lock_ref,request_identity,
+                    metadata,rules,recipe,policy,environment)
+            value=_resolution(prepared,policy,metadata,manifests,digest,identity,lock_ref,selected)
+            ref=self.publish(value.model_dump(mode='json'),'candidate-dependency-resolution')
+            self.engine.state.write(candidate_name,ref.model_dump(mode='json'))
+            return ref,value
     def read_candidate_dependencies(self,ref,prepared,source,rules):
         """Verify retained candidate inputs without resolving again or executing."""
         from .candidates import CandidateResolution, validate_candidate_resolution
         ref=ArtifactRef.model_validate(ref)
         if ref.kind!='candidate-dependency-resolution' or ref.visibility!=Visibility.PRIVATE or ref.encoding!='bytes':
             raise PolicyRejected('private candidate dependency resolution required')
-        value=CandidateResolution.model_validate_json(self.read_bytes(ref,1024*1024))
+        value=CandidateResolution.model_validate_json(self.read_bytes(ref,self.policy.max_staging_bytes))
         recipe=self.recipe(prepared,bind=False)
         policy=SandboxPolicy.model_validate_json(self.read_bytes(prepared.policy,131072))
         return validate_candidate_resolution(value,self.store,prepared,recipe,policy,source,rules)
@@ -293,13 +319,14 @@ class EnvironmentRuntime:
             raise PolicyRejected('request CPU cap exceeds admitted policy')
         value,prepared,recipe,saved,source=self.workspace(handle);wheel=None
         rules=AllowedChanges.model_validate_json(canonical_json(value['allowed_changes']))
-        resolution_ref=resolution=None
+        resolution_ref=resolution=None;dependency_failure=None
         if development:
             try:resolution_ref,resolution=self.candidate_dependencies(prepared,source,rules)
-            except (SourceRejected,DependencyUnavailable):
-                # Incomplete declarations remain editable using the baseline
-                # tools. Builds never use this fallback.
-                pass
+            except (SourceRejected,DependencyUnavailable) as exc:
+                # Incomplete declarations remain editable using baseline tools.
+                # Retain the controller outcome so evidence replay stays offline.
+                dependency_failure={'type':type(exc).__name__,'source_tree_sha256':source.tree_sha256,
+                                    'reason':str(exc)}
         else:
             resolution_ref=build.dependency_resolution
             resolution=self.read_candidate_dependencies(resolution_ref,prepared,source,rules)
@@ -342,7 +369,7 @@ class EnvironmentRuntime:
         elif result.reason=='monitor_failure':reason,category='infrastructure_failure','infrastructure'
         elif result.reason=='exited':reason,category=('command_failed','candidate') if result.exit_code else ('completed','none')
         else:reason,category=result.reason,'candidate'
-        evidence=self.evidence(s,phase,{'dependency_resolution':resolution_ref.model_dump(mode='json') if resolution_ref else None,'error':repr(error) if error else None,'reason':reason,'failure_category':category,'saved_source':next_saved.model_dump(mode='json'),'save_status':save_status,'import_policy':'current source first; no installed target package' if development else 'fresh exact-source wheel installed outside source','build_evidence':build.evidence.model_dump(mode='json') if build else None})
+        evidence=self.evidence(s,phase,{'dependency_resolution':resolution_ref.model_dump(mode='json') if resolution_ref else None,'dependency_failure':dependency_failure,'error':repr(error) if error else None,'reason':reason,'failure_category':category,'saved_source':next_saved.model_dump(mode='json'),'save_status':save_status,'import_policy':'current source first; no installed target package' if development else 'fresh exact-source wheel installed outside source','build_evidence':build.evidence.model_dump(mode='json') if build else None})
         cost=CostRecord(category='execution',wall_seconds=time.monotonic()-start,cpu_seconds=s.maximum_cpu_seconds,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='partial',note='CPU/memory maximum from Docker cgroup samples; wall includes setup/export/cleanup; no currency estimate')
         if error and not isinstance(error,Exception):raise error
         return ExecutionResult(operation_id=s.record.operation_id,reason=reason,failure_category=category,exit_code=result.exit_code if result else None,stdout=result.stdout if result else b'',stderr=result.stderr if result else b'',

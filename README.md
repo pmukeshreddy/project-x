@@ -39,10 +39,10 @@ dependency closure, source layout and system package requirements, then freezes
 wheel hashes and image digests. Configure the Linux platform, sandbox limits and
 publishing registry; per-repository profiles and dependency pins are generated.
 Unresolved declarations or an incomplete reproducible closure reject preparation.
-Preparation automatically populates a shared package/version catalog from trusted
-PyPI metadata and hash-verified wheels, including compatible alternative versions
-and dependencies discovered across repositories. Each task freezes one catalog
-snapshot; candidates resolve their own safe declarations against it offline.
+Candidate builds resolve their own safe declarations through a trusted controller
+registry service. Resolution retains package-index snapshots and an exact
+hash-verified wheel closure for offline installation and replay. Shared metadata
+and wheel caches can serve other candidates and repositories.
 See [runtime construction](docs/interfaces-M3.md).
 
 [`construct-feature --github`](docs/runbook.md) captures a merged PR, its discussion
@@ -51,9 +51,10 @@ with `--prepared`; private repositories support token authentication. The recons
 contract explicitly selects required files and records their requirement/evidence links.
 Projection preserves selected source, stubs, assets, configuration, build and dependency
 changes. Unrelated files retain their baseline versions. Candidate dependencies can
-use any compatible catalog choice while the task's Python, platform and system
-packages stay fixed. Missing catalog packages leave the result unmeasured; unsafe
-declarations are candidate rejections.
+use compatible registry packages while the task's Python, platform and system
+packages stay fixed. Unavailable dependency resolution leaves the result unmeasured;
+unsafe declarations are candidate rejections. Candidate resolutions are build
+artifacts; the task and environment recipe retain their original identities.
 Experiment splits and authoring budgets remain explicit.
 GPU training,
 native GPU inference, new task generation and experimental results remain

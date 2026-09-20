@@ -40,8 +40,6 @@ def _reject(message):
 def _strings(value, label):
     if not isinstance(value, (list, tuple)) or any(not isinstance(x, str) for x in value):
         _reject(label+' must be a static list of strings')
-    if len(value) > 1024:
-        _reject(label+' exceeds metadata item limit')
     return list(value)
 
 
@@ -132,8 +130,6 @@ class _Repository:
         requirements, constraints = [], []
         content = re.sub(r'\\\s*\n', ' ', self.text(path))
         for number, original in enumerate(content.splitlines(), 1):
-            if len(requirements)+len(constraints) > 4096:
-                _reject(path+' exceeds requirement item limit')
             line = re.split(r'\s+#', original, maxsplit=1)[0].strip()
             if not line or line.startswith('#'):
                 continue
@@ -229,7 +225,7 @@ def _literal(node, env):
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
         left, right = _literal(node.left, env), _literal(node.right, env)
         if isinstance(left, (str, list)) and type(left) is type(right):
-            if len(left)+len(right) > (1024*1024 if isinstance(left, str) else 4096):
+            if len(left if isinstance(left, str) else repr(left)) + len(right if isinstance(right, str) else repr(right)) > 1024*1024:
                 raise ValueError('static expression exceeds size limit')
             return left+right
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'dict':
@@ -587,8 +583,8 @@ def _locks(repo, project_name):
             continue
         lock = repo.toml(path)
         packages = lock.get('package')
-        if not isinstance(packages, list) or len(packages) > 2048:
-            _reject(path+' has an invalid/bounded package roster')
+        if not isinstance(packages, list):
+            _reject(path+' has an invalid package roster')
         for item in packages:
             item = _table(item, path+' package')
             name = item.get('name')

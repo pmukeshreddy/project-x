@@ -70,7 +70,6 @@ class FeatureWorkflow:
         value={'version':'m6-feature-policy-v1','revision':factory.revision,
             'builder_revision':factory.builder.revision,'runtime_revision':runtime.revision,
             'runtime_policy':document(runtime.base_policy),
-            'dependency_catalog':document(runtime.dependency_catalog) if runtime.dependency_catalog is not None else None,
             'settings':document(config),'source_index':document(manifest)}
         self.configuration=put(factory,value,'m6-feature-policy',dependencies=references(value))
 
@@ -259,8 +258,7 @@ class FeatureWorkflow:
         candidate=typed(self.store,selected.candidate,c.CandidateRecord)
         pair=typed(self.store,selected.source_pair,c.SourcePair)
         prepared=self.runtime.prepare_repository(selected.baseline,
-            source_evidence=candidate.provenance.evidence[0],extra_roots=tuple(entry.path for entry in pair.changed_files),
-            dependency_sources=(selected.reference,))
+            source_evidence=candidate.provenance.evidence[0],extra_roots=tuple(entry.path for entry in pair.changed_files))
         discovery=RuntimeDiscoveryService(runtime=self.runtime).discover(prepared)
         value=PreparationSelection(environment=prepared,context=discovery.context,
             entry_points=discovery.observation.entry_points,

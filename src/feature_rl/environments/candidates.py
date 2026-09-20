@@ -1,8 +1,8 @@
-"""Pure, bounded resolution of candidate declarations against immutable wheels.
+"""Inert candidate declarations, dependency solving and frozen-input validation.
 
-Only repository text and ZIP metadata are inspected on the controller.  The
-catalog is frozen when a task is prepared; this module never downloads, builds,
-imports a project, or writes candidate state.
+The controller supplies a lazy trusted registry provider during resolution.
+Archived resolutions use only exact retained artifacts. Submitted source and
+wheel code are never executed here.
 """
 from dataclasses import dataclass
 from email.parser import BytesParser
@@ -33,15 +33,8 @@ from .models import DependencyUnavailable, PolicyRejected, SourceRejected
 from .profiles import RuntimeProfile, WheelPin, metadata_digest
 
 
-_SOLVER_VERSION = 'offline-wheel-solver-v1'
-_CATALOG_WHEELS = 2048
-_CATALOG_BYTES = 4 * 1024 * 1024
-_CATALOG_PAYLOAD_BYTES = 512 * 1024 * 1024
-_CATALOG_EXPANDED_BYTES = 1024 * 1024 * 1024
+_SOLVER_VERSION = 'candidate-wheel-solver-v2'
 _METADATA_BYTES = 1024 * 1024
-_REQUIREMENTS = 4096
-_SOLVER_STEPS = 200000
-_SOLVER_BRANCHES = 4096
 _MARKER_KEYS = frozenset({
     'implementation_name', 'implementation_version', 'os_name', 'platform_machine',
     'platform_python_implementation', 'platform_release', 'platform_system',
@@ -55,21 +48,26 @@ class CatalogWheel(StrictModel):
     artifact: ArtifactRef
 
 
-class DependencyCatalog(StrictModel):
-    version: Literal['offline-wheel-catalog-v1'] = 'offline-wheel-catalog-v1'
-    wheels: Annotated[tuple[CatalogWheel, ...], Field(min_length=1, max_length=_CATALOG_WHEELS)]
+class DependencyResolution(StrictModel):
+    """Reusable controller result bound to an immutable package-index snapshot."""
+    version: Literal['dependency-resolution-v1'] = 'dependency-resolution-v1'
+    request_identity: _DIGEST
+    index_snapshot: ArtifactRef
+    identity: _DIGEST
+    wheels: tuple[CatalogWheel, ...]
+    failure: Literal['no-compatible-closure'] | None = None
 
 
 class CandidateResolution(StrictModel):
     version: Literal['candidate-dependencies-v1'] = 'candidate-dependencies-v1'
     recipe: ArtifactRef
     policy: ArtifactRef
-    catalog: ArtifactRef
+    resolution: ArtifactRef
     identity: _DIGEST
     manifest_hashes: dict[str, str]
     metadata_sha256: _DIGEST
     profile: RuntimeProfile
-    dependencies: Annotated[tuple[DependencyPin, ...], Field(min_length=1, max_length=64)]
+    dependencies: Annotated[tuple[DependencyPin, ...], Field(min_length=1)]
 
 
 @dataclass(frozen=True)
@@ -115,14 +113,14 @@ def _inspect_wheel(store, item, policy):
     pin = item.pin
     data = _bytes(store, item.artifact, policy.max_staging_bytes)
     if hashlib.sha256(data).hexdigest() != pin.sha256:
-        raise PolicyRejected('dependency catalog wheel payload hash mismatch')
+        raise PolicyRejected('dependency wheel payload hash mismatch')
     try:
         if safe_path(pin.filename) != pin.filename or '/' in pin.filename:
             raise PolicyRejected('noncanonical dependency wheel filename')
         _tags('-'.join(pin.filename[:-4].split('-')[-3:]))
         name, version, build, tags = parse_wheel_filename(pin.filename)
         if name != canonicalize_name(pin.name) or version != Version(pin.version):
-            raise PolicyRejected('dependency catalog filename/pin identity mismatch')
+            raise PolicyRejected('dependency wheel filename/pin identity mismatch')
         metadata_root = '-'.join(pin.filename.split('-')[:2]) + '.dist-info'
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             infos = archive.infolist()
@@ -186,8 +184,8 @@ def _inspect_wheel(store, item, policy):
             python_headers = package.get_all('Requires-Python', [])
             requires = package.get_all('Requires-Dist', [])
             extras = package.get_all('Provides-Extra', [])
-            if len(python_headers) > 1 or len(requires) > _REQUIREMENTS or len(extras) > 256:
-                raise PolicyRejected('dependency wheel requirement metadata cap')
+            if len(python_headers) > 1:
+                raise PolicyRejected('ambiguous dependency wheel Requires-Python metadata')
             if any(not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', extra) for extra in extras):
                 raise PolicyRejected('invalid dependency wheel extra')
             return _Wheel(item, name, version, build, frozenset(declared_tags),
@@ -197,87 +195,6 @@ def _inspect_wheel(store, item, policy):
     except (SourceRejected, zipfile.BadZipFile, ValueError, OSError, RuntimeError,
             NotImplementedError, EOFError, zlib.error) as exc:
         raise PolicyRejected('invalid frozen dependency wheel: ' + str(exc)) from exc
-
-
-def _inspect_catalog(store, catalog, policy):
-    records, names, artifacts = [], set(), set()
-    compressed = expanded = 0
-    for item in catalog.wheels:
-        if item.pin.filename in names or item.artifact in artifacts:
-            raise PolicyRejected('duplicate dependency catalog wheel filename/artifact')
-        names.add(item.pin.filename)
-        artifacts.add(item.artifact)
-        wheel = _inspect_wheel(store, item, policy)
-        compressed += wheel.size
-        expanded += wheel.expanded_size
-        if compressed > _CATALOG_PAYLOAD_BYTES or expanded > _CATALOG_EXPANDED_BYTES:
-            raise PolicyRejected('aggregate dependency catalog byte cap')
-        records.append(wheel)
-    return tuple(records)
-
-
-def _load_catalog(store, ref, policy):
-    _reference(ref, 'dependency-catalog')
-    try:
-        catalog = DependencyCatalog.model_validate_json(_bytes(store, ref, _CATALOG_BYTES))
-    except ValidationError as exc:
-        raise PolicyRejected('invalid frozen dependency catalog') from exc
-    return catalog, _inspect_catalog(store, catalog, policy)
-
-
-def read_catalog(store, ref, policy) -> DependencyCatalog:
-    """Read and validate a bounded authoring/public catalog and every wheel."""
-    return _load_catalog(store, ref, policy)[0]
-
-
-def publish_catalog(store, policy, items) -> ArtifactRef:
-    """Validate and retain a deterministic catalog, independent of any repository."""
-    unique = {}
-    for item in items:
-        previous = unique.setdefault(item.pin.filename, item)
-        if previous != item:
-            raise PolicyRejected('conflicting dependency catalog wheel filename')
-    catalog = DependencyCatalog(wheels=tuple(sorted(unique.values(), key=lambda item: (
-        canonicalize_name(item.pin.name), Version(item.pin.version), item.pin.filename,
-        item.pin.sha256, item.artifact.sha256))))
-    _inspect_catalog(store, catalog, policy)
-    data = canonical_json(catalog.model_dump(mode='json'))
-    if len(data) > _CATALOG_BYTES:
-        raise PolicyRejected('dependency catalog serialized byte cap')
-    return store.put_bytes(data, 'dependency-catalog', Visibility.AUTHORING)
-
-
-def _baseline_entries(recipe, policy, catalog):
-    if policy.profile is None:
-        raise PolicyRejected('dependency catalog requires a runtime profile')
-    expected = {canonicalize_name(pin.name): pin for pin in policy.profile.dependencies}
-    pins = {canonicalize_name(pin.name): pin for pin in recipe.dependencies}
-    if len(pins) != len(recipe.dependencies) or set(pins) != set(expected):
-        raise PolicyRejected('recipe/profile dependency roster mismatch')
-    available = {(canonicalize_name(item.pin.name), item.pin.version, item.pin.filename,
-                  item.pin.sha256, item.artifact) for item in catalog.wheels}
-    if any(item.artifact not in recipe.provenance.inputs for item in catalog.wheels):
-        raise PolicyRejected('recipe dependency catalog wheel lost provenance')
-    for name, spec in expected.items():
-        pin = pins[name]
-        if (pin.version != spec.version or pin.sha256 != spec.sha256
-                or (name, spec.version, spec.filename, pin.sha256, pin.artifact) not in available):
-            raise PolicyRejected('frozen catalog omits or changes a baseline dependency')
-
-
-def _catalog_binding(recipe):
-    ref = recipe.dependency_catalog
-    _reference(ref, 'dependency-catalog')
-    if ref not in recipe.provenance.inputs:
-        raise PolicyRejected('recipe dependency catalog lost provenance')
-    return ref
-
-
-def validate_catalog(recipe, policy, store):
-    """Verify the recipe retains its catalog and complete baseline wheel inputs."""
-    catalog = read_catalog(store, _catalog_binding(recipe), policy)
-    _baseline_entries(recipe, policy, catalog)
-    return catalog
 
 
 def _safe_requirement(value):
@@ -317,8 +234,8 @@ def _repository_policy(source):
         return value
 
     def requirements(values):
-        if not isinstance(values, list) or len(values) > _REQUIREMENTS:
-            raise SourceRejected('candidate manifest requires a bounded dependency list')
+        if not isinstance(values, list):
+            raise SourceRejected('candidate manifest requires a static dependency list')
         for value in values:
             _safe_requirement(value)
 
@@ -403,7 +320,6 @@ def _candidate_inputs(store, prepared, recipe, policy, source, rules):
     profile = policy.profile
     if profile is None:
         raise DependencyUnavailable('candidate has no fixed repository runtime')
-    catalog = _catalog_binding(recipe)
     if prepared.policy not in recipe.provenance.inputs:
         raise PolicyRejected('candidate recipe/policy provenance mismatch')
     try:
@@ -450,7 +366,7 @@ def _candidate_inputs(store, prepared, recipe, policy, source, rules):
     # Hash the inert solver/inference sources, not a repository revision supplied
     # by a candidate. No imported dependency or submitted source is executed.
     implementation = {}
-    for filename in ('candidates.py', 'inference.py', 'profiles.py'):
+    for filename in ('candidates.py', 'catalog.py', 'inference.py', 'profiles.py'):
         try:
             implementation[filename] = hashlib.sha256(Path(__file__).with_name(filename).read_bytes()).hexdigest()
         except OSError as exc:
@@ -458,57 +374,49 @@ def _candidate_inputs(store, prepared, recipe, policy, source, rules):
     identity = hashlib.sha256(canonical_json({
         'solver': _SOLVER_VERSION, 'implementation': implementation, 'packaging': packaging_version,
         'recipe': prepared.recipe.model_dump(mode='json'), 'policy': prepared.policy.model_dump(mode='json'),
-        'catalog': catalog.model_dump(mode='json'), 'rules': rules.model_dump(mode='json'),
+        'rules': rules.model_dump(mode='json'),
         'manifest_hashes': manifests, 'metadata_sha256': digest,
         'profile_inputs': {'manifest_path': metadata['manifest_path'], 'source_roots': metadata['source_roots']},
     })).hexdigest()
-    return metadata, rules, environment, manifests, digest, identity
+    # The canonical dependency declarations identify the manifest for package
+    # selection. Unrelated source/build metadata edits reuse this lock; the exact
+    # submitted manifest hashes still bind the candidate profile above. Task and
+    # historical source identities never select packages. Restricted tasks retain
+    # their explicit artifact policy.
+    allowed = _allowed_artifacts(rules, recipe)
+    dependency_identity = hashlib.sha256(canonical_json({
+        'solver': _SOLVER_VERSION, 'implementation': implementation, 'packaging': packaging_version,
+        'manifest_dependencies': _semantic_dependencies(metadata),
+        'python': profile.interpreter_version, 'markers': environment, 'tags': profile.compatible_tags,
+        'system_packages': [pin.model_dump(mode='json') for pin in profile.system_packages],
+        'dependency_policy': rules.dependencies,
+        'artifact_policy': {'max_staging_bytes': policy.max_staging_bytes,
+                            'disk_bytes': policy.disk_bytes, 'max_files': policy.max_files},
+        'allowed_artifacts': None if allowed is None else sorted(
+            (ref.model_dump(mode='json') for ref in allowed), key=lambda item: item['sha256']),
+    })).hexdigest()
+    return metadata, rules, environment, manifests, digest, identity, dependency_identity
 
 
-def candidate_identity(store, prepared, recipe, policy, source, rules) -> str:
-    """Compute the candidate's cache identity without reading or searching wheels."""
-    return _candidate_inputs(store, prepared, recipe, policy, source, rules)[-1]
-
-
-def _solve(records, metadata, profile, rules, recipe, environment, policy):
-    steps = branches = 0
-
-    def charge():
-        nonlocal steps
-        steps += 1
-        if steps > _SOLVER_STEPS:
-            raise DependencyUnavailable('offline dependency resolution exceeded its bounded work budget')
-
-    baseline = {pin.artifact for pin in recipe.dependencies}
-    allowed = None
+def _allowed_artifacts(rules, recipe):
     if rules.dependencies == 'forbidden' or rules.dependency_artifacts:
-        allowed = baseline | set(rules.dependency_artifacts)
-    ranks = {tag: rank for rank, tag in reversed(tuple(enumerate(profile.compatible_tags)))}
-    options = {}
-    for wheel in records:
-        if (allowed is not None and wheel.item.artifact not in allowed
-                or not wheel.tags.intersection(ranks)
-                or not wheel.requires_python.contains(profile.interpreter_version, prereleases=True)):
-            continue
-        try:
-            for requirement in wheel.requirements:
-                charge()
-                _safe_requirement(str(requirement))
-        except SourceRejected:
-            # Vendor metadata cannot turn a safe candidate into a rejection;
-            # another safe version may still satisfy the complete closure.
-            continue
-        options.setdefault(wheel.name, []).append(wheel)
-    for values in options.values():
-        values.sort(key=lambda wheel: (wheel.item.pin.filename, wheel.item.pin.sha256, wheel.item.artifact.sha256))
-        values.sort(key=lambda wheel: wheel.build, reverse=True)
-        values.sort(key=lambda wheel: min(ranks[tag] for tag in wheel.tags if tag in ranks))
-        values.sort(key=lambda wheel: wheel.version, reverse=True)
+        return {pin.artifact for pin in recipe.dependencies} | set(rules.dependency_artifacts)
+    return None
+
+
+def _solve(options, metadata, profile, rules, recipe, environment, policy, *, check_deadline=lambda: None):
+    """Iterative backtracking over lazy choices, without package/version count caps.
+
+    ``options`` supplies every compatible version from one retained registry view,
+    or just the archived wheels during offline verification. Byte/disk and
+    controller deadline limits constrain resources, never the version roster.
+    """
+    allowed = _allowed_artifacts(rules, recipe)
     roots = tuple(_safe_requirement(value) for value in (*metadata['build_requirements'], *metadata['requirements']))
     constraints = {}
 
     def active(requirement, extra=''):
-        charge()
+        check_deadline()
         try:
             return requirement.marker is None or requirement.marker.evaluate({**environment, 'extra': extra})
         except (ValueError, KeyError) as exc:
@@ -520,9 +428,12 @@ def _solve(records, metadata, profile, rules, recipe, environment, policy):
             constraints.setdefault(canonicalize_name(requirement.name), []).append(requirement)
 
     def accepts(wheel, requirements, extras):
-        charge()
+        check_deadline()
         hashes = metadata['dependency_hashes'].get(wheel.name)
         return (extras <= wheel.extras and (not hashes or wheel.item.pin.sha256 in hashes)
+                and (allowed is None or wheel.item.artifact in allowed)
+                and wheel.tags.intersection(profile.compatible_tags)
+                and wheel.requires_python.contains(profile.interpreter_version, prereleases=True)
                 and all(requirement.specifier.contains(wheel.version, prereleases=True)
                         for requirement in (*requirements, *constraints.get(wheel.name, ()))))
 
@@ -530,6 +441,7 @@ def _solve(records, metadata, profile, rules, recipe, environment, policy):
         needed, extras, expanded, known = {}, {}, set(), set()
         pending = [(requirement, '', False) for requirement in roots]
         while pending:
+            check_deadline()
             requirement, extra, vendor = pending.pop()
             try:
                 applicable = active(requirement, extra)
@@ -546,8 +458,6 @@ def _solve(records, metadata, profile, rules, recipe, environment, policy):
                 needed.setdefault(name, []).append(requirement)
             requested = extras.setdefault(name, set())
             requested.update(canonicalize_name(value) for value in requirement.extras)
-            if len(needed) > 64 or len(known) > _REQUIREMENTS:
-                raise DependencyUnavailable('candidate dependency closure exceeds the fixed task bounds')
             wheel = selected.get(name)
             if wheel is None:
                 continue
@@ -561,47 +471,95 @@ def _solve(records, metadata, profile, rules, recipe, environment, policy):
                     pending.append((dependency, enabled, True))
         return needed, extras
 
-    def search(selected):
-        nonlocal branches
-        branches += 1
-        if branches > _SOLVER_BRANCHES:
-            raise DependencyUnavailable('offline dependency resolution exceeded its bounded search budget')
-        result = closure(selected)
-        if result is None:
-            return None
-        needed, extras = result
-        missing = sorted(set(needed) - set(selected))
-        if not missing:
-            return tuple(selected[name] for name in sorted(selected))
-        choices = []
-        for name in missing:
-            candidates = [wheel for wheel in options.get(name, ()) if accepts(wheel, needed[name], extras[name])]
-            if not candidates:
-                return None
-            if not any(requirement.specifier.prereleases for requirement in (*needed[name], *constraints.get(name, ()))):
-                candidates.sort(key=lambda wheel: wheel.version.is_prerelease)
-            # Preserve an already frozen usable baseline choice, while allowing
-            # constraints or later transitive conflicts to select any alternative.
-            candidates.sort(key=lambda wheel: wheel.item.artifact not in baseline)
-            choices.append((len(candidates), name, candidates))
-        _, name, candidates = min(choices, key=lambda choice: (choice[0], choice[1]))
-        for wheel in candidates:
+    def extend(selected, name, requirements, extras):
+        requirements = (*requirements, *constraints.get(name, ()))
+        hashes = metadata['dependency_hashes'].get(name)
+        # The existing forbidden-dependency policy uses B's pins, never H's.
+        if rules.dependencies == 'forbidden':
+            baseline = next((pin for pin in recipe.dependencies if canonicalize_name(pin.name) == name), None)
+            if baseline is None:
+                return
+            requirements = (*requirements, Requirement(name + '==' + baseline.version))
+            hashes = {baseline.sha256} if not hashes else set(hashes) & {baseline.sha256}
+            if not hashes:
+                return
+        prereleases = any(requirement.specifier.prereleases for requirement in requirements)
+        for wheel in options(name, requirements, hashes, prefer_prereleases=prereleases):
+            check_deadline()
+            if wheel.name != name:
+                raise PolicyRejected('dependency provider returned a different package name')
+            try:
+                for requirement in wheel.requirements:
+                    _safe_requirement(str(requirement))
+            except SourceRejected:
+                continue
+            if not accepts(wheel, requirements, extras):
+                continue
             next_selected = {**selected, name: wheel}
             if (sum(item.size for item in next_selected.values()) > policy.max_staging_bytes
                     or sum(item.expanded_size for item in next_selected.values()) > policy.disk_bytes):
                 continue
-            result = search(next_selected)
-            if result is not None:
-                return result
-        return None
+            yield next_selected
 
-    selected = search({})
-    if not selected:
-        raise DependencyUnavailable('fixed offline wheel catalog has no compatible complete candidate dependency closure')
-    return selected
+    # Iterator frames avoid Python's recursion limit on package closure size and
+    # acquire each wheel only when its branch is actually explored.
+    stack = [iter(({},))]
+    while stack:
+        check_deadline()
+        try:
+            selected = next(stack[-1])
+        except StopIteration:
+            stack.pop()
+            continue
+        result = closure(selected)
+        if result is None:
+            continue
+        needed, extras = result
+        missing = sorted(set(needed) - set(selected))
+        if not missing:
+            return tuple(selected[name] for name in sorted(selected))
+        name = missing[0]
+        stack.append(extend(selected, name, needed[name], extras[name]))
+    return None
 
 
-def _resolution(prepared, recipe, policy, metadata, manifests, digest, identity, selected):
+def resolution_identity(request_identity, snapshot):
+    return hashlib.sha256(canonical_json({'request': request_identity,
+        'package_index_snapshot': snapshot.model_dump(mode='json')})).hexdigest()
+
+
+def read_dependency_resolution(store, ref, request_identity, metadata, rules, recipe, policy, environment):
+    """Check a retained lock offline, without choosing any alternative artifacts."""
+    from .catalog import validate_snapshot
+    _reference(ref, 'dependency-resolution')
+    try:
+        value = DependencyResolution.model_validate_json(_bytes(store, ref, policy.max_staging_bytes))
+        if (value.request_identity != request_identity
+                or value.identity != resolution_identity(request_identity, value.index_snapshot)):
+            raise PolicyRejected('dependency resolution/cache identity mismatch')
+        validate_snapshot(store, value.index_snapshot, policy.profile, policy, value.wheels)
+        if value.failure is not None:
+            if value.wheels:
+                raise PolicyRejected('failed dependency resolution contains selected wheels')
+            raise DependencyUnavailable('trusted registry snapshot has no compatible complete dependency closure')
+        records = tuple(_inspect_wheel(store, item, policy) for item in value.wheels)
+        by_name = {wheel.name: wheel for wheel in records}
+        if len(by_name) != len(records) or not records:
+            raise PolicyRejected('frozen dependency resolution has a duplicate or empty package roster')
+
+        def options(name, requirements, hashes, *, prefer_prereleases=False):
+            if name in by_name:
+                yield by_name[name]
+
+        selected = _solve(options, metadata, policy.profile, rules, recipe, environment, policy)
+        if selected is None or tuple(wheel.item for wheel in selected) != value.wheels:
+            raise PolicyRejected('frozen dependency resolution is not the exact declared closure')
+        return value, selected
+    except (SourceRejected, ValidationError) as exc:
+        raise PolicyRejected('invalid frozen dependency resolution') from exc
+
+
+def _resolution(prepared, policy, metadata, manifests, digest, identity, resolution, selected):
     pins = tuple(DependencyPin(name=wheel.name, version=str(wheel.version), artifact=wheel.item.artifact,
                                sha256=wheel.item.pin.sha256) for wheel in selected)
     values = policy.profile.model_dump()
@@ -619,42 +577,22 @@ def _resolution(prepared, recipe, policy, metadata, manifests, digest, identity,
         profile = RuntimeProfile.model_validate(values)
     except ValidationError as exc:
         raise DependencyUnavailable('candidate runtime metadata is outside the supported profile bounds') from exc
-    return CandidateResolution(recipe=prepared.recipe, policy=prepared.policy, catalog=recipe.dependency_catalog,
+    return CandidateResolution(recipe=prepared.recipe, policy=prepared.policy, resolution=resolution,
                                identity=identity, manifest_hashes=manifests, metadata_sha256=digest,
                                profile=profile, dependencies=pins)
 
 
-def candidate_resolution(store, prepared, recipe, policy, source, rules) -> CandidateResolution:
-    """Resolve source-backed declarations without changing recipe, store or state."""
-    metadata, rules, environment, manifests, digest, identity = _candidate_inputs(
-        store, prepared, recipe, policy, source, rules)
-    catalog, records = _load_catalog(store, _catalog_binding(recipe), policy)
-    _baseline_entries(recipe, policy, catalog)
-    selected = _solve(records, metadata, policy.profile, rules, recipe, environment, policy)
-    return _resolution(prepared, recipe, policy, metadata, manifests, digest, identity, selected)
-
-
 def validate_candidate_resolution(value, store, prepared, recipe, policy, source, rules) -> CandidateResolution:
-    """Validate archived selected wheels and their closure, with no alternative search.
-
-    The available roster is reduced to the archived artifacts before walking its
-    closure. No other version can be chosen and no candidate state is written.
-    """
+    """Validate the candidate profile and frozen closure entirely offline."""
     try:
         value = CandidateResolution.model_validate(value)
-        metadata, rules, environment, manifests, digest, identity = _candidate_inputs(
+        metadata, rules, environment, manifests, digest, identity, dependency_identity = _candidate_inputs(
             store, prepared, recipe, policy, source, rules)
-        if (value.identity != identity or value.recipe != prepared.recipe or value.policy != prepared.policy
-                or value.catalog != recipe.dependency_catalog):
+        if value.identity != identity or value.recipe != prepared.recipe or value.policy != prepared.policy:
             raise PolicyRejected('archived candidate resolution identity mismatch')
-        catalog, records = _load_catalog(store, _catalog_binding(recipe), policy)
-        _baseline_entries(recipe, policy, catalog)
-        artifacts = {pin.artifact for pin in value.dependencies}
-        selected_records = tuple(wheel for wheel in records if wheel.item.artifact in artifacts)
-        if len(artifacts) != len(value.dependencies) or len(selected_records) != len(artifacts):
-            raise PolicyRejected('archived candidate dependency artifact roster mismatch')
-        selected = _solve(selected_records, metadata, policy.profile, rules, recipe, environment, policy)
-        expected = _resolution(prepared, recipe, policy, metadata, manifests, digest, identity, selected)
+        _, selected = read_dependency_resolution(store, value.resolution, dependency_identity,
+                                                 metadata, rules, recipe, policy, environment)
+        expected = _resolution(prepared, policy, metadata, manifests, digest, identity, value.resolution, selected)
         if value != expected:
             raise PolicyRejected('archived candidate resolution profile or selected closure mismatch')
         return value

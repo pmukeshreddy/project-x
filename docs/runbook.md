@@ -111,36 +111,36 @@ closure in a source-free builder. It retains wheel hashes, package versions,
 resolution inputs and immutable image digests. Dynamic or contradictory declarations
 which cannot be resolved reproducibly fail closed.
 
-Preparation automatically populates the shared dependency catalog from the trusted
-PyPI index and artifact CDN. Repository requirements seed acquisition; compatible
-alternative versions, requested extras and their transitive dependencies are also
-captured. Historical declarations seed available packages without constraining a
-candidate's solution. No wheelhouse path, package list or per-repository pins are
-required. `runtime.dependency_catalog` may optionally add an existing trusted catalog.
+At candidate build time, the trusted controller resolves the submitted safe
+requirements, extras and transitive dependencies from the trusted package registry.
+The resolver retains package-index snapshots and the exact hash-verified wheels
+selected for that build. Historical declarations do not seed a finite task package
+roster or constrain a candidate's solution. No manual catalog or per-repository
+package supply is configured.
 
 Keep `runtime.state_root` and `store_root` persistent to reuse index snapshots and
-hash-verified wheel artifacts across repositories. Preparation freezes a bounded
-catalog snapshot and its acquisition evidence into each recipe. Existing preparation
-locks retain that exact snapshot even as the shared cache grows. Preparation fails
-closed if it cannot retain a usable package/version choice beyond the baseline.
-The public runtime manifest lists the exact available wheel names, versions,
-filenames, hashes and artifact references; it is not a mirror of every PyPI package.
+hash-verified wheel artifacts across candidates and repositories. Each candidate
+resolution freezes its exact selected closure and resolution evidence for replay
+without a fresh lookup. Preparation retains the baseline dependencies needed by
+the runtime image. The public runtime manifest describes that fixed runtime;
+candidate resolutions remain separate build artifacts.
 
 New construction requires `runtime.image_repository` (for example,
 `registry.example.com/team/runtimes`), registry push access through the dedicated
-Docker client config, and Buildx timestamp-rewrite support. Only preparation downloads
-dependencies or system packages. Repository hooks run in the qualified offline sandbox.
-`runtime.image_seconds` bounds each image operation and catalog acquisition
+Docker client config, and Buildx timestamp-rewrite support. Preparation downloads
+baseline dependencies and system packages; the trusted controller acquires candidate
+dependencies when resolution needs them. Repository hooks run in the qualified
+offline sandbox. `runtime.image_seconds` bounds each image operation and registry resolution
 (default 600 seconds).
 
 The original task and environment recipe remain fixed for every candidate. Candidate
-builds parse the submitted declarations and choose a compatible closure from the
-frozen catalog without network access. Different catalog versions are installed in
-separate candidate workspaces. The task's Python interpreter, platform, system packages
-and sandbox limits stay fixed. A required package absent from the catalog produces
-an unavailable, unmeasured result; unsafe declarations produce a candidate rejection.
-Workers may omit `image_repository` and load the exact policy, image and catalog from
-the task recipe. Sandbox platform and limits must still match their configuration.
+builds use the controller's frozen resolution to install exact wheels without network
+access in separate candidate workspaces. The task's Python interpreter, platform,
+system packages and sandbox limits stay fixed. Unavailable compatible resolution
+produces an unavailable, unmeasured result; unsafe declarations produce a candidate
+rejection. Workers may omit `image_repository` and load the exact policy and image
+from the task recipe, then consume the retained candidate closure. Sandbox platform
+and limits must still match their configuration.
 See [M3 construction](interfaces-M3.md) for retained inputs and package constraints.
 
 Qualification configuration is `qualification` with the actual M5 `revision`

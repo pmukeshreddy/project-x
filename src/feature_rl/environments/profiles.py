@@ -46,14 +46,14 @@ class RuntimeProfile(StrictModel):
     compatible_tags: tuple[str, ...] = ()
     resolution: ArtifactRef | None = None
     build_backend: Annotated[str, Field(min_length=1, max_length=256)]
-    build_requirements: Annotated[tuple[str, ...], Field(min_length=1, max_length=64)]
+    build_requirements: Annotated[tuple[str, ...], Field(min_length=1)]
     source_roots: Annotated[tuple[str, ...], Field(min_length=1, max_length=2000)]
     source_mappings: Annotated[tuple[SourceMapping, ...], Field(min_length=1, max_length=32)]
     import_modules: Annotated[tuple[str, ...], Field(min_length=1, max_length=32)]
     entry_points: Annotated[tuple[str, ...], Field(min_length=1, max_length=64)]
     supported_observables: Annotated[tuple[Literal['JSON return value', 'CLI exit code',
         'standard output', 'standard error', 'combined terminal output'], ...], Field(min_length=1)]
-    dependencies: Annotated[tuple[WheelPin, ...], Field(min_length=1, max_length=64)]
+    dependencies: Annotated[tuple[WheelPin, ...], Field(min_length=1)]
     system_packages: Annotated[tuple[SystemPackagePin, ...], Field(max_length=128)] = Field(
         default=(), exclude_if=lambda value: not value)
     neutral_repairs: Annotated[tuple[NeutralRepair, ...], Field(max_length=2)] = ()
@@ -230,6 +230,4 @@ def validate_recipe_profile(recipe, policy, store):
             raise PolicyRejected('runtime resource policy drift')
     if recipe.limits.wall_seconds != policy.lifecycle_seconds:
         raise PolicyRejected('runtime wall policy drift')
-    from .candidates import validate_catalog
-    validate_catalog(recipe,policy,store)
     return profile

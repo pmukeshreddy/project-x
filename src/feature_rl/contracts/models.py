@@ -492,7 +492,6 @@ class EnvironmentRecipe(ArtifactModel):
     kind: Literal['EnvironmentRecipe']
     image_digest: Annotated[str, Field(pattern=r'^.+@sha256:[0-9a-f]{64}$')]
     runtime_image: ArtifactRef
-    dependency_catalog: ArtifactRef
     interpreter_version: Text
     dependencies: tuple[DependencyPin, ...]
     setup: Annotated[tuple[CommandSpec, ...], Field(min_length=1)]
