@@ -92,19 +92,23 @@ class EnvironmentRuntime:
         if self.profile!=click_profile():raise PolicyRejected('Click recipe requested for a different runtime profile')
         return self.create_recipe(baseline,pins,source_evidence=source_evidence)
     def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
+        from .images import prepare_runtime_image, validate_baseline
         baseline=ArtifactRef.model_validate(baseline);pins=tuple(DependencyPin.model_validate(x) for x in pins)
         if self.policy.profile is None and self.policy.image!=REPAIRED_IMAGE:raise PolicyRejected('legacy Click requires the pinned system pager repair')
         source=self.source(baseline);self.profile.validate_source(source);self.dependency_bytes(pins)
         if baseline.visibility not in {Visibility.AUTHORING,Visibility.PUBLIC}:raise PolicyRejected('B-only recipe requires authoring/public baseline')
+        image,image_ref=prepare_runtime_image(self,pins)
+        construction_evidence=validate_baseline(self,image,baseline,source,pins)
         p=self.policy;policy_ref=self.publish(p.model_dump(mode='json'),'sandbox-policy',Visibility.AUTHORING)
         now=datetime.now(timezone.utc)
         repairs=self.profile.neutral_repairs
         if self.policy.profile is None:
             repairs=(NeutralRepair(description='Add pinned Debian less binary and copyright only; environment repair 1/2, candidate repair 1/4',patch=self.repair_ref,neutrality_evidence=(EvidenceRecord(producer='feature_rl.environments trusted package-only image qualification',command=('verify pinned image and base layers','machine-check hardened boundary'),recorded_at=now,exit_status=0,artifacts=(self.repair_ref,self.qualification_summary_ref),revision=self.revision,scope='real_integration'),)),)
         recipe=EnvironmentRecipe(kind='EnvironmentRecipe',schema_version=1,visibility=Visibility.AUTHORING,
-            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=(baseline,policy_ref,*[pin.artifact for pin in pins]),evidence=(source_evidence,)),
+            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=(baseline,policy_ref,image_ref,image.context,*[pin.artifact for pin in pins]),evidence=(source_evidence,
+                EvidenceRecord(producer='feature_rl.environments runtime image construction',command=('build pinned runtime image','verify offline baseline dependency closure'),recorded_at=now,exit_status=0,artifacts=(image_ref,construction_evidence),revision=self.revision,scope='real_integration'))),
             costs=(CostRecord(category='construction',wall_seconds=None,cpu_seconds=None,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='unknown',note='Recipe publication; execution measured separately'),),
-            image_digest=p.image,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.setup,reset=self.profile.setup,services=(),
+            image_digest=image.image_digest,runtime_image=image_ref,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.prebuilt_setup,reset=self.profile.prebuilt_setup,services=(),
             limits=ResourceLimits(wall_seconds=p.lifecycle_seconds,cpu_seconds=p.cpu_seconds,memory_bytes=p.memory_bytes,pids=p.pids,output_bytes=p.output_bytes,disk_bytes=p.disk_bytes,tool_calls=100,input_tokens=1,output_tokens=1),
             neutral_repairs=repairs,locale='C.UTF-8',timezone='UTC',environment=tuple(EnvironmentVariable(name=k,value=v) for k,v in self.profile.environment),
             randomness=SeedPolicy(algorithm='PYTHONHASHSEED',seeds=(0,),same_cases_within_group=True),network_policy='none',baseline=baseline)
@@ -152,9 +156,9 @@ class EnvironmentRuntime:
         saved=SavedSource.model_validate_json(canonical_json(value['saved']));source=self.source(saved.artifact)
         if hashlib.sha256(self.read_bytes(saved.artifact,self.policy.max_archive_bytes)).hexdigest()!=saved.raw_sha256 or source.tree_sha256!=saved.tree_sha256:raise SourceRejected('saved source binding mismatch')
         return value,prepared,recipe,saved,source
-    def stage(self,session,source,pins,*,wheel=None):
+    def stage(self,session,source,pins,*,wheel=None,prebuilt=False):
         files={'source/'+name:entry for name,entry in source.files.items()}
-        files.update({'supply/'+name:entry for name,entry in self.dependency_bytes(pins).items()})
+        if not prebuilt:files.update({'supply/'+name:entry for name,entry in self.dependency_bytes(pins).items()})
         if wheel is not None:files['built/'+self.profile.wheel_filename]=SourceFile(wheel,False)
         data=SourceArchive(files).to_tar()
         if len(data)>self.policy.max_staging_bytes:raise PolicyRejected('aggregate stage archive cap')
@@ -202,25 +206,30 @@ class EnvironmentRuntime:
                 if actual!=expected:raise SourceRejected('built repository wheel differs from supplied source')
         except (zipfile.BadZipFile,ValueError,OSError) as exc:raise SourceRejected('invalid built wheel') from exc
         return data
+
+    def capture_wheel(self,session,source):
+        command=CommandSpec(argv=('python','-I','-c',"import pathlib,sys;p=pathlib.Path(sys.argv[1]);data=p.read_bytes();assert len(data)<=int(sys.argv[2]);sys.stdout.buffer.write(data)",'/workspace/built/'+self.profile.wheel_filename,str(self.policy.max_source_bytes)),working_directory='/workspace',timeout_seconds=5.0)
+        result=session.execute(command,output_limit=self.policy.max_source_bytes)
+        if result.reason=='monitor_failure':raise DockerUnavailable('wheel capture monitor failed')
+        if result.reason!='exited' or result.exit_code!=0:raise SourceRejected('built wheel capture failed')
+        return self.wheel_bytes(result.stdout,source)
+
     def build_snapshot(self,handle):
         start=time.monotonic()
         self.recover_owned()
         value,prepared,recipe,saved,source=self.workspace(handle)
-        s=self.engine.session(binding=self.binding(prepared,saved,'build',value),saved_source=saved.model_dump(mode='json'));error=None;data=None
+        s=self.engine.session(binding=self.binding(prepared,saved,'build',value),saved_source=saved.model_dump(mode='json'),image=recipe.image_digest);error=None;data=None
         try:
             with s:
-                self.stage(s,source,recipe.dependencies)
-                for command in self.profile.setup[:2]:
+                self.stage(s,source,recipe.dependencies,prebuilt=recipe.runtime_image is not None)
+                for command in recipe.setup[:2]:
                     r=s.execute(command,environment=self.profile.environment)
                     if r.reason!='exited' or r.exit_code!=0:
-                        category='infrastructure' if command==DEPS or r.reason=='monitor_failure' else 'candidate'
-                        reason='infrastructure_failure' if r.reason=='monitor_failure' else ('setup_failed' if command==DEPS else ('command_failed' if r.reason=='exited' else r.reason))
-                        raise StageFailure('offline '+('dependency setup' if command==DEPS else 'repository build')+' failed',reason,category)
-                command=CommandSpec(argv=('python','-I','-c',"import pathlib,sys;p=pathlib.Path(sys.argv[1]);data=p.read_bytes();assert len(data)<=int(sys.argv[2]);sys.stdout.buffer.write(data)",'/workspace/built/'+self.profile.wheel_filename,str(self.policy.max_source_bytes)),working_directory='/workspace',timeout_seconds=5.0)
-                r=s.execute(command,output_limit=self.policy.max_source_bytes)
-                if r.reason=='monitor_failure':raise DockerUnavailable('wheel capture monitor failed')
-                if r.reason!='exited' or r.exit_code!=0:raise SourceRejected('built wheel capture failed')
-                data=self.wheel_bytes(r.stdout,source)
+                        dependency_setup=command==recipe.setup[0]
+                        category='infrastructure' if dependency_setup or r.reason=='monitor_failure' else 'candidate'
+                        reason='infrastructure_failure' if r.reason=='monitor_failure' else ('setup_failed' if dependency_setup else ('command_failed' if r.reason=='exited' else r.reason))
+                        raise StageFailure('offline '+('dependency setup' if dependency_setup else 'repository build')+' failed',reason,category)
+                data=self.capture_wheel(s,source)
         except BaseException as exc:error=exc
         reason,category=failure(error) if error else ('completed','none')
         evidence=self.evidence(s,'build',{'error':repr(error) if error else None,'reason':reason,'failure_category':category,'wheel_sha256':hashlib.sha256(data).hexdigest() if data is not None else None,'source_tree_sha256':source.tree_sha256,'saved_source':saved.model_dump(mode='json')})
@@ -261,13 +270,13 @@ class EnvironmentRuntime:
                 raise PolicyRejected('successful build receipt binding mismatch')
         if len(request.stdin)>self.policy.stdin_bytes:raise PolicyRejected('command stdin cap')
         phase='development' if development else 'execute'
-        s=self.engine.session(binding=self.binding(prepared,saved,phase,value),saved_source=saved.model_dump(mode='json'),cpu_seconds=request.remaining_cpu_seconds)
+        s=self.engine.session(binding=self.binding(prepared,saved,phase,value),saved_source=saved.model_dump(mode='json'),cpu_seconds=request.remaining_cpu_seconds,image=recipe.image_digest)
         start=time.monotonic();result=None;error=None;save_status='last_confirmed';next_saved=saved
         environment=self.profile.development_environment if development else self.profile.environment
         try:
             with s:
-                self.stage(s,source,recipe.dependencies,wheel=wheel)
-                for command in ((DEPS,) if development else (DEPS,self.profile.setup[2])):
+                self.stage(s,source,recipe.dependencies,wheel=wheel,prebuilt=recipe.runtime_image is not None)
+                for command in ((recipe.setup[0],) if development else (recipe.setup[0],recipe.setup[2])):
                     r=s.execute(command,environment=environment)
                     if r.reason=='cpu_limit':raise CpuBudgetExceeded('CPU budget exhausted during offline execution setup')
                     if r.reason!='exited' or r.exit_code!=0:raise StageFailure('offline execution setup failed','infrastructure_failure' if r.reason=='monitor_failure' else 'setup_failed','infrastructure')

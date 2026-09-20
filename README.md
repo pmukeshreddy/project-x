@@ -27,6 +27,9 @@ not replace the original exhausted feature-generation attempt. See
 
 [Final CPU/CLI verification](docs/evidence/integration/final/receipt.json) and
 [progress](docs/progress.md) record the executed checks and current limitations.
-The Docker runtime currently supports the pinned Click profile. GPU training,
+The Docker runtime supports pinned Python wheel profiles, including the legacy
+Click profile, with [construction-time cached runtime images](docs/interfaces-M3.md).
+New construction requires a publishing registry and complete pinned inputs.
+GPU training,
 native GPU inference, new task generation and experimental results remain
 deferred and unverified. No real task has been human-approved or released.

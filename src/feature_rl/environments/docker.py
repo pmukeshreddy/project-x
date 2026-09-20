@@ -135,7 +135,13 @@ class UnixHTTP(http.client.HTTPConnection):
         self.sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);self.sock.settimeout(self.timeout);self.sock.connect(self.path)
 
 class DockerEngine:
-    def __init__(self,*,state_root:Path,socket_path:Path,policy:SandboxPolicy):
+    def __init__(self,*,state_root:Path,socket_path:Path,policy:SandboxPolicy,image_repository=None,image_seconds=600.0):
+        from pydantic import TypeAdapter
+        from .images import ImageRepository
+        self.image_repository=None if image_repository is None else TypeAdapter(ImageRepository).validate_python(image_repository)
+        if type(image_seconds) not in (int,float) or not math.isfinite(image_seconds) or not 0<image_seconds<=3600:
+            raise PolicyRejected('invalid image operation deadline')
+        self.image_seconds=float(image_seconds)
         self.policy=SandboxPolicy.model_validate(policy);self.state=StateDirectory(state_root)
         if not socket_path.is_absolute():raise PolicyRejected('Docker socket must be absolute')
         self.socket_path=str(socket_path)
@@ -157,7 +163,43 @@ class DockerEngine:
         if info.get('OSType')!='linux' or architecture!=self.policy.platform.split('/')[1]:raise PolicyRejected('Docker host must match the configured Linux runtime platform')
         self.info=info;self.qualified=False;self.qualification=None
 
-    def session(self,*,binding,saved_source,cpu_seconds=None):return DockerSession(self,binding,saved_source,cpu_seconds=cpu_seconds)
+    def session(self,*,binding,saved_source,cpu_seconds=None,image=None):
+        if image is not None:
+            from pydantic import TypeAdapter
+            from .images import ImageDigest
+            binding={**binding,'runtime_image':TypeAdapter(ImageDigest).validate_python(image)}
+        return DockerSession(self,binding,saved_source,cpu_seconds=cpu_seconds)
+
+    def image_command(self,args,*,stdin=b'',checked=True):
+        result=stream_process(self.base+args,stdin,time.monotonic()+self.image_seconds,8*1024*1024)
+        if checked and (result.reason!='exited' or result.exit_code!=0):
+            raise DockerUnavailable('Docker image operation failed: '+str(args[:2])+': '+result.stderr.decode(errors='replace')[-2000:])
+        return result
+
+    def inspect_image(self,image):
+        try:return json.loads(self.image_command(['image','inspect',image]).stdout)[0]
+        except (ValueError,IndexError,KeyError,TypeError) as exc:raise DockerUnavailable('invalid image inspection') from exc
+
+    def ensure_image(self,image):
+        """Workers pull only an immutable registry digest; never build or install."""
+        from pydantic import TypeAdapter
+        from .images import ImageDigest
+        image=TypeAdapter(ImageDigest).validate_python(image)
+        result=self.image_command(['image','inspect',image],checked=False)
+        if result.reason!='exited':raise DockerUnavailable('image inspection did not complete')
+        if result.exit_code!=0:
+            if 'no such image' not in result.stderr.decode(errors='replace').lower():
+                raise DockerUnavailable('cannot inspect pinned image: '+result.stderr.decode(errors='replace')[-1500:])
+            self.image_command(['pull','--platform',self.policy.platform,image])
+            info=self.inspect_image(image)
+        else:
+            try:info=json.loads(result.stdout)[0]
+            except (ValueError,IndexError,KeyError,TypeError) as exc:raise DockerUnavailable('invalid image inspection') from exc
+        if (image not in (info.get('RepoDigests') or ()) or info.get('Os')!='linux'
+                or info.get('Architecture')!=self.policy.platform.split('/')[1]
+                or info.get('Config',{}).get('Volumes') or info.get('Config',{}).get('OnBuild')):
+            raise PolicyRejected('pulled image manifest/platform/configuration mismatch')
+        return info
 
     def http(self,method,path,*,deadline,cap):
         remaining=deadline-time.monotonic()
@@ -196,9 +238,9 @@ class DockerEngine:
             if record.phase!='removed':
                 raise CleanupUnverified('pending owned cleanup blocks terminal transition; recover and retry: '+record.operation_id)
 
-    def qualify_boundary(self):
+    def qualify_boundary(self,*,image=None):
         from .probes import BOUNDARY_CODE,check_boundary
-        with self.session(binding={'purpose':'trusted-boundary'},saved_source={}) as s:
+        with self.session(binding={'purpose':'trusted-boundary'},saved_source={},image=image) as s:
             r=s.execute(CommandSpec(argv=('python','-I','-c',BOUNDARY_CODE),working_directory='/workspace',timeout_seconds=8.0),check_oom=False)
             if r.reason!='exited' or r.exit_code!=0:raise PolicyRejected('trusted boundary command failed')
             obs=json.loads(r.stdout);check_boundary(obs,self.policy)
@@ -242,15 +284,19 @@ class DockerSession:
                 workspace=self.engine.state.read('workspace-'+self.record.binding['workspace_id']+'.json')
                 if workspace['closed'] or str(workspace['generation'])!=self.record.binding['generation'] or workspace['saved']['artifact']['sha256']!=self.record.binding['source']:
                     raise PolicyRejected('workspace changed before operation admission')
-            image=json.loads(self.checked(['image','inspect',self.policy.image]).stdout)[0]
+            selected_image=self.record.binding.get('runtime_image',self.policy.image)
+            image=self.engine.ensure_image(selected_image)
             if image.get('Os')!='linux' or image.get('Architecture')!=self.policy.platform.split('/')[1] or image['Config'].get('Volumes') or image['Config'].get('OnBuild'):
                 raise PolicyRejected('image platform/volume/build policy mismatch')
-            if self.policy.image==REPAIRED_IMAGE:
-                base=json.loads(self.checked(['image','inspect',IMAGE]).stdout)[0]
+            if selected_image==REPAIRED_IMAGE:
+                base=self.engine.ensure_image(IMAGE)
                 layers=image['RootFS']['Layers'];original=base['RootFS']['Layers']
                 if layers[:len(original)]!=original or len(layers)!=len(original)+2:
                     raise PolicyRejected('repaired image base layer identity mismatch')
-                self.receipts.append({'image_manifest':self.policy.image,'image_inspect_id':image['Id'],'base_manifest':IMAGE,'base_layers':original,'image_layers':layers})
+                self.receipts.append({'image_manifest':selected_image,'image_inspect_id':image['Id'],'base_manifest':IMAGE,'base_layers':original,'image_layers':layers})
+            self.receipts.append({'image_manifest':selected_image,'image_inspect_id':image['Id']})
+            # Image transfer has its own bounded deadline, outside task CPU/wall budgets.
+            self.deadline=time.monotonic()+self.policy.lifecycle_seconds
             disk=self.policy.disk_bytes;tmp=min(8*1024*1024,disk//4);shm=1024*1024;workspace=disk-tmp-shm
             args=['create','--name',self.record.container_name,'--label','feature-rl.owner='+self.record.owner_token,'--label','feature-rl.operation='+self.record.operation_id,
                 '--platform',self.policy.platform,'--pull','never','--network','none','--ipc','private','--cgroupns','private','--read-only','--user','65534:65534','--cap-drop','ALL',
@@ -260,7 +306,7 @@ class DockerSession:
                 '--tmpfs',f'/workspace:rw,noexec,nosuid,nodev,size={workspace},uid=65534,gid=65534,mode=0700',
                 '--tmpfs',f'/tmp:rw,noexec,nosuid,nodev,size={tmp},uid=65534,gid=65534,mode=0700',
                 '--workdir','/workspace','--env','LANG=C.UTF-8','--env','LC_ALL=C.UTF-8','--env','TZ=UTC','--env','PYTHONDONTWRITEBYTECODE=1','--env','PYTHONHASHSEED=0',
-                '--entrypoint','/usr/local/bin/python',self.policy.image,'-I','-c','import time; time.sleep(86400)']
+                '--entrypoint','/usr/local/bin/python',selected_image,'-I','-c','import time; time.sleep(86400)']
             cid=self.checked(args).stdout.decode().strip()
             if len(cid)!=64 or any(c not in '0123456789abcdef' for c in cid):raise EnvironmentError('invalid Docker container ID')
             self.persist(container_id=cid,phase='created')
@@ -285,6 +331,7 @@ class DockerSession:
         limits={u['Name']:(u['Soft'],u['Hard']) for u in h.get('Ulimits',[])}
         if limits!={'core':(0,0),'nofile':(256,256),'fsize':(disk,disk)}:raise PolicyRejected('effective rlimit mismatch')
         if c['Labels'].get('feature-rl.owner')!=self.record.owner_token:raise PolicyRejected('owner label mismatch')
+        if c.get('Image')!=self.record.binding.get('runtime_image',self.policy.image):raise PolicyRejected('effective runtime image mismatch')
     def monitor(self):
         try:
             status,data=self.engine.http('GET','/containers/'+self.name+'/stats?stream=false&one-shot=true',deadline=min(self.deadline,time.monotonic()+1),cap=128*1024)

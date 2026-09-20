@@ -21,6 +21,12 @@ class SourceMapping(StrictModel):
     wheel: str
 
 
+class SystemPackagePin(StrictModel):
+    """Required Debian userspace package, supplied by the digest-pinned base."""
+    name: Annotated[str, Field(pattern=r'^[a-z0-9][a-z0-9+.-]*$')]
+    version: Annotated[str, Field(pattern=r'^[0-9][A-Za-z0-9.+:~_-]*$')]
+
+
 class RuntimeProfile(StrictModel):
     version: Literal['python-wheel-profile-v1'] = 'python-wheel-profile-v1'
     profile_id: Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')]
@@ -38,6 +44,8 @@ class RuntimeProfile(StrictModel):
     supported_observables: Annotated[tuple[Literal['JSON return value', 'CLI exit code',
         'standard output', 'standard error', 'combined terminal output'], ...], Field(min_length=1)]
     dependencies: Annotated[tuple[WheelPin, ...], Field(min_length=1, max_length=64)]
+    system_packages: Annotated[tuple[SystemPackagePin, ...], Field(max_length=128)] = Field(
+        default=(), exclude_if=lambda value: not value)
     neutral_repairs: Annotated[tuple[NeutralRepair, ...], Field(max_length=2)] = ()
 
     @model_validator(mode='after')
@@ -52,6 +60,7 @@ class RuntimeProfile(StrictModel):
             raise ValueError('runtime profiles currently support pyproject.toml wheel builds')
         for values in (self.source_roots, self.import_modules, self.entry_points,
                        tuple(p.name for p in self.dependencies), tuple(p.filename for p in self.dependencies),
+                       tuple(p.name for p in self.system_packages),
                        tuple(m.source for m in self.source_mappings), tuple(m.wheel for m in self.source_mappings)):
             if len(values) != len(set(values)):
                 raise ValueError('duplicate runtime profile entry')
@@ -106,6 +115,11 @@ class RuntimeProfile(StrictModel):
             '--no-index', '--no-deps', '--no-compile', '--target', '/workspace/site',
             '/workspace/built/'+self.wheel_filename), working_directory='/workspace', timeout_seconds=30.0)
         return DEPS, BUILD, install
+
+    @property
+    def prebuilt_setup(self):
+        from .images import LINK_DEPS
+        return (LINK_DEPS, *self.setup[1:])
 
     def validate_source(self, source):
         from .models import PolicyRejected
@@ -187,8 +201,15 @@ def validate_recipe_profile(recipe, policy, store):
     from .models import PolicyRejected, REPAIRED_IMAGE
     from .runtime import REPAIR
     profile = runtime_profile(policy)
-    if (recipe.image_digest != policy.image or recipe.interpreter_version != profile.interpreter_version
-            or recipe.services or recipe.network_policy != 'none' or recipe.setup != profile.setup
+    setup = profile.setup
+    if recipe.runtime_image is not None:
+        from .images import validate_runtime_image
+        validate_runtime_image(recipe, policy, store)
+        setup = profile.prebuilt_setup
+    elif recipe.image_digest != policy.image:
+        raise PolicyRejected('recipe differs from pinned base image')
+    if (recipe.interpreter_version != profile.interpreter_version
+            or recipe.services or recipe.network_policy != 'none' or recipe.setup != setup
             or recipe.reset != recipe.setup or tuple((v.name, v.value) for v in recipe.environment) != profile.environment
             or recipe.locale != 'C.UTF-8' or recipe.timezone != 'UTC'
             or recipe.randomness != SeedPolicy(algorithm='PYTHONHASHSEED', seeds=(0,), same_cases_within_group=True)):
@@ -210,5 +231,6 @@ def validate_recipe_profile(recipe, policy, store):
             raise PolicyRejected('runtime resource policy drift')
     if recipe.limits.wall_seconds != policy.lifecycle_seconds:
         raise PolicyRejected('runtime wall policy drift')
-    dependency_files(store, recipe.dependencies, policy)
+    if recipe.runtime_image is None:
+        dependency_files(store, recipe.dependencies, policy)
     return profile

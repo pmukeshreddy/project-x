@@ -7,6 +7,7 @@ from pydantic import Field, field_validator
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactStore
 from feature_rl.environments import DockerEngine, EnvironmentRuntime, SandboxPolicy
+from feature_rl.environments.images import ImageDigest, ImageRepository
 from feature_rl.grading import GradingService
 from feature_rl.qualification import QualificationPolicy, QualificationService, SSHHumanVerifier
 from feature_rl.registry import Registry, RegistryLimits
@@ -39,6 +40,9 @@ class RuntimeConfiguration(LocalPaths):
     revision: c.Revision
     grading_revision: c.Revision
     policy: SandboxPolicy = Field(default_factory=SandboxPolicy)
+    image_repository: ImageRepository | None = Field(default=None, exclude_if=lambda value: value is None)
+    qualification_image: ImageDigest | None = Field(default=None, exclude_if=lambda value: value is None)
+    image_seconds: Annotated[float, Field(gt=0, le=3600)] = Field(default=600.0, exclude_if=lambda value: value == 600.0)
     grade_wall_seconds: Annotated[float, Field(gt=0, le=3600)] = 600.0
 
 
@@ -132,8 +136,8 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
     if runtime or qualification:
         settings=config.runtime
         engine=DockerEngine(state_root=Path(settings.state_root),socket_path=Path(settings.socket_path),
-            policy=settings.policy)
-        engine.qualify_boundary()
+            policy=settings.policy,image_repository=settings.image_repository,image_seconds=settings.image_seconds)
+        engine.qualify_boundary(image=settings.qualification_image)
         actual_runtime=EnvironmentRuntime(store=store,engine=engine,revision=settings.revision)
         grader=GradingService(store=store,runtime=actual_runtime,revision=settings.grading_revision,
             max_wall_seconds=settings.grade_wall_seconds)

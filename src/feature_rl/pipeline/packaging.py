@@ -158,6 +158,11 @@ def public_values(store, resolved):
     if resolved.policy.profile is not None:
         runtime.update(profile=resolved.policy.profile.model_dump(mode='json', exclude={'neutral_repairs'}),
                        platform=resolved.policy.platform)
+    if recipe.runtime_image is not None:
+        from feature_rl.environments.images import validate_runtime_image
+        image = validate_runtime_image(recipe, resolved.policy, store)
+        runtime.update(host_requirements=document(image.host_requirements),
+                       runtime_image_context_sha256=image.context_sha256)
     checks = tuple(dict.fromkeys((*contract.public_checks, *resolved.verifier.public_examples)))
     if len(checks) > 64:
         raise BuildRejected('public-check count limit')

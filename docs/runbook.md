@@ -35,6 +35,24 @@ boundary qualification. A caller flag, copied receipt or altered policy cannot
 stand in for that qualification. Candidate grades keep M3's fresh build/isolation
 rules and supported pinned image/dependency cache semantics.
 
+New environment construction also requires `runtime.image_repository`, an
+explicit registry/repository such as `registry.example.com/team/runtimes`, with
+push access through the runtime's dedicated Docker client config. The builder
+needs Buildx/BuildKit timestamp-rewrite support, a digest-pinned policy base,
+and the profile's hash-pinned dependency wheels. Construction rejects missing
+dependencies and failed offline builds before publishing a recipe. Images are
+cached by their canonical build-context hash and recipes retain the exact
+published digest. `runtime.image_seconds` bounds each image operation (default
+600 seconds), separately from task execution limits.
+
+Workers can omit `image_repository` and set `runtime.qualification_image` to the
+prepared recipe's `image_digest`. They then pull only that final image for
+qualification and execution; no per-server repository dependency installation
+or image build is needed. Keep the same `SandboxPolicy`/profile used to construct
+the recipe. The runtime manifest records Linux architecture, Docker and CPU-only
+host requirements for scheduling. See [M3 construction](interfaces-M3.md) for
+cache identity, legacy recipe compatibility and supported package constraints.
+
 Qualification configuration is `qualification` with the actual M5 `revision`,
 optional `QualificationPolicy`, and optional `human` containing external
 `enrollment_path` plus `enrollment_sha256`. The enrollment is read-only and subject
