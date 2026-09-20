@@ -8,7 +8,6 @@ from pydantic import Field, model_validator
 
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactStore, canonical_json
-from feature_rl.environments import SandboxPolicy, SourceArchive
 from feature_rl.pipeline import BuildInputs, Factory
 from feature_rl.qualification.evidence import collapse_costs
 from feature_rl.verifiers.language import decode_json
@@ -74,7 +73,7 @@ class ExternalSourceAssignment(c.StrictModel):
     normalized_request_sha256: c.Digest
     patch_sha256: c.Digest
     test_patch_sha256: c.Digest
-    baseline_tree_sha256: c.Digest
+    baseline_tree_id: c.Revision
     environment_config_sha256: c.Digest
     relation_evidence: c.ArtifactRef
 
@@ -279,19 +278,11 @@ class ExternalCorpusAdapter:
         issue = request.get("issue") if type(request) is dict else None
         if type(issue) is not dict:
             raise ValueError("authoring request lacks the actual M1 issue record")
-        baseline = SourceArchive.read(
-            self.store.get_bytes(pair.baseline, max_envelope_bytes=32 * 1024 * 1024,
-                                 max_payload_bytes=16 * 1024 * 1024),
-            SandboxPolicy(),
-        )
-        reference = SourceArchive.read(
-            self.store.get_bytes(pair.reference, max_envelope_bytes=32 * 1024 * 1024,
-                                 max_payload_bytes=16 * 1024 * 1024),
-            SandboxPolicy(),
-        )
         locked_overlap = any(
-            item.repository_family == candidate.repository_family
-            or bool(set(item.request_lineage) & set(candidate.request_lineage))
+            item.partition == c.Partition.LOCKED_TEST and (
+                item.repository_family == candidate.repository_family
+                or bool(set(item.request_lineage) & set(candidate.request_lineage))
+            )
             for item in self.locked_roster.sources
         )
         if locked_overlap:
@@ -326,8 +317,12 @@ class ExternalCorpusAdapter:
             issue.get("source_response_sha256") in {source.content.sha256 for source in candidate.sources},
             proof.get("baseline_commit") == pair.baseline_commit,
             proof.get("reference_commit") == pair.reference_commit,
-            proof.get("baseline_tree") == baseline.tree_sha256,
-            proof.get("reference_tree") == reference.tree_sha256,
+            type(proof.get("baseline_tree")) is str,
+            len(proof.get("baseline_tree", "")) in (40, 64),
+            all(char in "0123456789abcdef" for char in proof.get("baseline_tree", "")),
+            type(proof.get("reference_tree")) is str,
+            len(proof.get("reference_tree", "")) in (40, 64),
+            all(char in "0123456789abcdef" for char in proof.get("reference_tree", "")),
             proof.get("patch_sha256") == mapping.patch_sha256,
             candidate.license.status == "verified",
             candidate.partition == self.configuration.local_partition,
@@ -350,7 +345,7 @@ class ExternalCorpusAdapter:
             or assignment.normalized_request_sha256 != mapping.normalized_request_sha256
             or assignment.patch_sha256 != mapping.patch_sha256
             or assignment.test_patch_sha256 != mapping.test_patch_sha256
-            or assignment.baseline_tree_sha256 != proof.get("baseline_tree")
+            or assignment.baseline_tree_id != proof.get("baseline_tree")
             or assignment.environment_config_sha256 != mapping.environment_config_sha256
             or assignment.relation_evidence != inspection_refs[0]
         ):

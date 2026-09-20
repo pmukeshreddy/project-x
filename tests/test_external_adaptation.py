@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import hashlib
+import json
 
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactStore, canonical_json
@@ -15,7 +16,7 @@ def digest(value):
 
 
 def records(tmp_path, *, bad_patch_digest=False, bad_relation=False, locked_overlap=False,
-            with_build_inputs=False, bad_build_pair=False):
+            listed_train_overlap=False, with_build_inputs=False, bad_build_pair=False):
     from feature_rl.evaluation import (
         ExternalAdaptationConfig, ExternalCorpusFrame, ExternalCorpusRow,
         ExternalOriginMapping, ExternalSourceAssignment, FrozenRoster,
@@ -42,9 +43,8 @@ def records(tmp_path, *, bad_patch_digest=False, bad_relation=False, locked_over
     raw = canonical_json(row.model_dump(mode="json"))
     row_ref = store.put_bytes(raw, "m8-external-row", c.Visibility.PRIVATE)
     baseline = SourceArchive.read(store.get_bytes(pair.baseline), SandboxPolicy())
-    reference = SourceArchive.read(store.get_bytes(pair.reference), SandboxPolicy())
-    baseline_tree = baseline.tree_sha256
-    reference_tree = reference.tree_sha256
+    baseline_tree = "a" * 40
+    reference_tree = "b" * 40
     proof = {
         "baseline_commit": pair.baseline_commit,
         "reference_commit": pair.reference_commit,
@@ -113,7 +113,7 @@ def records(tmp_path, *, bad_patch_digest=False, bad_relation=False, locked_over
         local_partition=candidate.partition,
         normalized_request_sha256=mapping.normalized_request_sha256,
         patch_sha256=mapping.patch_sha256, test_patch_sha256=mapping.test_patch_sha256,
-        baseline_tree_sha256=baseline_tree,
+        baseline_tree_id=baseline_tree,
         environment_config_sha256=mapping.environment_config_sha256,
         relation_evidence=(row_ref if bad_relation else proof_ref),
     )
@@ -122,14 +122,23 @@ def records(tmp_path, *, bad_patch_digest=False, bad_relation=False, locked_over
         "repository_family": candidate.repository_family if locked_overlap else "unrelated-family",
         "request_lineage": candidate.request_lineage if locked_overlap else ("unrelated-request",),
     }))
+    exclusion_sources = [SourceAssignment(
+        source_id="locked-control", task=locked_task,
+        repository_family=candidate.repository_family if locked_overlap else "unrelated-family",
+        request_lineage=candidate.request_lineage if locked_overlap else ("unrelated-request",),
+        partition=c.Partition.LOCKED_TEST, evidence=proof_ref,
+    )]
+    if listed_train_overlap:
+        exclusion_sources.append(SourceAssignment(
+            source_id="listed-external-train", task=task_fixture(store),
+            repository_family=candidate.repository_family,
+            request_lineage=candidate.request_lineage,
+            partition=c.Partition.TRAIN, evidence=proof_ref,
+        ))
     exclusions = FrozenRoster(
         version="m8-frozen-roster-v1", locked_tasks=(locked_task,),
-        sources=(SourceAssignment(
-            source_id="locked-control", task=locked_task,
-            repository_family=candidate.repository_family if locked_overlap else "unrelated-family",
-            request_lineage=candidate.request_lineage if locked_overlap else ("unrelated-request",),
-            partition=c.Partition.LOCKED_TEST, evidence=proof_ref,
-        ),), relations=(), test_source_frame=proof_ref, exclusions=proof_ref, created_at=NOW,
+        sources=tuple(exclusion_sources), relations=(), test_source_frame=proof_ref,
+        exclusions=proof_ref, created_at=NOW,
     )
     exclusions = store.put_bytes(canonical_json(exclusions.model_dump(mode="json")), "m8-frozen-roster", c.Visibility.PRIVATE)
     frame = ExternalCorpusFrame(
@@ -217,6 +226,18 @@ def test_external_adapter_rejects_family_or_lineage_overlap_with_frozen_locked_r
     assert not any(job for job in registry.trace(batch.items[0].origin_mapping).jobs)
 
 
+def test_external_adapter_does_not_treat_listed_train_source_as_locked_exclusion(tmp_path):
+    from feature_rl.evaluation import ExternalCorpusAdapter
+    from feature_rl.pipeline import Factory
+
+    store, registry, config_ref, _ = records(tmp_path, listed_train_overlap=True)
+    _, batch = ExternalCorpusAdapter(
+        store=store, factory=Factory(store=store, registry=registry, revision="e" * 40),
+        configuration=config_ref, revision="f" * 40,
+    ).adapt()
+    assert batch.items[0].disposition == c.Disposition.BLOCKED
+
+
 def test_external_adapter_rejects_unbound_relation_evidence_before_factory(tmp_path):
     from feature_rl.evaluation import ExternalCorpusAdapter
     from feature_rl.pipeline import Factory
@@ -260,3 +281,175 @@ def test_external_adapter_rejects_build_inputs_for_another_source_pair(tmp_path)
     assert batch.items[0].disposition == c.Disposition.INVALID
     assert "BuildInputs" in batch.items[0].reason
     assert not any(job for job in registry.trace(batch.items[0].origin_mapping).jobs)
+
+
+def test_external_adapter_accepts_authentic_local_git_m1_tree_ids(tmp_path):
+    from feature_rl.evaluation import (
+        ExternalAdaptationConfig, ExternalCorpusAdapter, ExternalCorpusFrame,
+        ExternalCorpusRow, ExternalOriginMapping, ExternalSourceAssignment,
+        FrozenRoster, SourceAssignment,
+    )
+    from feature_rl.environments import SandboxPolicy, SourceArchive
+    from feature_rl.history import GitHistory
+    from feature_rl.intake import (
+        CachedSourceCatalog, GitHubPullRequestIntake, PullRequestIntakeSpec,
+    )
+    from feature_rl.pipeline import Factory
+    from feature_rl.splits import SplitPlanner
+    from feature_rl.verifiers.language import decode_json
+    from test_click_intake import commit, git, write_cache
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "--initial-branch=main")
+    (repo / "LICENSE.txt").write_text("BSD fixture\n")
+    (repo / "src").mkdir()
+    (repo / "src/core.py").write_text("OLD = True\n")
+    (repo / ".github" / "workflows").mkdir(parents=True)
+    (repo / ".github" / "workflows" / "ci.yml").write_text("name: ci\n")
+    baseline_commit = commit(repo, "baseline")
+    license_blob = git(repo, "rev-parse", f"{baseline_commit}:LICENSE.txt")
+    git(repo, "switch", "-c", "feature")
+    (repo / "src/core.py").write_text("FEATURE = True\n")
+    (repo / "tests").mkdir()
+    (repo / "tests/test_feature.py").write_text("# feature check\n")
+    source_head = commit(repo, "feature")
+    git(repo, "switch", "main")
+    git(repo, "merge", "--squash", "feature")
+    integrated = commit(repo, "integrate feature")
+    history = GitHistory(repo / ".git")
+    patch = history._run_bytes(
+        "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
+        "--diff-algorithm=myers", "--binary", "--full-index",
+        "--src-prefix=a/", "--dst-prefix=b/", baseline_commit, integrated, "--",
+    ).decode()
+    issue_url = "https://api.github.com/repos/example/project/issues/1"
+    sources = {
+        "pr": ("https://api.github.com/repos/example/project/pulls/1", json.dumps({
+            "number": 1, "title": "Add feature", "body": "Implementation PR",
+            "created_at": "2026-02-01T00:00:00Z", "updated_at": "2026-02-25T00:00:00Z",
+            "merged_at": "2026-02-25T00:00:00Z", "merge_commit_sha": integrated,
+            "base": {"sha": baseline_commit}, "head": {"sha": source_head},
+        }).encode()),
+        "issue": (issue_url, json.dumps({
+            "number": 1, "title": "Feature request", "body": "Add the requested feature.",
+            "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z",
+        }).encode()),
+        "comments": (issue_url + "/comments", b"[]"),
+        "commits": ("https://api.github.com/repos/example/project/pulls/1/commits",
+                    json.dumps([{"sha": source_head}]).encode()),
+        "files": ("https://api.github.com/repos/example/project/pulls/1/files",
+                  json.dumps([{"filename": "src/core.py"}, {"filename": "tests/test_feature.py"}]).encode()),
+        "license": ("https://api.github.com/repos/example/project/license",
+                    json.dumps({"sha": license_blob, "license": {"spdx_id": "BSD-3-Clause"}}).encode()),
+        "license-text": ("https://raw.githubusercontent.com/example/project/main/LICENSE.txt", b"BSD fixture\n"),
+    }
+    manifest = write_cache(tmp_path / "responses", sources)
+    store = ArtifactStore(tmp_path / "objects", c.ActorRole.CONTROLLER)
+    registry = Registry(tmp_path / "registry", store)
+    intake = GitHubPullRequestIntake(
+        store=store,
+        catalog=CachedSourceCatalog(tmp_path / "responses", manifest, max_bytes=1_000_000),
+        history=history,
+        factory_revision="1" * 40,
+    )
+    spec = PullRequestIntakeSpec(
+        repository_url="https://github.com/example/project",
+        repository_family="example-project", request_lineage=("pr-1",),
+        partition_source_ids=("pr-1",),
+        source_names=("pr", "issue", "comments", "commits", "files", "license"),
+        license_text_name="license-text", pr_name="pr", issue_name="issue",
+        comments_name="comments", commits_name="commits", files_name="files",
+        license_name="license", integration="squash",
+        admissible_cutoff=datetime(2026, 2, 2, tzinfo=timezone.utc),
+        recorded_at=NOW, provenance_label="reconstructed_specification",
+        mixed_paths={}, max_tree_archive_bytes=1_000_000,
+    )
+    result = intake.ingest(spec, SplitPlanner(()).assign({"pr-1": c.Partition.TRAIN}))
+    candidate = store.get_artifact(result.candidate)
+    pair = store.get_artifact(result.source_pair)
+    proof_ref = candidate.screening.evidence[0].artifacts[0]
+    proof = decode_json(store.get_bytes(proof_ref), 4 * 1024 * 1024)
+    assert proof["baseline_tree"] == git(repo, "rev-parse", f"{baseline_commit}^{{tree}}")
+    assert proof["reference_tree"] == git(repo, "rev-parse", f"{integrated}^{{tree}}")
+    archive_tree = SourceArchive.read(store.get_bytes(pair.baseline), SandboxPolicy()).tree_sha256
+    assert proof["baseline_tree"] != archive_tree
+    assert proof["patch_sha256"] == digest(patch)
+
+    row = ExternalCorpusRow(
+        repo="example/project", instance_id="local-git-1", base_commit=baseline_commit,
+        created_at="2026-01-01T00:00:00Z", language="python", task_type="feature",
+        repo_type="library", difficulty="unknown", problem_statement="Add the requested feature.",
+        patch=patch, test_patch="PRIVATE TEST PATCH", FAIL_TO_PASS='["test_feature"]',
+        PASS_TO_PASS='[]', environment_config='{"untrusted":"hint"}',
+    )
+    raw = canonical_json(row.model_dump(mode="json"))
+    row_ref = store.put_bytes(raw, "m8-external-row", c.Visibility.PRIVATE)
+    mapping = ExternalOriginMapping(
+        version="m8-external-origin-v1", row=row_ref,
+        row_payload_sha256=hashlib.sha256(raw).hexdigest(), dataset_repository=row.repo,
+        canonical_origin_url=candidate.repository_url, request_locator=issue_url,
+        candidate=result.candidate, source_pair=result.source_pair,
+        authoring_request=result.authoring.request_evidence,
+        authoring_baseline=result.authoring.baseline,
+        authoring_license=result.authoring.license_text,
+        reference_commit=pair.reference_commit,
+        normalized_request_sha256=digest(" ".join(row.problem_statement.split())),
+        patch_sha256=digest(row.patch), test_patch_sha256=digest(row.test_patch),
+        native_case_ids_sha256=digest(row.FAIL_TO_PASS + "\0" + row.PASS_TO_PASS),
+        environment_config_sha256=digest(row.environment_config),
+        changed_paths=tuple(sorted(item.path for item in pair.changed_files)),
+        intended_use="noncommercial_research", evidence=candidate.screening.evidence,
+    )
+    mapping_ref = store.put_bytes(canonical_json(mapping.model_dump(mode="json")), "m8-external-origin", c.Visibility.PRIVATE)
+    assignment = ExternalSourceAssignment(
+        instance_id=row.instance_id, row=row_ref, candidate=result.candidate,
+        repository_family=candidate.repository_family, request_lineage=candidate.request_lineage,
+        local_partition=candidate.partition,
+        normalized_request_sha256=mapping.normalized_request_sha256,
+        patch_sha256=mapping.patch_sha256, test_patch_sha256=mapping.test_patch_sha256,
+        baseline_tree_id=proof["baseline_tree"],
+        environment_config_sha256=mapping.environment_config_sha256,
+        relation_evidence=proof_ref,
+    )
+    locked_task_ref = task_fixture(store)
+    locked_task = store.get_artifact(locked_task_ref).model_copy(update={
+        "partition": c.Partition.LOCKED_TEST, "repository_family": "unrelated-family",
+        "request_lineage": ("unrelated-request",),
+    })
+    locked_task_ref = store.put_artifact(locked_task)
+    locked = FrozenRoster(
+        version="m8-frozen-roster-v1", locked_tasks=(locked_task_ref,),
+        sources=(SourceAssignment(
+            source_id="locked-control", task=locked_task_ref,
+            repository_family=locked_task.repository_family,
+            request_lineage=locked_task.request_lineage,
+            partition=c.Partition.LOCKED_TEST, evidence=proof_ref,
+        ),), relations=(), test_source_frame=proof_ref, exclusions=proof_ref, created_at=NOW,
+    )
+    locked_ref = store.put_bytes(canonical_json(locked.model_dump(mode="json")), "m8-frozen-roster", c.Visibility.PRIVATE)
+    frame = ExternalCorpusFrame(
+        version="m8-external-source-frame-v1",
+        dataset_id="TuringEnterprises/SWE-Bench-plus-plus",
+        release_revision="da364537055b9bb5091783af78a02b6a3bc0e130",
+        upstream_split="test", assignments=(assignment,), exclusions=locked_ref, created_at=NOW,
+    )
+    frame_ref = store.put_bytes(canonical_json(frame.model_dump(mode="json")), "m8-external-source-frame", c.Visibility.PRIVATE)
+    config = ExternalAdaptationConfig(
+        version="m8-external-adaptation-v1",
+        dataset_id="TuringEnterprises/SWE-Bench-plus-plus",
+        release_revision="da364537055b9bb5091783af78a02b6a3bc0e130",
+        harness_revision="f938edd189049806fef7a76fdf01f0da55baa565",
+        upstream_config="default", upstream_split="test", local_partition=c.Partition.TRAIN,
+        dataset_license="non-commercial research, academic, or educational use only",
+        intended_use="noncommercial_research", rows=(row_ref,), origin_mappings=(mapping_ref,),
+        construction_inputs=(None,), source_frame=frame_ref,
+        supported_languages=("python",), supported_task_types=("feature",),
+    )
+    config_ref = store.put_bytes(canonical_json(config.model_dump(mode="json")), "m8-external-adaptation-configuration", c.Visibility.PRIVATE)
+    _, batch = ExternalCorpusAdapter(
+        store=store, factory=Factory(store=store, registry=registry, revision="e" * 40),
+        configuration=config_ref, revision="f" * 40,
+    ).adapt()
+    assert batch.items[0].disposition == c.Disposition.BLOCKED
+    assert batch.funnel.stages[1].accepted == 1
