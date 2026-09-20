@@ -62,14 +62,21 @@ class TaskBuilder:
         return self.registry.reconcile(claim, CostObservation(source='m6-build', upstream_attempt_id=claim.attempt_id,
             revision=revision, receipts=refs, costs=values))
 
-    def build(self, inputs: BuildInputs, *, owner: str, claim_key: str) -> c.OperationResult:
+    def job_spec(self, inputs: BuildInputs) -> JobSpec:
+        """Freeze the exact input/policy CAS identity without enqueueing or assembly."""
         inputs = packaging.checked(BuildInputs, inputs)
         inputs_ref = self._put(inputs, 'm6-build-inputs')
         policy_ref = self.store.put_bytes(self.configuration, 'm6-build-policy', c.Visibility.PRIVATE)
+        return JobSpec(operation='construct', inputs=(inputs_ref,), configuration=policy_ref,
+            implementation=self.revision, invocation=inputs.invocation, attempt_limit=3)
+
+    def build(self, inputs: BuildInputs, *, owner: str, claim_key: str) -> c.OperationResult:
+        inputs = packaging.checked(BuildInputs, inputs)
+        spec = self.job_spec(inputs)
+        inputs_ref = spec.inputs[0]
         # The request is an opaque private input so a missing requested dependency
         # can still receive an attributable attempt and failed operation result.
-        job = self.registry.enqueue(JobSpec(operation='construct', inputs=(inputs_ref,), configuration=policy_ref,
-            implementation=self.revision, invocation=inputs.invocation, attempt_limit=3))
+        job = self.registry.enqueue(spec)
         if job.state == 'completed':
             return job.result
         claim = self.registry.claim(job.job_id, owner=owner, claim_key=claim_key)

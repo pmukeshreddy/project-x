@@ -12,6 +12,7 @@ from feature_rl.qualification.evidence import collapse_costs, unknown_cost
 from feature_rl.registry import Registry, RegistryError, Claim, JobSpec, CostObservation
 from .packaging import MAX_DOCUMENT, checked, document, typed, read_record
 from .locking import candidate_lock
+from .models import BuildInputs
 
 
 class FactoryRecoveryRequired(Exception):
@@ -21,10 +22,17 @@ class FactoryRecoveryRequired(Exception):
 
 
 class FactoryPublicationFailed(FactoryRecoveryRequired):
-    def __init__(self, message, claim, payload):
+    def __init__(self, message, claim, payload, *, kind='m6-source-disposition'):
         super().__init__(message, claim)
         self.payload = payload
         self.sha256 = hashlib.sha256(payload).hexdigest()
+        self.kind = kind
+
+
+class FactoryUpstreamPending(FactoryRecoveryRequired):
+    def __init__(self, message, claim, upstream):
+        super().__init__(message,claim)
+        self.upstream = upstream
 
 
 class SourceDisposition(c.StrictModel):
@@ -67,16 +75,24 @@ def source_decision(candidate):
 
 
 class Factory:
-    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str):
+    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None):
         if (not isinstance(store, ArtifactStore) or store.role != c.ActorRole.CONTROLLER
                 or not isinstance(registry, Registry) or registry.store is not store):
             raise TypeError('Factory requires the same actual controller store and Registry')
         if type(revision) is not str or len(revision) not in (40,64) or any(ch not in '0123456789abcdef' for ch in revision):
             raise ValueError('exact factory implementation revision required')
         self.store, self.registry, self.revision = store, registry, revision
+        from .build import TaskBuilder
+        self.builder = TaskBuilder(store=store,registry=registry,revision=revision) if builder is None else builder
+        if (type(self.builder) is not TaskBuilder or self.builder.store is not store or self.builder.registry is not registry):
+            raise TypeError('Factory requires the actual same-store TaskBuilder')
         self.source_configuration = store.put_bytes(self._source_policy(revision),
             'm6-source-policy', c.Visibility.PRIVATE)
         registry.register(self.source_configuration)
+
+    def construct(self, candidate: c.ArtifactRef, *, inputs: BuildInputs | None=None) -> c.OperationResult:
+        from .construction import construct
+        return construct(self,candidate,inputs)
 
     @staticmethod
     def _source_policy(revision):
@@ -217,6 +233,9 @@ class Factory:
     def recover(self, claim: Claim) -> c.OperationResult:
         claim = checked(Claim,claim)
         job = self.registry.job(claim.job_id)
+        if job.spec.invocation=='m6-construct':
+            from .construction import recover
+            return recover(self,claim)
         if job.spec.configuration!=self.source_configuration or not any(a.claim==claim for a in self.registry.attempts(job.job_id)):
             raise ValueError('claim is not this Factory source configuration')
         if job.state=='completed': return job.result
@@ -230,7 +249,14 @@ class Factory:
         return self._finish_source(receipt,refs[0])
 
     def retry_publication(self, pending: FactoryPublicationFailed) -> c.OperationResult:
+        if type(pending) is FactoryUpstreamPending:
+            from .construction import retry_build
+            return retry_build(self,pending)
         if (type(pending) is not FactoryPublicationFailed or type(pending.payload) is not bytes
                 or hashlib.sha256(pending.payload).hexdigest()!=pending.sha256):
             raise ValueError('invalid retained Factory source publication')
+        if pending.kind=='m6-construction-result':
+            from .construction import publish
+            return publish(self,pending.payload,pending.claim)
+        if pending.kind!='m6-source-disposition': raise ValueError('unknown Factory publication kind')
         return self._publish_source(pending.payload,pending.claim)

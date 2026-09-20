@@ -187,3 +187,17 @@ The selected source job has `operation='construct'`, `inputs=(candidate_ref,)`, 
 Rejected-source audits require the exact completed job/result/claim and record, equality with the retained CandidateRecord, `source_status='rejected'`, and `disposition='candidate_rejection'`. That outcome derives only from actual rejected screening or an ineligible license. Unsupported/infrastructure/provisional/unresolved prerequisites are not semantic source rejections. This route creates no TaskBundle or RolloutRecord. Reading the record is historical, not current admission.
 
 `Factory.recover(claim)` recovers a durably frozen source outcome; an unknown pre-freeze attempt raises `FactoryRecoveryRequired`. `Factory.retry_publication(FactoryPublicationFailed)` retries retained exact bytes and costs without source execution. These capabilities stay private. Source aggregate costs are imported once per exact immutable candidate, including reuse from another Factory revision under the same source protocol. The original selected result/revision is preserved; downstream construction references it instead of adding those costs again.
+# Factory construction from complete artifacts
+
+```python
+factory = Factory(store=store, registry=registry, revision=factory_revision,
+                  builder=actual_task_builder)  # default: actual builder at factory_revision
+result = factory.construct(candidate_ref, inputs=build_inputs)
+# success artifacts: (BUILT_T0, m5_repair_history_ref, m6_construction_result_ref)
+```
+
+`construct(candidate: ArtifactRef, *, inputs: BuildInputs | None = None) -> OperationResult` consumes the selected source prerequisite before actual TaskBuilder assembly. It returns that exact rejected/unresolved source result without entering the builder. Eligible source with missing inputs returns a selected `blocked_dependency` construct result; it manufactures no contract/scenario/verifier/root. Supplied inputs must bind the exact `SourcePair.candidate`. The Registry parent job has `operation='construct'`, `invocation='m6-construct'` and inputs `(candidate_ref, source_disposition_ref, construction_request_ref)`. Its opaque request/configuration/result refs explicitly declare consumed dependencies.
+
+The selected parent result contains the actual builder task and an evidenced M5 `RepairHistory`; currently this retains known M3 neutral repairs and remains incomplete until authentic generation-attempt history is imported. Parent costs represent incremental controller/publication work; source and builder costs remain in their own selected jobs. `m6-construction-result` binds the parent claim, request, selected child job/result, history, exact costs, disposition, reason and revision.
+
+`TaskBuilder.job_spec(inputs) -> JobSpec` freezes the builder's actual existing input/policy CAS identities without enqueueing or assembly. Factory uses this exact public method for deterministic child recovery. `Factory.recover(parent_claim)` reuses a completed/frozen child, preserves unknown builder attempts, and never fabricates execution results. `FactoryUpstreamPending` retains an actual `BuildPublicationFailed`; `Factory.retry_publication(pending)` delegates to the actual builder replay before completing the parent. Parent `FactoryPublicationFailed` retains its own exact result bytes. Historical completion readback is distinct from current consumer admission.

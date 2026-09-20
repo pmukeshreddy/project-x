@@ -3,9 +3,10 @@ from .models import BuildInputs, BuildRejected, BuildRecoveryRequired, BuildPubl
 from .build import TaskBuilder
 from .lifecycle import TaskLifecycle, AdmissionRejected, LifecycleRecoveryRequired, LifecyclePublicationFailed
 from .resolver import ReleasedTaskResolver
-from .factory import Factory, FactoryRecoveryRequired, FactoryPublicationFailed, SourceDisposition, read_source_disposition
+from .factory import Factory, FactoryRecoveryRequired, FactoryPublicationFailed, FactoryUpstreamPending, SourceDisposition, read_source_disposition
 
 __all__ = ['BuildInputs', 'TaskBuilder', 'BuildRejected', 'BuildRecoveryRequired', 'BuildPublicationFailed',
     'TaskLifecycle', 'AdmissionRejected', 'LifecycleRecoveryRequired', 'LifecyclePublicationFailed',
     'ReleasedTaskResolver', 'Factory', 'FactoryRecoveryRequired', 'FactoryPublicationFailed',
     'SourceDisposition', 'read_source_disposition']
+__all__.append('FactoryUpstreamPending')
