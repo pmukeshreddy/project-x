@@ -2,6 +2,12 @@
 
 Independent reviewer: `/root`; implementation remains with the retained module owners. This is the consolidated review for new service checkpoints. Earlier unchanged module reviews and raw evidence remain authoritative; no historical Docker matrix was repeated.
 
+## Final code-scope closure — PASS
+
+The previously open service findings are closed by M6 `4e0b72f`, M7 `21339c7` and M8 `7216034`. Root reviewed the new grading/result retention, native run/recovery, matched settings/source origins and terminal cleanup. M7 independently reviewed M6 native CLI argument flow and cleanup. Module-owner focused evidence is retained: M6 authoring35 and final CLI33 checks, M7 final19 checks, M8 final11 checks. No unchanged-module review or historical Docker matrix was reopened.
+
+Final verification at exact code checkout `72160343356d555e3eaab84246826a4b3363b26c`: **889 CPU tests passed**, no failures/skips, followed by **one passing cached Docker CLI grade**. The TEST baseline returned reward0 with all three cases completed, only F1 failing, C1 preserved, exact selected Registry result and verified cleanup. Source hashes and original Registry bytes were unchanged. Evidence: `docs/evidence/integration/final/receipt.json` and accompanying raw logs. Earlier partial/open wording below describes historical checkpoints and is superseded by this closure. GPU execution and empirical results remain unverified; no real human approval or successful task generation is claimed.
+
 ## M3 remaining CPU cap — PASS for the implemented boundary
 
 Reviewed `08467cd67fe661d01180fd3be60bc7c0e4a47fcf`: request validation, session ownership/recovery, cumulative monitor, staging/setup/export classification, last-confirmed source and receipt joins. The override cannot increase the admitted cap. Storage, monitor and cleanup failures retain infrastructure classification. Recovery retains a recorded older cap so a stricter current policy cannot prevent cleanup.

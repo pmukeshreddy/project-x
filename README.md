@@ -1,26 +1,32 @@
 # Feature RL
 
 This project constructs immutable feature tasks from retained source evidence,
-grades implementations in a pinned Docker boundary, and requires exact current
-qualification before release or learning. A built task is not an admitted task.
+grades source implementations in a pinned Docker boundary, and checks current
+qualification before release, agent execution or learning. It includes native
+agent runs, SFT/GRPO training integration, frozen evaluation and historical audits.
 
 Install the package with Python 3.11 or newer using `python -m pip install .` in
-the intended environment. In this workspace, use the existing environment with
-`PYTHONPATH=src` because its editable `.pth` installation is not effective:
+the intended environment. In this workspace, use the existing environment:
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m feature_rl --help
 PYTHONPATH=src .venv/bin/python -m feature_rl config-schema
 ```
 
-The current command checkpoint supports `screen-source`, `construct`, `qualify`,
-`accept`, `release` and read-only `resolve`. Commands use strict JSON requests and
-actual services. The setup, identities, prerequisite failures and private recovery
-output are documented in [the runbook](docs/runbook.md). Library interfaces are in
-[M6 interfaces](docs/interfaces-M6.md); actual implementation status and remaining
-agent/training/evaluation command joins are in [progress](docs/progress.md).
+The CLI exposes `construct`, `qualify`, `release`, `run`, `grade`, `audit`, `train`
+and `evaluate`, plus source screening, authoring, retained-history import,
+acceptance, resolution and publication recovery. Commands use strict JSON inputs
+and the actual library services. See [the runbook](docs/runbook.md) for commands,
+configuration and recovery, and [the native launch contract](docs/reports/M7-native-launch.md)
+for pinned Linux/CUDA setup, training and checkpoint resume.
 
 The labeled Click fixture executed 13 real grades and 39 cases through M3–M6. It
 remains provisional: it is a diagnostic feature, has no human approval, and does
 not replace the original exhausted feature-generation attempt. See
-[the consolidated execution report](docs/reports/M6-click-fixture.md).
+[the retained fixture report](docs/reports/M6-click-fixture.md).
+
+[Final CPU/CLI verification](docs/evidence/integration/final/receipt.json) and
+[progress](docs/progress.md) record the executed checks and current limitations.
+The Docker runtime currently supports the pinned Click profile. GPU training,
+native GPU inference, new task generation and experimental results remain
+deferred and unverified. No real task has been human-approved or released.

@@ -1,0 +1,506 @@
+{
+  "version": "final-cpu-docker-integration-v1",
+  "scope": "Complete code verification; GPU execution, new task generation and experimental results deferred",
+  "tested_revision": "72160343356d555e3eaab84246826a4b3363b26c",
+  "started_at": "2026-09-20T02:17:57.193209+00:00",
+  "source_tree_sha256_before": "ea24f4c1f2ec7fe6f7b7b8b68325f1cd82bc2e57fb621731ca1f9171a9efbb4a",
+  "tracked_source_test_file_count": 180,
+  "cpu": {
+    "command": [
+      "/Users/mukeshreddypochamreddy/Desktop/project x/.venv-training-cpu/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "--ignore=tests/test_environments_docker.py",
+      "--ignore=tests/test_grading_docker.py"
+    ],
+    "status": "passed",
+    "excluded": [
+      "tests/test_environments_docker.py",
+      "tests/test_grading_docker.py"
+    ],
+    "exclusion_reason": "Docker execution is verified by the one final CLI command and retained fixture/runner evidence",
+    "returncode": 0,
+    "elapsed_seconds": 369.9969880839344,
+    "completed_at": "2026-09-20T02:24:07.216297+00:00",
+    "source_files_unchanged": true,
+    "pytest_summary": "889 passed, 1 warning in 369.43s (0:06:09)"
+  },
+  "docker": {
+    "status": "passed",
+    "state": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/final-cli-13d0d5f5468b4de4805615adb93f2bcb",
+    "command": [
+      "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+      "-m",
+      "feature_rl",
+      "--config",
+      "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/final-cli-13d0d5f5468b4de4805615adb93f2bcb/controller.json",
+      "grade",
+      "--request",
+      "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/final-cli-13d0d5f5468b4de4805615adb93f2bcb/grade-request.json",
+      "--invocation",
+      "final-cli-baseline-001"
+    ],
+    "started_at": "2026-09-20T02:25:25.939729+00:00",
+    "scope": "TEST ONLY synthetic fixture through actual final CLI/M6/M4/M3",
+    "model_calls": 0,
+    "human_approval": false,
+    "original_registry_sha256_before": "1ba709591e0fd43106732d56f58ff8a1bf1e60061b8657b1d833b61d73f7f58e",
+    "configuration": {
+      "version": "m6-cli-v1",
+      "store_root": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M6/fixture-runtime-b13724fc39834225bbe263556d481695/store",
+      "registry_root": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/final-cli-13d0d5f5468b4de4805615adb93f2bcb/registry",
+      "revision": "72160343356d555e3eaab84246826a4b3363b26c",
+      "builder_revision": "c7a2edb387409dc3f0555453918419edf15cd275",
+      "registry_limits": {
+        "max_active_jobs": 32,
+        "max_jobs": 1000,
+        "max_attempts_per_job": 3,
+        "max_artifacts": 10000,
+        "max_closure_artifacts": 256,
+        "max_graph_edges": 20000,
+        "max_event_bytes": 262144,
+        "max_events": 10000,
+        "max_journal_bytes": 67108864,
+        "max_database_bytes": 134217728,
+        "max_artifact_envelope_bytes": 8388608,
+        "max_artifact_payload_bytes": 4194304,
+        "max_closure_bytes": 33554432,
+        "lock_timeout_seconds": 1.0
+      },
+      "runtime": {
+        "state_root": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/final-cli-13d0d5f5468b4de4805615adb93f2bcb/runtime",
+        "socket_path": "/Users/mukeshreddypochamreddy/.docker/run/docker.sock",
+        "revision": "72160343356d555e3eaab84246826a4b3363b26c",
+        "grading_revision": "72160343356d555e3eaab84246826a4b3363b26c",
+        "policy": {
+          "version": "docker-click-v1",
+          "image": "feature-rl-m3-less@sha256:b28d3b1eeaa6251e82354fa61dc28a29afead9e2d7179436e77ca8ba612032fa",
+          "seccomp_sha256": "005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44",
+          "platform": "linux/arm64",
+          "cpus": 0.5,
+          "cpu_seconds": 60.0,
+          "memory_bytes": 536870912,
+          "pids": 64,
+          "disk_bytes": 134217728,
+          "output_bytes": 2097152,
+          "stdin_bytes": 1048576,
+          "max_source_bytes": 8388608,
+          "max_archive_bytes": 16777216,
+          "max_files": 2000,
+          "max_staging_bytes": 33554432,
+          "lifecycle_seconds": 120.0,
+          "cleanup_seconds": 10.0,
+          "control_seconds": 5.0,
+          "save_policy": "last-confirmed-source"
+        },
+        "grade_wall_seconds": 600.0
+      },
+      "qualification": null,
+      "authoring": null,
+      "native": null,
+      "evaluation": null,
+      "audit": null
+    },
+    "request": {
+      "task_version": {
+        "sha256": "259b16c9faf122474ecd548e342987098aa4ba5ddd7c217c6fd33986f109b875",
+        "kind": "TaskBundle",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "json"
+      },
+      "submission": {
+        "sha256": "54fb668757733fa74e876a2e37bb271ced4a548273c9733360e99991229ab5bd",
+        "kind": "m4-submission",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "case_seed": 11
+    },
+    "returncode": 1,
+    "elapsed_seconds": 27.070647875079885,
+    "completed_at": "2026-09-20T02:25:53.015530+00:00",
+    "original_registry_sha256_after": "1ba709591e0fd43106732d56f58ff8a1bf1e60061b8657b1d833b61d73f7f58e",
+    "result": {
+      "operation": "grade",
+      "disposition": "candidate_rejection",
+      "artifacts": [
+        {
+          "sha256": "31f14b8e9753c0da0d02cc52ace39471c58d3c6437fd1d34a28d26a7fd95ca32",
+          "kind": "m4-grade-receipt",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        {
+          "sha256": "5ff50c6a8c9f5c1406bf5504b8f19dbc78587c53b91ec1907e9e286e91d2ea6a",
+          "kind": "m6-frozen-grade",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        }
+      ],
+      "evidence": [
+        {
+          "producer": "feature_rl.grading",
+          "command": [
+            "GradingService.grade",
+            "259b16c9faf122474ecd548e342987098aa4ba5ddd7c217c6fd33986f109b875",
+            "54fb668757733fa74e876a2e37bb271ced4a548273c9733360e99991229ab5bd",
+            "11"
+          ],
+          "recorded_at": "2026-09-20T02:25:49.981206Z",
+          "exit_status": 0,
+          "artifacts": [
+            {
+              "sha256": "31f14b8e9753c0da0d02cc52ace39471c58d3c6437fd1d34a28d26a7fd95ca32",
+              "kind": "m4-grade-receipt",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            },
+            {
+              "sha256": "b00533c954ed21b5a511fa112f88f1a4de85f5f3570219868fcb4b8f1503bfca",
+              "kind": "environment-execution",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            },
+            {
+              "sha256": "776c6dd1247a24e3fd7ec443ccdc8149be624c81867b1e6831e6df45dd536b61",
+              "kind": "environment-execution",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            },
+            {
+              "sha256": "e7e16ae5c9cb75ac7bf2be380bc06a90d39f2b535a84449c498220623e76d28f",
+              "kind": "environment-execution",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            },
+            {
+              "sha256": "71e9724f386e6a2244de33779660706657f6a6a10da66ded18b605de08e10661",
+              "kind": "environment-execution",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "72160343356d555e3eaab84246826a4b3363b26c",
+          "scope": "real_integration"
+        },
+        {
+          "producer": "feature_rl.pipeline.Factory.grade",
+          "command": [
+            "Factory.grade",
+            "4abda0f59f7c46458aac7892315c7d06aa29ce8b094e600f54120f8cdee051ac"
+          ],
+          "recorded_at": "2026-09-20T02:25:49.981206Z",
+          "exit_status": 1,
+          "artifacts": [
+            {
+              "sha256": "5ff50c6a8c9f5c1406bf5504b8f19dbc78587c53b91ec1907e9e286e91d2ea6a",
+              "kind": "m6-frozen-grade",
+              "schema_version": 1,
+              "visibility": "private",
+              "encoding": "bytes"
+            }
+          ],
+          "revision": "72160343356d555e3eaab84246826a4b3363b26c",
+          "scope": "source_inspection"
+        }
+      ],
+      "costs": [
+        {
+          "category": "construction",
+          "wall_seconds": 5.500798875000328,
+          "cpu_seconds": 2.340389,
+          "gpu_seconds": null,
+          "input_tokens": null,
+          "output_tokens": null,
+          "human_minutes": null,
+          "usd": null,
+          "measurement": "partial",
+          "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results."
+        },
+        {
+          "category": "execution",
+          "wall_seconds": 13.76160416728817,
+          "cpu_seconds": 5.68675,
+          "gpu_seconds": null,
+          "input_tokens": null,
+          "output_tokens": null,
+          "human_minutes": null,
+          "usd": null,
+          "measurement": "partial",
+          "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results."
+        },
+        {
+          "category": "storage",
+          "wall_seconds": null,
+          "cpu_seconds": null,
+          "gpu_seconds": null,
+          "input_tokens": null,
+          "output_tokens": null,
+          "human_minutes": null,
+          "usd": null,
+          "measurement": "unknown",
+          "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results."
+        },
+        {
+          "category": "verifier",
+          "wall_seconds": 0.16750754113309085,
+          "cpu_seconds": 0.9188689999999997,
+          "gpu_seconds": null,
+          "input_tokens": null,
+          "output_tokens": null,
+          "human_minutes": null,
+          "usd": null,
+          "measurement": "partial",
+          "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results."
+        }
+      ],
+      "reason": "required comparison failed"
+    },
+    "grade": {
+      "version": "m4-grade-v1",
+      "task": {
+        "sha256": "259b16c9faf122474ecd548e342987098aa4ba5ddd7c217c6fd33986f109b875",
+        "kind": "TaskBundle",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "json"
+      },
+      "submission": {
+        "sha256": "54fb668757733fa74e876a2e37bb271ced4a548273c9733360e99991229ab5bd",
+        "kind": "m4-submission",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "verifier": {
+        "sha256": "0c93103d39a9774270c3ff9c772fc0a0bd972aa3e390e62ffcf7b000b8f6c76a",
+        "kind": "VerifierBundle",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "json"
+      },
+      "case_seed": 11,
+      "manifest": {
+        "sha256": "e0b07bf10d6d35957c864a20519018ebd2d902cb94c83a36d397d09a97e953ec",
+        "kind": "m4-case-manifest",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "source": {
+        "sha256": "919ac17123f8c7d7cef33914a8df6c1d5741d06670f2b2bf2470733c506aceb1",
+        "kind": "source-archive",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "disposition": "candidate_rejection",
+      "reward": 0,
+      "reason": "required comparison failed",
+      "expected_case_ids": [
+        "c0",
+        "c1",
+        "c2"
+      ],
+      "cases": [
+        {
+          "case_id": "c0",
+          "mandatory": true,
+          "status": "completed",
+          "passed": false,
+          "assertions": [
+            {
+              "assertion_id": "present",
+              "requirement_ids": [
+                "F1"
+              ],
+              "passed": false
+            },
+            {
+              "assertion_id": "result",
+              "requirement_ids": [
+                "F1"
+              ],
+              "passed": false
+            },
+            {
+              "assertion_id": "echo",
+              "requirement_ids": [
+                "C1"
+              ],
+              "passed": true
+            },
+            {
+              "assertion_id": "exit",
+              "requirement_ids": [
+                "C1"
+              ],
+              "passed": true
+            }
+          ],
+          "evidence": {
+            "sha256": "776c6dd1247a24e3fd7ec443ccdc8149be624c81867b1e6831e6df45dd536b61",
+            "kind": "environment-execution",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          "reason": "compared externally"
+        },
+        {
+          "case_id": "c1",
+          "mandatory": true,
+          "status": "completed",
+          "passed": false,
+          "assertions": [
+            {
+              "assertion_id": "present",
+              "requirement_ids": [
+                "F1"
+              ],
+              "passed": false
+            },
+            {
+              "assertion_id": "result",
+              "requirement_ids": [
+                "F1"
+              ],
+              "passed": false
+            },
+            {
+              "assertion_id": "echo",
+              "requirement_ids": [
+                "C1"
+              ],
+              "passed": true
+            },
+            {
+              "assertion_id": "exit",
+              "requirement_ids": [
+                "C1"
+              ],
+              "passed": true
+            }
+          ],
+          "evidence": {
+            "sha256": "e7e16ae5c9cb75ac7bf2be380bc06a90d39f2b535a84449c498220623e76d28f",
+            "kind": "environment-execution",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          "reason": "compared externally"
+        },
+        {
+          "case_id": "c2",
+          "mandatory": true,
+          "status": "completed",
+          "passed": false,
+          "assertions": [
+            {
+              "assertion_id": "present",
+              "requirement_ids": [
+                "F1"
+              ],
+              "passed": false
+            },
+            {
+              "assertion_id": "result",
+              "requirement_ids": [
+                "F1"
+              ],
+              "passed": false
+            },
+            {
+              "assertion_id": "echo",
+              "requirement_ids": [
+                "C1"
+              ],
+              "passed": true
+            },
+            {
+              "assertion_id": "exit",
+              "requirement_ids": [
+                "C1"
+              ],
+              "passed": true
+            }
+          ],
+          "evidence": {
+            "sha256": "71e9724f386e6a2244de33779660706657f6a6a10da66ded18b605de08e10661",
+            "kind": "environment-execution",
+            "schema_version": 1,
+            "visibility": "private",
+            "encoding": "bytes"
+          },
+          "reason": "compared externally"
+        }
+      ],
+      "build_evidence": {
+        "sha256": "b00533c954ed21b5a511fa112f88f1a4de85f5f3570219868fcb4b8f1503bfca",
+        "kind": "environment-execution",
+        "schema_version": 1,
+        "visibility": "private",
+        "encoding": "bytes"
+      },
+      "runtime_evidence": [
+        {
+          "sha256": "b00533c954ed21b5a511fa112f88f1a4de85f5f3570219868fcb4b8f1503bfca",
+          "kind": "environment-execution",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        {
+          "sha256": "776c6dd1247a24e3fd7ec443ccdc8149be624c81867b1e6831e6df45dd536b61",
+          "kind": "environment-execution",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        {
+          "sha256": "e7e16ae5c9cb75ac7bf2be380bc06a90d39f2b535a84449c498220623e76d28f",
+          "kind": "environment-execution",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        },
+        {
+          "sha256": "71e9724f386e6a2244de33779660706657f6a6a10da66ded18b605de08e10661",
+          "kind": "environment-execution",
+          "schema_version": 1,
+          "visibility": "private",
+          "encoding": "bytes"
+        }
+      ],
+      "cleanup_verified": true,
+      "implementation_revision": "72160343356d555e3eaab84246826a4b3363b26c",
+      "recorded_at": "2026-09-20T02:25:49.981206Z"
+    },
+    "selected_job_id": "233a64dea3c60713f951b7b06881069eee16a23559171b3a4bd692f8176ca581",
+    "completed_cases": 3,
+    "failed_requirement_ids": [
+      "F1"
+    ],
+    "original_registry_unchanged": true,
+    "source_files_unchanged": true,
+    "cleanup_verified": true,
+    "conclusion": "Actual final CLI selected baseline feature rejection; all three cases completed, C1 preserved, cleanup verified"
+  },
+  "gpu_execution": "unverified",
+  "new_task_generation_calls": 0,
+  "source_tree_sha256_after_cpu": "ea24f4c1f2ec7fe6f7b7b8b68325f1cd82bc2e57fb621731ca1f9171a9efbb4a",
+  "source_tree_sha256_after_docker": "ea24f4c1f2ec7fe6f7b7b8b68325f1cd82bc2e57fb621731ca1f9171a9efbb4a",
+  "status": "passed",
+  "completed_at": "2026-09-20T02:25:53.291265+00:00"
+}
