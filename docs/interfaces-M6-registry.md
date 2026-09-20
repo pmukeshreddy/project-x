@@ -171,3 +171,20 @@ remain M0 errors. `RegistryIOError` means the transaction may already have commi
 The implementation does not claim cross-file/service atomicity, external exactly-once
 execution, power-loss durability, automatic corruption repair, backup/migration,
 remote workers or untrusted-controller protection.
+# Historical audit quarantine scope
+
+```python
+audit_configuration = registry.historical_audit_configuration(
+    original_audit_configuration_ref,
+    subjects=(validated_historical_verifier_or_candidate_ref, ...),
+    protected=(current_instruction_ref, selection_ref, envelope_ref,
+               payload_ref, signature_ref, ...),
+)
+# Use audit_configuration in the actual operation='audit' JobSpec.
+```
+
+`historical_audit_configuration(configuration: ArtifactRef, *, subjects: tuple[ArtifactRef, ...], protected: tuple[ArtifactRef, ...]) -> ArtifactRef` verifies and freezes private `registry-historical-audit-policy` bytes plus exact subject/protected reference groups. Both tuples must be nonempty, distinct and within the Registry closure limit. The original configuration and scope/group refs are automatically protected. Callers must explicitly list current audit instruction/selection/envelope/payload/signature refs; subjects come from validated historical source/patch joins.
+
+Only an actual `audit` job using this configuration ignores notices rooted within the historical subjects' dependency closure, excluding protected roots. The same rule applies at enqueue, claim, retry and completion. Protected current-input notices and newly quarantined output roots still block. A historical audit result remains quarantined for ordinary consumers; this scope grants no release, reward, collection or training admission. `Registry.assert_usable` and all normal operation checks are unchanged. Integrity and human-trust validation remain required.
+
+Existing JobSpec/event/model bytes are unchanged. Wrap configuration before creating a new audit job; existing immutable jobs are not retrofitted. M8 must separately confirm and record any actual applied quarantine before claiming a finding succeeded, then recover its exact report if publication fails.

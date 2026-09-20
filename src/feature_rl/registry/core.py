@@ -6,7 +6,7 @@ from pathlib import Path
 import secrets
 
 from feature_rl.artifacts import ArtifactStore, canonical_json
-from feature_rl.contracts import ActorRole, ArtifactRef, OperationResult
+from feature_rl.contracts import ActorRole, ArtifactRef, OperationResult, Visibility
 from .models import (
     AccountingReport, ArtifactRecord, AttemptRecord, Claim, ClaimConflict,
     CostObservation, JobRecord, JobSpec, ObservationRecord, QuarantineNotice,
@@ -15,6 +15,7 @@ from .models import (
 )
 from .state import document, identity, validated
 from .storage import Storage
+from . import historical
 
 
 def references(value):
@@ -83,7 +84,7 @@ class Registry:
                 payload = self.store.get_bytes(ref, max_envelope_bytes=cap,
                                                max_payload_bytes=self.limits.max_artifact_payload_bytes)
                 envelope_payload = base64.b64encode(payload).decode('ascii')
-                intrinsic = ()
+                intrinsic = historical.intrinsic(ref,payload)
             else:
                 artifact = self.store.get_artifact(ref, max_envelope_bytes=cap)
                 envelope_payload = document(artifact)
@@ -93,6 +94,8 @@ class Registry:
                 raise RegistryLimit('artifact dependency closure byte budget exceeded')
             old = state.artifacts.get(ref.sha256)
             declared = explicit.get(ref.sha256, old.dependencies if old is not None else ())
+            if ref.kind in historical.RESERVED and not set(declared)<=set(intrinsic):
+                raise RegistryConflict('reserved audit scope cannot add undeclared dependencies')
             dependencies = tuple(sorted(set((*intrinsic, *declared)), key=lambda r: (r.sha256, r.kind, r.visibility.value)))
             if len(dependencies) > self.limits.max_closure_artifacts:
                 raise RegistryLimit('artifact dependency count exceeded')
@@ -115,10 +118,30 @@ class Registry:
                                       {'artifacts': self._verify(current, (*spec.inputs, spec.configuration)), 'spec': document(spec)}))
         return state.jobs[key]
 
+    def historical_audit_configuration(self, configuration: ArtifactRef, *,
+            subjects: tuple[ArtifactRef,...], protected: tuple[ArtifactRef,...]) -> ArtifactRef:
+        """Freeze explicit historical subjects and current protected audit inputs.
+
+        Use the returned configuration only for actual historical audit jobs.
+        It permits no task/reward admission and skips no artifact-integrity or
+        external human-trust check. Old JobSpec records/identities are unchanged.
+        """
+        configuration=self._ref(configuration)
+        subject_group=historical.AuditReferences(references=self._refs(subjects))
+        protected_group=historical.AuditReferences(references=self._refs(protected))
+        if configuration.kind in historical.RESERVED:
+            raise RegistryConflict('historical audit configuration cannot wrap another scope')
+        subject_ref=self.store.put_bytes(canonical_json(document(subject_group)),historical.SUBJECTS,Visibility.PRIVATE)
+        protected_ref=self.store.put_bytes(canonical_json(document(protected_group)),historical.PROTECTED,Visibility.PRIVATE)
+        policy=historical.AuditPolicy(configuration=configuration,subjects=subject_ref,protected=protected_ref)
+        reference=self.store.put_bytes(canonical_json(document(policy)),historical.POLICY,Visibility.PRIVATE)
+        self.register(reference)  # Reserved records have strictly validated intrinsic refs.
+        return reference
+
     def claim(self, job_id: str, *, owner: str, claim_key: str) -> Claim:
         def build(state):
             job = state.get_job(job_id)
-            state.usable((*job.spec.inputs, job.spec.configuration))
+            state.job_usable(job.spec,(*job.spec.inputs, job.spec.configuration))
             self._verify(state, (*job.spec.inputs, job.spec.configuration))
             existing = next((a.claim for a in state.attempts.values() if a.claim.claim_key == claim_key), None)
             if existing is not None:

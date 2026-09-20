@@ -12,6 +12,7 @@ from .models import (
     QuarantinedError, QuarantineNotice, RegistryConflict, RegistryIntegrityError,
     RegistryLimit, StaleClaim, TraceReport, UnknownIdentity,
 )
+from .historical import ignored_roots
 
 
 def document(value):
@@ -119,13 +120,16 @@ class State:
             changed = len(seen) + len(jobs) != size
         return seen, jobs
 
-    def usable(self, refs):
+    def usable(self, refs, *, ignored=frozenset()):
         for ref in refs:
             if ref.sha256 not in self.artifacts or self.artifacts[ref.sha256].ref != ref:
                 raise UnknownIdentity('unregistered exact artifact reference')
             for notice in self.notices.values():
-                if notice.active and ref.sha256 in self.affected(notice.root)[0]:
+                if notice.active and notice.root.sha256 not in ignored and ref.sha256 in self.affected(notice.root)[0]:
                     raise QuarantinedError('artifact is affected by quarantine ' + notice.notice_id)
+
+    def job_usable(self,spec,refs):
+        self.usable(refs,ignored=ignored_roots(self,spec))
 
     def trace(self, ref):
         seen, jobs = self.affected(ref)
@@ -183,7 +187,7 @@ class State:
                 raise Backpressure('active job queue is full')
             if spec.attempt_limit > self.limits.max_attempts_per_job:
                 raise AttemptLimit('job attempt limit exceeds registry policy')
-            self.usable((*spec.inputs, spec.configuration))
+            self.job_usable(spec,(*spec.inputs, spec.configuration))
             self.jobs[key] = JobRecord(job_id=key, spec=spec, state='queued', attempts=(), result=None, result_observations=())
             return
         if action in ('claim', 'abandon', 'reconcile', 'complete'):
@@ -198,7 +202,7 @@ class State:
                 raise AttemptLimit('job attempt limit exhausted')
             if claim.attempt_id != identity({'job_id': job.job_id, 'claim_key': claim.claim_key, 'owner': claim.owner}):
                 raise RegistryConflict('attempt identity mismatch')
-            self.usable((*job.spec.inputs, job.spec.configuration))
+            self.job_usable(job.spec,(*job.spec.inputs, job.spec.configuration))
             self.attempts[claim.attempt_id] = AttemptRecord(claim=claim, state='running', reason=None, evidence=())
             self.jobs[job.job_id] = updated(job, state='running', attempts=[*job.attempts, claim.attempt_id])
         elif action == 'abandon':
@@ -218,7 +222,7 @@ class State:
             record = updated(self.attempts[job.attempts[-1]], reason=data['reason'], evidence=data['evidence'])
             if not record.evidence:
                 raise RegistryConflict('retry requires diagnosed cause/change evidence')
-            self.usable((*job.spec.inputs, job.spec.configuration))
+            self.job_usable(job.spec,(*job.spec.inputs, job.spec.configuration))
             self.jobs[job.job_id] = updated(job, state='queued')
         elif action == 'reconcile':
             self.authenticate(claim)
@@ -257,7 +261,7 @@ class State:
             costs = tuple(cost for key in wanted for cost in self.observations[key].observation.costs)
             if result.costs != costs:
                 raise RegistryConflict('result costs do not match the declared snapshot records')
-            self.usable((*job.spec.inputs, job.spec.configuration, *result.artifacts, *_result_evidence(result)))
+            self.job_usable(job.spec,(*job.spec.inputs, job.spec.configuration, *result.artifacts, *_result_evidence(result)))
             self.attempts[claim.attempt_id] = updated(attempt, state='completed')
             self.jobs[job.job_id] = updated(job, state='completed', result=result, result_observations=list(wanted))
         elif action == 'quarantine':

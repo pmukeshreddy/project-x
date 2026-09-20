@@ -1,0 +1,45 @@
+{
+  "diagnostic_only": true,
+  "human_approval_created": false,
+  "native_model_or_docker_execution": false,
+  "observed_head": "94b7fceb3c76ae01253e5b10e2b34b747d2f283a",
+  "started_at": "2026-09-20T00:14:21.673938+00:00",
+  "sources_before": {
+    "src/feature_rl/registry/__init__.py": "c9b303f231a63377f881c70c3a0d58cf4fd778d12c039aa0ccf28d0d448c443a",
+    "src/feature_rl/registry/core.py": "80f58f619018195468c5c40b106d9eccaf84139c8bf050e1fc123e45540544d1",
+    "src/feature_rl/registry/historical.py": "f1a2239fbd6f7bc6b246822687df7740c3d5fa1c99b65b5023ac45eb992d3150",
+    "src/feature_rl/registry/models.py": "c138bad378120deadb1da24e8451ef9261140551058d5efd73fa386c832fe545",
+    "src/feature_rl/registry/state.py": "6c102a0adba859e777e483b887b6ed0743d313d951755f5d3e71a65345da633a",
+    "src/feature_rl/registry/storage.py": "0785bf743819f8d5b8c2a42255bc18c9d82b69c9faa772d00ca97a2325a46aba",
+    "tests/test_registry_historical_audit.py": "a45f40eecd54efbd4765cb94ce3744fc9bbb96bd9b3a0945f35a3b055cd6e2f3",
+    "tests/test_registry.py": "9be3c6d20e3241e352f8b47321ef081cf581266d40692fa14fbd7d16e5b40112"
+  },
+  "red": {
+    "result": "13 failed: Registry.historical_audit_configuration missing",
+    "pytest_seconds": 0.4
+  },
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_registry_historical_audit.py",
+    "tests/test_registry.py"
+  ],
+  "environment": {
+    "PYTHONPATH": "src"
+  },
+  "exit_code": 0,
+  "wall_seconds": 8.652061959030107,
+  "ended_at": "2026-09-20T00:14:30.327296+00:00",
+  "sources_after": {
+    "src/feature_rl/registry/__init__.py": "c9b303f231a63377f881c70c3a0d58cf4fd778d12c039aa0ccf28d0d448c443a",
+    "src/feature_rl/registry/core.py": "80f58f619018195468c5c40b106d9eccaf84139c8bf050e1fc123e45540544d1",
+    "src/feature_rl/registry/historical.py": "f1a2239fbd6f7bc6b246822687df7740c3d5fa1c99b65b5023ac45eb992d3150",
+    "src/feature_rl/registry/models.py": "c138bad378120deadb1da24e8451ef9261140551058d5efd73fa386c832fe545",
+    "src/feature_rl/registry/state.py": "6c102a0adba859e777e483b887b6ed0743d313d951755f5d3e71a65345da633a",
+    "src/feature_rl/registry/storage.py": "0785bf743819f8d5b8c2a42255bc18c9d82b69c9faa772d00ca97a2325a46aba",
+    "tests/test_registry_historical_audit.py": "a45f40eecd54efbd4765cb94ce3744fc9bbb96bd9b3a0945f35a3b055cd6e2f3",
+    "tests/test_registry.py": "9be3c6d20e3241e352f8b47321ef081cf581266d40692fa14fbd7d16e5b40112"
+  }
+}
