@@ -1,0 +1,38 @@
+{
+  "commit": "7c79981dc58aef78b3632c2ba6a8cdd36817945d",
+  "worktree": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/runner-milestone-7c79981",
+  "command": [
+    "/Users/mukeshreddypochamreddy/Desktop/project x/.venv-training-cpu/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "--ignore=tests/test_environments_docker.py",
+    "--ignore=tests/test_grading_docker.py"
+  ],
+  "PYTHONPATH": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/runner-milestone-7c79981/src",
+  "python": "3.13.7 (main, Aug 14 2025, 11:12:11) [Clang 17.0.0 (clang-1700.3.19.1)]",
+  "started_at": "2026-09-20T00:23:14.345171+00:00",
+  "finished_at": "2026-09-20T00:25:27.781098+00:00",
+  "wall_seconds": 133.43579974980094,
+  "exit_status": 0,
+  "tracked_tree_sha256_before": "44fa932d6b94e7fede843ac74af95d301214ded2656a24fcdc7f727595f2756a",
+  "tracked_tree_sha256_after": "44fa932d6b94e7fede843ac74af95d301214ded2656a24fcdc7f727595f2756a",
+  "log_sha256": "b625bdf2867806e97e188f2d316ada14f6a5797b9e9efe5f6b792ab122d32a20",
+  "scope": "CPU integration checkpoint; Docker evidence reused from real fixture, runner diagnostic and M3 CPU-cap diagnostic. Known M8 interface findings and native service implementation remain open. No GPU or task-generation calls.",
+  "source_audit_followup": {
+    "command": [
+      "/Users/mukeshreddypochamreddy/Desktop/project x/.venv-training-cpu/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_training_skyrl.py::test_bridge_calls_are_actual_pinned_trainer_symbols"
+    ],
+    "exit_status": 0,
+    "completed_at": "2026-09-20T00:27:24.352610+00:00",
+    "local_source": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/M7/skyrl/skyrl/train/trainer.py",
+    "copied_source_sha256": "73c584dc6ce9a247b6708c1284aecbf38ffb0b1c85f7b1277e12679eefb4acf0",
+    "original_source_sha256": "73c584dc6ce9a247b6708c1284aecbf38ffb0b1c85f7b1277e12679eefb4acf0",
+    "log_sha256": "09229b326b028651d725fa47cd1bae9fd8e0145ff8779bdb84ae2762c00ab737",
+    "scope": "Run only previously skipped symbol check against exact existing pinned source bytes copied into frozen checkout; no source retrieval or native imports."
+  }
+}
