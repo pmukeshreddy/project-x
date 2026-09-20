@@ -232,7 +232,8 @@ class BoundedHttpFetcher:
         published_at: datetime | None = None,
         edited_at: datetime | None = None,
         media_type: str | None = None,
-        accept: Literal['application/vnd.github+json', 'application/vnd.github.raw+json'] = 'application/vnd.github+json',
+        accept: Literal['application/vnd.github+json', 'application/vnd.github.raw+json',
+                        'application/vnd.pypi.simple.v1+json', 'application/octet-stream'] = 'application/vnd.github+json',
     ) -> FetchedSource:
         _validate_url(url)
         if self.bearer_token is not None and urlsplit(url).netloc != 'api.github.com':

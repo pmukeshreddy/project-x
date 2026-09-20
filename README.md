@@ -39,9 +39,10 @@ dependency closure, source layout and system package requirements, then freezes
 wheel hashes and image digests. Configure the Linux platform, sandbox limits and
 publishing registry; per-repository profiles and dependency pins are generated.
 Unresolved declarations or an incomplete reproducible closure reject preparation.
-Each task retains one runtime and an immutable dependency catalog containing the
-baseline closure plus any optional controller-supplied catalog. Candidates resolve
-their own safe build and dependency declarations offline against that catalog.
+Preparation automatically populates a shared package/version catalog from trusted
+PyPI metadata and hash-verified wheels, including compatible alternative versions
+and dependencies discovered across repositories. Each task freezes one catalog
+snapshot; candidates resolve their own safe declarations against it offline.
 See [runtime construction](docs/interfaces-M3.md).
 
 [`construct-feature --github`](docs/runbook.md) captures a merged PR, its discussion

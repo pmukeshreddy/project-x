@@ -230,39 +230,21 @@ def read_catalog(store, ref, policy) -> DependencyCatalog:
     return _load_catalog(store, ref, policy)[0]
 
 
-def freeze_catalog(store, policy, pins, extra_catalog=None) -> ArtifactRef:
-    """Freeze baseline wheels plus an optional controller-supplied wheel catalog."""
-    if policy.profile is None:
-        raise PolicyRejected('dependency catalog requires a resolved baseline profile')
-    try:
-        pins = tuple(DependencyPin.model_validate(pin) for pin in pins)
-        by_name = {canonicalize_name(pin.name): pin for pin in pins}
-        expected = {canonicalize_name(pin.name): pin for pin in policy.profile.dependencies}
-        if len(by_name) != len(pins) or set(by_name) != set(expected):
-            raise PolicyRejected('catalog baseline dependency roster mismatch')
-        items = []
-        for name, spec in sorted(expected.items()):
-            pin = by_name[name]
-            if Version(pin.version) != Version(spec.version) or pin.sha256 != spec.sha256:
-                raise PolicyRejected('catalog baseline dependency identity mismatch')
-            items.append(CatalogWheel(pin=spec, artifact=pin.artifact))
-        if extra_catalog is not None:
-            items.extend(read_catalog(store, extra_catalog, policy).wheels)
-        unique = {}
-        for item in items:
-            previous = unique.setdefault(item.pin.filename, item)
-            if previous != item:
-                raise PolicyRejected('conflicting dependency catalog wheel filename')
-        catalog = DependencyCatalog(wheels=tuple(sorted(unique.values(), key=lambda item: (
-            canonicalize_name(item.pin.name), Version(item.pin.version), item.pin.filename,
-            item.pin.sha256, item.artifact.sha256))))
-        _inspect_catalog(store, catalog, policy)
-        data = canonical_json(catalog.model_dump(mode='json'))
-        if len(data) > _CATALOG_BYTES:
-            raise PolicyRejected('dependency catalog serialized byte cap')
-        return store.put_bytes(data, 'dependency-catalog', Visibility.AUTHORING)
-    except (ArtifactError, ValidationError, InvalidVersion) as exc:
-        raise PolicyRejected('cannot freeze dependency catalog') from exc
+def publish_catalog(store, policy, items) -> ArtifactRef:
+    """Validate and retain a deterministic catalog, independent of any repository."""
+    unique = {}
+    for item in items:
+        previous = unique.setdefault(item.pin.filename, item)
+        if previous != item:
+            raise PolicyRejected('conflicting dependency catalog wheel filename')
+    catalog = DependencyCatalog(wheels=tuple(sorted(unique.values(), key=lambda item: (
+        canonicalize_name(item.pin.name), Version(item.pin.version), item.pin.filename,
+        item.pin.sha256, item.artifact.sha256))))
+    _inspect_catalog(store, catalog, policy)
+    data = canonical_json(catalog.model_dump(mode='json'))
+    if len(data) > _CATALOG_BYTES:
+        raise PolicyRejected('dependency catalog serialized byte cap')
+    return store.put_bytes(data, 'dependency-catalog', Visibility.AUTHORING)
 
 
 def _baseline_entries(recipe, policy, catalog):

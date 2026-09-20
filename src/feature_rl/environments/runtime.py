@@ -72,12 +72,12 @@ class EnvironmentRuntime:
             self.engine.qualify_boundary(image=policy.image)
         self.policy=policy;self.profile=policy.profile
         self._publish_qualification()
-    def prepare_repository(self,baseline,*,source_evidence,extra_roots=()):
+    def prepare_repository(self,baseline,*,source_evidence,extra_roots=(),dependency_sources=()):
         from .resolution import resolve_repository
         source=self.source(baseline)
         policy,pins=resolve_repository(self,source,extra_roots=extra_roots)
         self.bind_policy(policy)
-        return self.create_recipe(baseline,pins,source_evidence=source_evidence)
+        return self.create_recipe(baseline,pins,source_evidence=source_evidence,dependency_sources=dependency_sources)
     def publish(self,value,kind,visibility=Visibility.PRIVATE):
         data=canonical_json(value)
         if len(data)>64*1024*1024:raise EnvironmentError('evidence publication limit')
@@ -94,14 +94,16 @@ class EnvironmentRuntime:
         return SourceArchive.read(self.read_bytes(ref,self.policy.max_archive_bytes),self.policy)
     def dependency_bytes(self,pins):
         return dependency_files(self.store,pins,self.policy)
-    def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
+    def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord,dependency_sources=()):
         from .images import prepare_runtime_image, validate_baseline
         baseline=ArtifactRef.model_validate(baseline);pins=tuple(DependencyPin.model_validate(x) for x in pins)
         if self.profile is None or not self.engine.qualified:raise PolicyRejected('resolved qualified runtime required')
         source=self.source(baseline);self.profile.validate_source(source);self.dependency_bytes(pins)
         if baseline.visibility not in {Visibility.AUTHORING,Visibility.PUBLIC}:raise PolicyRejected('B-only recipe requires authoring/public baseline')
-        from .candidates import freeze_catalog, read_catalog
-        catalog=freeze_catalog(self.store,self.policy,pins,self.dependency_catalog)
+        from .catalog import prepare_catalog
+        from .candidates import read_catalog
+        catalog,catalog_evidence=prepare_catalog(self,source,pins,
+            dependency_sources=tuple(self.source(ref) for ref in dependency_sources))
         catalog_wheels=tuple(item.artifact for item in read_catalog(self.store,catalog,self.policy).wheels)
         image,image_ref=prepare_runtime_image(self,pins)
         construction_evidence=validate_baseline(self,image,baseline,source)
@@ -109,7 +111,7 @@ class EnvironmentRuntime:
         now=datetime.now(timezone.utc)
         repairs=self.profile.neutral_repairs
         recipe=EnvironmentRecipe(kind='EnvironmentRecipe',schema_version=1,visibility=Visibility.AUTHORING,
-            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=tuple(dict.fromkeys((baseline,policy_ref,catalog,image_ref,image.context,*(() if self.profile.resolution is None else (self.profile.resolution,)),*catalog_wheels))),evidence=(source_evidence,
+            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=tuple(dict.fromkeys((baseline,policy_ref,catalog,catalog_evidence,image_ref,image.context,*(() if self.profile.resolution is None else (self.profile.resolution,)),*catalog_wheels))),evidence=(source_evidence,
                 EvidenceRecord(producer='feature_rl.environments runtime image construction',command=('build pinned runtime image','verify offline baseline dependency closure'),recorded_at=now,exit_status=0,artifacts=(image_ref,construction_evidence),revision=self.revision,scope='real_integration'))),
             costs=(CostRecord(category='construction',wall_seconds=None,cpu_seconds=None,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='unknown',note='Recipe publication; execution measured separately'),),
             image_digest=image.image_digest,runtime_image=image_ref,dependency_catalog=catalog,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.setup,reset=self.profile.setup,services=(),

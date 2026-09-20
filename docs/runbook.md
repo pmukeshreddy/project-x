@@ -111,18 +111,27 @@ closure in a source-free builder. It retains wheel hashes, package versions,
 resolution inputs and immutable image digests. Dynamic or contradictory declarations
 which cannot be resolved reproducibly fail closed.
 
-`runtime.dependency_catalog` optionally references a trusted immutable wheel catalog
-in the artifact store. Preparation combines that catalog with the automatically
-captured baseline closure and binds the result to the task recipe. This is a shared
-controller input; repository-specific manual dependency pins are not required. The
-public runtime manifest lists catalog wheel names, versions, filenames, hashes and
-artifact references.
+Preparation automatically populates the shared dependency catalog from the trusted
+PyPI index and artifact CDN. Repository requirements seed acquisition; compatible
+alternative versions, requested extras and their transitive dependencies are also
+captured. Historical declarations seed available packages without constraining a
+candidate's solution. No wheelhouse path, package list or per-repository pins are
+required. `runtime.dependency_catalog` may optionally add an existing trusted catalog.
+
+Keep `runtime.state_root` and `store_root` persistent to reuse index snapshots and
+hash-verified wheel artifacts across repositories. Preparation freezes a bounded
+catalog snapshot and its acquisition evidence into each recipe. Existing preparation
+locks retain that exact snapshot even as the shared cache grows. Preparation fails
+closed if it cannot retain a usable package/version choice beyond the baseline.
+The public runtime manifest lists the exact available wheel names, versions,
+filenames, hashes and artifact references; it is not a mirror of every PyPI package.
 
 New construction requires `runtime.image_repository` (for example,
 `registry.example.com/team/runtimes`), registry push access through the dedicated
 Docker client config, and Buildx timestamp-rewrite support. Only preparation downloads
 dependencies or system packages. Repository hooks run in the qualified offline sandbox.
-`runtime.image_seconds` bounds each image operation (default 600 seconds).
+`runtime.image_seconds` bounds each image operation and catalog acquisition
+(default 600 seconds).
 
 The original task and environment recipe remain fixed for every candidate. Candidate
 builds parse the submitted declarations and choose a compatible closure from the

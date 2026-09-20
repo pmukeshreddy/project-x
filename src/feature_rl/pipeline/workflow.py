@@ -259,7 +259,8 @@ class FeatureWorkflow:
         candidate=typed(self.store,selected.candidate,c.CandidateRecord)
         pair=typed(self.store,selected.source_pair,c.SourcePair)
         prepared=self.runtime.prepare_repository(selected.baseline,
-            source_evidence=candidate.provenance.evidence[0],extra_roots=tuple(entry.path for entry in pair.changed_files))
+            source_evidence=candidate.provenance.evidence[0],extra_roots=tuple(entry.path for entry in pair.changed_files),
+            dependency_sources=(selected.reference,))
         discovery=RuntimeDiscoveryService(runtime=self.runtime).discover(prepared)
         value=PreparationSelection(environment=prepared,context=discovery.context,
             entry_points=discovery.observation.entry_points,
