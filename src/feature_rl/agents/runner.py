@@ -288,11 +288,13 @@ class AgentRunner:
                             remaining=limits.wall_seconds-(time.monotonic()-started)
                             if remaining<=0: stop=c.StopReason.TIME_LIMIT;terminal=True;obs={'status':'time_limit'}
                             else:
-                                # At <=1 CPU, this conservatively bounds the
-                                # command's CPU by remaining measured allowance.
-                                # M3 setup/export/cleanup remain separately capped;
-                                # this is not a hard aggregate session CPU override.
-                                execution=execution_request(action,min(remaining,limits.cpu_seconds-used_cpu))
+                                # The M3 session watchdog covers staging, setup,
+                                # command and export. Its sampled detection can
+                                # overshoot; measured usage is carried forward.
+                                cpu_cap=min(limits.cpu_seconds-used_cpu,self.runtime.policy.cpu_seconds)
+                                execution=execution_request(action,min(remaining,cpu_cap))
+                                execution=type(execution).model_validate({**execution.model_dump(),
+                                    'remaining_cpu_seconds':cpu_cap})
                                 tools+=1
                                 result,elapsed,phase=self._phase(claim,req,'action',len(steps),
                                     lambda:self.runtime.execute_development(handle,execution),lambda v,w:(v.cost,))

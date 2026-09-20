@@ -324,4 +324,6 @@ def test_next_command_timeout_is_capped_by_remaining_measured_cpu(tmp_path,monke
     monkeypatch.setattr(f.runner.runtime,'execute_development',expensive)
     r=record(f,f.runner.run(f.task,f.policy,f.limits))
     assert f.actions[1][1].command.timeout_seconds==.5
+    assert f.actions[0][1].remaining_cpu_seconds==60.
+    assert f.actions[1][1].remaining_cpu_seconds==.5
     assert r.stopping_reason==c.StopReason.TIME_LIMIT and len(f.backend.calls)==2
