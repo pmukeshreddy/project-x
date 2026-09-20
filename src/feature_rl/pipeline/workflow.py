@@ -34,7 +34,7 @@ from .locking import candidate_lock
 from .models import BuildInputs
 from .packaging import checked, document, read_record, read_bytes, typed, MAX_DOCUMENT
 from .workflow_models import (FeatureWorkflowSettings, FeatureWorkflowRequest, IntakeSelection,
-    PreparationSelection, FeatureStep, FeatureOutcome)
+    PreparationSelection, FeatureRuntimeSelection, FeatureStep, FeatureOutcome)
 
 
 class FeatureRecoveryRequired(FactoryRecoveryRequired):
@@ -69,7 +69,7 @@ class FeatureWorkflow:
         manifest=self.store.put_bytes(raw,'m6-feature-source-index',c.Visibility.PRIVATE)
         value={'version':'m6-feature-policy-v1','revision':factory.revision,
             'builder_revision':factory.builder.revision,'runtime_revision':runtime.revision,
-            'runtime_policy':document(runtime.policy),'settings':document(config),'source_index':document(manifest)}
+            'runtime_policy':document(runtime.base_policy),'settings':document(config),'source_index':document(manifest)}
         self.configuration=put(factory,value,'m6-feature-policy',dependencies=references(value))
 
     def _spec(self,ref):
@@ -175,10 +175,11 @@ class FeatureWorkflow:
             selected=IntakeSelection.model_validate_json(canonical_json(inputs['inputs']))
             recipe=typed(self.store,output.environment.recipe,c.EnvironmentRecipe)
             policy=read_record(self.store,output.environment.policy,type(self.runtime.policy),'sandbox-policy')
-            if (step.key!='preparation' or recipe.baseline!=selected.baseline or policy!=self.runtime.policy
+            if (step.key!='preparation' or recipe.baseline!=selected.baseline
                     or output.environment.policy not in recipe.provenance.inputs):
                 raise ValueError('preparation changed its selected baseline or runtime policy')
             validate_recipe_profile(recipe,policy,self.store)
+            self.runtime.bind_policy(policy)
             raw=read_bytes(self.store,output.context.source,128*1024)
             from feature_rl.requirements.runtime_discovery import parse_discovery, discovery_locator
             observed=parse_discovery(output.context.source,raw)
@@ -192,6 +193,36 @@ class FeatureWorkflow:
                     or {data['build_evidence_sha256'],data['execution_evidence_sha256']}
                     !={ref.sha256 for ref in output.private_evidence}):
                 raise ValueError('workflow discovery lost its private execution evidence')
+        elif isinstance(output,FeatureRuntimeSelection):
+            if step.key!='feature-runtime' or document(output.contract)!=inputs['inputs']['contract']:
+                raise ValueError('feature runtime changed the selected contract')
+            original=PreparedEnvironment.model_validate_json(canonical_json(inputs['inputs']['environment']))
+            before=self.runtime.recipe(original)
+            recipe=self.runtime.recipe(output.environment)
+            if (recipe.baseline!=before.baseline or output.environment.policy!=original.policy
+                    or recipe.model_dump(exclude={'source_variants','provenance'})!=before.model_dump(exclude={'source_variants','provenance'})):
+                raise ValueError('feature runtime changed the original baseline environment')
+            from feature_rl.environments import SourceArchive, PolicyRejected
+            pair=typed(self.store,c.ArtifactRef.model_validate_json(canonical_json(inputs['inputs']['source_pair'])),c.SourcePair)
+            if pair.baseline!=before.baseline:
+                raise ValueError('feature runtime changed the selected source pair')
+            contract=typed(self.store,output.contract,c.RequirementContract)
+            baseline=self.runtime.source(pair.baseline);reference=self.runtime.source(pair.reference)
+            files=dict(baseline.files)
+            for item in contract.feature_files:
+                if baseline.files.get(item.path)==reference.files.get(item.path):
+                    raise ValueError('feature runtime selected an unchanged file')
+                if item.path in reference.files:files[item.path]=reference.files[item.path]
+                else:files.pop(item.path,None)
+            projected=SourceArchive(files)
+            try:self.runtime.profile.validate_source(projected)
+            except PolicyRejected:
+                if len(recipe.source_variants)!=1 or contract.allowed_changes.dependencies!='pinned_allowlist':
+                    raise ValueError('feature runtime lacks its one required frozen resolution')
+            else:
+                if recipe.source_variants:
+                    raise ValueError('feature runtime adds an unrelated resolution')
+            self.runtime.source_environment(output.environment,projected,bind=False)
         elif output.artifacts:
             # Each successful/failed child selection comes from the actual
             # source/author/build receipt and remains in its original cost job.
@@ -254,14 +285,48 @@ class FeatureWorkflow:
     def _prepare(self,selected):
         from feature_rl.requirements import RuntimeDiscoveryService
         candidate=typed(self.store,selected.candidate,c.CandidateRecord)
-        prepared=self.runtime.create_recipe(selected.baseline,self.settings.dependency_pins,
-            source_evidence=candidate.provenance.evidence[0])
+        pair=typed(self.store,selected.source_pair,c.SourcePair)
+        prepared=self.runtime.prepare_repository(selected.baseline,
+            source_evidence=candidate.provenance.evidence[0],extra_roots=tuple(entry.path for entry in pair.changed_files))
         discovery=RuntimeDiscoveryService(runtime=self.runtime).discover(prepared)
         value=PreparationSelection(environment=prepared,context=discovery.context,
             entry_points=discovery.observation.entry_points,
             supported_observables=discovery.observation.supported_observables,
             private_evidence=discovery.private_evidence,costs=discovery.costs)
         return value,(*discovery.costs,*overhead(),unknown_cost('storage','Runtime preparation publication overhead unmeasured'))
+
+    def _feature_runtime(self,selected,prepared,contract_ref):
+        """Freeze any required build/dependency change before authoring controls."""
+        from feature_rl.environments import SourceArchive, PolicyRejected
+        from feature_rl.environments.resolution import resolve_repository
+        contract=typed(self.store,contract_ref,c.RequirementContract)
+        original=self.runtime.recipe(prepared.environment)
+        baseline_policy=self.runtime.policy
+        before=self.runtime.source(selected.baseline);after=self.runtime.source(selected.reference)
+        files=dict(before.files)
+        for entry in contract.feature_files:
+            if before.files.get(entry.path)==after.files.get(entry.path):
+                raise ValueError('contract selected an unchanged feature file: '+entry.path)
+            if entry.path in after.files:files[entry.path]=after.files[entry.path]
+            else:files.pop(entry.path,None)
+        projected=SourceArchive(files)
+        try:baseline_policy.profile.validate_source(projected)
+        except PolicyRejected:
+            if contract.allowed_changes.dependencies!='pinned_allowlist':
+                raise ValueError('feature changes runtime inputs without a pinned dependency policy')
+            policy,pins=resolve_repository(self.runtime,projected,extra_roots=baseline_policy.profile.source_roots)
+            self.runtime.bind_policy(policy)
+            candidate=typed(self.store,selected.candidate,c.CandidateRecord)
+            variant=self.runtime.create_recipe(selected.baseline,pins,
+                source_evidence=candidate.provenance.evidence[0],validation_source=projected)
+            value=original.model_copy(update={'source_variants':(variant.recipe,),
+                'provenance':original.provenance.model_copy(update={'inputs':(*original.provenance.inputs,variant.recipe)})})
+            environment=PreparedEnvironment(recipe=self.store.put_artifact(value),policy=prepared.environment.policy)
+        else:
+            environment=prepared.environment
+        self.runtime.bind_policy(baseline_policy)
+        return FeatureRuntimeSelection(environment=environment,contract=contract_ref),(
+            *overhead(),unknown_cost('construction','Feature runtime resolution and offline construction, if required'))
 
     def _sources(self,selected,prepared,request):
         source=self.runtime.source(selected.baseline);profile=self.runtime.policy.profile
@@ -270,7 +335,7 @@ class FeatureWorkflow:
         terms=set(re.findall(r'[A-Za-z_]{3,}',text.lower()))-{'the','and','with','this','that','from','true','false','null'}
         ranked=[]
         for path,entry in source.files.items():
-            if not path.endswith('.py') or not any(path==root or path.startswith(root.rstrip('/')+'/') for root in profile.source_roots):continue
+            if not any(path==root or path.startswith(root.rstrip('/')+'/') for root in profile.source_roots):continue
             try:lines=entry.data.decode().splitlines()
             except UnicodeError:continue
             if not lines:continue
@@ -286,7 +351,7 @@ class FeatureWorkflow:
             spans.append(RetrievalRequest(context_id='B_'+str(len(spans)+1),path=path,line_ranges=((start,end),)))
             total+=size
             if len(spans)>=self.settings.context_files:break
-        if not spans:raise ValueError('profile has no bounded author-visible Python source context')
+        if not spans:raise ValueError('profile has no bounded author-visible source context')
         policy=RetrievalPolicy(allowed_paths=tuple(span.path for span in spans),max_archive_bytes=self.runtime.policy.max_archive_bytes,
             max_files=self.runtime.policy.max_files,max_selected_bytes=self.settings.context_bytes,
             max_spans=self.settings.context_files,max_expanded_bytes=self.runtime.policy.max_source_bytes)
@@ -386,8 +451,8 @@ class FeatureWorkflow:
         sources,resolver,baseline=self._sources(selected,prepared,request)
         author=self._author_factory(selected)
         profile=self.runtime.policy.profile
-        allowed=c.AllowedChanges(source_roots=profile.source_roots,forbidden_paths=('.feature-rl','controller_checks','reference','tests','docs'),
-            dependencies='forbidden',dependency_artifacts=(),additional_artifact_types=())
+        allowed=c.AllowedChanges(source_roots=profile.source_roots,forbidden_paths=('.feature-rl','controller_checks','reference'),
+            dependencies='pinned_allowlist',dependency_artifacts=(),additional_artifact_types=())
         profile.validate_allowed_changes(allowed)
         base_provenance=self._provenance(claim,sources)
         contract_inputs=ContractFinalizationInputs(visible_request=sources[0].text,
@@ -405,6 +470,10 @@ class FeatureWorkflow:
                 supported_observables=prepared.supported_observables,allowed_changes=allowed))
         if contract_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,contract_result)
         contract_ref=contract_result.artifacts[0];contract=typed(self.store,contract_ref,c.RequirementContract)
+        feature_runtime,_=self._step(claim,ref,'feature-runtime',{'contract':document(contract_ref),
+            'environment':document(prepared.environment),'source_pair':document(selected.source_pair)},
+            lambda:self._feature_runtime(selected,prepared,contract_ref))
+        prepared=prepared.model_copy(update={'environment':feature_runtime.environment})
         scenario_inputs=ScenarioFinalizationInputs(contract=contract_ref,supported_observables=prepared.supported_observables,
             seed_policy=request.seed_policy,visibility=c.Visibility.PRIVATE,
             provenance=self._provenance(claim,sources,(contract_ref,)),costs=overhead())

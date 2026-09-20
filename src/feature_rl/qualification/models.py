@@ -14,8 +14,7 @@ class QualificationRejected(ValueError):
 
 class ProjectionPath(StrictModel):
     path: Annotated[str,Field(min_length=1,max_length=1024)]
-    action: Literal['included_implementation','excluded_documentation','excluded_tests',
-                    'excluded_dependency_build','excluded_out_of_policy']
+    action: Literal['included_implementation','excluded_unrelated']
     rationale: Annotated[str,Field(min_length=1,max_length=4096)]
     before_sha256: Digest | None
     after_sha256: Digest | None

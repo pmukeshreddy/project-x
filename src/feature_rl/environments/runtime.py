@@ -11,7 +11,6 @@ import json
 import tarfile
 import tomllib
 import uuid
-import zipfile
 from pathlib import Path
 
 from feature_rl.artifacts import ArtifactStore,canonical_json
@@ -50,13 +49,32 @@ def failure(exc):
 
 class EnvironmentRuntime:
     def __init__(self,*,store:ArtifactStore,engine:DockerEngine,revision:str):
-        if not getattr(engine,'qualified',False):raise PolicyRejected('production boundary qualification required')
+        if engine.policy.profile is not None and not getattr(engine,'qualified',False):raise PolicyRejected('production boundary qualification required')
         if not isinstance(store,ArtifactStore) or store.role!=ActorRole.CONTROLLER:raise PolicyRejected('controller store required')
         if len(revision) not in (40,64) or any(c not in '0123456789abcdef' for c in revision):raise PolicyRejected('implementation revision required')
-        self.store=store;self.engine=engine;self.policy=engine.policy;self.revision=revision
+        self.store=store;self.engine=engine;self.policy=engine.policy;self.base_policy=engine.policy;self.revision=revision
         self.profile=self.policy.profile
-        self.qualification_ref=self.publish(engine.qualification,'sandbox-qualification')
-        self.qualification_summary_ref=self.publish({'qualified':True,'policy':self.policy.model_dump(mode='json'),'observations':engine.qualification['observations']},'sandbox-qualification-summary',Visibility.AUTHORING)
+        if engine.qualified:self._publish_qualification()
+    def _publish_qualification(self):
+        self.qualification_ref=self.publish(self.engine.qualification,'sandbox-qualification')
+        self.qualification_summary_ref=self.publish({'qualified':True,'policy':self.policy.model_dump(mode='json'),'observations':self.engine.qualification['observations']},'sandbox-qualification-summary',Visibility.AUTHORING)
+    def bind_policy(self,policy):
+        policy=SandboxPolicy.model_validate(policy)
+        if policy.profile is None or policy.image is None:raise PolicyRejected('resolved repository runtime required')
+        if policy.model_dump(exclude={'image','profile'})!=self.base_policy.model_dump(exclude={'image','profile'}):
+            raise PolicyRejected('resolved repository changed sandbox constraints')
+        if self.engine.policy!=policy or not self.engine.qualified:
+            self.engine.qualified=False;self.engine.qualification=None
+            self.engine.policy=policy
+            self.engine.qualify_boundary(image=policy.image)
+        self.policy=policy;self.profile=policy.profile
+        self._publish_qualification()
+    def prepare_repository(self,baseline,*,source_evidence,extra_roots=()):
+        from .resolution import resolve_repository
+        source=self.source(baseline)
+        policy,pins=resolve_repository(self,source,extra_roots=extra_roots)
+        self.bind_policy(policy)
+        return self.create_recipe(baseline,pins,source_evidence=source_evidence)
     def publish(self,value,kind,visibility=Visibility.PRIVATE):
         data=canonical_json(value)
         if len(data)>64*1024*1024:raise EnvironmentError('evidence publication limit')
@@ -73,10 +91,11 @@ class EnvironmentRuntime:
         return SourceArchive.read(self.read_bytes(ref,self.policy.max_archive_bytes),self.policy)
     def dependency_bytes(self,pins):
         return dependency_files(self.store,pins,self.policy)
-    def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
+    def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord,validation_source=None):
         from .images import prepare_runtime_image, validate_baseline
         baseline=ArtifactRef.model_validate(baseline);pins=tuple(DependencyPin.model_validate(x) for x in pins)
-        source=self.source(baseline);self.profile.validate_source(source);self.dependency_bytes(pins)
+        if self.profile is None or not self.engine.qualified:raise PolicyRejected('resolved qualified runtime required')
+        source=validation_source or self.source(baseline);self.profile.validate_source(source);self.dependency_bytes(pins)
         if baseline.visibility not in {Visibility.AUTHORING,Visibility.PUBLIC}:raise PolicyRejected('B-only recipe requires authoring/public baseline')
         image,image_ref=prepare_runtime_image(self,pins)
         construction_evidence=validate_baseline(self,image,baseline,source)
@@ -84,7 +103,7 @@ class EnvironmentRuntime:
         now=datetime.now(timezone.utc)
         repairs=self.profile.neutral_repairs
         recipe=EnvironmentRecipe(kind='EnvironmentRecipe',schema_version=1,visibility=Visibility.AUTHORING,
-            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=(baseline,policy_ref,image_ref,image.context,*[pin.artifact for pin in pins]),evidence=(source_evidence,
+            provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=(baseline,policy_ref,image_ref,image.context,*(() if self.profile.resolution is None else (self.profile.resolution,)),*[pin.artifact for pin in pins]),evidence=(source_evidence,
                 EvidenceRecord(producer='feature_rl.environments runtime image construction',command=('build pinned runtime image','verify offline baseline dependency closure'),recorded_at=now,exit_status=0,artifacts=(image_ref,construction_evidence),revision=self.revision,scope='real_integration'))),
             costs=(CostRecord(category='construction',wall_seconds=None,cpu_seconds=None,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='unknown',note='Recipe publication; execution measured separately'),),
             image_digest=image.image_digest,runtime_image=image_ref,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.setup,reset=self.profile.setup,services=(),
@@ -93,14 +112,35 @@ class EnvironmentRuntime:
             randomness=SeedPolicy(algorithm='PYTHONHASHSEED',seeds=(0,),same_cases_within_group=True),network_policy='none',baseline=baseline)
         validate_recipe_profile(recipe,p,self.store)
         ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
-    def recipe(self,prepared):
+    def recipe(self,prepared,*,bind=True):
         prepared=PreparedEnvironment.model_validate(prepared)
         recipe=self.store.get_artifact(prepared.recipe,max_envelope_bytes=256*1024)
         if not isinstance(recipe,EnvironmentRecipe):raise PolicyRejected('EnvironmentRecipe required')
         policy=SandboxPolicy.model_validate_json(self.read_bytes(prepared.policy,65536))
-        if policy!=self.policy or prepared.policy not in recipe.provenance.inputs:raise PolicyRejected('recipe/policy binding mismatch')
+        if prepared.policy not in recipe.provenance.inputs:raise PolicyRejected('recipe/policy binding mismatch')
         validate_recipe_profile(recipe,policy,self.store)
+        if bind:self.bind_policy(policy)
         return recipe
+    def source_environment(self,prepared,source,*,bind=True):
+        """Select only a pre-resolved manifest variant; rollout never resolves deps."""
+        recipe=self.recipe(prepared,bind=False)
+        base=SandboxPolicy.model_validate_json(self.read_bytes(prepared.policy,65536))
+        try:base.profile.validate_source(source)
+        except PolicyRejected:pass
+        else:
+            if bind:self.bind_policy(base)
+            return prepared,recipe
+        matches=[]
+        for ref in recipe.source_variants:
+            variant=self.store.get_artifact(ref,max_envelope_bytes=256*1024)
+            policies=[p for p in variant.provenance.inputs if p.kind=='sandbox-policy']
+            if len(policies)!=1:raise PolicyRejected('source variant lacks one frozen policy')
+            policy=SandboxPolicy.model_validate_json(self.read_bytes(policies[0],65536))
+            try:policy.profile.validate_source(source)
+            except PolicyRejected:continue
+            matches.append(PreparedEnvironment(recipe=ref,policy=policies[0]))
+        if len(matches)!=1:raise SourceRejected('source build/dependency inputs have no unique frozen runtime resolution')
+        return matches[0],self.recipe(matches[0],bind=bind)
     def saved(self,source,version,visibility=Visibility.PRIVATE):
         data=source.to_tar()
         if len(data)>self.policy.max_archive_bytes:raise SourceRejected('saved archive exceeds cap')
@@ -115,26 +155,30 @@ class EnvironmentRuntime:
             if not isinstance(pair,SourcePair) or pair.baseline!=recipe.baseline or pair.reference!=initial:raise PolicyRejected('M1 source pair mismatch')
         policy=allowed_changes or AllowedChanges(source_roots=self.profile.source_roots,forbidden_paths=(),dependencies='forbidden',dependency_artifacts=(),additional_artifact_types=())
         policy=AllowedChanges.model_validate(policy)
-        if policy.dependencies!='forbidden' or policy.dependency_artifacts or policy.additional_artifact_types:raise PolicyRejected('only source-only fixed-dependency changes supported')
         for path in (*policy.source_roots,*policy.forbidden_paths):safe_path(path)
         self.profile.validate_allowed_changes(policy)
-        baseline=self.source(recipe.baseline);tree=self.source(initial);self.profile.validate_source(tree)
+        baseline=self.source(recipe.baseline);tree=self.source(initial)
+        self.source_environment(prepared,tree)
         if role=='candidate':tree.validate_changes(baseline,policy.source_roots,policy.forbidden_paths)
         snapshot=self.saved(tree,0)
         handle=WorkspaceHandle(workspace_id=uuid.uuid4().hex)
         value={'workspace_id':handle.workspace_id,'prepared':prepared.model_dump(mode='json'),'initial':snapshot.model_dump(mode='json'),'saved':snapshot.model_dump(mode='json'),'source_input':initial.model_dump(mode='json'),'source_pair':source_pair.model_dump(mode='json') if source_pair else None,'role':role,'allowed_changes':policy.model_dump(mode='json'),'closed':False,'generation':0}
         with self.engine.state.lock():self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
         return handle
-    def workspace(self,handle):
+    def workspace(self,handle,*,select_runtime=True):
         handle=WorkspaceHandle.model_validate(handle);value=self.engine.state.read('workspace-'+handle.workspace_id+'.json')
         if value['workspace_id']!=handle.workspace_id or value['closed']:raise PolicyRejected('workspace is closed/mismatched')
-        prepared=PreparedEnvironment.model_validate_json(canonical_json(value['prepared']));recipe=self.recipe(prepared)
+        prepared=PreparedEnvironment.model_validate_json(canonical_json(value['prepared']))
         saved=SavedSource.model_validate_json(canonical_json(value['saved']));source=self.source(saved.artifact)
         if hashlib.sha256(self.read_bytes(saved.artifact,self.policy.max_archive_bytes)).hexdigest()!=saved.raw_sha256 or source.tree_sha256!=saved.tree_sha256:raise SourceRejected('saved source binding mismatch')
+        if select_runtime:prepared,recipe=self.source_environment(prepared,source)
+        else:recipe=self.recipe(prepared,bind=False)
         return value,prepared,recipe,saved,source
-    def stage(self,session,source,*,wheel=None):
+    def stage(self,session,source,*,wheel=None,wheel_filename=None):
         files={'source/'+name:entry for name,entry in source.files.items()}
-        if wheel is not None:files['built/'+self.profile.wheel_filename]=SourceFile(wheel,False)
+        if wheel is not None:
+            if not wheel_filename or safe_path(wheel_filename)!=wheel_filename or '/' in wheel_filename:raise SourceRejected('invalid built wheel filename')
+            files['built/'+wheel_filename]=SourceFile(wheel,False)
         data=SourceArchive(files).to_tar()
         if len(data)>self.policy.max_staging_bytes:raise PolicyRejected('aggregate stage archive cap')
         command=CommandSpec(argv=('python','-I','-c',STAGE_CODE,str(self.policy.max_staging_bytes)),working_directory='/workspace',timeout_seconds=20.0)
@@ -145,55 +189,35 @@ class EnvironmentRuntime:
         return {'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,'source':saved.artifact.sha256,'source_raw':saved.raw_sha256,'tree':saved.tree_sha256,'phase':phase,'revision':self.revision,'workspace_id':value['workspace_id'],'generation':str(value['generation']),'role':value['role'],'source_input':value['source_input']['sha256'],'source_pair':value['source_pair']['sha256'] if value['source_pair'] else 'none','allowed_changes':hashlib.sha256(canonical_json(value['allowed_changes'])).hexdigest()}
     def evidence(self,session,phase,extra=None):
         return self.publish({'phase':phase,'revision':self.revision,'lifecycle_wall_seconds':max(0.0,time.monotonic()-(session.deadline-session.policy.lifecycle_seconds)),'record':session.record.model_dump(mode='json'),'effective':session.effective,'commands':session.receipts,'cleanup_verified':session.cleanup_verified,'maximum_cpu_seconds':session.maximum_cpu_seconds,'effective_cpu_seconds':session.effective_cpu_seconds,'maximum_memory_bytes':session.maximum_memory_bytes,'memory_oom_events':session.memory_oom_events,'container_state':session.container_state,'extra':extra},'environment-execution')
-    def wheel_bytes(self,data,source):
-        if len(data)>self.policy.max_source_bytes:raise SourceRejected('built wheel size limit')
-        try:
-            with zipfile.ZipFile(io.BytesIO(data)) as z:
-                infos=z.infolist()
-                if len(infos)>self.policy.max_files or sum(x.file_size for x in infos)>self.policy.max_source_bytes+1024*1024:raise SourceRejected('expanded wheel cap')
-                names=[safe_path(x.filename) for x in infos]
-                if len(set(names))!=len(names):raise SourceRejected('duplicate wheel paths')
-                actual={};metadata=self.profile.wheel_stem+'.dist-info/'
-                from email.parser import BytesParser
-                import re
-                headers={}
-                for filename in ('METADATA','WHEEL'):
-                    if metadata+filename not in names:raise SourceRejected('missing built wheel identity metadata')
-                    headers[filename]=BytesParser().parsebytes(z.read(metadata+filename))
-                normalize=lambda name:re.sub(r'[-_.]+','-',name).lower()
-                package=headers['METADATA'];tags=headers['WHEEL']
-                if (len(package.get_all('Name',[]))!=1 or len(package.get_all('Version',[]))!=1
-                        or normalize(package['Name'])!=normalize(self.profile.project_name)
-                        or package['Version']!=self.profile.project_version
-                        or tags.get_all('Root-Is-Purelib',[])!=['true']
-                        or tags.get_all('Wheel-Version',[])!=['1.0']
-                        or tags.get_all('Tag',[])!=['py3-none-any']):
-                    raise SourceRejected('built wheel project/version/platform identity mismatch')
-                for info,name in zip(infos,names):
-                    if info.is_dir():continue
-                    matches=[m for m in self.profile.source_mappings if name==m.wheel or name.startswith(m.wheel+'/')]
-                    if matches:
-                        mapping=matches[0]
-                        actual[mapping.source+name[len(mapping.wheel):]]=z.read(info)
-                    elif not name.startswith(metadata):raise SourceRejected('unexpected wheel root')
-                expected={name:file.data for name,file in source.files.items() if any(
-                    name==m.source or name.startswith(m.source+'/') for m in self.profile.source_mappings)}
-                if actual!=expected:raise SourceRejected('built repository wheel differs from supplied source')
-        except (zipfile.BadZipFile,ValueError,OSError) as exc:raise SourceRejected('invalid built wheel') from exc
-        return data
+    def wheel_bytes(self,data,source,filename):
+        from .wheels import validate_wheel
+        return validate_wheel(data,source,filename,self.policy)
 
     def capture_wheel(self,session,source):
-        command=CommandSpec(argv=('python','-I','-c',"import pathlib,sys;p=pathlib.Path(sys.argv[1]);data=p.read_bytes();assert len(data)<=int(sys.argv[2]);sys.stdout.buffer.write(data)",'/workspace/built/'+self.profile.wheel_filename,str(self.policy.max_source_bytes)),working_directory='/workspace',timeout_seconds=5.0)
-        result=session.execute(command,output_limit=self.policy.max_source_bytes)
+        from .wheels import CAPTURE_WHEEL_CODE
+        command=CommandSpec(argv=('python','-I','-c',CAPTURE_WHEEL_CODE,str(self.policy.max_source_bytes)),working_directory='/workspace',timeout_seconds=5.0)
+        result=session.execute(command,output_limit=self.policy.max_source_bytes+20*1024,artifact_capture=True)
         if result.reason=='monitor_failure':raise DockerUnavailable('wheel capture monitor failed')
         if result.reason!='exited' or result.exit_code!=0:raise SourceRejected('built wheel capture failed')
-        return self.wheel_bytes(result.stdout,source)
+        try:
+            with tarfile.open(fileobj=io.BytesIO(result.stdout),mode='r:') as archive:
+                member=archive.next()
+                if (member is None or not member.isfile() or member.issparse()
+                        or member.size<0 or member.size>self.policy.max_source_bytes
+                        or safe_path(member.name)!=member.name or '/' in member.name):
+                    raise SourceRejected('invalid built wheel capture member')
+                data=archive.extractfile(member).read(member.size+1)
+                if len(data)!=member.size or archive.next() is not None:
+                    raise SourceRejected('built wheel capture must contain one complete file')
+                return member.name,self.wheel_bytes(data,source,member.name)
+        except (tarfile.TarError,ValueError,OSError) as exc:
+            raise SourceRejected('invalid built wheel capture archive') from exc
 
     def build_snapshot(self,handle):
         start=time.monotonic()
         self.recover_owned()
         value,prepared,recipe,saved,source=self.workspace(handle)
-        s=self.engine.session(binding=self.binding(prepared,saved,'build',value),saved_source=saved.model_dump(mode='json'),image=recipe.image_digest);error=None;data=None
+        s=self.engine.session(binding=self.binding(prepared,saved,'build',value),saved_source=saved.model_dump(mode='json'),image=recipe.image_digest);error=None;data=None;wheel_filename=None
         try:
             with s:
                 self.stage(s,source)
@@ -204,10 +228,18 @@ class EnvironmentRuntime:
                         category='infrastructure' if dependency_setup or r.reason=='monitor_failure' else 'candidate'
                         reason='infrastructure_failure' if r.reason=='monitor_failure' else ('setup_failed' if dependency_setup else ('command_failed' if r.reason=='exited' else r.reason))
                         raise StageFailure('offline '+('dependency setup' if dependency_setup else 'repository build')+' failed',reason,category)
-                data=self.capture_wheel(s,source)
+                from .images import CHECK_CODE
+                check=s.execute(CommandSpec(argv=('python','-I','-c',CHECK_CODE,'/workspace/built'),
+                    working_directory='/workspace',timeout_seconds=30),
+                    canonical_json(self.profile.model_dump(mode='json',exclude={'neutral_repairs'})))
+                if check.reason=='monitor_failure':
+                    raise DockerUnavailable('dependency verification monitor failed')
+                if check.reason!='exited' or check.exit_code!=0:
+                    raise SourceRejected('built project dependencies differ from the frozen runtime closure')
+                wheel_filename,data=self.capture_wheel(s,source)
         except BaseException as exc:error=exc
         reason,category=failure(error) if error else ('completed','none')
-        evidence=self.evidence(s,'build',{'error':repr(error) if error else None,'reason':reason,'failure_category':category,'wheel_sha256':hashlib.sha256(data).hexdigest() if data is not None else None,'source_tree_sha256':source.tree_sha256,'saved_source':saved.model_dump(mode='json')})
+        evidence=self.evidence(s,'build',{'error':repr(error) if error else None,'reason':reason,'failure_category':category,'wheel_sha256':hashlib.sha256(data).hexdigest() if data is not None else None,'wheel_filename':wheel_filename,'source_tree_sha256':source.tree_sha256,'saved_source':saved.model_dump(mode='json')})
         if error:
             if not isinstance(error,Exception):raise error
             raise BuildFailed(str(error),evidence,saved,reason=reason,failure_category=category,cleanup_verified=s.cleanup_verified) from error
@@ -217,7 +249,7 @@ class EnvironmentRuntime:
             pending.cleanup_verified=s.cleanup_verified;pending.saved_source=saved.model_dump(mode='json');pending.build_evidence=evidence
             raise pending from exc
         cost=CostRecord(category='construction',wall_seconds=time.monotonic()-start,cpu_seconds=s.maximum_cpu_seconds,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='partial',note='Local offline build including setup, capture, cleanup and publication; currency not estimated')
-        return BuildResult(source=saved.artifact,recipe=prepared.recipe,policy=prepared.policy,wheel=wheel,wheel_sha256=hashlib.sha256(data).hexdigest(),source_tree_sha256=source.tree_sha256,evidence=evidence,cost=cost)
+        return BuildResult(source=saved.artifact,recipe=prepared.recipe,policy=prepared.policy,wheel=wheel,wheel_filename=wheel_filename,wheel_sha256=hashlib.sha256(data).hexdigest(),source_tree_sha256=source.tree_sha256,evidence=evidence,cost=cost)
 
     def execute(self,handle,request,*,build):
         """Fresh installed-wheel execution; exact saved-source build is mandatory."""
@@ -232,16 +264,22 @@ class EnvironmentRuntime:
         request=ExecutionRequest.model_validate(request)
         if request.remaining_cpu_seconds is not None and request.remaining_cpu_seconds>self.policy.cpu_seconds:
             raise PolicyRejected('request CPU cap exceeds admitted policy')
-        value,prepared,recipe,saved,source=self.workspace(handle);wheel=None
+        value,prepared,recipe,saved,source=self.workspace(handle,select_runtime=not development);wheel=None
+        if development:
+            try:prepared,recipe=self.source_environment(prepared,source)
+            except (SourceRejected,PolicyRejected):
+                # Intermediate manifest edits may use the baseline tools for
+                # further editing; builds still require an exact frozen variant.
+                recipe=self.recipe(prepared)
         if not development:
             if build.source!=saved.artifact or build.recipe!=prepared.recipe or build.policy!=prepared.policy or build.source_tree_sha256!=source.tree_sha256:raise PolicyRejected('build/source/recipe/policy mismatch')
             if build.wheel.kind!='snapshot-wheel' or build.evidence.kind!='environment-execution':raise PolicyRejected('build artifact kinds mismatch')
             wheel=self.read_bytes(build.wheel,self.policy.max_source_bytes)
             if hashlib.sha256(wheel).hexdigest()!=build.wheel_sha256:raise SourceRejected('built wheel raw hash mismatch')
-            self.wheel_bytes(wheel,source)
+            self.wheel_bytes(wheel,source,build.wheel_filename)
             receipt=json.loads(self.read_bytes(build.evidence,32*1024*1024))
             binding=receipt.get('record',{}).get('binding',{});extra=receipt.get('extra',{})
-            if receipt.get('phase')!='build' or receipt.get('cleanup_verified') is not True or extra.get('reason')!='completed' or extra.get('error') is not None or extra.get('wheel_sha256')!=build.wheel_sha256 or extra.get('source_tree_sha256')!=source.tree_sha256 or any(binding.get(k)!=v for k,v in {'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,'source':saved.artifact.sha256}.items()):
+            if receipt.get('phase')!='build' or receipt.get('cleanup_verified') is not True or extra.get('reason')!='completed' or extra.get('error') is not None or extra.get('wheel_sha256')!=build.wheel_sha256 or extra.get('wheel_filename')!=build.wheel_filename or extra.get('source_tree_sha256')!=source.tree_sha256 or any(binding.get(k)!=v for k,v in {'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,'source':saved.artifact.sha256}.items()):
                 raise PolicyRejected('successful build receipt binding mismatch')
         if len(request.stdin)>self.policy.stdin_bytes:raise PolicyRejected('command stdin cap')
         phase='development' if development else 'execute'
@@ -250,7 +288,7 @@ class EnvironmentRuntime:
         environment=self.profile.development_environment if development else self.profile.environment
         try:
             with s:
-                self.stage(s,source,wheel=wheel)
+                self.stage(s,source,wheel=wheel,wheel_filename=build.wheel_filename if build else None)
                 for command in ((recipe.setup[0],) if development else (recipe.setup[0],recipe.setup[2])):
                     r=s.execute(command,environment=environment)
                     if r.reason=='cpu_limit':raise CpuBudgetExceeded('CPU budget exhausted during offline execution setup')
@@ -277,14 +315,14 @@ class EnvironmentRuntime:
         self.recover_owned()
         with self.engine.state.lock():
             self.engine._require_clean_owned_state()
-            value,prepared,recipe,saved,source=self.workspace(handle)
+            value,prepared,recipe,saved,source=self.workspace(handle,select_runtime=False)
             value['saved']=value['initial'];value['generation']+=1;self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
         return SavedSource.model_validate_json(canonical_json(value['saved']))
     def close(self,handle):
         self.recover_owned()
         with self.engine.state.lock():
             self.engine._require_clean_owned_state()
-            value,*_=self.workspace(handle)
+            value,*_=self.workspace(handle,select_runtime=False)
             value['closed']=True;value['generation']+=1;self.engine.state.write('workspace-'+handle.workspace_id+'.json',value)
         return SavedSource.model_validate_json(canonical_json(value['saved']))
     def recover_owned(self):return self.engine.recover_owned()

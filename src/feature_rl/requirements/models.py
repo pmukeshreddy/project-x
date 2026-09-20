@@ -55,6 +55,7 @@ RequirementContractProposal = derived_model(
         "entry_points",
         "requirements",
         "compatibility_obligations",
+        "feature_files",
         "ambiguities",
         "allowed_changes",
     ),

@@ -297,8 +297,8 @@ class DockerSession:
                 '--security-opt','no-new-privileges=true','--security-opt','seccomp='+str(self.engine.profile),'--pids-limit',str(self.policy.pids),'--cpus',str(self.policy.cpus),
                 '--memory',str(self.policy.memory_bytes),'--memory-swap',str(self.policy.memory_bytes),'--shm-size',str(shm),'--ulimit','nofile=256:256','--ulimit','core=0:0',
                 '--ulimit','fsize='+str(disk)+':'+str(disk),'--log-driver','none','--restart','no',
-                '--tmpfs',f'/workspace:rw,noexec,nosuid,nodev,size={workspace},uid=65534,gid=65534,mode=0700',
-                '--tmpfs',f'/tmp:rw,noexec,nosuid,nodev,size={tmp},uid=65534,gid=65534,mode=0700',
+                '--tmpfs',f'/workspace:rw,exec,nosuid,nodev,size={workspace},uid=65534,gid=65534,mode=0700',
+                '--tmpfs',f'/tmp:rw,exec,nosuid,nodev,size={tmp},uid=65534,gid=65534,mode=0700',
                 '--workdir','/workspace','--env','LANG=C.UTF-8','--env','LC_ALL=C.UTF-8','--env','TZ=UTC','--env','PYTHONDONTWRITEBYTECODE=1','--env','PYTHONHASHSEED=0',
                 '--entrypoint','/usr/local/bin/python',selected_image,'-I','-c','import time; time.sleep(86400)']
             cid=self.checked(args).stdout.decode().strip()
@@ -320,7 +320,7 @@ class DockerSession:
         opts=h.get('SecurityOpt',[]);profiles=[o[8:] for o in opts if o.startswith('seccomp=')]
         if len(profiles)!=1 or json.loads(profiles[0])!=self.engine.profile_data or not any(o in ('no-new-privileges','no-new-privileges=true') for o in opts):raise PolicyRejected('effective seccomp/no-new-privileges mismatch')
         disk=self.policy.disk_bytes;tmp=min(8*1024*1024,disk//4);shm=1024*1024
-        expected_tmpfs={path:f'rw,noexec,nosuid,nodev,size={size},uid=65534,gid=65534,mode=0700' for path,size in [('/workspace',disk-tmp-shm),('/tmp',tmp)]}
+        expected_tmpfs={path:f'rw,exec,nosuid,nodev,size={size},uid=65534,gid=65534,mode=0700' for path,size in [('/workspace',disk-tmp-shm),('/tmp',tmp)]}
         if x.get('Mounts') or h.get('Tmpfs')!=expected_tmpfs or h.get('ShmSize')!=shm:raise PolicyRejected('unexpected extra mount or tmpfs policy')
         limits={u['Name']:(u['Soft'],u['Hard']) for u in h.get('Ulimits',[])}
         if limits!={'core':(0,0),'nofile':(256,256),'fsize':(disk,disk)}:raise PolicyRejected('effective rlimit mismatch')
@@ -341,14 +341,18 @@ class DockerSession:
         try:return int(dict(line.split() for line in r.stdout.decode().splitlines() if line.strip())['oom_kill'])
         except (ValueError,KeyError):return None
 
-    def execute(self,command,stdin=b'',*,output_limit=None,staging=False,environment=(),check_oom=True):
+    def execute(self,command,stdin=b'',*,output_limit=None,staging=False,environment=(),check_oom=True,artifact_capture=False):
         command=CommandSpec.model_validate(command)
         if '\x00' in ''.join(command.argv) or len(canonical_json(command.model_dump(mode='json')))>128*1024:raise PolicyRejected('oversized/invalid command')
         cwd=command.working_directory
         if cwd!='/workspace' and (not cwd.startswith('/workspace/') or any(p in ('.','..','') for p in cwd.split('/')[1:])):raise PolicyRejected('command cwd outside workspace')
         cap=self.policy.max_staging_bytes if staging else self.policy.stdin_bytes
         if type(stdin) is not bytes or len(stdin)>cap:raise PolicyRejected('stdin exceeds policy')
-        limit=min(self.remaining_output,output_limit or self.policy.output_bytes)
+        if artifact_capture:
+            if type(output_limit) is not int or not 0<output_limit<=max(self.policy.max_staging_bytes,self.policy.max_source_bytes+20*1024):
+                raise PolicyRejected('artifact transport exceeds its declared byte cap')
+            limit=output_limit
+        else:limit=min(self.remaining_output,output_limit or self.policy.output_bytes)
         args=['exec','-i','--workdir',cwd]
         for key,value in environment:args+=['--env',key+'='+value]
         args+=[self.name,*command.argv]
@@ -360,8 +364,11 @@ class DockerSession:
         if r.reason=='exited':
             verdict=self.monitor()
             if verdict:r=r.model_copy(update={'reason':verdict})
-        self.remaining_output=max(0,self.remaining_output-r.observed_bytes)
+        if not artifact_capture:self.remaining_output=max(0,self.remaining_output-r.observed_bytes)
         receipt=observation_json(r);receipt.update({'stdin_bytes':len(stdin),'stdin_sha256':hashlib.sha256(stdin).hexdigest(),'oom_events_before':before,'oom_events_after':after,'effective_cpu_seconds':self.effective_cpu_seconds})
+        if artifact_capture:
+            receipt.update(stdout_b64='',stderr_b64=base64.b64encode(r.stderr[:4096]).decode(),
+                stdout_sha256=hashlib.sha256(r.stdout).hexdigest(),stdout_bytes=len(r.stdout),artifact_capture=True)
         self.receipts.append(receipt);return r
     def export_source(self):
         from .workers import EXPORT_CODE

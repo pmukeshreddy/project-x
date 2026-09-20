@@ -20,14 +20,14 @@ def change_path(path,rules):
     if '.pytest_cache' in path.split('/'):raise SourceRejected('unauthorized pytest cache change')
     if not any(path==r or path.startswith(r+'/') for r in rules.source_roots):raise SourceRejected('outside source roots')
     if any(path==r or path.startswith(r+'/') for r in rules.forbidden_paths):raise SourceRejected('forbidden path')
-    # Python runtime profiles transfer source only; caches, packages, tests,
-    # arbitrary binary artifacts and replacement controller files are not transfers.
-    if not path.endswith('.py'):raise SourceRejected('only Python source changes supported')
 
 
 def validate_rules(rules):
     rules=AllowedChanges.model_validate(rules)
-    if rules.dependencies!='forbidden' or rules.dependency_artifacts or rules.additional_artifact_types:
+    if (rules.additional_artifact_types
+            or (rules.dependencies=='forbidden' and rules.dependency_artifacts)
+            or len(set(rules.dependency_artifacts))!=len(rules.dependency_artifacts)
+            or any(ref.kind!='dependency-wheel' or ref.encoding!='bytes' for ref in rules.dependency_artifacts)):
         raise SourceRejected('unsupported dependency/artifact policy')
     if len(set(rules.source_roots))!=len(rules.source_roots):raise SourceRejected('duplicate roots')
     for path in (*rules.source_roots,*rules.forbidden_paths):
@@ -53,7 +53,6 @@ def apply_delta(baseline,archive,deletions,rules,policy):
         del result[name]
     for name,entry in changes.files.items():
         change_path(name,rules)
-        if entry.executable:raise SourceRejected('executable source delta unsupported')
         result[name]=entry
     merged=SourceArchive.read(SourceArchive(result).to_tar(),policy)
     merged.validate_changes(baseline,rules.source_roots,rules.forbidden_paths)

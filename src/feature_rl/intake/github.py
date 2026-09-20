@@ -4,8 +4,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import json
+import hashlib
 import re
 from typing import Literal, Mapping
+from urllib.parse import urlsplit
 
 from feature_rl.artifacts import ArtifactStore
 from feature_rl.contracts import (
@@ -26,7 +28,7 @@ from feature_rl.contracts import (
 from feature_rl.history import GitHistory, classify_changed_files
 from feature_rl.splits import PartitionManifest
 
-from .sources import CachedSourceCatalog, FetchedSource, SourceArchiver
+from .sources import CachedSourceCatalog, SourceArchiver
 
 
 _REVISION = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
@@ -61,6 +63,66 @@ def _canonical(value) -> bytes:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode("utf-8")
+
+
+def _response_paths(files_data):
+    """Git's no-renames inventory includes both sides of a GitHub rename."""
+    from feature_rl.environments.archive import safe_path
+    paths = []
+    for item in files_data:
+        names = [item["filename"]]
+        if item.get("status") == "renamed":
+            names.append(item["previous_filename"])
+        for name in names:
+            if safe_path(name) != name:
+                raise ValueError("changed-file paths must be canonical repository paths")
+            paths.append(name)
+    return tuple(dict.fromkeys(paths))
+
+
+def _validate_subjects(repository_url, pr, issue, pr_url, issue_url=None, timeline=(), *, source_commits=()):
+    """Bind cached subjects to this repository and prove any optional issue link."""
+    slug = repository_url.removeprefix("https://github.com/")
+    api = "https://api.github.com/repos/" + slug
+    number = pr.get("number")
+    if (type(number) is not int or number < 1
+            or urlsplit(pr_url)._replace(query="", fragment="").geturl().lower()
+            != (api + "/pulls/" + str(number)).lower()
+            or pr.get("merged") is False or pr.get("state", "closed") != "closed"
+            or not pr.get("merged_at")
+            or pr.get("base", {}).get("repo", {}).get("full_name", slug).lower() != slug.lower()):
+        raise ValueError("a merged PR from the configured repository is required")
+    if issue is None:
+        return
+    issue_number = issue.get("number")
+    expected = api + "/issues/" + str(issue_number)
+    if (type(issue_number) is not int or issue_number < 1 or "pull_request" in issue
+            or issue_number == number or issue_url is None
+            or urlsplit(issue_url)._replace(query="", fragment="").geturl().lower() != expected.lower()
+            or issue.get("repository_url", api).lower() != api.lower()):
+        raise ValueError("the optional linked issue must be an issue in the PR repository")
+
+    def mentions(text, target, kind):
+        text = text or ""
+        return bool(re.search(r"(?<![\w/#])#" + str(target) + r"\b", text)
+                    or re.search(r"(?<![\w/])" + re.escape(slug) + r"#" + str(target) + r"\b", text, re.I)
+                    or re.search(re.escape(repository_url) + "/" + kind + "/" + str(target) + r"\b", text, re.I))
+
+    linked = mentions(pr.get("body"), issue_number, "issues") or mentions(issue.get("body"), number, "pull")
+    linked_commits = {*source_commits, pr.get("merge_commit_sha")}
+    if any(not isinstance(revision, str) or not _REVISION.fullmatch(revision) for revision in linked_commits):
+        raise ValueError("issue linkage requires full PR commit object IDs")
+    for event in timeline:
+        source = (event.get("source") or {}).get("issue") or {}
+        pull = source.get("pull_request") or {}
+        if (event.get("event") == "cross-referenced"
+                and (pull.get("url", "").lower() == (api + "/pulls/" + str(number)).lower()
+                     or source.get("html_url", "").lower() == (repository_url + "/pull/" + str(number)).lower())):
+            linked = True
+        if event.get("event") in {"referenced", "closed"} and event.get("commit_id") in linked_commits:
+            linked = True
+    if not linked:
+        raise ValueError("the optional issue has no archived link to the selected PR")
 
 
 def _reconstruct_pull_request(history, integration, pr_data, commits_data):
@@ -110,8 +172,6 @@ class PullRequestIntakeSpec:
     source_names: tuple[str, ...]
     license_text_name: str
     pr_name: str
-    issue_name: str
-    comments_name: str
     commits_name: str
     files_name: str
     license_name: str
@@ -121,6 +181,12 @@ class PullRequestIntakeSpec:
     provenance_label: Literal["historical_request", "reconstructed_specification"]
     mixed_paths: Mapping[str, str]
     max_tree_archive_bytes: int
+    issue_name: str | None = None
+    comments_name: str | None = None
+    pr_comments_name: str | None = None
+    reviews_name: str | None = None
+    review_comments_name: str | None = None
+    issue_timeline_name: str | None = None
     license_path: str = 'LICENSE.txt'
     additional_pages: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
@@ -128,20 +194,23 @@ class PullRequestIntakeSpec:
         from feature_rl.environments.archive import safe_path
         if safe_path(self.license_path) != self.license_path:
             raise ValueError('canonical repository license path required')
-        required = {
-            self.pr_name,
-            self.issue_name,
-            self.comments_name,
-            self.commits_name,
-            self.files_name,
-            self.license_name,
-        }
+        names = (self.pr_name, self.issue_name, self.comments_name, self.commits_name,
+                 self.files_name, self.license_name, self.pr_comments_name,
+                 self.reviews_name, self.review_comments_name, self.issue_timeline_name)
+        required = {name for name in names if name is not None}
+        if len(required) != sum(name is not None for name in names) or any(not name for name in required):
+            raise ValueError("response roles must have distinct nonempty source names")
+        if self.issue_name is None and (self.comments_name or self.issue_timeline_name):
+            raise ValueError("issue comments and timeline require an optional linked issue")
         if not required.issubset(self.source_names):
             raise ValueError("source_names omits a required PR intake response")
         if len(set(self.source_names)) != len(self.source_names):
             raise ValueError("source_names must be unique")
-        if set(self.additional_pages).difference({self.comments_name, self.commits_name, self.files_name}):
-            raise ValueError("only comments, commits and files can have additional response pages")
+        arrays = {self.comments_name, self.commits_name, self.files_name,
+                  self.pr_comments_name, self.reviews_name, self.review_comments_name,
+                  self.issue_timeline_name} - {None}
+        if set(self.additional_pages).difference(arrays):
+            raise ValueError("only array responses can have additional response pages")
         pages = tuple(name for names in self.additional_pages.values() for name in names)
         if (len(pages) != len(set(pages)) or set(pages).intersection(required)
                 or not set(pages).issubset(self.source_names)
@@ -218,14 +287,14 @@ class GitHubPullRequestIntake:
         return next(iter(values))
 
     def _load_sources(self, spec: PullRequestIntakeSpec):
-        editable = {spec.pr_name, spec.issue_name, spec.comments_name,
-                    *spec.additional_pages.get(spec.comments_name, ())}
+        immutable = {spec.commits_name, spec.files_name, spec.license_name}
+        immutable.update(page for name in tuple(immutable) for page in spec.additional_pages.get(name, ()))
         loaded = {
             name: self.catalog.load(
                 name,
                 edit_history=(
                     "unavailable"
-                    if name in editable
+                    if name not in immutable
                     else "not_applicable"
                 ),
                 media_type="application/json",
@@ -233,15 +302,13 @@ class GitHubPullRequestIntake:
             for name in spec.source_names
         }
         pr_data = _json(loaded[spec.pr_name].body)
-        issue_data = _json(loaded[spec.issue_name].body)
-        if not isinstance(pr_data, dict) or not isinstance(issue_data, dict):
-            raise ValueError("PR and issue sources must be JSON objects")
-        loaded[spec.pr_name] = replace(
-            loaded[spec.pr_name], published_at=_parse_time(pr_data["created_at"])
-        )
-        loaded[spec.issue_name] = replace(
-            loaded[spec.issue_name], published_at=_parse_time(issue_data["created_at"])
-        )
+        issue_data = None if spec.issue_name is None else _json(loaded[spec.issue_name].body)
+        if not isinstance(pr_data, dict) or (issue_data is not None and not isinstance(issue_data, dict)):
+            raise ValueError("PR and optional issue sources must be JSON objects")
+        for name, value in ((spec.pr_name, pr_data), (spec.issue_name, issue_data)):
+            if name is not None:
+                loaded[name] = replace(loaded[name], published_at=_parse_time(value["created_at"]),
+                                       edited_at=_parse_time(value["updated_at"]))
         license_text = self.catalog.load(
             spec.license_text_name,
             edit_history="not_applicable",
@@ -250,18 +317,152 @@ class GitHubPullRequestIntake:
         return loaded, license_text, pr_data, issue_data
 
     @staticmethod
+    def _validate_endpoints(spec, loaded, pr_data, issue_data):
+        api = 'https://api.github.com/repos/' + spec.repository_url.removeprefix('https://github.com/')
+        pr_url = api + '/pulls/' + str(pr_data['number'])
+        endpoints = {spec.commits_name: pr_url+'/commits', spec.files_name: pr_url+'/files'}
+        for name, url in ((spec.pr_comments_name, api+'/issues/'+str(pr_data['number'])+'/comments'),
+                          (spec.reviews_name, pr_url+'/reviews'),
+                          (spec.review_comments_name, pr_url+'/comments')):
+            if name is not None:
+                endpoints[name] = url
+        if issue_data is not None:
+            for name, suffix in ((spec.comments_name, '/comments'), (spec.issue_timeline_name, '/timeline')):
+                if name is not None:
+                    endpoints[name] = api+'/issues/'+str(issue_data['number'])+suffix
+        for name, endpoint in endpoints.items():
+            for page in (name, *spec.additional_pages.get(name, ())):
+                parsed = urlsplit(loaded[page].url)
+                if parsed._replace(query='', fragment='').geturl().lower() != endpoint.lower():
+                    raise ValueError('response page does not belong to the selected PR or linked issue')
+
+    @staticmethod
     def _array(loaded, spec, name):
+        if name is None:
+            return []
         values = []
         for page in (name, *spec.additional_pages.get(name, ())):
             value = _json(loaded[page].body)
             if not isinstance(value, list):
                 raise ValueError("paginated source body must be a JSON array")
             values.extend(value)
-        key = {spec.commits_name: 'sha', spec.files_name: 'filename', spec.comments_name: 'id'}[name]
-        identities = [item[key] for item in values]
+        key = {spec.commits_name: 'sha', spec.files_name: 'filename'}.get(name, 'id')
+        # Some timeline event types have no numeric ID; their canonical body is the identity.
+        identities = [item.get(key, _canonical(item).decode()) if name == spec.issue_timeline_name
+                      else item[key] for item in values]
         if len(identities) != len(set(identities)):
             raise ValueError("source pages contain duplicate identities")
         return values
+
+    @staticmethod
+    def _request_payload(spec, loaded, pr_data, issue_data, classification, source_objects, reconstruction):
+        """Project traceable text without claiming late captures are historical intent."""
+        historical = spec.provenance_label == "historical_request"
+
+        def provenance(name):
+            source = loaded[name]
+            return {"source_url": source.url,
+                    "source_response_sha256": hashlib.sha256(source.body).hexdigest(),
+                    "retrieved_at": source.retrieved_at.isoformat().replace("+00:00", "Z"),
+                    "edit_history": source.edit_history}
+
+        def admissible(item, name, *, review=False):
+            source = loaded[name]
+            created_value = item.get("submitted_at") if review else item.get("created_at")
+            if created_value is None:
+                if review and item.get("state") == "PENDING":
+                    return not historical
+                raise ValueError("request evidence lacks its publication timestamp")
+            created = _parse_time(created_value)
+            updated = _parse_time(item.get("updated_at") or created_value)
+            if updated < created or updated > source.retrieved_at or source.retrieved_at > spec.recorded_at:
+                raise ValueError("request evidence chronology is contradictory")
+            return not historical or updated <= source.retrieved_at <= spec.admissible_cutoff
+
+        def subject(item, name):
+            if name is None or not admissible(item, name):
+                return None
+            return {key: item[key] for key in (
+                "number", "html_url", "title", "body", "state", "created_at", "updated_at",
+                "merged_at", "merge_commit_sha", "user", "author_association", "labels") if key in item} | provenance(name)
+
+        def discussion(name, *, review=False):
+            if name is None:
+                return []
+            projected = []
+            for page in (name, *spec.additional_pages.get(name, ())):
+                for item in _json(loaded[page].body):
+                    if admissible(item, page, review=review):
+                        projected.append({key: item[key] for key in (
+                            "id", "html_url", "body", "user", "author_association", "state",
+                            "created_at", "updated_at", "submitted_at", "commit_id",
+                            "original_commit_id", "pull_request_review_id", "in_reply_to_id",
+                            "path", "line", "original_line", "start_line", "side", "start_side",
+                            "position", "original_position") if key in item} | provenance(page))
+            return projected
+
+        request = {
+            "provenance_label": spec.provenance_label,
+            "admissible_cutoff": spec.admissible_cutoff.isoformat().replace("+00:00", "Z"),
+            "pull_request": subject(pr_data, spec.pr_name),
+            "issue": subject(issue_data, spec.issue_name),
+            "comments": discussion(spec.comments_name),
+            "pr_comments": discussion(spec.pr_comments_name),
+            "reviews": discussion(spec.reviews_name, review=True),
+            "review_comments": discussion(spec.review_comments_name),
+            "caveat": (
+                "Reconstructed specification from captured PR, optional linked issue, discussion, "
+                "review and commit metadata, including evidence after the cutoff. Current bodies "
+                "have no recoverable edit history and are not claimed as preimplementation intent. "
+                "Raw responses and implementation history remain archived privately."
+                if not historical else
+                "Request prose is limited to evidence archived by the preimplementation cutoff. "
+                "Creation timestamps alone do not prove the historical body revision. The separately "
+                "labelled changed-file inventory was captured after implementation and only identifies "
+                "paths for feature-file selection; it is not historical request evidence."
+            ),
+        }
+        if historical:
+            if not any(request[key] for key in (
+                    "pull_request", "issue", "comments", "pr_comments", "reviews", "review_comments")):
+                raise ValueError("historical_request requires archived preimplementation request evidence")
+
+        request["changed_files"] = []
+        file_metadata = {}
+        for page in (spec.files_name, *spec.additional_pages.get(spec.files_name, ())):
+            for item in _json(loaded[page].body):
+                file_metadata[item["filename"]] = (item, page, False)
+                if item.get("status") == "renamed":
+                    file_metadata.setdefault(item["previous_filename"], (item, page, True))
+        for classified in classification.changed_files:
+            item, page, old_side = file_metadata[classified.path]
+            projected = {key: item[key] for key in (
+                "status", "previous_filename", "additions", "deletions", "changes") if key in item}
+            if old_side:
+                projected.update(status="removed", renamed_to=item["filename"])
+            metadata = {"path": classified.path, "category": classified.category,
+                        "evidence_scope": "postimplementation_file_inventory"}
+            if not historical:
+                metadata["rationale"] = classified.rationale
+            request["changed_files"].append(projected | metadata | provenance(page))
+        if historical:
+            return request
+        request["commits"] = []
+        commit_objects = {item.revision: item for item in source_objects}
+        for page in (spec.commits_name, *spec.additional_pages.get(spec.commits_name, ())):
+            for item in _json(loaded[page].body):
+                commit = commit_objects[item["sha"]]
+                request["commits"].append({
+                    "sha": item["sha"], "message": item.get("commit", {}).get("message"),
+                    "parents": list(commit.parents),
+                    "authored_at": commit.authored_at.isoformat().replace("+00:00", "Z"),
+                    "committed_at": commit.committed_at.isoformat().replace("+00:00", "Z"),
+                    **provenance(page)})
+        request["history"] = {"baseline_commit": reconstruction.baseline_commit,
+                              "reference_commit": reconstruction.reference_commit,
+                              "patch_sha256": reconstruction.patch_sha256,
+                              "integration": reconstruction.integration}
+        return request
 
     def ingest(
         self, spec: PullRequestIntakeSpec, partition_manifest: PartitionManifest
@@ -274,16 +475,20 @@ class GitHubPullRequestIntake:
         loaded, license_text_source, pr_data, issue_data = self._load_sources(spec)
         commits_data = self._array(loaded, spec, spec.commits_name)
         files_data = self._array(loaded, spec, spec.files_name)
-        comments_data = self._array(loaded, spec, spec.comments_name)
+        for name in (spec.comments_name, spec.pr_comments_name, spec.reviews_name, spec.review_comments_name):
+            self._array(loaded, spec, name)
+        timeline = self._array(loaded, spec, spec.issue_timeline_name)
+        _validate_subjects(spec.repository_url, pr_data, issue_data, loaded[spec.pr_name].url,
+                           None if spec.issue_name is None else loaded[spec.issue_name].url, timeline,
+                           source_commits=tuple(item["sha"] for item in commits_data))
+        self._validate_endpoints(spec, loaded, pr_data, issue_data)
         license_data = _json(loaded[spec.license_name].body)
         reconstruction, source_commits = _reconstruct_pull_request(
             self.history, spec.integration, pr_data, commits_data)
 
-        issue_created = _parse_time(issue_data["created_at"])
         merged_at = _parse_time(pr_data["merged_at"])
-        if issue_created > spec.admissible_cutoff:
-            raise ValueError("visible issue did not exist by the admissible cutoff")
-        if spec.admissible_cutoff > merged_at or merged_at > spec.recorded_at:
+        if (spec.admissible_cutoff > merged_at or merged_at > loaded[spec.pr_name].retrieved_at
+                or _parse_time(pr_data["created_at"]) > merged_at):
             raise ValueError("cutoff, integration, and recording chronology is contradictory")
         all_sources = (*loaded.values(), license_text_source)
         if any(item.retrieved_at > spec.recorded_at for item in all_sources):
@@ -298,18 +503,7 @@ class GitHubPullRequestIntake:
             spec.admissible_cutoff <= implementation_started <= merged_at
         ):
             raise ValueError("admissible cutoff is not preimplementation")
-        historical_snapshot = loaded[spec.issue_name].retrieved_at <= spec.admissible_cutoff
-        if spec.provenance_label == "historical_request" and not historical_snapshot:
-            raise ValueError(
-                "historical_request requires an archived preimplementation issue snapshot"
-            )
-        issue_updated = _parse_time(issue_data["updated_at"])
-        if spec.provenance_label == "historical_request" and (
-            issue_updated > loaded[spec.issue_name].retrieved_at
-        ):
-            raise ValueError("historical issue metadata postdates its archived snapshot")
-
-        response_paths = tuple(item["filename"] for item in files_data)
+        response_paths = _response_paths(files_data)
         graph_paths = self.history.changed_paths(
             reconstruction.baseline_commit, reconstruction.reference_commit
         )
@@ -318,6 +512,8 @@ class GitHubPullRequestIntake:
         classification = classify_changed_files(
             graph_paths, mixed_paths=spec.mixed_paths
         )
+        request_payload = self._request_payload(
+            spec, loaded, pr_data, issue_data, classification, source_objects, reconstruction)
 
         license_blob = license_data["sha"]
         if not isinstance(license_blob, str) or not _REVISION.fullmatch(license_blob):
@@ -529,47 +725,6 @@ class GitHubPullRequestIntake:
         )
         source_pair_ref = self.store.put_artifact(source_pair)
 
-        cutoff_comments = []
-        for comment in comments_data:
-            created = _parse_time(comment["created_at"])
-            updated = _parse_time(comment["updated_at"])
-            if updated < created or updated > spec.recorded_at:
-                raise ValueError("comment chronology is contradictory")
-            if created <= spec.admissible_cutoff and updated <= spec.admissible_cutoff:
-                cutoff_comments.append(
-                    {
-                        "id": comment["id"],
-                        "body": comment["body"],
-                        "created_at": comment["created_at"],
-                        "updated_at": comment["updated_at"],
-                    }
-                )
-        request_payload = {
-            "provenance_label": spec.provenance_label,
-            "admissible_cutoff": spec.admissible_cutoff.isoformat().replace(
-                "+00:00", "Z"
-            ),
-            "issue": {
-                "url": loaded[spec.issue_name].url,
-                "title": issue_data["title"],
-                "body": issue_data["body"],
-                "created_at": issue_data["created_at"],
-                "retrieved_at": loaded[spec.issue_name]
-                .retrieved_at.isoformat()
-                .replace("+00:00", "Z"),
-                "source_response_sha256": snapshots[
-                    spec.source_names.index(spec.issue_name)
-                ].content.sha256,
-                "edit_history": "unavailable",
-            },
-            "comments": cutoff_comments,
-            "caveat": (
-                "Current request text has no recoverable preimplementation body revision; "
-                "later contract evidence must retain reconstructed-specification provenance."
-                if spec.provenance_label == "reconstructed_specification"
-                else "Archived issue response was captured before implementation began."
-            ),
-        }
         request_ref = self.store.put_bytes(
             _canonical(request_payload), "authoring-request", Visibility.AUTHORING
         )

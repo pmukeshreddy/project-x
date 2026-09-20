@@ -34,15 +34,21 @@ feature-generation attempt or establish a newly qualified real task. See
 
 [Historical CPU/CLI verification](docs/evidence/integration/final/receipt.json) and
 [progress](docs/progress.md) distinguish earlier executed checks from the unexecuted cleanup.
-The Docker runtime requires an explicit repository profile and pinned base image,
-and a required [construction-time cached runtime image](docs/interfaces-M3.md).
-Legacy Click policies and recipes without prebuilt images are no longer accepted.
-New construction requires a publishing registry and complete pinned inputs.
-[`construct-feature --github`](docs/runbook.md) captures a selected PR/issue and Git
-history and passes the frozen inputs directly to construction. Existing captures
-can be selected with `--prepared`; private repositories support token authentication.
-Mixed-file labels are resolved through permitted-source projection and automated
-qualification. Runtime dependencies and experiment splits remain explicit.
+`construct-feature` derives each repository's Python version, build backend,
+dependency closure, source layout and system package requirements, then freezes
+wheel hashes and image digests. Configure the Linux platform, sandbox limits and
+publishing registry; per-repository profiles and dependency pins are generated.
+Unresolved declarations or an incomplete reproducible closure reject preparation.
+See [runtime construction](docs/interfaces-M3.md).
+
+[`construct-feature --github`](docs/runbook.md) captures a merged PR, its discussion
+and review metadata, and an optional linked issue. Existing captures can be selected
+with `--prepared`; private repositories support token authentication. The reconstructed
+contract explicitly selects required files and records their requirement/evidence links.
+Projection preserves selected source, stubs, assets, configuration, build and dependency
+changes. Unrelated files retain their baseline versions. Required runtime changes are
+resolved during construction; grading uses only the frozen baseline or feature runtime.
+Experiment splits and authoring budgets remain explicit.
 GPU training,
 native GPU inference, new task generation and experimental results remain
 deferred and unverified. No real task has been fully qualified and released.

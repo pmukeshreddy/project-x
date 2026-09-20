@@ -48,7 +48,8 @@ CHECK_CODE = r'''
 import email.parser, importlib.metadata as metadata, json, os, pathlib, platform, subprocess, sys, zipfile
 from pip._vendor.packaging.requirements import Requirement
 from pip._vendor.packaging.specifiers import SpecifierSet
-from pip._vendor.packaging.utils import canonicalize_name
+from pip._vendor.packaging.utils import canonicalize_name, parse_wheel_filename
+from pip._vendor.packaging.tags import sys_tags
 root=pathlib.Path('/opt/feature-rl')
 settings=json.loads(sys.stdin.buffer.read()) if len(sys.argv)>1 else json.loads((root/'profile.json').read_text())
 version=platform.python_version()
@@ -79,7 +80,14 @@ def require(text,extra=''):
  pending.extend((name,x) for x in ('',*sorted(req.extras)))
 for requirement in settings['build_requirements']:require(requirement)
 if len(sys.argv)>1:
- with zipfile.ZipFile(sys.argv[1]) as wheel:
+ paths=list(pathlib.Path(sys.argv[1]).glob('*.whl'))
+ if len(paths)!=1 or paths[0].is_symlink() or not paths[0].is_file():
+  raise RuntimeError('exactly one regular project wheel required')
+ name,wheel_version,build,wheel_tags=parse_wheel_filename(paths[0].name)
+ if not set(sys_tags()).intersection(wheel_tags):raise RuntimeError('project wheel is incompatible with the pinned worker')
+ if name!=canonicalize_name(settings['project_name']) or str(wheel_version)!=settings['project_version']:
+  raise RuntimeError('project wheel filename identity mismatch')
+ with zipfile.ZipFile(paths[0]) as wheel:
   names=[name for name in wheel.namelist() if name.endswith('.dist-info/METADATA')]
   if len(names)!=1:raise RuntimeError('ambiguous project wheel metadata')
   project=email.parser.BytesParser().parsebytes(wheel.read(names[0]))
@@ -240,7 +248,7 @@ def validate_baseline(runtime, image, baseline, source):
         with session:
             runtime.stage(session, source)
             commands = (*runtime.profile.setup[:2], CommandSpec(
-                argv=('python', '-I', '-c', CHECK_CODE, '/workspace/built/'+runtime.profile.wheel_filename),
+                argv=('python', '-I', '-c', CHECK_CODE, '/workspace/built'),
                 working_directory='/workspace', timeout_seconds=30.0))
             for command in commands:
                 settings = canonical_json(runtime.profile.model_dump(mode='json', exclude={'neutral_repairs'})) if command == commands[-1] else b''
@@ -248,7 +256,7 @@ def validate_baseline(runtime, image, baseline, source):
                 if result.reason != 'exited' or result.exit_code != 0:
                     raise PolicyRejected('environment cannot be built with its pinned dependency closure: '+
                         result.stderr.decode(errors='replace')[-1500:])
-            wheel = runtime.capture_wheel(session, source)
+            wheel_filename, wheel = runtime.capture_wheel(session, source)
     except BaseException as exc:
         error = exc
         raise
@@ -257,6 +265,7 @@ def validate_baseline(runtime, image, baseline, source):
             'image_digest': image.image_digest, 'error': repr(error) if error else None})
     return runtime.publish({'baseline': baseline.model_dump(mode='json'),
         'image_digest': image.image_digest, 'context_sha256': image.context_sha256,
-        'source_tree_sha256': source.tree_sha256, 'wheel_sha256': hashlib.sha256(wheel).hexdigest(),
+        'source_tree_sha256': source.tree_sha256, 'wheel_filename': wheel_filename,
+        'wheel_sha256': hashlib.sha256(wheel).hexdigest(),
         'cleanup_verified': session.cleanup_verified, 'execution_sha256': evidence.sha256},
         'runtime-image-construction-summary', Visibility.AUTHORING)

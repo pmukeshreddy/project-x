@@ -90,6 +90,7 @@ def _qualification_context(service,report_ref,result,qualification_job):
     if summary.wall_seconds is None or summary.wall_seconds>service.policy.max_wall_seconds:
         raise QualificationRejected('budget_exhausted','qualification package lacks a completed bounded qualification wall measurement')
     checked=load_verifier(service.store,report.task)
+    service.grader.select_task(checked)
     if checked.task.state!=c.TaskState.BUILT or checked.task.qualification is not None:
         raise QualificationRejected('invalid_evidence','Q.task must be exact unqualified BUILT T0')
     if any(a.disposition=='unresolved' for a in checked.contract.ambiguities):
@@ -98,7 +99,7 @@ def _qualification_context(service,report_ref,result,qualification_job):
     service.builder.solver_package(report.task)
     service.registry.assert_usable(summary.projection)
     projection=read_local(service.store,summary.projection,ReferenceProjection,'m5-reference-projection',1024*1024)
-    if projection!=derive_reference(service.store,report.task,service.grader.runtime.policy):
+    if projection!=derive_reference(service.store,report.task,service.grader.submissions.policy):
         raise QualificationRejected('invalid_evidence','qualified H projection differs from exact B/H bytes and policy')
     count,missing_history=service._history(checked)
     if missing_history or count is None or report.repair_attempts!=count or summary.repair_count!=count:

@@ -199,13 +199,14 @@ class QualificationService:
             return receipt
         try:
             checked=load_verifier(self.store,task_version)
+            self.grader.select_task(checked)
             if checked.task.state!=c.TaskState.BUILT or checked.task.qualification is not None:
                 raise QualificationRejected('invalid_evidence','qualification requires exact unqualified BUILT T0')
             if any(a.disposition=='unresolved' for a in checked.contract.ambiguities):
                 raise QualificationRejected('ambiguous_requirement','unresolved contract ambiguity')
             if self.builder is None:raise QualificationRejected('provisional','actual M6 final package validator is unavailable')
             self.builder.solver_package(task_version)
-            projection=derive_reference(self.store,task_version,self.grader.runtime.policy)
+            projection=derive_reference(self.store,task_version,self.grader.submissions.policy)
             projection_ref=put_record(self.store,projection,'m5-reference-projection')
             self.registry.register(projection_ref,dependencies=(task_version,projection.submission,projection.projected_source))
             _,targets=validate_control_plan(checked,self.policy)
@@ -352,31 +353,29 @@ class QualificationService:
         return ref,result,receipt
 
     def _reset(self,checked,projection_ref,submission):
+        from .evidence import reset_probe, RESET_PROBE_BYTES
         projection=read_local(self.store,projection_ref,ReferenceProjection,'m5-reference-projection',1024*1024)
-        policies=[r for r in checked.recipe.provenance.inputs if r.kind=='sandbox-policy']
-        if len(policies)!=1:raise QualificationRejected('invalid_evidence','exact runtime policy required for reset')
+        prepared=self.grader.select_task(checked)
         runtime=self.grader.runtime
-        handle=runtime.open_workspace(PreparedEnvironment(recipe=checked.task.environment,policy=policies[0]),
+        handle=runtime.open_workspace(prepared,
             source=projection.projected_source,role='candidate',allowed_changes=checked.contract.allowed_changes)
         try:
-            initial_state,_,_,initial,_=runtime.workspace(handle)
+            initial_state,_,_,initial,initial_source=runtime.workspace(handle)
             # A fixed controller diagnostic mutates only an allowed source file;
             # the original confirmed source must be restored before grading.
-            from feature_rl.submission.source import change_path
-            path=checked.contract.allowed_changes.source_roots[0]+'/__m5_reset_probe__.py'
-            change_path(path,checked.contract.allowed_changes)
+            path,_=reset_probe(initial_source,checked.contract.allowed_changes,runtime.profile)
             mutation=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(
-                argv=('python','-I','-c','import pathlib,sys;p=pathlib.Path(sys.argv[1]);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(sys.stdin.buffer.read())','/workspace/source/'+path),
-                working_directory='/workspace',timeout_seconds=2.0),stdin=b'# M5 temporary reset probe\n',save_source=True))
+                argv=('python','-I','-c','import pathlib,sys\nwith pathlib.Path(sys.argv[1]).open("ab") as stream: stream.write(sys.stdin.buffer.read())','/workspace/source/'+path),
+                working_directory='/workspace',timeout_seconds=2.0),stdin=RESET_PROBE_BYTES,save_source=True))
             if mutation.reason!='completed' or not mutation.cleanup_verified or mutation.saved_source.artifact==initial.artifact:
                 raise QualificationRejected('environment_failure','reset canary was not actually saved with verified cleanup')
             interrupted=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(argv=('python','-I','-c','import time;time.sleep(5)'),
                 working_directory='/workspace',timeout_seconds=0.25),save_source=False))
             if interrupted.reason!='timeout' or not interrupted.cleanup_verified:
                 raise QualificationRejected('environment_failure','actual bounded interruption and cleanup required')
-            before=runtime.workspace(handle)[0]['generation']
+            before=runtime.workspace(handle,select_runtime=False)[0]['generation']
             restored=runtime.reset(handle)
-            after=runtime.workspace(handle)[0]['generation']
+            after=runtime.workspace(handle,select_runtime=False)[0]['generation']
             if restored!=initial or after<=before:
                 raise QualificationRejected('environment_failure','reset did not restore exact initial saved source and advance generation')
             reset_submission=self.grader.submissions.from_saved(checked.task.baseline,restored.artifact,checked.contract.allowed_changes)

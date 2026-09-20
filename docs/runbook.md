@@ -21,15 +21,18 @@ integration method and cutoff with the actual selected feature's values:
 {
   "repository_url": "https://github.com/OWNER/REPO",
   "pull_request": 123,
-  "issue": 100,
   "repository_family": "chosen-family",
   "request_lineage": ["chosen-feature"],
-  "partition_source_ids": ["chosen-pr", "chosen-issue"],
+  "partition_source_ids": ["chosen-pr"],
   "integration": "squash",
   "admissible_cutoff": "2026-01-01T00:00:00Z",
   "license_path": "LICENSE"
 }
 ```
+
+Add an optional `issue` number when the PR has a linked issue; include that issue in
+the partition closure. PR-only requests retain PR discussion, reviews, inline review
+comments, commit messages and changed-file metadata.
 
 The command writes raw responses, `sources.tsv`, a bare `repository.git`, and
 `prepared.json`, and prints the last document. Construction consumes it directly:
@@ -47,8 +50,8 @@ PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json construct
 With either option, omit `intake` from `feature.json` and the capture's source
 paths/hash/limits from `controller.json`'s `workflow`; the CLI fills and validates
 them before composing the existing services. Supplied conflicting values reject.
-Keep authoring, dependency, runtime, episode-budget and partition settings
-explicit; the partition manifest must cover the selected `partition_source_ids`.
+Keep authoring, sandbox, episode-budget and partition settings
+explicit; repository runtime/dependency inputs are derived automatically, and the partition manifest must cover the selected `partition_source_ids`.
 The original complete cached-input command remains supported.
 
 For a private repository, set `token_env` to `GH_TOKEN` or `GITHUB_TOKEN` in
@@ -63,20 +66,17 @@ for token permissions.
 
 Repeating the same preparation request/output verifies and reuses the completed
 capture offline. Changed requests, damaged captures and incomplete output
-directories reject; a new capture uses a new directory. Fresh issue downloads are
-always labeled `reconstructed_specification`, never historical snapshots.
-Merged PRs with an explicit same-repository issue are supported. Missing history,
+directories reject; a new capture uses a new directory. Fresh captures are labeled
+`reconstructed_specification`. PR-only and PR-with-linked-issue requests are supported.
+Raw response pages and confirmation snapshots are retained. Missing history,
 unavailable license identity, API limits and configured byte/page/time/depth limits
-reject; there is no automatic deepening, dependency discovery or feature selection.
-Git transfer has time/depth bounds, but no aggregate pack-file disk quota.
+reject. Git transfer has time/depth bounds, but no aggregate pack-file disk quota.
 
-Mixed/unknown path labels do not require manual source approval. Intake retains
-those labels, and qualification records an exact projection of permitted Python
-source changes onto B. Documentation, tests, build/dependency files and changes
-outside the source policy retain their B versions. Qualification runs its real
-feature, compatibility and verifier-control checks against that projection. If a
-feature needs an excluded configuration or asset change, the reference must fail
-those checks; source screening alone never admits it to training.
+The authored contract selects `feature_files` with requirement IDs, evidence and a
+reason each file is necessary. Qualification projects those exact B/H changes,
+including stubs, templates, data, configuration, build files, native code and dependency
+manifests. Unrelated changes retain B's bytes. Path categories describe history and
+do not decide inclusion. Traversal, links and controller-private paths remain forbidden.
 
 Create a controller-private configuration with absolute `store_root` and
 `registry_root` paths, `version: "m6-cli-v1"`, and the exact Factory `revision`.
@@ -103,30 +103,27 @@ Source and construction replay reuse the original job/output and original costs.
 Runtime commands additionally require `runtime` with absolute `state_root`,
 `socket_path`, exact M3 `revision`, exact `grading_revision`, an explicit `policy`
 (`SandboxPolicy`), and optional bounded `grade_wall_seconds`. New policies default
-to `docker-python-v2` and must supply `image` (an immutable base digest) and
-`profile` (the repository's pinned `RuntimeProfile`) and `platform`. Legacy Click
-policies and recipes without a prebuilt image must be reconstructed. Composition invokes the actual M3 trusted
-boundary qualification. A caller flag, copied receipt or altered policy cannot
-stand in for that qualification. Candidate grades keep M3's fresh build/isolation
-rules and supported pinned image/dependency cache semantics.
+to `docker-python-v3` and require `platform`. Omit `image` and `profile` for automatic
+repository preparation. `workflow.dependency_pins` is removed. Construction reads
+repository metadata, requirements/locks, layout and system-package declarations,
+selects a compatible official Python image, and resolves a target-platform wheel
+closure in a source-free builder. It retains wheel hashes, package versions,
+resolution inputs and immutable image digests. Dynamic or contradictory declarations
+which cannot be resolved reproducibly fail closed.
 
-New environment construction also requires `runtime.image_repository`, an
-explicit registry/repository such as `registry.example.com/team/runtimes`, with
-push access through the runtime's dedicated Docker client config. The builder
-needs Buildx/BuildKit timestamp-rewrite support, a digest-pinned policy base,
-and the profile's hash-pinned dependency wheels. Construction rejects missing
-dependencies and failed offline builds before publishing a recipe. Images are
-cached by their canonical build-context hash and recipes retain the exact
-published digest. `runtime.image_seconds` bounds each image operation (default
-600 seconds), separately from task execution limits.
+New construction requires `runtime.image_repository` (for example,
+`registry.example.com/team/runtimes`), registry push access through the dedicated
+Docker client config, and Buildx timestamp-rewrite support. Only preparation downloads
+dependencies or system packages. Repository hooks run in the qualified offline sandbox.
+`runtime.image_seconds` bounds each image operation (default 600 seconds).
 
-Workers can omit `image_repository` and set `runtime.qualification_image` to the
-prepared recipe's `image_digest`. They then pull only that final image for
-qualification and execution; no per-server repository dependency installation
-or image build is needed. Keep the same `SandboxPolicy`/profile used to construct
-the recipe. The runtime manifest records Linux architecture, Docker and CPU-only
-host requirements for scheduling. See [M3 construction](interfaces-M3.md) for
-cache identity and supported package constraints.
+When the selected feature changes build/dependency requirements, construction freezes
+a separate compatible runtime variant. This supports incompatible baseline and feature
+dependency pins without installing both versions together. Workers select a frozen
+variant from the submitted source's runtime declarations; unrecognized requirements
+are rejected. Workers may omit `image_repository` and load the exact policy and images
+from the task recipe. Sandbox platform and limits must still match their configuration.
+See [M3 construction](interfaces-M3.md) for retained inputs and package constraints.
 
 Qualification configuration is `qualification` with the actual M5 `revision`
 and optional `QualificationPolicy`. Passing all automated gates produces a

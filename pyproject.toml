@@ -7,7 +7,7 @@ name = "feature-rl"
 version = "0.1.0"
 description = "Evidence-backed feature environment construction and learning"
 requires-python = ">=3.11"
-dependencies = ["pydantic==2.13.5"]
+dependencies = ["pydantic==2.13.5", "packaging==25.0"]
 
 [project.scripts]
 feature-rl = "feature_rl.cli:main"

@@ -2,7 +2,7 @@
 from .models import PolicyRejected
 
 BOUNDARY_CODE = r'''
-import ctypes,json,os,pathlib,platform,socket,subprocess,time
+import _ctypes,ctypes,json,os,pathlib,platform,socket,subprocess,time
 p=pathlib.Path
 out={"uid":os.getuid(),"gid":os.getgid()}
 out['interpreter_version']=platform.python_version()
@@ -24,7 +24,11 @@ for name,family,address in [('ipv4_errno',socket.AF_INET,('1.1.1.1',443)),('ipv6
 for fam in [38,40]:out['socket_'+str(fam)+'_errno']=errno_of(lambda:socket.socket(fam,socket.SOCK_STREAM))
 s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);out['dns_udp_errno']=errno_of(lambda:s.sendto(b'probe',('1.1.1.1',53)));s.close()
 out['host_socket_present']=p('/var/run/docker.sock').exists();out['host_users_present']=p('/Users').exists()
-f=p('/workspace/noexec');f.write_text('#!/bin/sh\nexit 0\n');f.chmod(0o700);out['noexec_errno']=errno_of(lambda:subprocess.run([str(f)]));f.unlink()
+for folder in ['/workspace','/tmp']:
+ f=p(folder)/'native-probe';f.write_text('#!/bin/sh\nexit 0\n');f.chmod(0o700)
+ out[folder+'_exec_errno']=errno_of(lambda:subprocess.run([str(f)],check=True));f.unlink()
+ f=p(folder)/'native-probe.so';f.write_bytes(p(_ctypes.__file__).read_bytes())
+ out[folder+'_native_load_errno']=errno_of(lambda:ctypes.CDLL(str(f)));f.unlink()
 children=[]
 try:
  for _ in range(out['pids.max']+1):
@@ -60,8 +64,14 @@ def check_boundary(obs,policy):
         'cpu.max':f'{int(policy.cpus*100000)} 100000','root_write_errno':30,'cgroup_write_errno':30,
         'setuid_errno':1,'ptrace_errno':1,'unshare_errno':1,'ipv4_errno':101,'ipv6_errno':101,
         'socket_38_errno':1,'socket_40_errno':1,'dns_udp_errno':101,'host_socket_present':False,'host_users_present':False,
-        'noexec_errno':13,'fork_errno':11,'/workspace_disk_errno':28,'/tmp_disk_errno':28,'/dev/shm_disk_errno':28}
-    expected['interpreter_version']=policy.profile.interpreter_version
+        '/workspace_exec_errno':0,'/tmp_exec_errno':0,'/workspace_native_load_errno':0,'/tmp_native_load_errno':0,
+        'fork_errno':11,'/workspace_disk_errno':28,'/tmp_disk_errno':28,'/dev/shm_disk_errno':28}
+    if policy.profile is not None:
+        expected['interpreter_version']=policy.profile.interpreter_version
+    else:
+        import re
+        if not isinstance(obs.get('interpreter_version'),str) or not re.fullmatch(r'3\.[0-9]+\.[0-9]+',obs['interpreter_version']):
+            raise PolicyRejected('bootstrap image lacks a supported exact Python interpreter')
     for key,value in expected.items():
         if type(obs.get(key)) is not type(value) or obs[key]!=value:raise PolicyRejected('boundary observation missing/mismatch: '+key)
     if obs.get('memory_oom_delta',0)<1 or obs.get('memory_child_exit',0)==0:raise PolicyRejected('memory denial not observed')

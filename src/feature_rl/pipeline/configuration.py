@@ -137,7 +137,10 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
         settings=config.runtime
         engine=DockerEngine(state_root=Path(settings.state_root),socket_path=Path(settings.socket_path),
             policy=settings.policy,image_repository=settings.image_repository,image_seconds=settings.image_seconds)
-        engine.qualify_boundary(image=settings.qualification_image)
+        if settings.policy.image is not None:
+            engine.qualify_boundary(image=settings.qualification_image)
+        elif settings.policy.profile is not None:
+            raise ConfigurationRequired('an explicit profile requires its pinned image; automatic profiles are resolved per repository')
         actual_runtime=EnvironmentRuntime(store=store,engine=engine,revision=settings.revision)
         grader=GradingService(store=store,runtime=actual_runtime,revision=settings.grading_revision,
             max_wall_seconds=settings.grade_wall_seconds)

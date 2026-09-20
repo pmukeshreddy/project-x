@@ -10,6 +10,7 @@ from feature_rl import contracts as c
 from feature_rl.environments import SourceArchive, SourceFile, SandboxPolicy
 from feature_rl.environments.archive import safe_path
 from feature_rl.environments.profiles import validate_recipe_profile
+from feature_rl.submission.source import validate_rules
 from .models import BuildInputs, BuildRejected, InventoryEntry, SolverInventory
 
 MAX_DOCUMENT = 1024 * 1024
@@ -63,10 +64,10 @@ def source_path(name):
         raise BuildRejected('noncanonical package path')
     parts = name.casefold().split('/')
     forbidden = {'.git', '.hg', '.svn', '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache',
-                 '.tox', '.venv', 'venv', 'node_modules', 'build', 'dist', '.ds_store',
+                 '.tox', '.venv', 'venv', 'node_modules', '.ds_store',
                  'reference', 'controller_checks', 'authoring_sessions'}
-    if any(part in forbidden for part in parts) or name.casefold().endswith(('.pyc', '.pyo', '.whl', '.egg', '.so', '.dylib', '.dll')):
-        raise BuildRejected('history, private material, cache or build product in source allowlist')
+    if any(part in forbidden for part in parts) or name.casefold().endswith(('.pyc', '.pyo')):
+        raise BuildRejected('history, private material or cache in source allowlist')
     return name
 
 
@@ -101,9 +102,8 @@ def resolve(store, inputs):
         raise BuildRejected('requirement coverage/identity mismatch')
     if any(a.disposition == 'unresolved' or (a.disposition == 'clarified' and a.resolution is None) for a in contract.ambiguities):
         raise BuildRejected('unresolved contract ambiguity')
-    allowed = contract.allowed_changes
-    if (allowed != verifier.permissions.submission_policy or allowed.dependencies != 'forbidden'
-            or allowed.dependency_artifacts or allowed.additional_artifact_types
+    allowed = validate_rules(contract.allowed_changes)
+    if (allowed != verifier.permissions.submission_policy
             or verifier.permissions.controller_role != c.ActorRole.CONTROLLER):
         raise BuildRejected('unsupported submission/controller policy')
     for path in allowed.source_roots:
@@ -113,6 +113,11 @@ def resolve(store, inputs):
     if inputs.environment.policy not in recipe.provenance.inputs:
         raise BuildRejected('runtime recipe omits its exact policy')
     validate_recipe_profile(recipe, policy, store)
+    dependency_artifacts={pin.artifact for pin in recipe.dependencies}
+    for ref in recipe.source_variants:
+        dependency_artifacts.update(pin.artifact for pin in typed(store,ref,c.EnvironmentRecipe).dependencies)
+    if not set(allowed.dependency_artifacts) <= dependency_artifacts:
+        raise BuildRejected('dependency allowlist contains artifacts outside the exact runtime recipe')
     raw = read_bytes(store, pair.baseline, policy.max_archive_bytes, kind='source-archive')
     source = SourceArchive.read(raw, policy)
     # M3 bounds and rejects links; additionally reject ambiguous regular-file names
@@ -141,6 +146,8 @@ def public_values(store, resolved):
                    '', '## Entry points', *('- ' + entry for entry in contract.entry_points), '', '## Requirements']
     for item in contract.requirements + contract.compatibility_obligations:
         instruction.append(f'- {item.requirement_id} ({"mandatory" if item.mandatory else "optional"}): {item.statement}; observable: {item.observable}')
+    instruction.extend(['', '## Feature files'])
+    instruction.extend(f'- {item.path}: {item.rationale} ({", ".join(item.requirement_ids)})' for item in contract.feature_files)
     instruction.extend(['', '## Clarifications'])
     instruction.extend(f'- {item.question}: {item.resolution or "excluded"} ({item.disposition})' for item in contract.ambiguities)
     instruction.extend(['', '## Allowed changes', canonical_json(document(contract.allowed_changes)).decode(),
@@ -159,6 +166,16 @@ def public_values(store, resolved):
     image = validate_runtime_image(recipe, resolved.policy, store)
     runtime.update(host_requirements=document(image.host_requirements),
                    runtime_image_context_sha256=image.context_sha256)
+    runtime['source_variants']=[]
+    for ref in recipe.source_variants:
+        variant=typed(store,ref,c.EnvironmentRecipe)
+        policies=[p for p in variant.provenance.inputs if p.kind=='sandbox-policy']
+        policy=read_record(store,policies[0],SandboxPolicy,'sandbox-policy')
+        runtime['source_variants'].append({'image_digest':variant.image_digest,
+            'profile':policy.profile.model_dump(mode='json',exclude={'neutral_repairs'}),
+            'setup':[document(command) for command in variant.setup],
+            'environment':[document(item) for item in variant.environment],
+            'development_environment':[{'name':key,'value':value} for key,value in policy.profile.development_environment]})
     checks = tuple(dict.fromkeys((*contract.public_checks, *resolved.verifier.public_examples)))
     if len(checks) > 64:
         raise BuildRejected('public-check count limit')

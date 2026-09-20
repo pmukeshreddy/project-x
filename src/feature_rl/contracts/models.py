@@ -376,6 +376,13 @@ class Requirement(StrictModel):
     observable: Text
 
 
+class FeatureFile(StrictModel):
+    path: Text
+    requirement_ids: Annotated[tuple[Identifier, ...], Field(min_length=1)]
+    rationale: Text
+    evidence: Annotated[tuple[EvidenceLink, ...], Field(min_length=1)]
+
+
 class AmbiguityDecision(StrictModel):
     question: Text
     resolution: Text | None
@@ -398,6 +405,7 @@ class RequirementContract(ArtifactModel):
     entry_points: Annotated[tuple[Text, ...], Field(min_length=1)]
     requirements: Annotated[tuple[Requirement, ...], Field(min_length=1)]
     compatibility_obligations: tuple[Requirement, ...]
+    feature_files: Annotated[tuple[FeatureFile, ...], Field(min_length=1, max_length=2000)]
     ambiguities: tuple[AmbiguityDecision, ...]
     allowed_changes: AllowedChanges
     public_checks: tuple[ArtifactRef, ...]
@@ -406,7 +414,13 @@ class RequirementContract(ArtifactModel):
 
     @model_validator(mode='after')
     def unique_requirements(self):
-        unique([r.requirement_id for r in self.requirements+self.compatibility_obligations], 'requirement IDs')
+        identifiers = [r.requirement_id for r in self.requirements+self.compatibility_obligations]
+        unique(identifiers, 'requirement IDs')
+        unique([item.path for item in self.feature_files], 'feature file paths')
+        for item in self.feature_files:
+            unique(item.requirement_ids, 'feature file requirement IDs')
+            if not set(item.requirement_ids) <= set(identifiers):
+                raise ValueError('feature file cites an unknown requirement')
         if not any(r.mandatory for r in self.requirements):
             raise ValueError('contract must have a mandatory feature requirement')
         return self
@@ -478,6 +492,7 @@ class EnvironmentRecipe(ArtifactModel):
     kind: Literal['EnvironmentRecipe']
     image_digest: Annotated[str, Field(pattern=r'^.+@sha256:[0-9a-f]{64}$')]
     runtime_image: ArtifactRef
+    source_variants: tuple[ArtifactRef, ...] = ()
     interpreter_version: Text
     dependencies: tuple[DependencyPin, ...]
     setup: Annotated[tuple[CommandSpec, ...], Field(min_length=1)]

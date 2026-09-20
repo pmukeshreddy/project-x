@@ -32,7 +32,7 @@ for entry in settings['entry_points']:
 value={'project_name':settings['project_name'],
  'project_version':importlib.metadata.version(settings['project_name']),
  'interpreter_version':platform.python_version(),
- 'module_files':{name:module.__file__ for name,module in modules.items()},
+ 'module_files':{name:module.__file__ or next(iter(module.__path__)) for name,module in modules.items()},
  'entry_points':settings['entry_points'], 'supported_observables':settings['supported_observables'],
  'signatures':signatures}
 print(json.dumps(value,sort_keys=True,separators=(',',':')),end='')
@@ -96,8 +96,8 @@ class RuntimeDiscoveryService:
 
     def discover(self, prepared):
         import hashlib
-        profile = self.runtime.profile
         recipe = self.runtime.recipe(prepared)
+        profile = self.runtime.profile
         handle = self.runtime.open_workspace(prepared, role='baseline')
         error = None
         build = execution = None
@@ -123,8 +123,8 @@ class RuntimeDiscoveryService:
                 raise ValueError('installed runtime discovery differs from the pinned profile')
             for path in probe.module_files.values():
                 relative = path.removeprefix('/workspace/site/')
-                if not path.startswith('/workspace/site/') or not any(
-                        relative == m.wheel or relative.startswith(m.wheel+'/') for m in profile.source_mappings):
+                from feature_rl.environments.wheels import mapped_path
+                if not path.startswith('/workspace/site/') or not mapped_path(relative,profile.source_mappings):
                     raise ValueError('discovery module is outside the target wheel source mappings')
             observation = RuntimeDiscoveryObservation(**probe.model_dump(),
                 profile_sha256=hashlib.sha256(canonical_json(profile.model_dump(mode='json'))).hexdigest(),

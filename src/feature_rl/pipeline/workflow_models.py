@@ -30,7 +30,6 @@ class FeatureWorkflowSettings(c.StrictModel):
     generation_limits: GenerationLimits
     authoring_caps: AuthoringCaps
     calibration_evidence: Annotated[tuple[c.ArtifactRef,...],Field(min_length=1,max_length=32)]
-    dependency_pins: Annotated[tuple[c.DependencyPin,...],Field(min_length=1,max_length=64)]
     context_files: Annotated[int,Field(ge=1,le=32)]=8
     context_lines: Annotated[int,Field(ge=8,le=512)]=80
     context_bytes: Annotated[int,Field(ge=1024,le=524288)]=65536
@@ -87,13 +86,18 @@ class PreparationSelection(c.StrictModel):
     costs: tuple[c.CostRecord,...]
 
 
+class FeatureRuntimeSelection(c.StrictModel):
+    environment: PreparedEnvironment
+    contract: c.ArtifactRef
+
+
 class FeatureStep(c.StrictModel):
     version: Literal['m6-feature-step-v1']='m6-feature-step-v1'
     claim: Claim
     request: c.ArtifactRef
     key: Name
     inputs: c.ArtifactRef
-    output: IntakeSelection | PreparationSelection | c.OperationResult
+    output: IntakeSelection | PreparationSelection | FeatureRuntimeSelection | c.OperationResult
     costs: tuple[c.CostRecord,...]
 
 

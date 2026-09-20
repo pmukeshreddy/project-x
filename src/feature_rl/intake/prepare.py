@@ -15,7 +15,7 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.environments.archive import safe_path
 from feature_rl.history import GitHistory, HistoryError
 from .github import (PullRequestIntakeSpec, GitHubPullRequestIntake, _json,
-                     _parse_time, _reconstruct_pull_request)
+                     _parse_time, _reconstruct_pull_request, _response_paths, _validate_subjects)
 from .sources import BoundedHttpFetcher, CachedSourceCatalog, SourceTooLarge
 
 
@@ -23,7 +23,7 @@ class GitHubPreparationRequest(c.StrictModel):
     version: Literal['github-preparation-request-v1'] = 'github-preparation-request-v1'
     repository_url: Annotated[str, Field(pattern=r'^https://github\.com/[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9._-]*$')]
     pull_request: Annotated[int, Field(ge=1)]
-    issue: Annotated[int, Field(ge=1)]
+    issue: Annotated[int, Field(ge=1)] | None = Field(default=None, exclude_if=lambda value: value is None)
     repository_family: c.Identifier
     request_lineage: Annotated[tuple[c.Identifier, ...], Field(min_length=1, max_length=64)]
     partition_source_ids: Annotated[tuple[c.Identifier, ...], Field(min_length=1, max_length=64)]
@@ -60,6 +60,32 @@ def _read(path, cap):
     return path.read_bytes()
 
 
+def _confirm_subjects(pr, confirmed_pr, issue, confirmed_issue):
+    if (any(confirmed_pr.get(key) != pr.get(key) for key in (
+            'number', 'merged', 'state', 'merge_commit_sha', 'commits', 'changed_files',
+            'comments', 'review_comments', 'created_at', 'updated_at', 'merged_at', 'title', 'body'))
+            or confirmed_pr['head']['sha'] != pr['head']['sha']
+            or confirmed_pr['base']['repo']['full_name'] != pr['base']['repo']['full_name']
+            or (issue is not None and any(confirmed_issue.get(key) != issue.get(key) for key in (
+                'number', 'repository_url', 'created_at', 'updated_at', 'comments', 'title', 'body')))):
+        raise ValueError('PR or linked issue changed during capture; use a new capture')
+
+
+def _capture_arrays(request, pr, issue):
+    api = 'https://api.github.com/repos/' + request.repository_url.removeprefix('https://github.com/')
+    pr_url = api + '/pulls/' + str(request.pull_request)
+    arrays = {'commits': (pr_url+'/commits', pr['commits'], 'sha', 250),
+              'files': (pr_url+'/files', pr['changed_files'], 'filename', 3000),
+              'pr-comments': (api+'/issues/'+str(request.pull_request)+'/comments', pr['comments'], 'id', 3000),
+              'reviews': (pr_url+'/reviews', None, 'id', 3000),
+              'review-comments': (pr_url+'/comments', pr['review_comments'], 'id', 3000)}
+    if issue is not None:
+        issue_url = api+'/issues/'+str(request.issue)
+        arrays.update({'comments': (issue_url+'/comments', issue['comments'], 'id', 3000),
+                       'issue-timeline': (issue_url+'/timeline', None, 'id', 3000)})
+    return arrays
+
+
 def _verify(root, request, prepared):
     """Reuse captured bytes and exact Git objects; never refresh a selected capture."""
     if (prepared['version'] != 'github-preparation-v1'
@@ -81,27 +107,83 @@ def _verify(root, request, prepared):
         integration=request.integration, admissible_cutoff=request.admissible_cutoff,
         license_path=request.license_path, mixed_paths=request.mixed_paths,
         max_tree_archive_bytes=request.max_tree_archive_bytes, provenance_label='reconstructed_specification',
-        pr_name='pr', issue_name='issue', comments_name='comments', commits_name='commits',
+        pr_name='pr', issue_name=None if request.issue is None else 'issue',
+        comments_name=None if request.issue is None else 'comments',
+        pr_comments_name='pr-comments', reviews_name='reviews', review_comments_name='review-comments',
+        issue_timeline_name=None if request.issue is None else 'issue-timeline', commits_name='commits',
         files_name='files', license_name='license', license_text_name='license-text')
     if any(getattr(spec, key) != value for key, value in bound.items()):
         raise ValueError('captured intake differs from the preparation request')
-    if set(catalog.entries) != {*spec.source_names, spec.license_text_name, 'pr-confirmed', 'issue-confirmed'}:
+    if set(catalog.entries) != {*spec.source_names, spec.license_text_name}:
         raise ValueError('captured source roster changed')
     loaded = {name: catalog.load(name, edit_history='unavailable') for name in catalog.entries}
     if sum(len(source.body) for source in loaded.values()) > request.max_capture_bytes:
         raise SourceTooLarge('aggregate source capture byte limit exceeded')
     if any(source.retrieved_at > spec.recorded_at for source in loaded.values()):
         raise ValueError('capture recording predates a source retrieval')
-    pr = _json(loaded['pr'].body); issue = _json(loaded['issue'].body)
-    for name, count in (('commits', pr['commits']), ('files', pr['changed_files']), ('comments', issue['comments'])):
-        if len(GitHubPullRequestIntake._array(loaded, spec, name)) != count:
+    pr = _json(loaded['pr'].body)
+    issue = None if request.issue is None else _json(loaded['issue'].body)
+    if (pr.get('number') != request.pull_request or pr.get('merged') is not True
+            or pr.get('state') != 'closed'
+            or (issue is not None and issue.get('number') != request.issue)):
+        raise ValueError('captured PR or linked issue differs from the preparation request')
+    expected_names = {'pr', 'pr-confirmed', 'license'}
+    if issue is not None:
+        expected_names.update({'issue', 'issue-confirmed'})
+    for name, (url, count, _, limit) in _capture_arrays(request, pr, issue).items():
+        names = (name, *spec.additional_pages.get(name, ()))
+        expected_names.update(names)
+        if len(names) > request.max_pages or (count is not None and (
+                type(count) is not int or not 0 <= count <= min(limit, request.max_pages*100))):
+            raise ValueError('captured pagination exceeds the preparation bound')
+        values = GitHubPullRequestIntake._array(loaded, spec, name)
+        if count is not None and len(values) != count:
             raise ValueError('captured page selection differs from the recorded response count')
+        for index, page in enumerate(names, 1):
+            items = _json(loaded[page].body)
+            if (loaded[page].url != url+'?per_page=100&page='+str(index)
+                    or len(items) > 100 or (index < len(names) and len(items) != 100)
+                    or (count is None and index == len(names) and len(items) == 100)):
+                raise ValueError('captured pagination is incomplete or has changed endpoints')
+        if count is not None and len(names) != max(1, (count+99)//100):
+            raise ValueError('captured page count differs from the recorded response count')
+    if set(spec.source_names) != expected_names:
+        raise ValueError('captured source roster differs from the preparation request')
+    _validate_subjects(request.repository_url, pr, issue, loaded['pr'].url,
+                       None if issue is None else loaded['issue'].url,
+                       GitHubPullRequestIntake._array(loaded, spec, spec.issue_timeline_name),
+                       source_commits=tuple(item['sha'] for item in GitHubPullRequestIntake._array(loaded, spec, spec.commits_name)))
+    _confirm_subjects(pr, _json(loaded['pr-confirmed'].body), issue,
+                      None if issue is None else _json(loaded['issue-confirmed'].body))
+    for name in ('pr', 'issue'):
+        if name in loaded and loaded[name+'-confirmed'].url != loaded[name].url:
+            raise ValueError('confirmation source endpoint changed')
     history = GitHistory(root/'repository.git', timeout_seconds=request.history_timeout_seconds)
     commits = GitHubPullRequestIntake._array(loaded, spec, spec.commits_name)
     reconstruction, _ = _reconstruct_pull_request(history, spec.integration, _json(loaded[spec.pr_name].body), commits)
     if (reconstruction.baseline_commit != prepared['baseline_commit']
             or reconstruction.reference_commit != prepared['reference_commit']):
         raise ValueError('captured Git history changed')
+    files = GitHubPullRequestIntake._array(loaded, spec, spec.files_name)
+    if set(_response_paths(files)) != set(history.changed_paths(reconstruction.baseline_commit, reconstruction.reference_commit)):
+        raise ValueError('captured PR file list differs from Git history')
+    source_objects = tuple(history.commit(item['sha']) for item in commits)
+    started = min(stamp for item in source_objects for stamp in (item.authored_at, item.committed_at))
+    if not request.admissible_cutoff <= started <= _parse_time(pr['merged_at']) <= loaded['pr'].retrieved_at:
+        raise ValueError('requested cutoff is not preimplementation')
+    baseline = reconstruction.baseline_commit
+    license_data = _json(loaded['license'].body)
+    api = 'https://api.github.com/repos/' + request.repository_url.removeprefix('https://github.com/')
+    if (loaded['license'].url != api+'/license?ref='+baseline
+            or loaded['license-text'].url != api+'/contents/'+quote(request.license_path, safe='/')+'?ref='+baseline
+            or license_data.get('path') != request.license_path
+            or (license_data.get('license') or {}).get('spdx_id') in {None, '', 'NOASSERTION'}):
+        raise ValueError('captured baseline license provenance changed')
+    for revision in (baseline, reconstruction.reference_commit):
+        if (history.path_object(revision, request.license_path) != license_data['sha']
+                or history.path_bytes(revision, request.license_path,
+                    max_bytes=request.max_tree_archive_bytes) != loaded['license-text'].body):
+            raise ValueError('captured license must match both baseline and reference')
     return prepared
 
 
@@ -155,48 +237,50 @@ def prepare_github(request: GitHubPreparationRequest, output: Path):
     slug = request.repository_url.removeprefix('https://github.com/')
     api = 'https://api.github.com/repos/'+slug
     pr_url = api+'/pulls/'+str(request.pull_request)
-    issue_url = api+'/issues/'+str(request.issue)
+    issue_url = None if request.issue is None else api+'/issues/'+str(request.issue)
     pr = fetch('pr', pr_url)
-    issue = fetch('issue', issue_url)
+    issue = None if issue_url is None else fetch('issue', issue_url)
     if (pr.get('number') != request.pull_request or not pr.get('merged')
             or pr.get('state') != 'closed'
             or pr['base']['repo']['full_name'].lower() != slug.lower()
-            or issue.get('number') != request.issue or 'pull_request' in issue
-            or issue.get('repository_url', '').lower() != api.lower()):
-        raise ValueError('a merged PR and a matching repository issue are required')
+            or (issue is not None and (issue.get('number') != request.issue or 'pull_request' in issue
+                or issue.get('repository_url', '').lower() != api.lower()))):
+        raise ValueError('a merged repository PR and, if supplied, a repository issue are required')
     additional = {}
 
     def pages(name, url, count, key, limit):
-        if type(count) is not int or not 0 <= count <= min(limit, request.max_pages*100):
+        if count is not None and (type(count) is not int or not 0 <= count <= min(limit, request.max_pages*100)):
             raise ValueError('source response count exceeds the supported capture bound')
         values = []; names = []
-        for page in range(1, max(1, (count+99)//100)+1):
+        page_bound = request.max_pages if count is None else max(1, (count+99)//100)
+        for page in range(1, page_bound+1):
             page_name = name if page == 1 else name+'-'+str(page)
             items = fetch(page_name, url+'?per_page=100&page='+str(page))
-            if not isinstance(items, list) or len(items) != min(100, count-len(values)):
+            if (not isinstance(items, list) or len(items) > 100
+                    or (count is not None and len(items) != min(100, count-len(values)))):
                 raise ValueError('source pagination is incomplete or changed during capture')
             names.append(page_name); values.extend(items)
-        identities = [item[key] for item in values]
+            if count is None and len(items) < 100:
+                break
+        else:
+            if count is None:
+                raise ValueError('unbounded source pagination exceeds the supported capture bound')
+        identities = [item.get(key, canonical_json(item).decode()) if name == 'issue-timeline'
+                      else item[key] for item in values]
         if len(identities) != len(set(identities)):
             raise ValueError('source pages overlap or contain duplicate identities')
         if len(names) > 1:
             additional[name] = tuple(names[1:])
         return values
 
-    commits = pages('commits', pr_url+'/commits', pr['commits'], 'sha', 250)
-    files = pages('files', pr_url+'/files', pr['changed_files'], 'filename', 3000)
-    pages('comments', issue_url+'/comments', issue['comments'], 'id', 3000)
+    arrays = {name: pages(name, *parameters) for name, parameters in _capture_arrays(request, pr, issue).items()}
+    commits = arrays['commits']; files = arrays['files']
+    _validate_subjects(request.repository_url, pr, issue, pr_url, issue_url, arrays.get('issue-timeline', ()),
+                       source_commits=tuple(item['sha'] for item in commits))
     # Recheck mutable metadata; all actual HTTP bodies, including these, are retained.
     confirmed_pr = fetch('pr-confirmed', pr_url)
-    confirmed_issue = fetch('issue-confirmed', issue_url)
-    if (any(confirmed_pr.get(key) != pr.get(key) for key in (
-            'number', 'merged', 'state', 'merge_commit_sha', 'commits', 'changed_files',
-            'created_at', 'updated_at', 'merged_at', 'title', 'body'))
-            or confirmed_pr['head']['sha'] != pr['head']['sha']
-            or confirmed_pr['base']['repo']['full_name'] != pr['base']['repo']['full_name']
-            or any(confirmed_issue.get(key) != issue.get(key) for key in (
-                'number', 'repository_url', 'created_at', 'updated_at', 'comments', 'title', 'body'))):
-        raise ValueError('PR or issue changed during capture; use a new capture')
+    confirmed_issue = None if issue_url is None else fetch('issue-confirmed', issue_url)
+    _confirm_subjects(pr, confirmed_pr, issue, confirmed_issue)
 
     git_root = root/'repository.git'; git_root.mkdir(mode=0o700)
     history = GitHistory(git_root, timeout_seconds=request.git_timeout_seconds)
@@ -224,12 +308,12 @@ def prepare_github(request: GitHubPreparationRequest, output: Path):
     history = GitHistory(git_root, timeout_seconds=request.history_timeout_seconds)
     reconstruction, source_commits = _reconstruct_pull_request(history, request.integration, pr, commits)
     changed = history.changed_paths(reconstruction.baseline_commit, reconstruction.reference_commit)
-    if set(changed) != {item['filename'] for item in files}:
+    if set(changed) != set(_response_paths(files)):
         raise ValueError('captured PR file list differs from Git history')
     source_objects = tuple(history.commit(revision) for revision in source_commits)
     started = min(stamp for item in source_objects for stamp in (item.authored_at, item.committed_at))
-    if not _parse_time(issue['created_at']) <= request.admissible_cutoff <= started <= _parse_time(pr['merged_at']):
-        raise ValueError('requested cutoff is not between issue creation and implementation')
+    if not request.admissible_cutoff <= started <= _parse_time(pr['merged_at']) <= captured['pr'].retrieved_at:
+        raise ValueError('requested cutoff is not preimplementation')
     baseline = reconstruction.baseline_commit
     license_data = fetch('license', api+'/license?ref='+baseline)
     if license_data.get('path') != request.license_path or (license_data.get('license') or {}).get('spdx_id') in {None, '', 'NOASSERTION'}:
@@ -243,8 +327,11 @@ def prepare_github(request: GitHubPreparationRequest, output: Path):
     spec = PullRequestIntakeSpec(repository_url=request.repository_url,
         repository_family=request.repository_family, request_lineage=request.request_lineage,
         partition_source_ids=request.partition_source_ids,
-        source_names=tuple(name for name in captured if name not in {'license-text', 'pr-confirmed', 'issue-confirmed'}),
-        license_text_name='license-text', pr_name='pr', issue_name='issue', comments_name='comments',
+        source_names=tuple(name for name in captured if name != 'license-text'),
+        license_text_name='license-text', pr_name='pr',
+        issue_name=None if issue is None else 'issue', comments_name=None if issue is None else 'comments',
+        pr_comments_name='pr-comments', reviews_name='reviews', review_comments_name='review-comments',
+        issue_timeline_name=None if issue is None else 'issue-timeline',
         commits_name='commits', files_name='files', license_name='license',
         integration=request.integration, admissible_cutoff=request.admissible_cutoff,
         recorded_at=datetime.now(timezone.utc), provenance_label='reconstructed_specification',

@@ -40,6 +40,19 @@ class GradingService:
         self.store=store;self.runtime=runtime;self.revision=revision;self.max_wall_seconds=max_wall_seconds
         self.submissions=SubmissionService(store=store,policy=runtime.policy)
 
+    def select_task(self,checked):
+        """Bind inert submission checks to this task's frozen repository policy."""
+        from feature_rl.environments import SandboxPolicy
+        from feature_rl.environments.profiles import validate_recipe_profile
+        policies=[r for r in checked.recipe.provenance.inputs if r.kind=='sandbox-policy']
+        if len(policies)!=1:raise ValueError('recipe must bind exactly one M3 sandbox policy')
+        policy=SandboxPolicy.model_validate_json(self.runtime.read_bytes(policies[0],65536))
+        if policy.model_dump(exclude={'image','profile'})!=self.runtime.base_policy.model_dump(exclude={'image','profile'}):
+            raise ValueError('task runtime exceeds configured sandbox policy')
+        validate_recipe_profile(checked.recipe,policy,self.store)
+        self.submissions=SubmissionService(store=self.store,policy=policy)
+        return PreparedEnvironment(recipe=checked.task.environment,policy=policies[0])
+
     def _publish(self,receipt,costs,scope):
         try:
             receipt=GradeReceipt.model_validate(receipt)
@@ -82,19 +95,19 @@ class GradingService:
             finally:worker_wall+=time.monotonic()-t
         try:
             checked=load_verifier(self.store,task_version)
+            prepared=self.select_task(checked)
             verifier_ref=checked.task.private_oracle
             manifest=materialize_manifest(checked,case_seed)
             results=[CaseResult(case_id=c.case_id,mandatory=c.mandatory,status='not_run',passed=None,
                 assertions=(),evidence=None,reason='not executed') for c in manifest.cases]
             manifest_ref=self.store.put_bytes(canonical_json(manifest.model_dump(mode='json')),'m4-case-manifest',Visibility.PRIVATE)
-            try:source=self.submissions.resolve(submission,checked.task.baseline,checked.contract.allowed_changes)
+            try:
+                source=self.submissions.resolve(submission,checked.task.baseline,checked.contract.allowed_changes)
+                self.runtime.source_environment(prepared,source,bind=False)
             except (SourceRejected,ArtifactSizeLimitError) as exc:
                 disposition=Disposition.REJECTED;reward=0;reason='source submission rejected: '+str(exc)[:800]
             else:
                 source_ref=self.store.put_bytes(source.to_tar(),'source-archive',Visibility.PRIVATE)
-                policies=[r for r in checked.recipe.provenance.inputs if r.kind=='sandbox-policy']
-                if len(policies)!=1:raise ValueError('recipe must bind exactly one M3 sandbox policy')
-                prepared=PreparedEnvironment(recipe=checked.task.environment,policy=policies[0])
                 self.runtime.recipe(prepared)
                 handle=self.runtime.open_workspace(prepared,source=source_ref,role='candidate',allowed_changes=checked.contract.allowed_changes)
                 try:

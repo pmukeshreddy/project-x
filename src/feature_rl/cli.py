@@ -79,7 +79,7 @@ def parser():
     root.add_argument('--config',help='strict local CLIConfiguration JSON; config-schema prints its schema')
     commands=root.add_subparsers(dest='command',required=True)
     commands.add_parser('config-schema',help='print the strict composition schema without opening state or a runtime')
-    preparation=commands.add_parser('prepare-github',help='capture one GitHub PR/issue and Git objects for construct-feature; no model or Docker required')
+    preparation=commands.add_parser('prepare-github',help='capture one GitHub PR, discussion, optional linked issue and Git objects for construct-feature; no model or Docker required')
     preparation.add_argument('--request',required=True,help='strict GitHubPreparationRequest JSON')
     preparation.add_argument('--output',required=True,help='absolute new capture directory; completed captures are reused offline')
     automatic=commands.add_parser('construct-feature',help='cached PR intake, real environment discovery, bounded M2/M4 authoring and immutable BUILT construction')

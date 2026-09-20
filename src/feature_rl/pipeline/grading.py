@@ -51,7 +51,7 @@ def configuration(factory,request):
     # New consumer config declares inner opaque refs explicitly. Existing
     # immutable submission/comparison declarations are never retrofitted.
     value={'version':'m6-grade-policy-v1','revision':factory.revision,'m4_revision':actual.revision,
-        'm3_revision':actual.runtime.revision,'policy':document(actual.runtime.policy),
+        'm3_revision':actual.runtime.revision,'policy':document(actual.runtime.base_policy),
         'max_wall_seconds':actual.max_wall_seconds,'opaque_inputs':[document(ref) for ref in dict.fromkeys(inner)]}
     return put(factory,value,'m6-grade-policy',dependencies=tuple(dict.fromkeys(inner)))
 

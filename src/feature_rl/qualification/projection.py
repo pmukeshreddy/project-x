@@ -10,7 +10,7 @@ from .models import QualificationRejected, ProjectionPath, ReferenceProjection
 
 
 def derive_reference(store, task_ref, policy):
-    """Resolve exact M1 H, account for all changes, submit permitted implementation only."""
+    """Resolve exact M1 H and submit only the contract's justified feature files."""
     try:
         task=store.get_artifact(task_ref,max_envelope_bytes=1024*1024)
         if not isinstance(task,TaskBundle) or task.state!=TaskState.BUILT or task.qualification is not None:
@@ -35,23 +35,23 @@ def derive_reference(store, task_ref, policy):
         automatic={entry.path:entry.category for entry in classify_changed_files(tuple(changed)).changed_files}
         rules=validate_rules(contract.allowed_changes)
         policy.profile.validate_allowed_changes(rules)
+        selected={item.path:item for item in contract.feature_files}
+        if len(selected)!=len(contract.feature_files) or not set(selected)<=set(changed):
+            raise QualificationRejected('invalid_evidence','every selected feature file must be a distinct actual B/H change')
+        for name in selected:
+            change_path(name,rules)
         projected=dict(before.files);paths=[];included=[]
         for name in changed:
             entry=classified[name];old=before.files.get(name);new=after.files.get(name)
-            if entry.category!='mixed' and automatic[name]!=entry.category:
-                raise QualificationRejected('unsupported_semantics','H classification cannot disguise an implementation/build path: '+name)
-            category=automatic[name]
-            rationale=entry.rationale
-            if category in {'documentation','tests','dependency_build'}:
-                action='excluded_'+category
+            selection=selected.get(name)
+            classification=f'history category: {entry.category}; path category: {automatic[name]}'
+            if selection is None:
+                action='excluded_unrelated'
+                rationale=f'Not selected by the requirement contract; {classification}; {entry.rationale}'[:4096]
             else:
-                try:
-                    change_path(name,rules)
-                except SourceRejected as exc:
-                    action='excluded_out_of_policy'
-                    rationale=(rationale+'; retained baseline: '+str(exc))[:4096]
-                else:
-                    action='included_implementation'
+                action='included_implementation'
+                rationale=(f'Required by {", ".join(selection.requirement_ids)}: '
+                    f'{selection.rationale}; {classification}')[:4096]
             if action=='included_implementation':
                 included.append(name)
                 if new is None:projected.pop(name,None)
@@ -60,7 +60,7 @@ def derive_reference(store, task_ref, policy):
                 before_sha256=hashlib.sha256(old.data).hexdigest() if old else None,
                 after_sha256=hashlib.sha256(new.data).hexdigest() if new else None,
                 before_executable=old.executable if old else None,after_executable=new.executable if new else None))
-        if not included:raise QualificationRejected('unsupported_semantics','H has no supported implementation delta')
+        if not included:raise QualificationRejected('unsupported_semantics','contract selects no changed feature files')
         delta=SourceArchive({name:after.files[name] for name in included if name in after.files}).to_tar()
         deletions=tuple(name for name in included if name not in after.files)
         submission=submissions.create(pair.baseline,delta,deletions,contract.allowed_changes)

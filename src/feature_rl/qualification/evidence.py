@@ -53,6 +53,7 @@ def evidence(ref,revision,command,*,scope='source_inspection'):
 
 def validate_grade(store,checked,submission,seed,result,grader,*,seen=None):
     """Validate a result obtained from the actual grader or its selected Registry job."""
+    prepared=grader.select_task(checked)
     if result.operation!='grade' or not result.artifacts:raise QualificationRejected('invalid_evidence','grade operation has no receipt')
     receipt=read_grade(store,result.artifacts[0])
     if (receipt.task,receipt.submission,receipt.case_seed,receipt.verifier,receipt.implementation_revision)!=(checked.task_ref,submission,seed,checked.task.private_oracle,grader.revision):
@@ -77,9 +78,12 @@ def validate_grade(store,checked,submission,seed,result,grader,*,seen=None):
     source=None
     if receipt.source is not None:
         source=grader.submissions.resolve(submission,checked.task.baseline,checked.contract.allowed_changes)
-        if read_bytes(store,receipt.source,grader.runtime.policy.max_archive_bytes,'source-archive',True)!=source.to_tar():
+        if read_bytes(store,receipt.source,grader.submissions.policy.max_archive_bytes,'source-archive',True)!=source.to_tar():
             raise QualificationRejected('invalid_evidence','grade reconstructed source differs from assigned submission')
-    policies=[ref for ref in checked.recipe.provenance.inputs if ref.kind=='sandbox-policy']
+        if runtime_refs:
+            prepared,_=grader.runtime.source_environment(prepared,source,bind=False)
+    elif runtime_refs:
+        raise QualificationRejected('invalid_evidence','runtime evidence lacks its reconstructed source')
     for ref in runtime_refs:
         raw=read_bytes(store,ref,32*1024*1024,'environment-execution',True);used+=len(raw)
         if used>64*1024*1024:raise QualificationRejected('invalid_evidence','aggregate runtime receipt limit')
@@ -87,9 +91,9 @@ def validate_grade(store,checked,submission,seed,result,grader,*,seen=None):
         owner=Ownership.model_validate_json(canonical_json(value.get('record')))
         binding=owner.binding
         runtime_values[ref]=(value,owner)
-        if value.get('cleanup_verified') is not True or owner.phase!='removed' or len(policies)!=1:
+        if value.get('cleanup_verified') is not True or owner.phase!='removed':
             raise QualificationRejected('environment_failure','runtime cleanup or policy evidence unverified')
-        expected_binding={'recipe':checked.task.environment.sha256,'policy':policies[0].sha256,'revision':grader.runtime.revision,'role':'candidate',
+        expected_binding={'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,'revision':grader.runtime.revision,'role':'candidate',
             'allowed_changes':hashlib.sha256(canonical_json(checked.contract.allowed_changes.model_dump(mode='json'))).hexdigest(),
             'phase':value.get('phase')}
         if receipt.source is not None:
@@ -189,12 +193,34 @@ def require_semantic_execution(store,checked,receipt):
             raise QualificationRejected('oracle_disagreement','process case '+actual.case_id+' did not establish normal adapter completion; exact intended absence must be an explicit compared observation')
 
 
+RESET_PROBE_BYTES=b'\n# M5 temporary reset probe\n'
+
+
+def reset_probe(source,rules,profile):
+    """Choose the same inert diagnostic mutation during execution and validation."""
+    from feature_rl.environments import SourceFile, SourceRejected
+    from feature_rl.submission.source import change_path
+    manifests={profile.manifest_path,*profile.manifest_hashes}
+    candidates=[]
+    for path,entry in source.files.items():
+        try:change_path(path,rules)
+        except SourceRejected:continue
+        mapped=any(path==mapping.source or path.startswith(mapping.source+'/')
+                   for mapping in profile.source_mappings)
+        candidates.append((path in manifests,not mapped,path,entry))
+    if not candidates:
+        raise QualificationRejected('unsupported_semantics','reset requires an existing allowed source file')
+    _,_,path,entry=min(candidates,key=lambda item:item[:3])
+    return path,SourceFile(entry.data+RESET_PROBE_BYTES,entry.executable)
+
+
 def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
     """Rejoin timeout, dirty saved source, restored source and independent workspace."""
-    from feature_rl.environments import SourceFile
-    from feature_rl.environments.models import SavedSource
+    from feature_rl.environments import SourceRejected, PolicyRejected
+    from feature_rl.environments.models import SavedSource, SandboxPolicy
     from feature_rl.verifiers.loader import read_local
     from .models import ResetReceipt, ReferenceProjection
+    prepared=grader.select_task(checked)
     reset=read_local(store,reset_ref,ResetReceipt,'m5-reset')
     projection=read_local(store,projection_ref,ReferenceProjection,'m5-reference-projection',1024*1024)
     if (reset.task,reset.projection,reset.initial_source,reset.reset_source)!=(checked.task_ref,projection_ref,projection.projected_source,projection.projected_source) or not reset.cleanup_verified or reset.generation_after<=reset.generation_before:
@@ -202,8 +228,22 @@ def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
     value=decode_json(read_bytes(store,reset.interruption,32*1024*1024,'environment-execution',True),32*1024*1024)
     owner=Ownership.model_validate_json(canonical_json(value.get('record')))
     saved=SavedSource.model_validate_json(canonical_json(owner.saved_source))
-    policies=[ref for ref in checked.recipe.provenance.inputs if ref.kind=='sandbox-policy']
-    expected={'recipe':checked.task.environment.sha256,'policy':policies[0].sha256 if len(policies)==1 else None,
+    initial=grader.submissions.source(projection.projected_source)
+    initial_prepared,_=grader.runtime.source_environment(prepared,initial,bind=False)
+    policy=SandboxPolicy.model_validate_json(grader.runtime.read_bytes(initial_prepared.policy,65536))
+    path,entry=reset_probe(initial,checked.contract.allowed_changes,policy.profile)
+    dirty=grader.submissions.source(saved.artifact)
+    expected_files=dict(initial.files);expected_files[path]=entry
+    if (dirty.files!=expected_files or saved.artifact==projection.projected_source
+            or dirty.tree_sha256!=saved.tree_sha256
+            or hashlib.sha256(dirty.to_tar()).hexdigest()!=saved.raw_sha256):
+        raise QualificationRejected('invalid_evidence','reset interruption did not observe the exact saved diagnostic mutation')
+    try:interrupted_prepared,_=grader.runtime.source_environment(prepared,dirty,bind=False)
+    except (SourceRejected,PolicyRejected):
+        # Development commands may inspect or repair intermediate manifests using
+        # the task's original frozen runtime; builds still require an exact match.
+        interrupted_prepared=prepared
+    expected={'recipe':interrupted_prepared.recipe.sha256,'policy':interrupted_prepared.policy.sha256,
         'revision':grader.runtime.revision,'role':'candidate','phase':'development','workspace_id':reset.workspace_id,
         'generation':str(reset.generation_before),'source_input':projection.projected_source.sha256,
         'source':saved.artifact.sha256,'source_raw':saved.raw_sha256,'tree':saved.tree_sha256,
@@ -215,11 +255,6 @@ def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
     rows=[r for r in value.get('commands',[]) if r.get('argv',[])[-len(command):]==command]
     if len(rows)!=1 or rows[0].get('reason')!='timeout' or rows[0].get('stdin_bytes')!=0:
         raise QualificationRejected('invalid_evidence','reset lacks actual fixed bounded timeout command')
-    dirty=grader.runtime.source(saved.artifact);initial=grader.runtime.source(projection.projected_source)
-    expected_files=dict(initial.files)
-    expected_files[checked.contract.allowed_changes.source_roots[0]+'/__m5_reset_probe__.py']=SourceFile(b'# M5 temporary reset probe\n',False)
-    if dirty.files!=expected_files or saved.artifact==projection.projected_source or dirty.tree_sha256!=saved.tree_sha256:
-        raise QualificationRejected('invalid_evidence','reset interruption did not observe the exact saved diagnostic mutation')
     identities=(owner.operation_id,'workspace:'+reset.workspace_id)
     if any(identity in seen for identity in identities):
         raise QualificationRejected('invalid_evidence','replayed reset interruption/workspace')

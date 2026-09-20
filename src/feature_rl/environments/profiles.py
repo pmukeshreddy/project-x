@@ -5,7 +5,15 @@ import tomllib
 from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
-from feature_rl.contracts import CommandSpec, NeutralRepair, SeedPolicy, StrictModel
+from feature_rl.contracts import ArtifactRef, CommandSpec, NeutralRepair, SeedPolicy, StrictModel
+
+
+def metadata_digest(metadata):
+    from feature_rl.artifacts import canonical_json
+    fields=('project_name','project_version','requires_python','python_versions','build_backend',
+        'build_requirements','requirements','constraints','dependency_hashes','system_requirements',
+        'source_mappings','import_modules','entry_points')
+    return hashlib.sha256(canonical_json({key:metadata.get(key) for key in fields})).hexdigest()
 
 
 class WheelPin(StrictModel):
@@ -34,9 +42,12 @@ class RuntimeProfile(StrictModel):
     interpreter_version: Annotated[str, Field(pattern=r'^3\.[0-9]+\.[0-9]+$')]
     manifest_path: str = 'pyproject.toml'
     manifest_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')] | None = None
+    manifest_hashes: dict[str, str | None] = Field(default_factory=dict)
+    metadata_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')] | None = None
+    resolution: ArtifactRef | None = None
     build_backend: Annotated[str, Field(min_length=1, max_length=256)]
     build_requirements: Annotated[tuple[str, ...], Field(min_length=1, max_length=64)]
-    source_roots: Annotated[tuple[str, ...], Field(min_length=1, max_length=32)]
+    source_roots: Annotated[tuple[str, ...], Field(min_length=1, max_length=2000)]
     source_mappings: Annotated[tuple[SourceMapping, ...], Field(min_length=1, max_length=32)]
     import_modules: Annotated[tuple[str, ...], Field(min_length=1, max_length=32)]
     entry_points: Annotated[tuple[str, ...], Field(min_length=1, max_length=64)]
@@ -52,11 +63,12 @@ class RuntimeProfile(StrictModel):
         from .archive import safe_path
         for path in (self.manifest_path, *self.source_roots,
                      *(m.source for m in self.source_mappings), *(m.wheel for m in self.source_mappings)):
-            if safe_path(path) != path or any(part in {'.pytest_cache', 'tests', 'test', 'build', 'dist', '.venv'}
+            if safe_path(path) != path or any(part in {'.pytest_cache', '.venv'}
                                                for part in path.split('/')):
                 raise ValueError('profile contains a noncanonical or protected source path')
-        if self.manifest_path != 'pyproject.toml':
-            raise ValueError('runtime profiles currently support pyproject.toml wheel builds')
+        for path, digest in self.manifest_hashes.items():
+            if safe_path(path) != path or (digest is not None and not re.fullmatch(r'[0-9a-f]{64}', digest)):
+                raise ValueError('noncanonical build input fingerprint')
         for values in (self.source_roots, self.import_modules, self.entry_points,
                        tuple(p.name for p in self.dependencies), tuple(p.filename for p in self.dependencies),
                        tuple(p.name for p in self.system_packages),
@@ -74,14 +86,10 @@ class RuntimeProfile(StrictModel):
                 raise ValueError('wheel mapping is outside the source roots')
             if '.dist-info' in mapping.wheel or '.data' in mapping.wheel:
                 raise ValueError('source cannot replace wheel metadata or install schemes')
-            if mapping.source != mapping.wheel and not mapping.source.endswith('/'+mapping.wheel):
-                raise ValueError('wheel source mappings must preserve the Python import path')
         for attribute in ('source', 'wheel'):
             names = [getattr(m, attribute) for m in self.source_mappings]
             if any(a != b and a.startswith(b+'/') for a in names for b in names):
                 raise ValueError('overlapping wheel source mappings')
-        if any(self.manifest_path == root or self.manifest_path.startswith(root+'/') for root in self.source_roots):
-            raise ValueError('build manifest must be immutable')
         normalized = lambda value: re.sub(r'[-_.]+', '-', value).lower()
         names = [normalized(pin.name) for pin in self.dependencies]
         if len(names) != len(set(names)) or normalized(self.project_name) in names:
@@ -93,17 +101,18 @@ class RuntimeProfile(StrictModel):
         return re.sub(r'[-_.]+', '_', self.project_name).lower()+'-'+self.project_version
 
     @property
-    def wheel_filename(self):
-        return self.wheel_stem+'-py3-none-any.whl'
-
-    @property
     def environment(self):
         return (('PYTHONPATH', '/workspace/site:/workspace/deps'), ('PYTHONSAFEPATH', '1'),
-                ('PYTEST_DISABLE_PLUGIN_AUTOLOAD', '1'))
+                ('PYTEST_DISABLE_PLUGIN_AUTOLOAD', '1'),
+                ('PATH','/workspace/site/bin:/workspace/deps/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin'))
 
     @property
     def development_environment(self):
-        parents = tuple(dict.fromkeys(m.source[:-len(m.wheel)].rstrip('/') for m in self.source_mappings))
+        from pathlib import PurePosixPath
+        parents = tuple(dict.fromkeys(m.source[:-len(m.wheel)].rstrip('/')
+            if m.source==m.wheel or m.source.endswith('/'+m.wheel)
+            else ('' if PurePosixPath(m.source).parent==PurePosixPath('.') else str(PurePosixPath(m.source).parent))
+            for m in self.source_mappings))
         paths = tuple('/workspace/source'+('/'+parent if parent else '') for parent in parents)
         return (('PYTHONPATH', ':'.join((*paths, '/workspace/deps'))), *self.environment[1:])
 
@@ -111,14 +120,35 @@ class RuntimeProfile(StrictModel):
     def setup(self):
         from .runtime import BUILD
         from .images import LINK_DEPS
-        install = CommandSpec(argv=('python', '-I', '-m', 'pip', '--isolated', 'install',
-            '--no-index', '--no-deps', '--no-compile', '--target', '/workspace/site',
-            '/workspace/built/'+self.wheel_filename), working_directory='/workspace', timeout_seconds=30.0)
+        # The build backend chooses the ABI/platform tag. Keep its actual wheel
+        # name, including for native extensions, and require a single product.
+        install = CommandSpec(argv=('python', '-I', '-c',
+            "import pathlib,subprocess,sys;w=list(pathlib.Path('/workspace/built').glob('*.whl'));"
+            "assert len(w)==1,'one project wheel required';subprocess.run([sys.executable,'-I','-m','pip',"
+            "'--isolated','install','--no-index','--no-deps','--no-compile','--target','/workspace/site',str(w[0])],check=True)"),
+            working_directory='/workspace', timeout_seconds=30.0)
         return LINK_DEPS, BUILD, install
 
 
     def validate_source(self, source):
         from .models import PolicyRejected
+        if self.manifest_hashes:
+            for path, digest in self.manifest_hashes.items():
+                entry = source.files.get(path)
+                actual = None if entry is None else hashlib.sha256(entry.data).hexdigest()
+                if actual != digest:
+                    raise PolicyRejected('repository runtime input differs from frozen resolution: '+path)
+            from .inference import infer_repository
+            metadata=infer_repository(source)
+            if (self.metadata_sha256 is None or metadata_digest(metadata)!=self.metadata_sha256
+                    or metadata['project_name']!=self.project_name or metadata['project_version']!=self.project_version
+                    or metadata['build_backend']!=self.build_backend
+                    or tuple(metadata['build_requirements'])!=self.build_requirements
+                    or metadata['source_mappings']!=[m.model_dump() for m in self.source_mappings]
+                    or tuple(metadata['import_modules'])!=self.import_modules
+                    or {p.split('=')[0] for p in metadata['system_requirements']}!={p.name for p in self.system_packages}):
+                raise PolicyRejected('repository identity, layout or build requirements differ from frozen resolution')
+            return
         try:
             data = source.files[self.manifest_path].data
             manifest = tomllib.loads(data.decode())
@@ -143,8 +173,10 @@ class RuntimeProfile(StrictModel):
     def validate_allowed_changes(self, rules):
         from .models import SourceRejected
         from .archive import safe_path
-        if rules.dependencies != 'forbidden' or rules.dependency_artifacts or rules.additional_artifact_types:
-            raise SourceRejected('runtime profiles require fixed dependencies and Python source changes')
+        if rules.dependencies == 'forbidden' and rules.dependency_artifacts:
+            raise SourceRejected('forbidden dependency policy supplies dependency artifacts')
+        if any(ref.kind != 'dependency-wheel' for ref in rules.dependency_artifacts):
+            raise SourceRejected('dependency changes require frozen wheel artifacts')
         for root in rules.source_roots:
             if safe_path(root) != root or not any(root == allowed or root.startswith(allowed+'/')
                                                 for allowed in self.source_roots):
@@ -181,6 +213,18 @@ def validate_recipe_profile(recipe, policy, store):
     from .models import PolicyRejected
     from .images import validate_runtime_image
     profile = policy.profile
+    if profile is None or policy.image is None:
+        raise PolicyRejected('recipe requires a resolved repository runtime')
+    if profile.metadata_sha256 is not None:
+        import json
+        if (profile.resolution is None or profile.resolution.kind!='repository-runtime-resolution'
+                or profile.resolution not in recipe.provenance.inputs):
+            raise PolicyRejected('automatically resolved profile lost its repository input evidence')
+        resolution=json.loads(store.get_bytes(profile.resolution,max_envelope_bytes=2*1024*1024,max_payload_bytes=1024*1024))
+        if (resolution.get('resolved_image')!=policy.image or resolution.get('cleanup_verified') is not True
+                or metadata_digest(resolution.get('inputs',{}).get('metadata',{}))!=profile.metadata_sha256
+                or resolution.get('inputs',{}).get('manifests')!=profile.manifest_hashes):
+            raise PolicyRejected('runtime resolution inputs differ from the pinned profile')
     validate_runtime_image(recipe, policy, store)
     setup = profile.setup
     if (recipe.interpreter_version != profile.interpreter_version
@@ -198,4 +242,20 @@ def validate_recipe_profile(recipe, policy, store):
             raise PolicyRejected('runtime resource policy drift')
     if recipe.limits.wall_seconds != policy.lifecycle_seconds:
         raise PolicyRejected('runtime wall policy drift')
+    if len(recipe.source_variants)>16 or len(set(recipe.source_variants))!=len(recipe.source_variants):
+        raise PolicyRejected('invalid source runtime variants')
+    for ref in recipe.source_variants:
+        from feature_rl.contracts import EnvironmentRecipe, Visibility
+        if ref.kind!='EnvironmentRecipe' or ref.visibility!=Visibility.AUTHORING or ref not in recipe.provenance.inputs:
+            raise PolicyRejected('source runtime variant lost provenance')
+        variant=store.get_artifact(ref,max_envelope_bytes=256*1024)
+        if not isinstance(variant,EnvironmentRecipe) or variant.source_variants or variant.baseline!=recipe.baseline:
+            raise PolicyRejected('runtime variants must share the original baseline and remain flat')
+        policies=[p for p in variant.provenance.inputs if p.kind=='sandbox-policy']
+        if len(policies)!=1:raise PolicyRejected('runtime variant lacks one policy')
+        from .models import SandboxPolicy
+        other=SandboxPolicy.model_validate_json(store.get_bytes(policies[0],max_envelope_bytes=131072,max_payload_bytes=65536))
+        if other.model_dump(exclude={'image','profile'})!=policy.model_dump(exclude={'image','profile'}):
+            raise PolicyRejected('runtime variant changed sandbox constraints')
+        validate_recipe_profile(variant,other,store)
     return profile

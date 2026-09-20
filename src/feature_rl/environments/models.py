@@ -29,11 +29,11 @@ class EvidencePublicationFailed(EnvironmentError):
 
 
 class SandboxPolicy(StrictModel):
-    version: Literal['docker-python-v2'] = 'docker-python-v2'
-    image: Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$')]
+    version: Literal['docker-python-v3'] = 'docker-python-v3'
+    image: Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$')] | None = None
     seccomp_sha256: Literal[SECCOMP_SHA256] = SECCOMP_SHA256
     platform: Literal['linux/arm64', 'linux/amd64']
-    profile: RuntimeProfile
+    profile: RuntimeProfile | None = None
     cpus: Annotated[float,Field(ge=0.1,le=2.0)] = 0.5
     cpu_seconds: Annotated[float,Field(ge=1,le=600)] = 60.0
     memory_bytes: Annotated[int,Field(ge=64*1024*1024,le=1024*1024*1024)] = 512*1024*1024
@@ -113,6 +113,7 @@ class BuildResult(StrictModel):
     recipe: ArtifactRef
     policy: ArtifactRef
     wheel: ArtifactRef
+    wheel_filename: str
     wheel_sha256: Annotated[str,Field(pattern=r"^[0-9a-f]{64}$")]
     source_tree_sha256: Annotated[str,Field(pattern=r"^[0-9a-f]{64}$")]
     cost: CostRecord

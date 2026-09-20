@@ -5,6 +5,8 @@ from __future__ import annotations
 from pydantic import ValidationError
 
 from feature_rl.contracts import EvidenceLink, RequirementContract
+from feature_rl.environments import SourceRejected
+from feature_rl.submission.source import change_path, validate_rules
 
 from .models import ContractFinalizationInputs, GroundedSource, RequirementContractProposal
 
@@ -95,6 +97,20 @@ class ContractFinalizer:
                 raise GroundingError("requirement observable is unsupported by discovery")
             for link in requirement.evidence:
                 validate_link(link, sources)
+        selected_paths = tuple(item.path for item in proposal.feature_files)
+        if len(selected_paths) != len(set(selected_paths)):
+            raise GroundingError("duplicate feature file paths")
+        try:
+            rules = validate_rules(inputs.allowed_changes)
+            for item in proposal.feature_files:
+                change_path(item.path, rules)
+                if (len(item.requirement_ids) != len(set(item.requirement_ids))
+                        or not set(item.requirement_ids) <= set(identifiers)):
+                    raise GroundingError("feature file must cite distinct selected requirement IDs")
+                for link in item.evidence:
+                    validate_link(link, sources)
+        except SourceRejected as error:
+            raise GroundingError("feature file is outside the allowed change policy: " + str(error)) from error
         for ambiguity in proposal.ambiguities:
             if ambiguity.disposition == "unresolved":
                 raise GroundingError("unresolved ambiguity blocks automatic finalization")
@@ -112,6 +128,7 @@ class ContractFinalizer:
             entry_points=proposal.entry_points,
             requirements=proposal.requirements,
             compatibility_obligations=proposal.compatibility_obligations,
+            feature_files=proposal.feature_files,
             ambiguities=proposal.ambiguities,
             allowed_changes=proposal.allowed_changes,
             public_checks=inputs.public_checks,
