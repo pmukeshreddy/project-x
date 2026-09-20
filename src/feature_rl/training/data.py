@@ -10,8 +10,6 @@ from typing import Callable
 
 from feature_rl.contracts import ArtifactRef, Disposition, Partition, PolicyConfig, RolloutRecord, TaskBundle, StopReason
 from feature_rl.grading.service import read_grade
-from feature_rl.environments.archive import SourceArchive
-from feature_rl.environments import SandboxPolicy
 from .core import GroupPlan, group_advantages, validate_trace
 from .torch_backend import CausalTurn
 
@@ -29,7 +27,7 @@ class PreparedGroup:
         return sum(r is not None for r in self.rewards)
 
     def optimization_turns(self):
-        if self.effective_size < 2:
+        if self.effective_size < 2 or not any(a is not None and a != 0 for a in self.advantages):
             return []
         return [turn for episode in self.turns for turn in episode]
 
@@ -51,15 +49,6 @@ class TrainingDataGate:
         if not isinstance(admitted, TaskBundle) or admitted != resolved or admitted.partition != Partition.TRAIN:
             raise ValueError('Admission must resolve exact immutable training task')
         return admitted
-
-    def _grade(self, ref, *, task, submission, seed=None, reward=None):
-        grade = read_grade(self.store, ref)
-        if (grade.implementation_revision != self.grader_revision or grade.task != task
-                or grade.submission != submission or not grade.cleanup_verified
-                or grade.reward is None or (reward is not None and grade.reward != reward)
-                or (seed is not None and grade.case_seed != seed)):
-            raise ValueError('Grading receipt does not bind the exact task/submission/cases/outcome')
-        return grade
 
     def _episode_grade(self, record, case_seed):
         """Bind controller-owned M4 evidence, including pre-execution outcomes.
@@ -112,14 +101,17 @@ class TrainingDataGate:
                       contexts: tuple[tuple[tuple[int, ...], ...], ...],
                       expected_policy: PolicyConfig, vocab_size: int, max_seq_len: int,
                       normalize_std: bool = False) -> PreparedGroup:
-        if len(records) != 4 or len(contexts) != 4:
-            raise ValueError('Exactly four assigned independent episodes required')
+        group_size = len(plan.episode_seeds)
+        if (group_size < 2 or len(set(plan.episode_seeds)) != group_size
+                or any(type(seed) is not int or seed < 0 for seed in plan.episode_seeds)
+                or len(records) != group_size or len(contexts) != group_size):
+            raise ValueError('One independent episode per assigned group seed required, with at least two seeds')
         tokenizer_digest = expected_policy.identity.tokenizer_digest
         if tokenizer_digest is None or expected_policy.policy_version != plan.policy_version:
             raise ValueError('Expected exact behavior policy/tokenizer required')
         task = records[0].task
         self.admit_task(task)
-        if task.sha256 != plan.task.task_id or len({r.run_id for r in records}) != 4:
+        if task.sha256 != plan.task.task_id or len({r.run_id for r in records}) != group_size:
             raise ValueError('Group task identity or fresh episode identities differ')
         checked = tuple(RolloutRecord.model_validate_json(r.model_dump_json()) for r in records)
         for n, record in enumerate(checked):
@@ -153,45 +145,3 @@ class TrainingDataGate:
                                            trace.behavior_log_probabilities, advantages[n]))
             episodes.append(tuple(rows))
         return PreparedGroup(plan, checked, tuple(episodes), rewards, advantages)
-
-    def prepare_supervised_source(self, *, task: ArtifactRef, submission: ArtifactRef, grade_ref: ArtifactRef,
-                                  render_solution: Callable, encode_context: Callable, encode_target: Callable,
-                                  max_seq_len: int) -> tuple[CausalTurn, ...]:
-        """SFT targets come only from the exact M4-verified solution source.
-
-        render_solution is the trusted fixed harness renderer, shared across arms;
-        it receives the admitted task (controller-only) and inert graded source archive and
-        returns (rendered_context, rendered_completion) pairs. It never executes source.
-        Tokenization is deterministic supervised labeling, not a sampled TokenTrace.
-        """
-        admitted = self.admit_task(task)
-        grade = self._grade(grade_ref, task=task, submission=submission, reward=1)
-        if grade.source is None:
-            raise ValueError('Verified solution source missing')
-        payload = self.store.get_bytes(grade.source, max_envelope_bytes=24*1024*1024, max_payload_bytes=16*1024*1024)
-        source = SourceArchive.read(payload, SandboxPolicy())
-        pairs = tuple(render_solution(admitted, source))
-        if not pairs:
-            raise ValueError('Verified solution produced no supervised targets')
-        return tuple(tokenize_supervision(context, target, encode_context=encode_context,
-                                         encode_target=encode_target, max_seq_len=max_seq_len)
-                     for context, target in pairs)
-
-
-def tokenize_supervision(context: str, target: str, *, encode_context: Callable, encode_target: Callable,
-                         max_seq_len: int) -> CausalTurn:
-    """Encode the full rendered text and require the exact generation-context prefix.
-
-    encode_target receives context+target, not the target alone. Different chat
-    templates or a BPE merge across the boundary must be fixed, never silently sliced.
-    """
-    if not context or not target:
-        raise ValueError('Nonempty rendered context and supervised target required')
-    prompt = tuple(encode_context(context))
-    full = tuple(encode_target(context + target))
-    if full[:len(prompt)] != prompt:
-        raise ValueError('Supervised template/tokenizer changed the generation context prefix')
-    targets = full[len(prompt):]
-    turn = CausalTurn(prompt, targets, (True,)*len(targets))
-    turn.validate(max_seq_len)
-    return turn

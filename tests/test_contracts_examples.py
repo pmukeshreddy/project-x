@@ -25,16 +25,16 @@ def examples():
     identity=dict(provider='unit',model='fixture',revision='1',weights=None,tokenizer_digest='c'*64)
     policy=dict(identity=identity,policy_version='p1',temperature=1.0,top_p=1.0,seed=13,system_prompt=public,harness_version='1',require_token_probabilities=True)
     training=dict(initial_policy=policy,reference_checkpoint=raw,tasks=[r('TaskBundle')],limits=limits,seeds=seeds,algorithm='grpo',group_size=4,max_updates=1,learning_rate=0.0001,framework='unit fixture',framework_version='1',backend_version='1',budget_usd=None)
-    evaluation=dict(tasks=[r('TaskBundle')],arms=[dict(arm='A',policy=policy,checkpoint=raw,training_config=None)],limits=limits,seeds=seeds,partition='locked_test',harness_version='1',checkpoint_selection_rule='frozen before test',invalid_trial_rule='report all assigned',metric='pass_at_1',episodes_per_trial=1,frozen_roster=raw,preregistration=raw)
+    evaluation=dict(tasks=[r('TaskBundle')],arms=[dict(arm='base',policy=policy,checkpoint=raw,training_config=None)],limits=limits,seeds=seeds,partition='locked_test',harness_version='1',checkpoint_selection_rule='frozen before test',invalid_trial_rule='report all assigned',metric='pass_at_1',episodes_per_trial=1,frozen_roster=raw,preregistration=raw)
     out={
       'CandidateRecord':dict(schema_version=2,provenance_label='reconstructed_specification',repository_url='https://example.test/repo',repository_family='family',request_lineage=['request-1'],partition='train',sources=[dict(url='https://example.test/issue/1',content=raw,retrieved_at='2026-09-19T00:00:00Z',published_at=None,edited_at=None,edit_history='unavailable',media_type='text/plain',redirect_chain=None)],license=dict(spdx_id=None,license_text=None,status='unknown',evidence=[ev]),commits=relation,screening=dict(disposition='provisional',reason='unit diagnostic',evidence=[ev])),
       'SourcePair':dict(schema_version=2,provenance_label='reconstructed_specification',candidate=r('CandidateRecord'),baseline_commit='a'*40,reference_commit='b'*40,baseline=public,reference=raw,relationship=relation,changed_files=[dict(path='src/cli.py',category='implementation',rationale='feature')],admissible_cutoff='2026-09-01T00:00:00Z',verification=[ev]),
       'RequirementContract':dict(visible_request='Add command suggestions',capability='Suggestions',entry_points=['CLI'],requirements=[req],compatibility_obligations=[],ambiguities=[],allowed_changes=allowed,public_checks=[],episode_limits=limits,provenance_label='historical_request'),
       'ScenarioPlan':dict(contract=r('RequirementContract'),mandatory_requirement_ids=['R1'],scenarios=[dict(scenario_id='S1',requirement_ids=['R1'],preconditions=['command exists'],actions=['invoke typo'],observations=['stderr'],expected_relation='suggests command',input_domain='one edit typo',oracle_origin=link,reset_needs=[])],seed_policy=seeds),
-      'EnvironmentRecipe':dict(image_digest='python@sha256:'+'d'*64,interpreter_version='3.13.7',dependencies=[],setup=[command],reset=[command],services=[],limits=limits,neutral_repairs=[],locale='C.UTF-8',timezone='UTC',environment=[],randomness=seeds,network_policy='none',baseline=public),
+      'EnvironmentRecipe':dict(runtime_image=r('runtime-image','authoring','bytes'),image_digest='python@sha256:'+'d'*64,interpreter_version='3.13.7',dependencies=[],setup=[command],reset=[command],services=[],limits=limits,neutral_repairs=[],locale='C.UTF-8',timezone='UTC',environment=[],randomness=seeds,network_policy='none',baseline=public),
       'VerifierBundle':dict(contract=r('RequirementContract'),scenario_plan=r('ScenarioPlan'),cases=[dict(case_id='C1',requirement_ids=['R1'],inputs=raw,comparison=raw,mandatory=True)],completion_manifest=['C1'],worker_adapter=dict(code=public,version='1',supported_observables=['stderr'],limitations=[]),public_examples=[],controls=[],permissions=dict(controller_role='controller',worker_inputs=[public],output_limit_bytes=1024,submission_policy=allowed)),
       'TaskBundle':dict(state='built',partition='train',repository_family='family',request_lineage=['request-1'],source_pair=r('SourcePair'),baseline=public,solver_view=dict(instruction=public,workspace=public,public_checks=[],runtime_manifest=public,inventory=public),contract=r('RequirementContract'),environment=r('EnvironmentRecipe'),adapter_version='1',private_oracle=r('VerifierBundle'),reference_solution=raw,qualification=None),
-      'QualificationReport':dict(task=r('TaskBundle'),disposition='provisional',baseline_health=None,baseline_absence=None,reference_run=None,controls=[],fresh_runs=[],interrupted_reset_runs=[],human_reviews=[],rejection_reasons=['not executed'],repair_attempts=0,policy_version='pilot-v1'),
+      'QualificationReport':dict(task=r('TaskBundle'),disposition='provisional',baseline_health=None,baseline_absence=None,reference_run=None,controls=[],fresh_runs=[],interrupted_reset_runs=[],rejection_reasons=['not executed'],repair_attempts=0,policy_version='pilot-v1'),
       'RolloutRecord':dict(run_id='run-1',task=r('TaskBundle'),policy=policy,limits=limits,seeds=seeds,steps=[],submission=None,stopping_reason='infrastructure_failure',disposition='infrastructure_failure',reward=None,grading_evidence=[],training_eligible=False),
       'TrainingCheckpoint':dict(weights=raw,optimizer_state=raw,reference_checkpoint=raw,data_position=0,policy_version='p1',configuration=training,consumed_tasks=[r('TaskBundle')],optimizer_steps=0,update_evidence=[ev],reload_evidence=[ev]),
       'EvaluationReport':dict(configuration=evaluation,frozen_task_roster=[r('TaskBundle')],trials=[],paired_metrics=[],audits=[],disposition='provisional',limitations=['not executed']),
@@ -80,8 +80,7 @@ def test_public_artifact_cannot_embed_private_references(tmp_path):
 def test_successful_qualification_rejects_recorded_failed_gates():
     value=examples()['QualificationReport']
     run=dict(name='gate',subject=ref(),disposition='invalid_measurement',passed=False,requirement_ids=['R1'],reason='failed',evidence=[evidence()])
-    review=dict(actor_type='human',human_identity='claimed human',subject_sha256='a'*64,decision='rejected',evidence=[evidence()],attestation=ref())
-    value.update(disposition='success',baseline_health=run,baseline_absence=run,reference_run=run,controls=[run],fresh_runs=[run]*3,interrupted_reset_runs=[run]*3,human_reviews=[review])
+    value.update(disposition='success',baseline_health=run,baseline_absence=run,reference_run=run,controls=[run],fresh_runs=[run]*3,interrupted_reset_runs=[run]*3)
     with pytest.raises(ValidationError): c.QualificationReport.model_validate_json(json.dumps(value))
 
 
@@ -147,7 +146,7 @@ def test_review_ordinary_stops_preserve_final_submission_grade(stop,reward):
 
 
 def evaluation_trial(**updates):
-    value=dict(trial_id='t1',task=ref('TaskBundle')|{'encoding':'json'},repository_family='family',arm='A',policy_seed=1,case_seed=1,rollout=None,disposition='blocked_dependency',resolved=None,evidence=[evidence()])
+    value=dict(trial_id='t1',task=ref('TaskBundle')|{'encoding':'json'},repository_family='family',arm='base',policy_seed=1,case_seed=1,rollout=None,disposition='blocked_dependency',resolved=None,evidence=[evidence()])
     return value|updates
 
 

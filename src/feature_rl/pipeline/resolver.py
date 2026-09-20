@@ -95,7 +95,7 @@ class ReleasedTaskResolver:
         The concrete service constructors only reassert already selected CAS
         and Registry configurations. No new policy/configuration is admitted by
         this read: all exact references must already be registered and usable.
-        Current M5 human trust is checked on every call; it is never cached.
+        M5 execution evidence and quarantine are checked on every call.
         """
         try:
             task_ref = checked(c.ArtifactRef, task_ref)
@@ -110,7 +110,7 @@ class ReleasedTaskResolver:
             template = profile.qualification
             qualification = QualificationService(store=self.store, registry=self.registry,
                 grader=template.grader, builder=template.builder, revision=template.revision,
-                policy=policy, attestation_verifier=template.attestation_verifier)
+                policy=policy)
             if (qualification.policy_ref != config.qualification_policy
                     or qualification.configuration != config.qualification_configuration):
                 raise AdmissionRejected('resolved service differs from selected M5 configuration')

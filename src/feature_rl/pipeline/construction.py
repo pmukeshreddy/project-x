@@ -7,7 +7,6 @@ from typing import Literal
 
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactError, canonical_json
-from feature_rl.environments.runtime import REPAIR
 from feature_rl.qualification import RepairAttempt, RepairHistory
 from feature_rl.qualification.evidence import unknown_cost
 from feature_rl.registry import JobSpec, Claim, CostObservation, RegistryError, UnknownIdentity
@@ -150,14 +149,16 @@ def incomplete_history(factory,request):
     """Retain evidenced neutral repairs; absent authoring closure never means zero."""
     value=typed(factory.store,request.candidate,c.CandidateRecord)
     recipe=typed(factory.store,request.inputs.environment.recipe,c.EnvironmentRecipe)
+    from feature_rl.environments import SandboxPolicy
+    from feature_rl.environments.profiles import validate_recipe_profile
+    policy=read_record(factory.store,request.inputs.environment.policy,SandboxPolicy,'sandbox-policy')
+    validate_recipe_profile(recipe,policy,factory.store)
     attempts=[];journals=[request.source]
     for repair in recipe.neutral_repairs:
-        raw=read_bytes(factory.store,repair.patch,16384,kind='neutral-environment-repair')
-        if raw!=canonical_json(REPAIR):raise ValueError('unsupported neutral repair history')
-        before=put(factory,{'version':'m6-environment-before-v1','base_manifest':REPAIR['base_manifest'],
+        before=put(factory,{'version':'m6-environment-before-v1','base_manifest':policy.image,
             'repair':document(repair.patch)},'m6-environment-before',dependencies=(repair.patch,))
         attempts.append(RepairAttempt(stage='environment',before=before,after=repair.patch,
-            diagnosis='Approved M3 base image lacks the pinned system pager',change=repair.description,
+            diagnosis='Neutral environment repair declared by the frozen runtime profile',change=repair.description,
             evidence=repair.neutrality_evidence,costs=(unknown_cost('construction',
                 'Per-candidate allocation of the retained neutral image repair is unknown; original recipe evidence/costs remain resolvable'),)))
         journals.append(repair.patch)

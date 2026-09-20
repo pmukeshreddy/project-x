@@ -5,7 +5,6 @@ import tomllib
 from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
-from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import CommandSpec, NeutralRepair, SeedPolicy, StrictModel
 
 
@@ -110,16 +109,13 @@ class RuntimeProfile(StrictModel):
 
     @property
     def setup(self):
-        from .runtime import DEPS, BUILD
+        from .runtime import BUILD
+        from .images import LINK_DEPS
         install = CommandSpec(argv=('python', '-I', '-m', 'pip', '--isolated', 'install',
             '--no-index', '--no-deps', '--no-compile', '--target', '/workspace/site',
             '/workspace/built/'+self.wheel_filename), working_directory='/workspace', timeout_seconds=30.0)
-        return DEPS, BUILD, install
+        return LINK_DEPS, BUILD, install
 
-    @property
-    def prebuilt_setup(self):
-        from .images import LINK_DEPS
-        return (LINK_DEPS, *self.setup[1:])
 
     def validate_source(self, source):
         from .models import PolicyRejected
@@ -158,26 +154,10 @@ class RuntimeProfile(StrictModel):
                 raise SourceRejected('noncanonical forbidden source path')
 
 
-def click_profile():
-    from .runtime import WHEELS
-    return RuntimeProfile(profile_id='click-8.3.3', project_name='click', project_version='8.3.3',
-        interpreter_version='3.12.14', build_backend='flit_core.buildapi',
-        build_requirements=('flit_core>=3.11,<4',), source_roots=('src',),
-        source_mappings=(SourceMapping(source='src/click', wheel='click'),),
-        import_modules=('click',), entry_points=('click.Group', 'click.group', 'click.command', 'click.testing.CliRunner'),
-        supported_observables=('CLI exit code', 'combined terminal output'),
-        dependencies=tuple(WheelPin(name=name, version=version, filename=filename, sha256=digest)
-                           for name, (version, filename, digest) in WHEELS.items()))
-
-
-def runtime_profile(policy):
-    return policy.profile if policy.profile is not None else click_profile()
-
-
 def dependency_files(store, pins, policy):
     from .archive import SourceFile
     from .models import PolicyRejected
-    expected = {p.name: p for p in runtime_profile(policy).dependencies}
+    expected = {p.name: p for p in policy.profile.dependencies}
     if len(pins) != len(expected) or {p.name for p in pins} != set(expected):
         raise PolicyRejected('exact profile dependency pins required')
     result = {}; total = 0
@@ -198,39 +178,24 @@ def dependency_files(store, pins, policy):
 
 
 def validate_recipe_profile(recipe, policy, store):
-    from .models import PolicyRejected, REPAIRED_IMAGE
-    from .runtime import REPAIR
-    profile = runtime_profile(policy)
+    from .models import PolicyRejected
+    from .images import validate_runtime_image
+    profile = policy.profile
+    validate_runtime_image(recipe, policy, store)
     setup = profile.setup
-    if recipe.runtime_image is not None:
-        from .images import validate_runtime_image
-        validate_runtime_image(recipe, policy, store)
-        setup = profile.prebuilt_setup
-    elif recipe.image_digest != policy.image:
-        raise PolicyRejected('recipe differs from pinned base image')
     if (recipe.interpreter_version != profile.interpreter_version
             or recipe.services or recipe.network_policy != 'none' or recipe.setup != setup
             or recipe.reset != recipe.setup or tuple((v.name, v.value) for v in recipe.environment) != profile.environment
             or recipe.locale != 'C.UTF-8' or recipe.timezone != 'UTC'
             or recipe.randomness != SeedPolicy(algorithm='PYTHONHASHSEED', seeds=(0,), same_cases_within_group=True)):
         raise PolicyRejected('recipe differs from pinned runtime profile')
-    if policy.profile is None:
-        if policy.image != REPAIRED_IMAGE or len(recipe.neutral_repairs) != 1:
-            raise PolicyRejected('legacy Click requires the pinned pager repair')
-        patch = recipe.neutral_repairs[0].patch
-        if patch.kind != 'neutral-environment-repair' or store.get_bytes(patch,
-                max_envelope_bytes=32768, max_payload_bytes=16384) != canonical_json(REPAIR):
-            raise PolicyRejected('legacy neutral image repair mismatch')
-    elif recipe.neutral_repairs != profile.neutral_repairs:
+    if recipe.neutral_repairs != profile.neutral_repairs:
         raise PolicyRejected('neutral repairs differ from configured profile')
-    else:
-        for repair in recipe.neutral_repairs:
-            store.get_bytes(repair.patch, max_envelope_bytes=131072, max_payload_bytes=65536)
+    for repair in recipe.neutral_repairs:
+        store.get_bytes(repair.patch, max_envelope_bytes=131072, max_payload_bytes=65536)
     for field in ('cpu_seconds', 'memory_bytes', 'pids', 'disk_bytes', 'output_bytes'):
         if getattr(recipe.limits, field) != getattr(policy, field):
             raise PolicyRejected('runtime resource policy drift')
     if recipe.limits.wall_seconds != policy.lifecycle_seconds:
         raise PolicyRejected('runtime wall policy drift')
-    if recipe.runtime_image is None:
-        dependency_files(store, recipe.dependencies, policy)
     return profile

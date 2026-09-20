@@ -30,8 +30,7 @@ from feature_rl.requirements import (
     ContractAuthoringService,
     ContractFinalizationInputs,
     ContractFinalizer,
-    ClickDiscoveryError,
-    ClickDiscoveryService,
+    RuntimeDiscoveryService,
     GenerationCandidate,
     GroundedSource,
     GroundingError,
@@ -76,7 +75,7 @@ REQUEST = ref("authoring-request", "a")
 BASELINE = ref("source-archive", "b")
 PUBLIC_CHECK = ref("public-check", "c", Visibility.PUBLIC)
 RECEIPT = ref("discovery-receipt", "d")
-DISCOVERY = ref("click-runtime-discovery", "9")
+DISCOVERY = ref("runtime-discovery", "9")
 RECIPE = ref("EnvironmentRecipe", "6")
 PREPARED = SimpleNamespace(recipe=RECIPE)
 
@@ -143,6 +142,8 @@ def bound_discovery_text(
     *, baseline: ArtifactRef = BASELINE, recipe: ArtifactRef = RECIPE
 ) -> str:
     value = json.loads(discovery_stdout())
+    from m4_fixtures import runtime_policy
+    value.update(version="runtime-discovery-v1", profile_sha256=hashlib.sha256(canonical_json(runtime_policy().profile.model_dump(mode="json"))).hexdigest())
     value.update(
         {
             "baseline": baseline.model_dump(mode="json"),
@@ -173,10 +174,10 @@ def sources() -> tuple[GroundedSource, ...]:
             provenance_label="existing_obligation",
         ),
         GroundedSource(
-            context_id="M3_CLICK_DISCOVERY",
+            context_id="M3_RUNTIME_DISCOVERY",
             role="baseline",
             source=DISCOVERY,
-            locator="m3:click-runtime-discovery-v1",
+            locator="m3:runtime-discovery-v1",
             text=bound_discovery_text(),
             provenance_label="existing_obligation",
         ),
@@ -500,7 +501,7 @@ def test_scenario_finalizer_rejects_nonidentical_contract_and_variable_case_poli
 
 def generation_limits() -> GenerationLimits:
     return GenerationLimits(
-        measurement_profile="larger_unqualified",
+
         wall_seconds=120,
         cpu_seconds=120,
         stdin_bytes=1_048_576,
@@ -508,9 +509,6 @@ def generation_limits() -> GenerationLimits:
         file_size_bytes=1_048_576,
         input_tokens=8_192,
         output_tokens=4_096,
-        mlx_memory_guideline_bytes=3_758_096_384,
-        mlx_wired_limit_bytes=3_758_096_384,
-        mlx_cache_limit_bytes=0,
         physical_footprint_kill_bytes=4_294_967_296,
         physical_footprint_poll_seconds=0.02,
         declared_memory_ceiling_bytes=5_368_709_120,
@@ -801,7 +799,7 @@ def test_contract_request_contains_only_grounded_sources_and_excludes_license():
     assert tuple(context.context_id for context in built.contexts) == (
         "REQUEST",
         "BASELINE",
-        "M3_CLICK_DISCOVERY",
+        "M3_RUNTIME_DISCOVERY",
     )
     assert all(context.source.kind != "source-response" for context in built.contexts)
     assert '"source_roots":["src"]' in built.instruction
@@ -1409,6 +1407,8 @@ class FakeRuntime:
         self.reason = reason
         self.exit_code = exit_code
         self.calls = []
+        from m4_fixtures import runtime_policy
+        self.profile = runtime_policy().profile
 
     def open_workspace(self, prepared, *, role):
         self.calls.append(("open_workspace", prepared, role))
@@ -1449,18 +1449,11 @@ class FakeRuntime:
 
 def discovery_stdout(**updates) -> bytes:
     value = {
-        "click_version": "8.3.3",
-        "module_file": "/workspace/site/click/__init__.py",
+        "project_name": "click", "project_version": "8.3.3", "interpreter_version": "3.12.14",
+        "module_files": {"click": "/workspace/site/click/__init__.py"},
         "entry_points": ["click.Group", "click.group", "click.command", "click.testing.CliRunner"],
         "supported_observables": ["CLI exit code", "combined terminal output"],
-        "resolve_command_signature": "(self, ctx, args)",
-        "exact_command": {"exit_code": 0, "output": "ready\n", "exception_type": None},
-        "unknown_command": {
-            "exit_code": 2,
-            "output": "Usage: cli [OPTIONS] COMMAND [ARGS]...\nTry 'cli --help' for help.\n\nError: No such command 'statuz'.\n",
-            "exception_type": "SystemExit",
-        },
-        "no_such_command_exported": False,
+        "signatures": {name: None for name in ("click.Group", "click.group", "click.command", "click.testing.CliRunner")},
     }
     value.update(updates)
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -1469,8 +1462,8 @@ def discovery_stdout(**updates) -> bytes:
 def test_click_discovery_runs_installed_baseline_and_publishes_sanitized_author_context(tmp_path):
     store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
     runtime = FakeRuntime(store, discovery_stdout())
-    result = ClickDiscoveryService(runtime=runtime).discover(PREPARED)
-    assert result.observation.click_version == "8.3.3"
+    result = RuntimeDiscoveryService(runtime=runtime).discover(PREPARED)
+    assert result.observation.project_version == "8.3.3"
     assert result.context.source.visibility is Visibility.AUTHORING
     assert result.context.role == "baseline"
     assert result.private_evidence == (
@@ -1486,8 +1479,8 @@ def test_click_discovery_runs_installed_baseline_and_publishes_sanitized_author_
 @pytest.mark.parametrize(
     "stdout, reason, exit_code",
     [
-        (discovery_stdout(click_version="8.4.0"), "completed", 0),
-        (discovery_stdout(module_file="/workspace/source/src/click/__init__.py"), "completed", 0),
+        (discovery_stdout(project_version="8.4.0"), "completed", 0),
+        (discovery_stdout(module_files={"click": "/workspace/source/src/click/__init__.py"}), "completed", 0),
         (b'{"click_version":"8.3.3","click_version":"forged"}', "completed", 0),
         (discovery_stdout(), "command_failed", 1),
     ],
@@ -1497,8 +1490,8 @@ def test_click_discovery_rejects_wrong_identity_malformed_output_and_failed_exec
 ):
     store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
     runtime = FakeRuntime(store, stdout, reason=reason, exit_code=exit_code)
-    with pytest.raises(ClickDiscoveryError):
-        ClickDiscoveryService(runtime=runtime).discover(PREPARED)
+    with pytest.raises(ValueError):
+        RuntimeDiscoveryService(runtime=runtime).discover(PREPARED)
     assert runtime.calls[-1] == ("close", "handle")
 
 
@@ -1625,7 +1618,7 @@ def test_authoring_evidence_resolver_reconstructs_exact_bytes_and_rejects_forged
     )
     discovery_text = bound_discovery_text(baseline=archive_ref)
     discovery_ref = store.put_bytes(
-        discovery_text.encode(), "click-runtime-discovery", Visibility.AUTHORING
+        discovery_text.encode(), "runtime-discovery", Visibility.AUTHORING
     )
     resolver = AuthoringEvidenceResolver(
         store=store,
@@ -1659,10 +1652,10 @@ def test_authoring_evidence_resolver_reconstructs_exact_bytes_and_rejects_forged
             provenance_label="existing_obligation",
         ),
         GroundedSource(
-            context_id="M3_CLICK_DISCOVERY",
+            context_id="M3_RUNTIME_DISCOVERY",
             role="baseline",
             source=discovery_ref,
-            locator="m3:click-runtime-discovery-v1",
+            locator="m3:runtime-discovery-v1",
             text=discovery_text,
             provenance_label="existing_obligation",
         ),

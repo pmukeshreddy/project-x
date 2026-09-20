@@ -3,6 +3,8 @@
 No H, historical private records, model calls or feature-qualification claims.
 All changed Python is inert host data and executes only through reviewed M3.
 """
+import os
+from m4_fixtures import runtime_policy
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -34,13 +36,13 @@ def route():
         assert hashlib.sha256(data).hexdigest()==wheel['sha256']
         ref=store.put_bytes(data,'dependency-wheel',c.Visibility.AUTHORING)
         pins.append(c.DependencyPin(name=wheel['name'],version=wheel['version'],artifact=ref,sha256=wheel['sha256']))
-    engine=DockerEngine(state_root=state/'runtime',socket_path=Path(setup['socket_path']),policy=SandboxPolicy())
+    engine=DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=state/'runtime',socket_path=Path(setup['socket_path']),policy=runtime_policy())
     engine.qualify_boundary()
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     runtime=EnvironmentRuntime(store=store,engine=engine,revision=revision)
     evidence=c.EvidenceRecord(producer='M4 diagnostic B-only input verification',command=('pytest','tests/test_grading_docker.py'),
         recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision=revision,scope='source_inspection')
-    prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+    prepared=runtime.create_recipe(baseline,tuple(pins),source_evidence=evidence)
     task=diagnostic(store,baseline=baseline,environment=prepared.recipe)
     rules=store.get_artifact(store.get_artifact(task).contract).allowed_changes
     submissions=SubmissionService(store=store,policy=runtime.policy)

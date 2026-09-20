@@ -1,7 +1,7 @@
 """Lifecycle mechanisms with a TEST-ONLY M5 gate substitution; no human approval.
 
 Positive transition mechanics substitute the trusted M5 method in temporary
-diagnostic state. The real M5 method is exercised for missing-human denial. No
+diagnostic state. The real M5 method is exercised for incomplete-qualification denial. No
 signing, native runtime, model call or accepted QualificationReport is created.
 """
 import importlib
@@ -38,11 +38,11 @@ def mutate(store, reference, **fields):
     return store.put_artifact(type(old).model_validate_json(json.dumps(value)))
 
 
-def test_actual_m5_missing_human_cannot_transition(tmp_path, monkeypatch):
+def test_actual_m5_incomplete_qualification_cannot_transition(tmp_path, monkeypatch):
     _, lifecycle, q, built, provisional = route(tmp_path, monkeypatch, simulated_gate=False)
     result = lifecycle.qualify(built, provisional)
     assert result.disposition == c.Disposition.PROVISIONAL
-    assert 'unverified_human_review' in result.reason
+    assert 'unresolved or failed automated gates' in result.reason
     assert all(ref.kind != 'TaskBundle' for ref in result.artifacts)
     assert result == lifecycle.qualify(built, provisional)
 

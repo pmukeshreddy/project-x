@@ -1,4 +1,4 @@
-"""Conservative changed-file categories with explicit mixed-file gates."""
+"""Changed-file categories with uncertain paths retained for qualification."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,7 +11,7 @@ from feature_rl.contracts import ChangedFile
 @dataclass(frozen=True)
 class ClassificationResult:
     changed_files: tuple[ChangedFile, ...]
-    manual_review_required: tuple[str, ...]
+    mixed_paths_for_qualification: tuple[str, ...]
 
 
 _DEPENDENCY_NAMES = frozenset(
@@ -24,18 +24,33 @@ _DEPENDENCY_NAMES = frozenset(
         "poetry.lock",
         "requirements.txt",
         "Dockerfile",
+        "Makefile",
+        "MANIFEST.in",
+        "pytest.ini",
+        "noxfile.py",
+        ".pre-commit-config.yaml",
+        ".readthedocs.yaml",
+        ".readthedocs.yml",
     }
 )
 
 
 def _automatic(path: str) -> tuple[str, str]:
     item = PurePosixPath(path)
-    if path.startswith("tests/") or item.name.startswith("test_"):
-        return "tests", "Test or fixture path"
-    if path.startswith("docs/") or item.suffix.lower() in {".md", ".rst"}:
-        return "documentation", "Documentation or changelog path"
-    if item.name in _DEPENDENCY_NAMES or path.startswith(".github/workflows/"):
+    # Protect build/configuration paths before applying broader directory rules.
+    if (item.name in _DEPENDENCY_NAMES
+            or (item.name.startswith("requirements") and item.suffix == ".txt")
+            or path.startswith(".github/workflows/")):
         return "dependency_build", "Dependency, build, or CI configuration path"
+    if (any(part in {"test", "tests"} for part in item.parts[:-1])
+            or item.name == "conftest.py" or item.name.startswith("test_")):
+        return "tests", "Test or fixture path"
+    if (path.startswith(("doc/", "docs/", "example/", "examples/"))
+            or path.startswith((".github/ISSUE_TEMPLATE/", ".github/PULL_REQUEST_TEMPLATE/"))
+            or item.suffix.lower() in {".md", ".rst"}
+            or (item.suffix.lower() in {"", ".txt"} and item.stem.upper() in {
+                "README", "CHANGES", "CHANGELOG", "CONTRIBUTING", "AUTHORS", "NEWS"})):
+        return "documentation", "Documentation or changelog path"
     if path.startswith("src/") or item.suffix.lower() in {".py", ".pyi", ".c", ".h"}:
         return "implementation", "Implementation path"
     return "mixed", "Path alone cannot establish a single purpose"

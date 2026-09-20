@@ -8,8 +8,8 @@ from feature_rl.verifiers.language import decode_json
 
 HARNESS = 'feature-rl-source-v1'
 INSTRUCTIONS = '''Return exactly one JSON action, without markdown:
-{"action":"read","path":"src/click/__init__.py"}
-{"action":"write","path":"src/click/example.py","content":"Python source"}
+{"action":"read","path":"src/package/__init__.py"}
+{"action":"write","path":"src/package/example.py","content":"Python source"}
 {"action":"command","argv":["python","-c","..."],"stdin":"","timeout_seconds":10.0}
 {"action":"public_test","argv":["python","-m","pytest"],"stdin":"","timeout_seconds":10.0}
 {"action":"submit"}

@@ -1,4 +1,5 @@
 """Inert diagnostic artifact fixtures; admissions here are explicit test doubles."""
+from m4_fixtures import runtime_policy
 import json
 from pathlib import Path
 import pytest
@@ -23,49 +24,6 @@ def test_admission_callback_is_mandatory_and_failure_propagates(tmp_path):
     with pytest.raises(ValueError): TrainingDataGate(store=store, admit=None, grader_revision='a'*40)
 
 
-def test_deterministic_supervised_targets_never_accept_behavior_probabilities():
-    from feature_rl.training.data import tokenize_supervision
-    # The test tokenizer exposes exact deterministic IDs without invoking a model.
-    encode = lambda text: tuple(ord(c) for c in text)
-    turn = tokenize_supervision('Context', 'Target', encode_context=encode, encode_target=encode,
-                               max_seq_len=100)
-    assert turn.context == encode('Context') and turn.targets == encode('Target')
-    assert turn.behavior is None and turn.advantage is None
-    with pytest.raises(ValueError):
-        tokenize_supervision('Context', '', encode_context=encode, encode_target=encode, max_seq_len=100)
-
-
-def test_supervised_source_is_loaded_from_exact_grade_and_prefix_checked(tmp_path):
-    from datetime import datetime, timezone
-    from feature_rl import contracts as c
-    from feature_rl.artifacts import canonical_json
-    from feature_rl.environments import SourceArchive, SourceFile
-    from feature_rl.grading.models import GradeReceipt, CaseResult, AssertionResult
-    from feature_rl.training.data import TrainingDataGate
-    samples = json.loads(Path('docs/evidence/M0/examples.json').read_text())
-    store = ArtifactStore(tmp_path, role=ActorRole.CONTROLLER)
-    task = TaskBundle.model_validate_json(json.dumps(samples['TaskBundle']))
-    task_ref = store.put_artifact(task)
-    source = store.put_bytes(SourceArchive({'src/file.py': SourceFile(b'answer = 1\n', False)}).to_tar(), 'source-archive', c.Visibility.PRIVATE)
-    submission = store.put_bytes(b'unit diagnostic submission', 'm4-submission', c.Visibility.PRIVATE)
-    receipt = GradeReceipt(version='m4-grade-v1',task=task_ref,submission=submission,verifier=task.private_oracle,
-        case_seed=1,manifest=source,source=source,disposition=c.Disposition.SUCCESS,reward=1,
-        reason='DIAGNOSTIC fixture only',expected_case_ids=('case',),cases=(CaseResult(case_id='case',mandatory=True,
-        status='completed',passed=True,assertions=(AssertionResult(assertion_id='a',requirement_ids=('r',),passed=True),),
-        evidence=source,reason='DIAGNOSTIC fixture only'),),build_evidence=source,runtime_evidence=(source,),
-        cleanup_verified=True,implementation_revision='a'*40,recorded_at=datetime.now(timezone.utc))
-    grade_ref = store.put_bytes(canonical_json(receipt.model_dump(mode='json')), 'm4-grade-receipt', c.Visibility.PRIVATE)
-    gate = TrainingDataGate(store=store,admit=lambda ref: task,grader_revision='a'*40)
-    render = lambda task, archive: [('Context', archive.files['src/file.py'].data.decode())]
-    encode = lambda text: tuple(ord(c) for c in text)
-    turns = gate.prepare_supervised_source(task=task_ref,submission=submission,grade_ref=grade_ref,
-        render_solution=render,encode_context=encode,encode_target=encode,max_seq_len=100)
-    assert turns[0].targets == encode('answer = 1\n')
-    with pytest.raises(ValueError,match='prefix'):
-        gate.prepare_supervised_source(task=task_ref,submission=submission,grade_ref=grade_ref,
-            render_solution=render,encode_context=encode,encode_target=lambda text: (9,),max_seq_len=100)
-
-
 def actual_group_fixture(tmp_path):
     """Real M4 source checks, diagnostic admission/tokens; no worker is invoked."""
     from copy import deepcopy
@@ -82,7 +40,7 @@ def actual_group_fixture(tmp_path):
     policy = c.PolicyConfig.model_validate_json(json.dumps(samples['RolloutRecord']['policy']))
     plan = BalancedSampler([TaskSlot(task_ref.sha256, task.repository_family, 'feature')], seed=2).next_group(policy.policy_version)
     runtime = object.__new__(EnvironmentRuntime)
-    runtime.store, runtime.policy = store, SandboxPolicy()
+    runtime.store, runtime.policy = store, runtime_policy()
     grader = GradingService(store=store, runtime=runtime, revision='a'*40)
     gate = TrainingDataGate(store=store, admit=lambda ref: task, grader_revision='a'*40)
     rejected = store.put_bytes(b'{"version":"forged","reward":1}', 'm4-submission', c.Visibility.PRIVATE)
@@ -117,7 +75,7 @@ def test_group_preparation_accepts_actual_source_rejection_and_authenticated_inf
     gate, plan, records, kwargs = actual_group_fixture(tmp_path)
     prepared = gate.prepare_group(plan, records, **kwargs)
     assert prepared.rewards == (0,None,0,None) and prepared.effective_size == 2
-    assert len(prepared.optimization_turns()) == 2 and prepared.advantages == (0.,None,0.,None)
+    assert len(prepared.optimization_turns()) == 0 and prepared.advantages == (0.,None,0.,None)
     assert prepared.records == records  # Original costs, scopes and excluded peers retained.
     assert all(r.costs for r in prepared.records)
     assert all(r.grading_evidence[0].scope == 'source_inspection' for r in prepared.records)

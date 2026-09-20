@@ -13,27 +13,8 @@ def package(tmp_path):
     return q,q.store.get_artifact(task_ref),q.store.get_artifact(result.artifacts[0])
 
 
-def test_frozen_comparison_allows_only_documented_admission_additions(tmp_path):
-    from feature_rl.qualification.admission import assert_frozen_evidence
-    _,_,report=package(tmp_path)
-    # This is still a provisional report with no human record. The pure equality
-    # check grants no admission and does not synthesize an approved report.
-    changed=report.model_copy(update={'rejection_reasons':('different provisional reason',),
-        'provenance':report.provenance.model_copy(update={'producer':'synthetic comparison only'})})
-    assert_frozen_evidence(report,changed)
 
 
-@pytest.mark.parametrize('field',[
-    'kind','schema_version','visibility','task','baseline_health','baseline_absence',
-    'reference_run','controls','fresh_runs','interrupted_reset_runs','repair_attempts','policy_version'])
-def test_every_reviewed_field_is_immutable_even_when_reports_look_provisional(tmp_path,field):
-    from feature_rl.qualification.admission import assert_frozen_evidence
-    _,_,report=package(tmp_path)
-    # model_copy is deliberately used to probe the comparison without claiming a
-    # valid artifact or constructing an approval. The store never receives it.
-    drift=report.model_copy(update={field:object()})
-    with pytest.raises(QualificationRejected,match='frozen reviewed evidence'):
-        assert_frozen_evidence(report,drift)
 
 
 def test_lifecycle_comparison_excludes_only_state_and_qualification(tmp_path):
@@ -49,13 +30,6 @@ def test_lifecycle_comparison_excludes_only_state_and_qualification(tmp_path):
             assert_lifecycle_subject(task,task.model_copy(update={field:object()}))
 
 
-def test_missing_human_verifier_and_callback_injection_fail_closed(tmp_path):
-    q,task,report=package(tmp_path)
-    class FakeHuman:
-        def verify(self,*args,**kwargs):raise AssertionError('untrusted verifier callback must never execute')
-    q.attestation_verifier=FakeHuman()
-    with pytest.raises(QualificationRejected,match='external SSHHumanVerifier'):
-        q.accept(report.task,report.task)
 
 
 def test_provisional_result_and_arbitrary_cas_are_never_accepted_origin(tmp_path):

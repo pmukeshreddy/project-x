@@ -39,7 +39,7 @@ the complete original BUILT root and frozen receipt, rechecks input joins, runti
 policy and quarantine, compares all public component bytes and the complete
 inventory, and returns the exact already-frozen uncompressed tar bytes. It does
 not assemble a replacement package or approve/qualify/release the task. M5 binds
-human review to this exact T0 and reviewed evidence/policy; it must not rewrite
+qualification to this exact T0 and frozen evidence/policy; it must not rewrite
 the returned bytes after approval.
 
 T0 is an actual immutable M0 `TaskBundle(state=BUILT, qualification=None)`.
@@ -131,20 +131,20 @@ configuration and policy dependencies. No other index or transition ledger exist
 `resolve_released` is the actual admission callable for M7/M8. It returns the exact
 stored TaskBundle only after resolving `Tn → Q → T0`, calling concrete
 `QualificationService.verify_accepted(Tn,Q)` for complete accepted origin, gates,
-current human enrollment/revocation and quarantine, and comparing the canonical
+current quarantine, and comparing the canonical
 Tn/T0 payloads with only `state` and `qualification` excluded. It reads the exact
 deterministically keyed completed M6 qualification and release jobs, their frozen
 receipts, selected attempts/results and target manifests. Caller-published state
 strings, orphan CAS outputs, metadata drift or a different predecessor/configuration
 cannot satisfy this chain. The resolver does not enqueue, claim, transition, grade
-or execute candidate source. M5 performs its current external trust verification;
-the caller must provide that actual configured service, not a test gate.
+or execute candidate source. New admission uses the selected automated report;
+Legacy signed task admissions are no longer supported.
 
 The only implemented legal sequence is `BUILT → QUALIFIED → RELEASED`. Calibration
 is a separate model-specific difficulty measurement and is not a release validity
 prerequisite. `TaskLifecycle.qualify(T0,Q)` records the transition **after** M5 has
-accepted Q; it does not generate or qualify evidence. A missing genuine human gate
-returns a typed provisional operation and no target TaskBundle. Every other T0
+accepted Q; it does not generate or qualify evidence. A fully passing automated
+report is sufficient; incomplete qualification returns no target TaskBundle. Every other T0
 payload field, including original provenance/costs and all solver references, stays
 identical. New transition evidence/costs are in OperationResult, the opaque frozen
 receipt and Registry dependencies. The final solver bytes are never repackaged.
@@ -168,7 +168,7 @@ resolver = ReleasedTaskResolver(profiles=(actual_task_lifecycle,), revision=git_
 released = resolver.resolve_released(task_ref)  # exact stored TaskBundle
 ```
 
-`profiles` is a tuple of one to 32 actual `TaskLifecycle` instances sharing the same controller store and Registry. Duplicate version profiles reject because their current trust could be ambiguous. Each profile supplies supported lifecycle/M5/grader/runtime/builder revisions and the current actual external human verifier. Candidate-specific qualification policies are resolved from the selected release configuration; they do not choose code, service versions or external trust. Multiple policies can share one profile. Unsupported or ambiguous selected chains raise `AdmissionRejected`.
+`profiles` is a tuple of one to 32 actual `TaskLifecycle` instances sharing the same controller store and Registry. Duplicate version profiles reject because their current trust could be ambiguous. Each profile supplies supported lifecycle/M5/grader/runtime/builder revisions. Candidate-specific qualification policies are resolved from the selected release configuration; they do not choose code, service versions or external trust. Multiple policies can share one profile. Unsupported or ambiguous selected chains raise `AdmissionRejected`.
 
 The resolver exposes `.store`, `.registry`, `.configuration` (private `m6-resolver-configuration` ref with explicit profile dependencies) and `.revision`, matching consumer identity needs. Every call enforces exact Tn→accepted Q→BUILT T0 equality, actual legal Registry transitions and current M5/quarantine/revocation. It dispatches no grade, source, model, transition or Registry job. Existing selected CAS/configuration bytes are reasserted idempotently. Audit historical reads grant no admission. A consumer's one `TaskBuilder` must still match the accepted Q.task construction revision when calling `builder.solver_package(Q.task)`.
 # Factory source admission
@@ -207,23 +207,21 @@ The selected parent result contains the actual builder task and an evidenced M5 
 ```python
 Factory(*, store, registry, revision, builder=None, qualification=None)
 factory.qualify(task_ref, *, policy: QualificationPolicy | None = None) -> OperationResult
-factory.accept(review_request_ref, attestation_ref) -> OperationResult
 factory.release(task_ref, *, accepted_report=None) -> OperationResult
 ```
 
 `qualification` is the actual same-store/Registry M5 `QualificationService`, supplying
-its actual grader, package validator, implementation revision and current external
-human verifier. Missing configuration rejects explicitly. Qualification selects the
+its actual grader, package validator and implementation revision. Missing configuration rejects explicitly. Qualification selects the
 original BUILT root's actual completed Factory construction history, selected child
 result and parent revision. It binds those values into M5 policy; an inconsistent
 caller history rejects. Unconstructed roots retain missing history and remain
 subject to all actual M5 gates. Actual M5 dispositions are preserved.
 
-Acceptance resolves the review request's exact frozen M5 policy and delegates to
-actual M5 acceptance. Release accepts BUILT plus accepted Q, or the exact QUALIFIED
+Passing automated qualification produces Q directly; there is no separate human
+acceptance step. Release accepts BUILT plus successful Q, or the exact QUALIFIED
 predecessor with its existing Q. It resolves the report's actual producer/policy and
-uses both reviewed Registry lifecycle transitions. Missing current human trust or
-other validity gates cannot create a released root. M5 and lifecycle retained
+uses both Registry lifecycle transitions. Missing automated validity evidence
+cannot create a released root. M5 and lifecycle retained
 publication/recovery capabilities keep their concrete upstream APIs.
 
 # Actual CLI composition checkpoint
@@ -246,7 +244,7 @@ external enrollment path/digest. Runtime composition invokes actual M3 boundary
 qualification; source/complete-artifact construction does not open Docker.
 
 Implemented commands and request shapes are documented in `docs/runbook.md`:
-`screen-source`, `construct`, `author`, `import-authoring`, `qualify`, `accept`,
+`screen-source`, `construct`, `author`, `import-authoring`, `qualify`,
 `release`, `resolve`, `grade`, `run`, `train`, `evaluate`, `audit`, `recover`,
 `retry-publication`.
 M0 request models remain authoritative; `construct --inputs` supplies actual

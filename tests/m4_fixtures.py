@@ -10,6 +10,30 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.environments import SourceArchive, SourceFile
 
 
+# Explicit Click inputs for retained diagnostics; no production defaults.
+WHEELS={
+ 'pytest':('9.0.2','pytest-9.0.2-py3-none-any.whl','711ffd45bf766d5264d487b917733b453d917afd2b0ad65223959f59089f875b'),
+ 'iniconfig':('2.3.0','iniconfig-2.3.0-py3-none-any.whl','f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12'),
+ 'packaging':('26.0','packaging-26.0-py3-none-any.whl','b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529'),
+ 'pluggy':('1.6.0','pluggy-1.6.0-py3-none-any.whl','e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746'),
+ 'pygments':('2.20.0','pygments-2.20.0-py3-none-any.whl','81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176'),
+ 'flit-core':('3.11.0','flit_core-3.11.0-py3-none-any.whl','fe464c086f630f106c0fc5001ee377980f45938f03f8f0d03da08a4841748541'),
+}
+
+def runtime_policy(**overrides):
+    from feature_rl.environments import SandboxPolicy, RuntimeProfile, SourceMapping, WheelPin
+    profile = RuntimeProfile(profile_id='click-8.3.3', project_name='click', project_version='8.3.3',
+        interpreter_version='3.12.14', build_backend='flit_core.buildapi',
+        build_requirements=('flit_core>=3.11,<4',), source_roots=('src',),
+        source_mappings=(SourceMapping(source='src/click', wheel='click'),),
+        import_modules=('click',), entry_points=('click.Group', 'click.group', 'click.command', 'click.testing.CliRunner'),
+        supported_observables=('CLI exit code', 'combined terminal output'),
+        dependencies=tuple(WheelPin(name=name, version=version, filename=filename, sha256=digest)
+                           for name, (version, filename, digest) in WHEELS.items()))
+    return SandboxPolicy(**(dict(image='python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333',
+                                platform='linux/arm64', profile=profile) | overrides))
+
+
 ADAPTER='''import json,sys
 import click
 from click.testing import CliRunner
@@ -71,7 +95,7 @@ def diagnostic(store, *, baseline=None, environment=None, adapter=ADAPTER, case_
         baseline=raw(SourceArchive({'src/click/__init__.py':SourceFile(b'# diagnostic',False)}).to_tar(),'source-archive',c.Visibility.AUTHORING)
     if environment is None:
         command=c.CommandSpec(argv=('python','--version'),working_directory='/workspace',timeout_seconds=1.0)
-        environment=store.put_artifact(c.EnvironmentRecipe(kind='EnvironmentRecipe',**common,image_digest='example@sha256:'+'a'*64,
+        environment=store.put_artifact(c.EnvironmentRecipe(kind='EnvironmentRecipe',**common,runtime_image=raw(b'DIAGNOSTIC ONLY', 'runtime-image', c.Visibility.AUTHORING),image_digest='example@sha256:'+'a'*64,
             interpreter_version='3.12.14',dependencies=(),setup=(command,),reset=(command,),services=(),limits=limits,
             neutral_repairs=(),locale='C.UTF-8',timezone='UTC',environment=(),randomness=plan.seed_policy,network_policy='none',baseline=baseline))
     # No real private SourcePair/H is inspected or loaded by this fixture.

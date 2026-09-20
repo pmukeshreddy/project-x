@@ -197,6 +197,7 @@ class GitHistory:
         *args: str,
         max_bytes: int = 16_000_000,
         deadline: float | None = None,
+        environment: dict[str, str] | None = None,
     ) -> bytes:
         if type(max_bytes) is not int or max_bytes <= 0:
             raise ValueError("max_bytes must be a positive integer")
@@ -212,7 +213,7 @@ class GitHistory:
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=self._environment(),
+            env=self._environment() | (environment or {}),
             start_new_session=True,
         )
         assert process.stdout is not None and process.stderr is not None

@@ -1,4 +1,4 @@
-"""Strict provider boundary for one local, offline MLX generation call."""
+"""Strict provider boundary for one local, offline Transformers generation call."""
 
 from __future__ import annotations
 
@@ -21,12 +21,6 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import ArtifactRef, CostRecord, StrictModel, Visibility
 
 from .backend import (
-    DEPENDENCY_MANIFEST_SHA256,
-    EXPECTED_DEPENDENCIES,
-    MODEL_CONFIG_SHA256,
-    MODEL_ID,
-    MODEL_MANIFEST_SHA256,
-    MODEL_REVISION,
     BackendConfig,
     VerifiedBackend,
 )
@@ -345,6 +339,8 @@ def _parse_events(
         or identity.offline_environment != expected_offline
         or identity.local_files_only is not True
         or identity.remote_code is not False
+        or identity.device != verified.device
+        or identity.dtype != verified.dtype
     ):
         raise ValueError("worker backend/offline/configuration identity mismatch")
     for event in (loaded, completed):
@@ -363,17 +359,21 @@ def _parse_events(
         or any(type(token_id) is not int or token_id < 0 for token_id in input_token_ids)
     ):
         raise ValueError("actual templated input token IDs are missing or inconsistent")
-    expected_memory = {
-        "mlx_memory_guideline_bytes": request.limits.mlx_memory_guideline_bytes,
-        "mlx_cache_limit_bytes": request.limits.mlx_cache_limit_bytes,
-        "mlx_wired_limit_bytes": request.limits.mlx_wired_limit_bytes,
-    }
-    if any(getattr(memory, key) != value for key, value in expected_memory.items()):
+    if memory.device != verified.device or memory.cuda_memory_bytes != request.limits.cuda_memory_bytes:
         raise ValueError("worker memory policy mismatch")
     if loaded.fresh_process is not True or loaded.fresh_prompt_cache is not True:
         raise ValueError("worker did not attest a fresh process and prompt cache")
-    if loaded.peak_memory_bytes < loaded.active_memory_bytes:
-        raise ValueError("worker load memory measurements are inconsistent")
+    for observation in (loaded, completed):
+        values = (observation.active_memory_bytes, observation.peak_memory_bytes, observation.cache_memory_bytes)
+        if verified.device == "cpu":
+            if any(value is not None for value in values):
+                raise ValueError("CPU worker must not claim CUDA allocator measurements")
+        elif (any(value is None for value in values)
+                or observation.peak_memory_bytes < observation.active_memory_bytes
+                or observation.cache_memory_bytes < observation.active_memory_bytes
+                or request.limits.cuda_memory_bytes is None
+                or max(values) > request.limits.cuda_memory_bytes):
+            raise ValueError("worker CUDA allocator measurements are inconsistent or exceed the limit")
     token_events = events[4:-1]
     token_ids: list[int] = []
     model_logprobs: list[float] = []
@@ -398,8 +398,6 @@ def _parse_events(
         raise ValueError("completion lacks fresh-context attestation")
     if completed.total_seconds < completed.inference_seconds:
         raise ValueError("worker timing measurements are inconsistent")
-    if completed.peak_memory_bytes < completed.active_memory_bytes:
-        raise ValueError("worker completion memory measurements are inconsistent")
     usage = GenerationUsage(
         input_tokens=input_tokens,
         input_token_ids=tuple(input_token_ids),
@@ -857,12 +855,12 @@ class LocalGenerationProvider:
                 name: hashlib.sha256(path.read_bytes()).hexdigest()
                 for name, path in source_paths.items()
             },
-            configured_model_id=MODEL_ID,
-            configured_model_revision=MODEL_REVISION,
-            model_config_sha256=MODEL_CONFIG_SHA256,
-            model_manifest_sha256=MODEL_MANIFEST_SHA256,
-            dependency_manifest_sha256=DEPENDENCY_MANIFEST_SHA256,
-            dependency_versions=EXPECTED_DEPENDENCIES,
+            configured_model_id=self._backend.model_id,
+            configured_model_revision=self._backend.revision,
+            model_manifest_sha256=self._backend.model_manifest_sha256,
+            dependency_manifest_sha256=self._backend.dependency_manifest_sha256,
+            device=self._backend.device,
+            dtype=self._backend.dtype,
         )
         attempt_archive = _ArchivePayload(
             name="attempt",
@@ -1114,12 +1112,20 @@ class LocalGenerationProvider:
         try:
             literal_prevalidator = _build_literal_prevalidator(output_schema)
             verified = self._backend.verify()
+            if (verified.device == "cpu") != (request.limits.cuda_memory_bytes is None):
+                raise ValueError("only CUDA authoring requires an explicit CUDA allocator limit")
             worker_input = canonical_json(
                 {
                     "protocol_version": PROTOCOL_VERSION,
-                    "model_directory": str(self._backend.model_directory.resolve()),
-                    "model_id": MODEL_ID,
-                    "revision": MODEL_REVISION,
+                    "model_directory": str(self._backend.model_directory.absolute()),
+                    "model_id": verified.model.model_id,
+                    "revision": verified.model.revision,
+                    "model_manifest": str(self._backend.model_manifest.absolute()),
+                    "dependency_manifest": str(self._backend.dependency_manifest.absolute()),
+                    "model_manifest_sha256": verified.model_manifest_sha256,
+                    "dependency_manifest_sha256": verified.dependency_manifest_sha256,
+                    "device": verified.device,
+                    "dtype": verified.dtype,
                     "response_id": request.response_id,
                     "request_id": request.request_id,
                     "prompt_id": request.prompt_id,
@@ -1127,11 +1133,7 @@ class LocalGenerationProvider:
                     "max_input_tokens": request.limits.input_tokens,
                     "max_output_tokens": request.limits.output_tokens,
                     "seed": request.seed,
-                    "memory": {
-                        "guideline_bytes": request.limits.mlx_memory_guideline_bytes,
-                        "wired_limit_bytes": request.limits.mlx_wired_limit_bytes,
-                        "cache_limit_bytes": request.limits.mlx_cache_limit_bytes,
-                    },
+                    "cuda_memory_bytes": request.limits.cuda_memory_bytes,
                 }
             )
             if len(worker_input) > request.limits.stdin_bytes:
@@ -1153,12 +1155,16 @@ class LocalGenerationProvider:
                     "TRANSFORMERS_OFFLINE": "1",
                     "HF_DATASETS_OFFLINE": "1",
                     "TOKENIZERS_PARALLELISM": "false",
+                    "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
                     "LC_ALL": "C",
                 }
                 if "HOME" in os.environ:
                     environment["HOME"] = os.environ["HOME"]
+                for name in ("CUDA_VISIBLE_DEVICES", "LD_LIBRARY_PATH"):
+                    if name in os.environ:
+                        environment[name] = os.environ[name]
                 outcome = self._runner.run(
-                    command=(str(self._backend.python_executable), "-I", "-X", "utf8", str(worker)),
+                    command=(str(self._backend.python_executable.absolute()), "-I", "-X", "utf8", str(worker)),
                     stdin=worker_input,
                     cwd=root,
                     environment=environment,
@@ -1219,6 +1225,7 @@ class LocalGenerationProvider:
             "wall_seconds": outcome.wall_seconds if outcome else None,
             "cpu_seconds": outcome.cpu_seconds if outcome else None,
             "memory_samples": outcome.memory_samples if outcome else None,
+            "max_sampled_resident_bytes": outcome.max_sampled_resident_bytes if outcome else None,
             "max_sampled_physical_footprint_bytes": (
                 outcome.max_sampled_physical_footprint_bytes if outcome else None
             ),
@@ -1250,11 +1257,13 @@ class LocalGenerationProvider:
                 "seed": request.seed,
                 "limits": request.limits.model_dump(mode="json"),
                 "model": verified.model.model_dump(mode="json") if verified else None,
+                "backend": verified.model_dump(mode="json") if verified else None,
                 "resource_enforcement": {
                     "wall": "external_monotonic_deadline",
                     "cpu": "kernel_rlimit_cpu",
                     "file_size": "kernel_rlimit_fsize",
-                    "memory": "sampled_proc_pid_rusage_20ms_with_1GiB_guard_band",
+                    "memory": outcome.memory_limit_enforcement if outcome else None,
+                    "cuda_memory": "torch_allocator_fraction" if verified and verified.device != "cpu" else None,
                 },
             },
             "provenance": provenance_payload,

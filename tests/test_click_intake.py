@@ -234,7 +234,7 @@ def test_connected_intake_builds_private_source_pair_and_safe_authoring_view(tmp
     assert candidate.commits.integration == "squash"
     assert candidate.commits.target_before == baseline
     assert candidate.commits.integrated_after == integrated
-    assert candidate.screening.disposition.value == "provisional"
+    assert candidate.screening.disposition.value == "success"
     assert pair.baseline_commit == baseline
     assert pair.schema_version == 2
     assert pair.provenance_label == candidate.provenance_label
@@ -243,7 +243,7 @@ def test_connected_intake_builds_private_source_pair_and_safe_authoring_view(tmp
     assert pair.reference.visibility is Visibility.PRIVATE
     assert pair.baseline.visibility is Visibility.AUTHORING
     assert {item.path: item.category for item in pair.changed_files}["src/options.py"] == "mixed"
-    assert result.manual_review_required == ("src/options.py",)
+    assert result.mixed_paths_for_qualification == ('src/options.py',)
 
     author_store = ArtifactStore(store_root, ActorRole.AUTHOR)
     baseline_tar = author_store.get_bytes(result.authoring.baseline)

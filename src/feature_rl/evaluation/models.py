@@ -1,4 +1,4 @@
-"""Frozen study and adaptation records for M8 evaluation."""
+"""Frozen study records for M8 evaluation."""
 from __future__ import annotations
 
 from typing import Annotated, Literal
@@ -8,7 +8,7 @@ from pydantic import Field, model_validator
 from feature_rl import contracts as c
 
 
-ArmName = Literal["A", "B", "C", "D", "E"]
+ArmName = Literal["base", "feature_grpo"]
 RelationKind = Literal[
     "fork", "backport", "copied_code", "monorepo", "descendant",
     "same_request", "dependency",
@@ -75,7 +75,7 @@ class BudgetLimit(c.StrictModel):
 
 class ArmProtocol(c.StrictModel):
     arm: ArmName
-    method: Literal["starting", "sft", "external_rl", "factory_rl", "ablation"]
+    method: Literal["starting", "factory_rl"]
     policy: c.PolicyConfig
     checkpoint: c.ArtifactRef
     training_config: c.ArtifactRef | None
@@ -127,42 +127,4 @@ class EvaluationPreregistration(c.StrictModel):
             raise ValueError("duplicate preregistered trial ID")
         if self.metric == "pass_at_1" and self.episodes_per_trial != 1:
             raise ValueError("pass_at_1 permits exactly one episode")
-        return self
-
-
-class AdaptationStage(c.StrictModel):
-    name: c.Identifier
-    entered: c.NonnegativeInt
-    accepted: c.NonnegativeInt
-    rejected: c.NonnegativeInt
-    invalid: c.NonnegativeInt
-    reasons: tuple[c.Text, ...]
-
-    @model_validator(mode="after")
-    def accounts_for_entries(self):
-        if self.entered != self.accepted + self.rejected + self.invalid:
-            raise ValueError("adaptation stage must account for every entered item")
-        if (self.rejected or self.invalid) and not self.reasons:
-            raise ValueError("adaptation losses require recorded reasons")
-        return self
-
-
-class AdaptationFunnel(c.StrictModel):
-    version: Literal["m8-adaptation-funnel-v1"]
-    corpus_id: c.Text
-    release_revision: c.Revision
-    upstream_split: c.Text
-    local_partition: c.Partition
-    license_constraint: c.Text
-    source_frame: c.ArtifactRef
-    stages: Annotated[tuple[AdaptationStage, ...], Field(min_length=1)]
-    selection_bias: tuple[c.Text, ...]
-    costs: c.Costs
-    disposition: c.Disposition
-
-    @model_validator(mode="after")
-    def stage_continuity(self):
-        for before, after in zip(self.stages, self.stages[1:]):
-            if after.entered != before.accepted:
-                raise ValueError("adaptation stages must account continuously for accepted items")
         return self

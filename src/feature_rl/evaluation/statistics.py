@@ -17,7 +17,7 @@ class StatisticsError(ValueError):
 
 
 class ArmCounts(c.StrictModel):
-    arm: Literal["A", "B", "C", "D", "E"]
+    arm: Literal["base", "feature_grpo"]
     assigned: c.NonnegativeInt
     valid: c.NonnegativeInt
     resolved: c.NonnegativeInt

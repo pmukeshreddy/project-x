@@ -1,4 +1,5 @@
 """M4 joins and controller outcomes; local cases are diagnostics, not qualification."""
+from m4_fixtures import runtime_policy
 import json
 import pytest
 from feature_rl import contracts as c
@@ -65,7 +66,7 @@ def test_grading_malformed_submission_is_zero_before_runtime(store):
     task=diagnostic(store)
     # Diagnostic at the pre-execution boundary only; real Docker tests exercise
     # build/probe behavior. This object has no callable execution methods mocked.
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=SandboxPolicy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
     bad=store.put_bytes(b'{"version":"forged","reward":1}','m4-submission',c.Visibility.PRIVATE)
     service=GradingService(store=store,runtime=runtime,revision='a'*40)
     result=service.grade(task,bad,11)
@@ -79,7 +80,7 @@ def test_missing_submission_is_unmeasured_and_replay_retains_seed(store):
     from feature_rl.grading import GradingService, read_grade
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy
     task=diagnostic(store)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=SandboxPolicy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
     missing=c.ArtifactRef(sha256='f'*64,kind='m4-submission',schema_version=1,visibility=c.Visibility.PRIVATE,encoding='bytes')
     result=GradingService(store=store,runtime=runtime,revision='a'*40).grade(task,missing,12)
     receipt=read_grade(store,result.artifacts[-1])
@@ -91,7 +92,7 @@ def test_grade_publication_recovery_reuses_exact_receipt_without_execution(store
     from feature_rl.grading import GradingService, GradePublicationFailed, read_grade
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy
     task=diagnostic(store)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=SandboxPolicy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
     bad=store.put_bytes(b'{}','m4-submission',c.Visibility.PRIVATE)
     service=GradingService(store=store,runtime=runtime,revision='a'*40)
     real=store.put_bytes
@@ -120,7 +121,7 @@ def test_unsupported_contract_source_policy_is_not_reported_as_an_outage(store):
     verifier['permissions']['submission_policy']=contract['allowed_changes']
     vref=store.put_artifact(c.VerifierBundle.model_validate_json(json.dumps(verifier)))
     task_ref=replace_artifact(store,task_ref,contract=cref,private_oracle=vref)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=SandboxPolicy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
     raw=store.put_bytes(b'{}','m4-submission',c.Visibility.PRIVATE)
     result=GradingService(store=store,runtime=runtime,revision='a'*40).grade(task_ref,raw,11)
     assert result.disposition==c.Disposition.UNSUPPORTED
@@ -146,7 +147,7 @@ def test_recipe_cannot_exceed_any_contract_worker_limit(store,field,limit):
     from feature_rl.grading import GradingService, read_grade
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy
     task_ref=task_with_limits(store,diagnostic(store),{field:limit})
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=SandboxPolicy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
     submission=store.put_bytes(b'{}','m4-submission',c.Visibility.PRIVATE)
     result=GradingService(store=store,runtime=runtime,revision='a'*40).grade(task_ref,submission,11)
     receipt=read_grade(store,result.artifacts[0])
@@ -170,12 +171,12 @@ def test_recipe_within_contract_limits_does_not_consume_solver_budgets(store):
 def test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero(store,bad_part):
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy, SourceArchive, SourceFile
     from feature_rl.grading import GradingService, read_grade
-    policy=SandboxPolicy()
+    policy=runtime_policy()
     if bad_part=='baseline_payload_size':
-        policy=SandboxPolicy(max_archive_bytes=10240)
+        policy=runtime_policy(max_archive_bytes=10240)
         baseline_bytes=b'x'*10241
     elif bad_part=='baseline_expanded_size':
-        policy=SandboxPolicy(max_source_bytes=16)
+        policy=runtime_policy(max_source_bytes=16)
         baseline_bytes=SourceArchive({'src/click/__init__.py':SourceFile(b'x'*17,False)}).to_tar()
     elif bad_part=='baseline_format':baseline_bytes=b'not an archive'
     else:baseline_bytes=SourceArchive({'src/click/__init__.py':SourceFile(b'# valid source',False)}).to_tar()

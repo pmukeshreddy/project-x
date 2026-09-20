@@ -1,6 +1,6 @@
 """Thin concrete M5/lifecycle orchestration with selected Factory history."""
 from feature_rl import contracts as c
-from feature_rl.qualification import QualificationPolicy, QualificationService, ReviewRequest
+from feature_rl.qualification import QualificationPolicy, QualificationService
 from .packaging import checked, read_record, typed
 from .lifecycle import AdmissionRejected, TaskLifecycle
 from .construction import ConstructionResult, read_construction_request
@@ -8,15 +8,14 @@ from .construction import ConstructionResult, read_construction_request
 
 def template(factory):
     if factory.qualification is None:
-        raise AdmissionRejected('configure an actual QualificationService, runtime/package verifier and external human trust before qualification/admission')
+        raise AdmissionRejected('configure an actual QualificationService, runtime/package verifier before qualification/admission')
     return factory.qualification
 
 
 def configured_service(factory,policy):
     current=template(factory)
     return QualificationService(store=factory.store,registry=factory.registry,grader=current.grader,
-        builder=current.builder,revision=current.revision,policy=policy,
-        attestation_verifier=current.attestation_verifier)
+        builder=current.builder,revision=current.revision,policy=policy)
 
 
 def construction_history(factory,task_ref):
@@ -64,32 +63,18 @@ def qualify(factory,task_ref,policy):
     return configured_service(factory,bound).qualify(task_ref)
 
 
-def for_request(factory,request_ref):
-    request=read_record(factory.store,request_ref,ReviewRequest,'m5-review-request')
-    policy=read_record(factory.store,request.policy,QualificationPolicy,'m5-qualification-policy')
-    service=configured_service(factory,policy)
-    if service.policy_ref!=request.policy:raise AdmissionRejected('review request policy identity changed')
-    return service
-
-
 def for_report(factory,report_ref):
     report=typed(factory.store,report_ref,c.QualificationReport)
     current=template(factory)
     if report.provenance.producer_version!=current.revision:
         raise AdmissionRejected('qualification report uses an unsupported M5 service revision')
     inputs=report.provenance.inputs
-    if report.provenance.producer=='feature_rl.qualification.admission' and len(inputs)==4:
-        return for_request(factory,inputs[1])
     if report.provenance.producer=='feature_rl.qualification' and len(inputs)==3:
-        # An actual provisional report still reaches actual M5 denial. No state
-        # field or caller assertion is promoted to accepted qualification.
+        # M5 authenticates the selected execution package; incomplete reports
+        # still fail admission even though human approval is no longer required.
         policy=read_record(factory.store,inputs[1],QualificationPolicy,'m5-qualification-policy')
         return configured_service(factory,policy)
     raise AdmissionRejected('qualification report lacks actual M5 origin')
-
-
-def accept(factory,request_ref,attestation_ref):
-    return for_request(factory,checked(c.ArtifactRef,request_ref)).accept(request_ref,checked(c.ArtifactRef,attestation_ref))
 
 
 def release(factory,task_ref,report_ref):

@@ -130,9 +130,6 @@ class Factory:
         from .qualification import qualify
         return qualify(self,task_ref,policy)
 
-    def accept(self, review_request_ref: c.ArtifactRef, attestation_ref: c.ArtifactRef) -> c.OperationResult:
-        from .qualification import accept
-        return accept(self,review_request_ref,attestation_ref)
 
     def release(self, task_ref: c.ArtifactRef, *, accepted_report: c.ArtifactRef | None=None) -> c.OperationResult:
         from .qualification import release
@@ -149,10 +146,10 @@ class Factory:
         return self._execution_service('native_run',NativeRunService).run(task_version,policy,limits,
             case_seed=case_seed,invocation=invocation)
 
-    def train(self,configuration,*,invocation,resume=None,demonstrations=()):
+    def train(self,configuration,*,invocation,resume=None):
         from feature_rl.training.service import TrainingService
         return self._execution_service('training',TrainingService).train(configuration,
-            invocation=invocation,resume=resume,demonstrations=demonstrations)
+            invocation=invocation,resume=resume)
 
     def evaluate(self,configuration):
         from feature_rl.evaluation.service import EvaluationService

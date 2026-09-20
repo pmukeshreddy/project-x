@@ -4,6 +4,7 @@ Only M5.verify_accepted is substituted on this isolated service/Registry. Existi
 CAS objects are immutable; the original Registry is never changed. One diagnostic
 symbol represents the one scripted action, not a real tokenizer probability.
 """
+from m4_fixtures import runtime_policy
 from datetime import datetime,timezone
 import hashlib,json,shutil,subprocess,uuid
 from pathlib import Path
@@ -36,7 +37,7 @@ def ref(v):return c.ArtifactRef.model_validate_json(json.dumps(v))
 save()
 try:
     print('Qualifying actual M3 boundary using cached image',flush=True)
-    engine=DockerEngine(state_root=state/'runtime',socket_path=Path(setup['socket_path']),policy=SandboxPolicy())
+    engine=DockerEngine(state_root=state/'runtime',socket_path=Path(setup['socket_path']),policy=runtime_policy())
     engine.qualify_boundary()
     runtime=EnvironmentRuntime(store=store,engine=engine,revision=old['context']['runtime_revision'])
     grader=GradingService(store=store,runtime=runtime,revision=old['context']['grading_revision'])
@@ -47,7 +48,7 @@ try:
     task_ref=ref(old['context']['task'])
     q_ref=next(ref(r) for r in old['qualification']['result']['artifacts'] if r['kind']=='QualificationReport')
     q=store.get_artifact(q_ref)
-    assert q.disposition==c.Disposition.PROVISIONAL and not q.human_reviews
+    assert q.disposition==c.Disposition.PROVISIONAL
     try:qualification.verify_accepted(task_ref,q_ref)
     except Exception as exc:result['unmodified_M5_denial']=type(exc).__name__+': '+str(exc)
     else:raise AssertionError('actual M5 unexpectedly admitted provisional evidence')

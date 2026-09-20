@@ -12,7 +12,7 @@ from feature_rl.agents.runner import aggregate, cost
 from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl.environments import EnvironmentRuntime
 from feature_rl.grading import GradingService
-from feature_rl.pipeline import Factory, ReleasedTaskResolver, TaskBuilder, TaskLifecycle
+from feature_rl.pipeline import ReleasedTaskResolver, TaskBuilder, TaskLifecycle
 from feature_rl.pipeline.construction import ConstructionResult
 from feature_rl.qualification.evidence import unknown_cost
 from feature_rl.registry import Claim, CostObservation, JobSpec, Registry
@@ -25,7 +25,6 @@ from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_local
 
 from .freeze import episode_sampling_seed, validate_preregistration
-from .adaptation import AdaptationBatch, ExternalCorpusAdapter, ExternalOriginMapping
 from .models import ArmProtocol, EvaluationPreregistration, FrozenRoster
 from .statistics import summarize_trials
 
@@ -62,7 +61,6 @@ class EvaluationService:
         self, *, store: ArtifactStore, registry: Registry, revision: str,
         evidence_scope: str = "real_integration", runner: AgentRunner | None = None,
         native_factory: NativeSessionFactory | None = None,
-        factory: Factory | None = None,
         lifecycle: TaskLifecycle | ReleasedTaskResolver | None = None,
         builder: TaskBuilder | None = None, runtime: EnvironmentRuntime | None = None,
         grader: GradingService | None = None,
@@ -87,8 +85,6 @@ class EvaluationService:
                 raise TypeError("real evaluation requires the inert M7 NativeSessionFactory")
             if (
                 native_factory.store is not store or native_factory.registry is not registry
-                or type(factory) is not Factory or factory.store is not store
-                or factory.registry is not registry
                 or type(lifecycle) not in (TaskLifecycle, ReleasedTaskResolver)
                 or lifecycle.store is not store or lifecycle.registry is not registry
                 or type(builder) is not TaskBuilder or builder.store is not store or builder.registry is not registry
@@ -98,7 +94,6 @@ class EvaluationService:
                 raise TypeError("real evaluation requires actual same-store M3/M4/M6 services")
         self.store, self.registry, self.runner = store, registry, runner
         self.native_factory = native_factory
-        self.factory = factory
         self.lifecycle, self.builder, self.runtime, self.grader = lifecycle, builder, runtime, grader
         self.revision, self.evidence_scope = revision, evidence_scope
         self._handles: dict[str, tuple[NativeHandle, Claim, str]] = {}
@@ -183,102 +178,17 @@ class EvaluationService:
             roots.append(report.task)
         return tuple(roots)
 
-    def _training_origins(self, protocols, actual_training):
-        if protocols["A"].training_sources or protocols["B"].training_sources:
-            raise EvaluationRejected("starting and SFT arms cannot claim RL construction origins")
-        external = protocols["C"].training_sources
-        if len(external) != 1 or external[0].kind != "m8-external-adaptation-batch":
-            raise EvaluationRejected("external RL arm requires one frozen external adaptation batch")
-        self.registry.assert_usable(external[0])
-        batch = read_local(
-            self.store, external[0], AdaptationBatch, "m8-external-adaptation-batch",
-        )
-        if (
-            batch.funnel.disposition != c.Disposition.SUCCESS
-            or batch.funnel.local_partition != c.Partition.TRAIN
-            or batch.funnel.source_frame != batch.source_frame
-            or any(
-                stage.rejected or stage.invalid or stage.accepted != len(batch.items)
-                for stage in batch.funnel.stages
-            )
-        ):
-            raise EvaluationRejected("external adaptation funnel is incomplete or not training-assigned")
-        adapter = ExternalCorpusAdapter(
-            store=self.store, factory=self.factory,
-            configuration=batch.configuration, revision=self.revision,
-        )
-        if (
-            batch.configuration != adapter.configuration_ref
-            or batch.source_frame != adapter.configuration.source_frame
-            or batch.funnel.corpus_id != adapter.configuration.dataset_id
-            or batch.funnel.release_revision != adapter.configuration.release_revision
-            or batch.funnel.upstream_split != adapter.configuration.upstream_split
-            or batch.funnel.license_constraint != adapter.configuration.dataset_license
-            or tuple(item.row for item in batch.items) != adapter.configuration.rows
-            or tuple(item.origin_mapping for item in batch.items)
-            != adapter.configuration.origin_mappings
-        ):
-            raise EvaluationRejected("external adaptation batch changed its frozen configuration/frame")
-        assignments = {item.row: item for item in adapter.frame.assignments}
-        external_tasks, external_receipts = [], []
-        for item, mapping_ref, build_inputs in zip(
-            batch.items, adapter.configuration.origin_mappings,
-            adapter.configuration.construction_inputs,
-        ):
-            try:
-                raw, row = adapter._row(item.row)
-                mapping = read_local(
-                    self.store, mapping_ref, ExternalOriginMapping, "m8-external-origin",
-                )
-                candidate, pair = adapter._validated(
-                    item.row, raw, row, mapping_ref, mapping,
-                    assignments[item.row], build_inputs,
-                )
-            except (KeyError, ValueError, OSError) as exc:
-                raise EvaluationRejected("external adaptation origin failed inert revalidation") from exc
-            if (
-                item.candidate is None or item.source_pair is None
-                or item.candidate != mapping.candidate
-                or item.source_pair != mapping.source_pair
-                or candidate != self.store.get_artifact(item.candidate)
-                or pair != self.store.get_artifact(item.source_pair)
-                or item.source_only_allowlist != (
-                    mapping.authoring_request, mapping.authoring_baseline,
-                    mapping.authoring_license,
-                )
-            ):
-                raise EvaluationRejected("external adaptation item differs from its authenticated M1 origin")
-            receipts = tuple(
-                ref for ref in item.construction_result
-                if ref.kind == "m6-construction-result"
-            )
-            if item.disposition != c.Disposition.SUCCESS or len(receipts) != 1:
-                raise EvaluationRejected("external adaptation item lacks one successful construction")
-            task, history, construction_candidate, construction_source = self._construction_root(
-                receipts[0]
-            )
-            if (
-                construction_candidate != mapping.candidate
-                or item.source_result != (construction_source,)
-                or item.construction_result != (task, history, receipts[0])
-            ):
-                raise EvaluationRejected("external adaptation item changed its selected construction roots")
-            external_tasks.append(task)
-            external_receipts.append(receipts[0])
-        factory_receipts = protocols["D"].training_sources
+    def _training_origins(self, protocols, training):
+        if protocols["base"].training_sources:
+            raise EvaluationRejected("starting arm cannot claim RL construction origins")
+        factory_receipts = protocols["feature_grpo"].training_sources
         if not factory_receipts or any(
             ref.kind != "m6-construction-result" for ref in factory_receipts
         ):
             raise EvaluationRejected("factory RL arm requires selected M6 construction roots")
         factory_tasks = tuple(self._construction_root(ref)[0] for ref in factory_receipts)
-        external_tasks = tuple(external_tasks)
-        if (
-            external_tasks != self._built_roots(actual_training["C"][0].tasks)
-            or factory_tasks != self._built_roots(actual_training["D"][0].tasks)
-        ):
-            raise EvaluationRejected("RL training tasks differ from their frozen dataset origins")
-        if set(external_tasks) & set(factory_tasks) or set(external_receipts) & set(factory_receipts):
-            raise EvaluationRejected("external and factory RL origins overlap")
+        if factory_tasks != self._built_roots(training.tasks):
+            raise EvaluationRejected("feature training tasks differ from their frozen construction origins")
 
     def _freeze(self, config):
         if isinstance(config, c.EvaluationConfig):
@@ -327,9 +237,9 @@ class EvaluationService:
                 )
             bootstrap = self.native_factory.training_configuration.initial_policy
             if (
-                protocols["A"].checkpoint != protocols["A"].policy.identity.weights
-                or protocols["A"].policy != bootstrap
-                or protocols["A"].checkpoint != bootstrap.identity.weights
+                protocols["base"].checkpoint != protocols["base"].policy.identity.weights
+                or protocols["base"].policy != bootstrap
+                or protocols["base"].checkpoint != bootstrap.identity.weights
                 or any(
                     item.policy.identity.model != bootstrap.identity.model
                     or item.policy.identity.tokenizer_digest != bootstrap.identity.tokenizer_digest
@@ -338,118 +248,78 @@ class EvaluationService:
                 )
             ):
                 raise EvaluationRejected("frozen arms differ from the native bootstrap model boundary")
-            actual_training = {}
-            for arm in ("B", "C", "D"):
-                protocol = protocols[arm]
-                checkpoint = validate_selected_checkpoint(
-                    self.store, self.registry, protocol.checkpoint,
+            protocol = protocols["feature_grpo"]
+            checkpoint = validate_selected_checkpoint(
+                self.store, self.registry, protocol.checkpoint,
+            )
+            requests = tuple(
+                ref for ref in checkpoint.provenance.inputs
+                if ref.kind == "m7-training-request"
+            )
+            if (
+                requests != (protocol.training_config,)
+                or checkpoint.weights != protocol.policy.identity.weights
+                or checkpoint.policy_version != protocol.policy.policy_version
+                or checkpoint.configuration.algorithm != "grpo"
+                or checkpoint.configuration.initial_policy != protocols["base"].policy
+                or checkpoint.reference_checkpoint != self.native_factory.training_configuration.reference_checkpoint
+                or not checkpoint.consumed_tasks
+            ):
+                raise EvaluationRejected(
+                    "trained arm differs from its selected M7 checkpoint/configuration"
                 )
-                requests = tuple(
-                    ref for ref in checkpoint.provenance.inputs
-                    if ref.kind == "m7-training-request"
+            request = decode_json(
+                self.store.get_bytes(
+                    requests[0], max_envelope_bytes=8 * 1024 * 1024,
+                    max_payload_bytes=4 * 1024 * 1024,
+                ),
+                4 * 1024 * 1024,
+            )
+            if type(request) is not dict:
+                raise EvaluationRejected("selected M7 training request is not an object")
+            try:
+                settings = NativeSettings.model_validate_json(
+                    canonical_json(request.get("settings"))
                 )
-                expected_algorithm = "sft" if arm == "B" else "grpo"
+            except ValueError as exc:
+                raise EvaluationRejected("selected M7 request has invalid native settings") from exc
+            for task_ref in checkpoint.configuration.tasks:
+                source = frozen_sources.get(task_ref)
+                if source is None or source.partition != c.Partition.TRAIN:
+                    raise EvaluationRejected(
+                        "training configuration task is outside the frozen training source frame"
+                    )
+                task = self.lifecycle.resolve_released(task_ref)
                 if (
-                    requests != (protocol.training_config,)
-                    or checkpoint.weights != protocol.policy.identity.weights
-                    or checkpoint.policy_version != protocol.policy.policy_version
-                    or checkpoint.configuration.algorithm != expected_algorithm
-                    or checkpoint.configuration.initial_policy != protocols["A"].policy
-                    or checkpoint.reference_checkpoint != self.native_factory.training_configuration.reference_checkpoint
-                    or not checkpoint.consumed_tasks
+                    task.partition != c.Partition.TRAIN
+                    or task.repository_family != source.repository_family
+                    or task.request_lineage != source.request_lineage
                 ):
                     raise EvaluationRejected(
-                        "trained arm differs from its selected M7 checkpoint/configuration"
+                        "training configuration task differs from its released source assignment"
                     )
-                request = decode_json(
-                    self.store.get_bytes(
-                        requests[0], max_envelope_bytes=8 * 1024 * 1024,
-                        max_payload_bytes=4 * 1024 * 1024,
-                    ),
-                    4 * 1024 * 1024,
-                )
-                if type(request) is not dict:
-                    raise EvaluationRejected("selected M7 training request is not an object")
-                try:
-                    settings = NativeSettings.model_validate_json(
-                        canonical_json(request.get("settings"))
-                    )
-                except ValueError as exc:
-                    raise EvaluationRejected("selected M7 request has invalid native settings") from exc
-                actual_training[arm] = (checkpoint.configuration, settings)
-                for task_ref in checkpoint.configuration.tasks:
-                    source = frozen_sources.get(task_ref)
-                    if source is None or source.partition != c.Partition.TRAIN:
-                        raise EvaluationRejected(
-                            "training configuration task is outside the frozen training source frame"
-                        )
-                    task = self.lifecycle.resolve_released(task_ref)
-                    if (
-                        task.partition != c.Partition.TRAIN
-                        or task.repository_family != source.repository_family
-                        or task.request_lineage != source.request_lineage
-                    ):
-                        raise EvaluationRejected(
-                            "training configuration task differs from its released source assignment"
-                        )
-                if any(ref not in checkpoint.configuration.tasks for ref in checkpoint.consumed_tasks):
-                    raise EvaluationRejected("checkpoint consumed a task outside its frozen training configuration")
-            def shared_config(value):
-                controls = value.model_dump(mode="json")
-                return {
-                    key: item for key, item in controls.items()
-                    if key not in {"algorithm", "tasks"}
-                }
-
-            if len({
-                canonical_json(shared_config(actual_training[arm][0]))
-                for arm in ("B", "C", "D")
-            }) != 1:
-                raise EvaluationRejected("trained arms differ in shared TrainingConfig controls")
-            shared_settings = (
-                "tokenizer_sha256", "num_gpus", "max_seq_len", "groups_per_update",
-                "mini_batch_groups", "probe_tokens", "probe_output_tokens",
-                "probe_timeout_seconds", "max_groups", "max_wall_seconds",
-            )
-            if any(
-                len({getattr(actual_training[arm][1], field) for arm in ("B", "C", "D")}) != 1
-                for field in shared_settings
-            ):
-                raise EvaluationRejected("trained arms differ in shared native resource controls")
-            evaluator_lora = canonical_json(
-                self.native_factory.settings.lora.model_dump(mode="json")
-            )
-            learned_lora = tuple(
-                canonical_json(actual_training[arm][1].lora.model_dump(mode="json"))
-                for arm in ("B", "C", "D")
-            )
-            if any(value != evaluator_lora for value in learned_lora):
+            if any(ref not in checkpoint.configuration.tasks for ref in checkpoint.consumed_tasks):
+                raise EvaluationRejected("checkpoint consumed a task outside its frozen training configuration")
+            if settings.lora != self.native_factory.settings.lora:
                 raise EvaluationRejected(
-                    "trained arms and evaluator differ in frozen LoRA controls"
+                    "trained arm and evaluator differ in frozen LoRA controls"
                 )
-            if any(
-                len({getattr(actual_training[arm][1], field) for arm in ("C", "D")}) != 1
-                for field in ("clip_epsilon", "kl_coefficient")
+            training = checkpoint.configuration
+            budget = protocol.training_budget
+            if budget.max_updates != training.max_updates:
+                raise EvaluationRejected(
+                    "declared update budget differs from selected training run"
+                )
+            actual_rollouts = settings.max_groups * training.group_size
+            if (
+                budget.max_rollouts != actual_rollouts
+                or budget.max_assistant_tokens
+                != actual_rollouts * training.limits.output_tokens
             ):
-                raise EvaluationRejected("RL arms differ in native clipping or KL controls")
-            for arm in ("B", "C", "D"):
-                training, settings = actual_training[arm]
-                budget = protocols[arm].training_budget
-                if budget.max_updates != training.max_updates:
-                    raise EvaluationRejected(
-                        "declared update budget differs from selected training run"
-                    )
-                if arm in ("C", "D"):
-                    actual_rollouts = settings.max_groups * training.group_size
-                    if (
-                        budget.max_rollouts != actual_rollouts
-                        or budget.max_assistant_tokens
-                        != actual_rollouts * training.limits.output_tokens
-                    ):
-                        raise EvaluationRejected(
-                            "declared RL rollout/token budget differs from native bounds"
-                        )
-            self._training_origins(protocols, actual_training)
+                raise EvaluationRejected(
+                    "declared RL rollout/token budget differs from native bounds"
+                )
+            self._training_origins(protocols, training)
         roster_dependencies = tuple(dict.fromkeys((
             *roster.locked_tasks, roster.test_source_frame, roster.exclusions,
             *(item.evidence for item in roster.sources), *(item.evidence for item in roster.relations),

@@ -49,7 +49,6 @@ class AuthoringContext(StrictModel):
 
 
 class GenerationLimits(StrictModel):
-    measurement_profile: Literal["tiny_smoke_2048x128", "larger_unqualified"]
     wall_seconds: Annotated[float, Field(gt=0, le=120)]
     cpu_seconds: Annotated[int, Field(gt=0, le=120)]
     stdin_bytes: Annotated[int, Field(gt=0, le=1_048_576)]
@@ -57,21 +56,17 @@ class GenerationLimits(StrictModel):
     file_size_bytes: Annotated[int, Field(gt=0, le=1_048_576)]
     input_tokens: Annotated[int, Field(gt=0, le=262_144)]
     output_tokens: Annotated[int, Field(gt=0, le=262_144)]
-    mlx_memory_guideline_bytes: Literal[3_758_096_384]
-    mlx_wired_limit_bytes: Literal[3_758_096_384]
-    mlx_cache_limit_bytes: Literal[0]
-    physical_footprint_kill_bytes: Literal[4_294_967_296]
-    physical_footprint_poll_seconds: Literal[0.02]
-    declared_memory_ceiling_bytes: Literal[5_368_709_120]
+    physical_footprint_kill_bytes: Annotated[int, Field(gt=0)]
+    physical_footprint_poll_seconds: Annotated[float, Field(gt=0, le=1)]
+    cuda_memory_bytes: Annotated[int, Field(gt=0)] | None = None
+    declared_memory_ceiling_bytes: Annotated[int, Field(gt=0)]
 
     @model_validator(mode="after")
     def token_envelope(self):
         if self.input_tokens + self.output_tokens > 262_144:
             raise ValueError("input and emitted output must fit the model context envelope")
-        if self.measurement_profile == "tiny_smoke_2048x128" and (
-            self.input_tokens > 2048 or self.output_tokens > 128
-        ):
-            raise ValueError("tiny smoke profile is qualified only through 2048 input/128 output")
+        if self.declared_memory_ceiling_bytes <= self.physical_footprint_kill_bytes + (self.cuda_memory_bytes or 0):
+            raise ValueError("declared memory ceiling must leave a guard band above process and CUDA limits")
         return self
 
 
@@ -160,7 +155,7 @@ class GenerationRequest(StrictModel):
                 elif item.role == "baseline":
                     baselines += 1
                     valid = (
-                        item.source.kind in {"source-archive", "click-runtime-discovery", "runtime-discovery"}
+                        item.source.kind in {"source-archive", "runtime-discovery"}
                         and item.source.encoding == "bytes"
                         and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
                     )
@@ -209,7 +204,7 @@ class GenerationRequest(StrictModel):
                 elif item.role == "baseline":
                     baselines += 1
                     valid = (
-                        item.source.kind in {"source-archive", "click-runtime-discovery", "runtime-discovery"}
+                        item.source.kind in {"source-archive", "runtime-discovery"}
                         and item.source.encoding == "bytes"
                         and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
                     )
@@ -305,7 +300,7 @@ class GenerationAttemptMetadata(StrictModel):
     attempt_id: Identifier
     recorded_at: UTCDateTime
     producer: Literal["feature_rl.generation.LocalGenerationProvider"]
-    protocol_version: Literal[3]
+    protocol_version: Literal[3, 4]
     request_id: GenerationIdentifier
     response_id: GenerationIdentifier
     prompt_id: GenerationIdentifier
@@ -314,10 +309,12 @@ class GenerationAttemptMetadata(StrictModel):
     source_sha256: dict[str, Digest]
     configured_model_id: Text
     configured_model_revision: Revision
-    model_config_sha256: Digest
+    model_config_sha256: Digest | None = None
     model_manifest_sha256: Digest
     dependency_manifest_sha256: Digest
-    dependency_versions: dict[str, str]
+    dependency_versions: dict[str, str] = Field(default_factory=dict)
+    device: str | None = None
+    dtype: str | None = None
 
 
 class GenerationResult(StrictModel):

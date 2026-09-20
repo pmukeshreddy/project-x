@@ -1,4 +1,5 @@
 """CPU-only request/monitor/classification tests; session doubles are not Docker evidence."""
+from m4_fixtures import runtime_policy
 from types import SimpleNamespace
 import json
 import pytest
@@ -21,7 +22,7 @@ def test_request_default_and_fractional_remaining_cpu():
 
 
 def engine_double():
-    engine=object.__new__(DockerEngine);engine.policy=SandboxPolicy();engine.daemon_id='test-daemon'
+    engine=object.__new__(DockerEngine);engine.policy=runtime_policy();engine.daemon_id='test-daemon'
     engine.http=lambda *a,**k:(200,json.dumps({'cpu_stats':{'cpu_usage':{'total_usage':700000000}},'memory_stats':{'usage':123}}).encode())
     return engine
 
@@ -43,7 +44,7 @@ def ref(kind):return ArtifactRef(sha256='a'*64,kind=kind,schema_version=1,visibi
 
 
 def runtime_double(phase,cleanup_failure=False):
-    runtime=object.__new__(EnvironmentRuntime);runtime.policy=SandboxPolicy();runtime.revision='a'*40
+    runtime=object.__new__(EnvironmentRuntime);runtime.policy=runtime_policy();runtime.revision='a'*40
     source=SourceArchive({'src/click/__init__.py':SourceFile(b'x=1\n',False)})
     saved=SavedSource(artifact=ref('source-archive'),raw_sha256='b'*64,tree_sha256=source.tree_sha256,version=0,saved_at='2026-09-19T00:00:00+00:00')
     prepared=PreparedEnvironment(recipe=ref('EnvironmentRecipe'),policy=ref('sandbox-policy'))
@@ -113,7 +114,7 @@ def test_export_cpu_monitor_failure_has_distinct_exception(monkeypatch):
 def test_recovery_preserves_original_cap_when_current_policy_is_stricter():
     from feature_rl.environments.docker import DockerSession
     engine=engine_double();original=engine.session(binding={},saved_source={})
-    engine.policy=SandboxPolicy(cpu_seconds=1.0)
+    engine.policy=runtime_policy(cpu_seconds=1.0)
     recovery=DockerSession(engine,original.record.binding,{},record=original.record)
     assert recovery.effective_cpu_seconds==60.0
     assert recovery.record.binding==original.record.binding

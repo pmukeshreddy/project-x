@@ -1,7 +1,7 @@
 """Connected GitHub PR intake over verified response and Git object caches."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import json
 import re
@@ -63,6 +63,29 @@ def _canonical(value) -> bytes:
     ).encode("utf-8")
 
 
+def _reconstruct_pull_request(history, integration, pr_data, commits_data):
+    """Use the same graph proof during acquisition and immutable intake."""
+    if not isinstance(commits_data, list) or not commits_data:
+        raise ValueError("PR commit response must be a nonempty array")
+    source_commits = tuple(item["sha"] for item in commits_data)
+    if any(not isinstance(item, str) or not _REVISION.fullmatch(item) for item in source_commits):
+        raise ValueError("PR commits contain an invalid full object ID")
+    source_head = pr_data["head"]["sha"]
+    if source_head != source_commits[-1]:
+        raise ValueError("PR head does not match the final source commit")
+    reconstruction = history.reconstruct(
+        pr_data["merge_commit_sha"], integration=integration,
+        source_head=source_head if integration in {"merge", "squash", "rebase"} else None,
+        implementation_commits=source_commits if integration == "linear" else (),
+        source_commits=source_commits if integration in {"squash", "rebase"} else (),
+    )
+    recovered = (reconstruction.source_commits if integration == "rebase"
+                 else reconstruction.implementation_commits)
+    if recovered != source_commits:
+        raise ValueError("Git graph and PR commit list disagree")
+    return reconstruction, source_commits
+
+
 def _unknown_cost(category: str, note: str) -> CostRecord:
     return CostRecord(
         category=category,
@@ -99,6 +122,7 @@ class PullRequestIntakeSpec:
     mixed_paths: Mapping[str, str]
     max_tree_archive_bytes: int
     license_path: str = 'LICENSE.txt'
+    additional_pages: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def __post_init__(self):
         from feature_rl.environments.archive import safe_path
@@ -116,6 +140,13 @@ class PullRequestIntakeSpec:
             raise ValueError("source_names omits a required PR intake response")
         if len(set(self.source_names)) != len(self.source_names):
             raise ValueError("source_names must be unique")
+        if set(self.additional_pages).difference({self.comments_name, self.commits_name, self.files_name}):
+            raise ValueError("only comments, commits and files can have additional response pages")
+        pages = tuple(name for names in self.additional_pages.values() for name in names)
+        if (len(pages) != len(set(pages)) or set(pages).intersection(required)
+                or not set(pages).issubset(self.source_names)
+                or any(len(names) > 29 for names in self.additional_pages.values())):
+            raise ValueError("additional response pages must be unique named source bodies")
         if not self.request_lineage or not self.partition_source_ids:
             raise ValueError("request lineage and partition source IDs are required")
         if self.admissible_cutoff.utcoffset() != timezone.utc.utcoffset(
@@ -148,7 +179,7 @@ class PullRequestIntakeResult:
     source_pair: ArtifactRef
     authoring: AuthoringSourceView
     reference: ArtifactRef
-    manual_review_required: tuple[str, ...]
+    mixed_paths_for_qualification: tuple[str, ...]
     provenance_label: Literal["historical_request", "reconstructed_specification"]
 
 
@@ -187,12 +218,14 @@ class GitHubPullRequestIntake:
         return next(iter(values))
 
     def _load_sources(self, spec: PullRequestIntakeSpec):
+        editable = {spec.pr_name, spec.issue_name, spec.comments_name,
+                    *spec.additional_pages.get(spec.comments_name, ())}
         loaded = {
             name: self.catalog.load(
                 name,
                 edit_history=(
                     "unavailable"
-                    if name in {spec.pr_name, spec.issue_name, spec.comments_name}
+                    if name in editable
                     else "not_applicable"
                 ),
                 media_type="application/json",
@@ -216,6 +249,20 @@ class GitHubPullRequestIntake:
         )
         return loaded, license_text, pr_data, issue_data
 
+    @staticmethod
+    def _array(loaded, spec, name):
+        values = []
+        for page in (name, *spec.additional_pages.get(name, ())):
+            value = _json(loaded[page].body)
+            if not isinstance(value, list):
+                raise ValueError("paginated source body must be a JSON array")
+            values.extend(value)
+        key = {spec.commits_name: 'sha', spec.files_name: 'filename', spec.comments_name: 'id'}[name]
+        identities = [item[key] for item in values]
+        if len(identities) != len(set(identities)):
+            raise ValueError("source pages contain duplicate identities")
+        return values
+
     def ingest(
         self, spec: PullRequestIntakeSpec, partition_manifest: PartitionManifest
     ) -> PullRequestIntakeResult:
@@ -225,42 +272,12 @@ class GitHubPullRequestIntake:
             raise TypeError("ingest requires a spec and partition manifest")
         partition = self._partition(spec, partition_manifest)
         loaded, license_text_source, pr_data, issue_data = self._load_sources(spec)
-        commits_data = _json(loaded[spec.commits_name].body)
-        files_data = _json(loaded[spec.files_name].body)
-        comments_data = _json(loaded[spec.comments_name].body)
+        commits_data = self._array(loaded, spec, spec.commits_name)
+        files_data = self._array(loaded, spec, spec.files_name)
+        comments_data = self._array(loaded, spec, spec.comments_name)
         license_data = _json(loaded[spec.license_name].body)
-        if not isinstance(commits_data, list) or not commits_data:
-            raise ValueError("PR commit response must be a nonempty array")
-        if not isinstance(files_data, list) or not isinstance(comments_data, list):
-            raise ValueError("PR files and comments must be arrays")
-
-        source_commits = tuple(item["sha"] for item in commits_data)
-        if any(not isinstance(item, str) or not _REVISION.fullmatch(item) for item in source_commits):
-            raise ValueError("PR commits contain an invalid full object ID")
-        integrated_after = pr_data["merge_commit_sha"]
-        source_head = pr_data["head"]["sha"]
-        if source_head != source_commits[-1]:
-            raise ValueError("PR head does not match the final source commit")
-        reconstruction = self.history.reconstruct(
-            integrated_after,
-            integration=spec.integration,
-            source_head=(
-                source_head if spec.integration in {"merge", "squash", "rebase"} else None
-            ),
-            implementation_commits=(
-                source_commits if spec.integration == "linear" else ()
-            ),
-            source_commits=(
-                source_commits if spec.integration in {"squash", "rebase"} else ()
-            ),
-        )
-        recovered_source = (
-            reconstruction.source_commits
-            if spec.integration == "rebase"
-            else reconstruction.implementation_commits
-        )
-        if recovered_source != source_commits:
-            raise ValueError("Git graph and PR commit list disagree")
+        reconstruction, source_commits = _reconstruct_pull_request(
+            self.history, spec.integration, pr_data, commits_data)
 
         issue_created = _parse_time(issue_data["created_at"])
         merged_at = _parse_time(pr_data["merged_at"])
@@ -395,7 +412,7 @@ class GitHubPullRequestIntake:
                 }
                 for item in partition_manifest.relations
             ],
-            "manual_review_required": list(classification.manual_review_required),
+            "mixed_paths_for_qualification": list(classification.mixed_paths_for_qualification),
             "provenance_label": spec.provenance_label,
             "source_commits": list(reconstruction.source_commits),
             "commit_mapping": [
@@ -439,14 +456,10 @@ class GitHubPullRequestIntake:
             parents=reconstruction.parents,
             evidence=evidence,
         )
-        screening_disposition = (
-            Disposition.PROVISIONAL
-            if classification.manual_review_required
-            else Disposition.SUCCESS
-        )
+        screening_disposition = Disposition.SUCCESS
         screening_reason = (
-            "Mixed-purpose changed files require explicit manual scope review"
-            if classification.manual_review_required
+            "Source history and licensing were reconstructed; mixed changes require automated permitted-source qualification"
+            if classification.mixed_paths_for_qualification
             else "Source history and licensing were reconstructed"
         )
         inputs = tuple(item.content for item in snapshots)
@@ -569,6 +582,6 @@ class GitHubPullRequestIntake:
                 license_text=license_snapshot.content,
             ),
             reference=reference_ref,
-            manual_review_required=classification.manual_review_required,
+            mixed_paths_for_qualification=classification.mixed_paths_for_qualification,
             provenance_label=spec.provenance_label,
         )

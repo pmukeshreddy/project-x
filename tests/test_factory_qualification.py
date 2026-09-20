@@ -1,4 +1,5 @@
 """Concrete M5 wiring; diagnostics do not create human approval or accepted Q."""
+from m4_fixtures import runtime_policy
 import pytest
 
 from feature_rl import contracts as c
@@ -13,7 +14,7 @@ def configured(tmp_path,monkeypatch):
     _,store,registry,builder,inputs,*_=fixture(tmp_path,monkeypatch)
     assert hasattr(Factory,'qualify'), 'Factory qualification orchestration is missing'
     runtime=object.__new__(EnvironmentRuntime)
-    runtime.store=store;runtime.policy=SandboxPolicy();runtime.revision='b'*40
+    runtime.store=store;runtime.policy=runtime_policy();runtime.revision='b'*40
     grader=GradingService(store=store,runtime=runtime,revision='c'*40)
     # Actual M5 missing package-validator denial runs without a worker/backend.
     q=QualificationService(store=store,registry=registry,grader=grader,builder=None,revision='d'*40)
@@ -71,23 +72,6 @@ def test_mechanical_release_uses_both_real_registry_transitions_under_test_gate(
     assert {'m6-transition-qualified','m6-transition-released'}<={j.spec.invocation for j in jobs}
 
 
-def test_accept_uses_frozen_request_policy_and_actual_human_denial(tmp_path,monkeypatch):
-    factory,built=configured(tmp_path,monkeypatch)
-    result=factory.qualify(built.artifacts[0])
-    from datetime import timedelta
-    from feature_rl.qualification import ReviewRequest
-    from feature_rl.artifacts import canonical_json
-    report=factory.store.get_artifact(result.artifacts[0])
-    qjob=next(factory.registry.job(j) for j in factory.registry.trace(built.artifacts[0]).jobs
-        if factory.registry.job(j).spec.invocation=='m5-qualify')
-    # Deliberately unselected TEST request: actual M5 must deny it, not ask for approval.
-    model=ReviewRequest(task=built.artifacts[0],report=result.artifacts[0],policy=report.provenance.inputs[1],
-        challenge='a'*64,issued_at=report.provenance.created_at,
-        expires_at=report.provenance.created_at+timedelta(seconds=60),qualification_job=qjob.job_id)
-    request=factory.store.put_bytes(canonical_json(model.model_dump(mode='json')),'m5-review-request',c.Visibility.PRIVATE)
-    attestation=factory.store.put_bytes(b'TEST ONLY not a human signature','m5-sshsig-attestation',c.Visibility.PRIVATE)
-    from feature_rl.qualification import QualificationRejected
-    with pytest.raises(QualificationRejected):factory.accept(request,attestation)
 
 
 def test_factory_recovery_reconstructs_selected_m5_policy_and_exact_revision(tmp_path,monkeypatch):

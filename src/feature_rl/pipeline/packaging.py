@@ -9,7 +9,7 @@ from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl import contracts as c
 from feature_rl.environments import SourceArchive, SourceFile, SandboxPolicy
 from feature_rl.environments.archive import safe_path
-from feature_rl.environments.profiles import runtime_profile, validate_recipe_profile
+from feature_rl.environments.profiles import validate_recipe_profile
 from .models import BuildInputs, BuildRejected, InventoryEntry, SolverInventory
 
 MAX_DOCUMENT = 1024 * 1024
@@ -108,7 +108,7 @@ def resolve(store, inputs):
         raise BuildRejected('unsupported submission/controller policy')
     for path in allowed.source_roots:
         source_path(path)
-    profile = runtime_profile(policy)
+    profile = policy.profile
     profile.validate_allowed_changes(allowed)
     if inputs.environment.policy not in recipe.provenance.inputs:
         raise BuildRejected('runtime recipe omits its exact policy')
@@ -150,19 +150,15 @@ def public_values(store, resolved):
         'dependencies': [{'name': p.name, 'version': p.version, 'sha256': p.sha256} for p in recipe.dependencies],
         'setup': [document(command) for command in recipe.setup], 'reset': [document(command) for command in recipe.reset],
         'environment': [document(item) for item in recipe.environment],
-        'development_environment': [{'name': key, 'value': value} for key, value in runtime_profile(resolved.policy).development_environment],
+        'development_environment': [{'name': key, 'value': value} for key, value in resolved.policy.profile.development_environment],
         'limits': document(recipe.limits), 'locale': recipe.locale, 'timezone': recipe.timezone,
         'randomness': document(recipe.randomness), 'network_policy': recipe.network_policy}
-    # Legacy policies retain the exact public bytes of their frozen packages.
-    # New profiles disclose their full safe runtime contract and platform.
-    if resolved.policy.profile is not None:
-        runtime.update(profile=resolved.policy.profile.model_dump(mode='json', exclude={'neutral_repairs'}),
-                       platform=resolved.policy.platform)
-    if recipe.runtime_image is not None:
-        from feature_rl.environments.images import validate_runtime_image
-        image = validate_runtime_image(recipe, resolved.policy, store)
-        runtime.update(host_requirements=document(image.host_requirements),
-                       runtime_image_context_sha256=image.context_sha256)
+    runtime.update(profile=resolved.policy.profile.model_dump(mode='json', exclude={'neutral_repairs'}),
+                   platform=resolved.policy.platform)
+    from feature_rl.environments.images import validate_runtime_image
+    image = validate_runtime_image(recipe, resolved.policy, store)
+    runtime.update(host_requirements=document(image.host_requirements),
+                   runtime_image_context_sha256=image.context_sha256)
     checks = tuple(dict.fromkeys((*contract.public_checks, *resolved.verifier.public_examples)))
     if len(checks) > 64:
         raise BuildRejected('public-check count limit')

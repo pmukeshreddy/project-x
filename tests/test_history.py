@@ -408,7 +408,7 @@ def test_file_classification_preserves_mixed_review_gates():
         "pyproject.toml": "dependency_build",
         "assets/unknown.bin": "mixed",
     }
-    assert result.manual_review_required == (
+    assert result.mixed_paths_for_qualification == (
         "assets/unknown.bin",
         "src/click/exceptions.py",
     )

@@ -179,7 +179,6 @@ class ScenarioAuthoringService:
             if artifact.kind in {
                 "authoring-request",
                 "source-archive",
-                "click-runtime-discovery",
                 "runtime-discovery",
             }
         } | set(contract.public_checks)

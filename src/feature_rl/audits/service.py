@@ -11,7 +11,7 @@ from feature_rl.artifacts import ArtifactError, ArtifactStore, canonical_json
 from feature_rl.grading import read_grade
 from feature_rl.pipeline import read_source_disposition
 from feature_rl.pipeline.factory import source_decision
-from feature_rl.qualification.attestation import NAMESPACE, SSHHumanVerifier, verify_sshsig
+from feature_rl.audits.attestation import NAMESPACE, SSHHumanVerifier, verify_sshsig
 from feature_rl.registry import Claim, CostObservation, JobSpec, Registry, RegistryError
 from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_bytes, read_local

@@ -102,7 +102,7 @@ def resolve_control_inputs(store, resolver, inputs, sources):
     sources = tuple(resolver.resolve(sources))
     contract = _artifact(store, inputs.contract, RequirementContract)
     expected = {ref for ref in contract.provenance.inputs if ref.kind in {
-        'authoring-request', 'source-archive', 'click-runtime-discovery', 'runtime-discovery'}} | set(contract.public_checks)
+        'authoring-request', 'source-archive', 'runtime-discovery'}} | set(contract.public_checks)
     if {source.source for source in sources} != expected or resolver.baseline != inputs.baseline or set(resolver.public_checks) != set(contract.public_checks):
         raise ValueError('control evidence differs from exact contract/B sources')
     requests = [source for source in sources if source.role == 'request']

@@ -12,7 +12,7 @@ def test_bridge_module_exists():
 
 def test_framework_grpo_uses_behavior_denominator_and_upstream_sum_reduction():
     torch = pytest.importorskip('torch')
-    from feature_rl.training.skyrl_bridge import feature_grpo_loss, feature_sft_loss
+    from feature_rl.training.skyrl_bridge import feature_grpo_loss
     current = torch.tensor([[-.5, -.5]], requires_grad=True)
     config = SimpleNamespace(eps_clip_low=.2, eps_clip_high=.2)
     # Recomputed old=-10 would clip differently; sampled behavior exactly equals current.
@@ -20,10 +20,6 @@ def test_framework_grpo_uses_behavior_denominator_and_upstream_sum_reduction():
         torch.tensor([[1., 0.]]), current.detach())
     loss.backward()
     assert current.grad.tolist() == [[-.5, 0.]]
-    current.grad = None
-    loss, _ = feature_sft_loss(current, None, torch.tensor([[.25, .25]]), config, torch.tensor([[1., 0.]]))
-    loss.backward()
-    assert current.grad.tolist() == [[-.25, 0.]]
 
 
 def test_bridge_calls_are_actual_pinned_trainer_symbols():
@@ -122,7 +118,7 @@ def test_conversion_rejects_noncontiguous_groups_without_changing_config(monkeyp
 
 
 def test_singleton_rows_are_omitted_without_replacing_assigned_records_or_costs():
-    from feature_rl.training.core import GroupPlan, TaskSlot
+    from feature_rl.training.core import GroupPlan, TaskSlot, group_advantages
     from feature_rl.training.data import PreparedGroup
     from feature_rl.training.skyrl_bridge import group_rows
     from feature_rl.training.torch_backend import CausalTurn
@@ -131,8 +127,9 @@ def test_singleton_rows_are_omitted_without_replacing_assigned_records_or_costs(
         plan=GroupPlan(str(n),TaskSlot('task','family','feature'),'policy',(1,2,3,4),5,n)
         # This pure tensor projection fixture does not claim to establish admissions/outcomes.
         records=tuple(SimpleNamespace(costs=(i+1,),reward=r) for i,r in enumerate(rewards))
-        turns=tuple((CausalTurn((1,2),(3,),(True,),(-1.,),0.),) if r is not None else () for r in rewards)
-        groups.append(PreparedGroup(plan,records,turns,rewards,tuple(0. if r is not None else None for r in rewards)))
+        advantages=group_advantages(rewards)
+        turns=tuple((CausalTurn((1,2),(3,),(True,),(-1.,),a),) if a is not None else () for a in advantages)
+        groups.append(PreparedGroup(plan,records,turns,rewards,advantages))
     original=[(g.records,tuple(r.costs for r in g.records)) for g in groups]
     rows=group_rows(groups)
     assert [r.instance_id for r in rows] == ['0','0','2','2','2']

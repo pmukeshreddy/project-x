@@ -1,5 +1,6 @@
 """Repository-profile discovery via an installed B wheel in the real sandbox."""
 from dataclasses import dataclass
+import json
 from typing import Annotated, Literal
 from pydantic import Field, model_validator
 
@@ -7,7 +8,6 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import ArtifactRef, CommandSpec, CostRecord, StrictModel, Visibility
 from feature_rl.environments import ExecutionRequest
 from .models import GroundedSource
-from .discovery import ClickDiscoveryService, ClickDiscoveryError, _json_no_duplicates
 
 
 DISCOVERY_CODE = r'''import importlib, importlib.metadata, inspect, json, platform, sys
@@ -79,16 +79,13 @@ class RuntimeDiscoveryResult:
 
 
 def parse_discovery(ref, text):
-    from .discovery import ClickDiscoveryObservation
-    if ref.kind == 'click-runtime-discovery':
-        return ClickDiscoveryObservation.model_validate_json(text)
     if ref.kind == 'runtime-discovery':
         return RuntimeDiscoveryObservation.model_validate_json(text)
     raise ValueError('unsupported runtime discovery kind')
 
 
 def discovery_locator(ref):
-    if ref.kind not in {'click-runtime-discovery', 'runtime-discovery'}:
+    if ref.kind not in {'runtime-discovery'}:
         raise ValueError('unsupported runtime discovery kind')
     return 'm3:'+ref.kind+'-v1'
 
@@ -98,8 +95,6 @@ class RuntimeDiscoveryService:
         self.runtime = runtime
 
     def discover(self, prepared):
-        if self.runtime.policy.profile is None:
-            return ClickDiscoveryService(runtime=self.runtime).discover(prepared)
         import hashlib
         profile = self.runtime.profile
         recipe = self.runtime.recipe(prepared)
@@ -115,8 +110,9 @@ class RuntimeDiscoveryService:
                 stdin=canonical_json(settings), save_source=False), build=build)
             if (execution.reason != 'completed' or execution.failure_category != 'none' or execution.exit_code != 0
                     or not execution.cleanup_verified or execution.oom_killed or len(execution.stdout) > 65536):
-                raise ClickDiscoveryError('installed repository discovery failed')
-            decoded = _json_no_duplicates(execution.stdout)
+                raise ValueError('installed repository discovery failed')
+            decoded = json.loads(execution.stdout)
+            # Exact canonical bytes also reject duplicate keys and nonfinite values.
             if canonical_json(decoded) != execution.stdout:
                 raise ValueError('discovery output is not canonical JSON')
             probe = RuntimeProbeObservation.model_validate_json(execution.stdout)

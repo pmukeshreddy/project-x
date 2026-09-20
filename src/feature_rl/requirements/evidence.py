@@ -62,7 +62,7 @@ class AuthoringEvidenceResolver:
         if self.baseline.kind != "source-archive" or self.baseline.encoding != "bytes":
             raise EvidenceResolutionError("exact baseline source archive is required")
         if (
-            self.runtime_discovery.kind not in {"click-runtime-discovery", "runtime-discovery"}
+            self.runtime_discovery.kind not in {"runtime-discovery"}
             or self.runtime_discovery.encoding != "bytes"
         ):
             raise EvidenceResolutionError("exact validated runtime discovery is required")

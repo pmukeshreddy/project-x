@@ -99,7 +99,7 @@ def context(
 
 def limits(**updates) -> GenerationLimits:
     values = dict(
-        measurement_profile="tiny_smoke_2048x128",
+
         wall_seconds=120.0,
         cpu_seconds=120,
         stdin_bytes=1_048_576,
@@ -107,9 +107,6 @@ def limits(**updates) -> GenerationLimits:
         file_size_bytes=1_048_576,
         input_tokens=2048,
         output_tokens=128,
-        mlx_memory_guideline_bytes=3_758_096_384,
-        mlx_wired_limit_bytes=3_758_096_384,
-        mlx_cache_limit_bytes=0,
         physical_footprint_kill_bytes=4_294_967_296,
         physical_footprint_poll_seconds=0.02,
         declared_memory_ceiling_bytes=5_368_709_120,
@@ -350,13 +347,13 @@ def test_request_rejects_duplicate_ids_placeholders_and_relaxed_resource_policy(
         {"wall_seconds": 120.1},
         {"cpu_seconds": 121},
         {"file_size_bytes": 1_048_577},
-        {"physical_footprint_poll_seconds": 0.021},
+        {"physical_footprint_poll_seconds": 1.01},
         {"physical_footprint_kill_bytes": 5_368_709_120},
     ):
         with pytest.raises(ValidationError):
             limits(**update)
     larger = limits(
-        measurement_profile="larger_unqualified", input_tokens=8192, output_tokens=1024
+         input_tokens=8192, output_tokens=1024
     )
     assert larger.input_tokens == 8192
 
@@ -418,7 +415,6 @@ MODEL_FILES = (
     "generation_config.json",
     "merges.txt",
     "model.safetensors",
-    "model.safetensors.index.json",
     "special_tokens_map.json",
     "tokenizer.json",
     "tokenizer_config.json",
@@ -434,7 +430,7 @@ def synthetic_model(tmp_path: Path):
         data = (
             b'{"architectures":["Qwen3ForCausalLM"],"model_type":"qwen3"}'
             if name == "config.json"
-            else ("content:" + name).encode()
+            else b"{}" if name == "tokenizer_config.json" else ("content:" + name).encode()
         )
         (model / name).write_bytes(data)
         files.append(
@@ -447,7 +443,7 @@ def synthetic_model(tmp_path: Path):
             }
         )
     manifest = {
-        "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+        "model_id": "test/causal-lm",
         "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
         "runtime_positive_allowlist": list(MODEL_FILES),
         "actual_total_bytes": sum(item["bytes"] for item in files),
@@ -469,7 +465,7 @@ def test_model_verifier_rejects_extra_missing_and_tampered_files(tmp_path):
         verify_model_files(manifest, model)
     (model / "remote_model.py").unlink()
     (model / "tokenizer.json").write_text("tampered")
-    with pytest.raises(BackendConfigurationError, match="hash"):
+    with pytest.raises(BackendConfigurationError, match="identity mismatch"):
         verify_model_files(manifest, model)
 
 
@@ -484,13 +480,16 @@ def test_platform_and_dependency_closure_refuse_fallbacks():
         macos_major=26,
     )
     assert verify_platform(supported) == supported
-    with pytest.raises(BackendConfigurationError, match="CPython 3.13"):
-        verify_platform(supported.model_copy(update={"machine": "x86_64"}))
+    with pytest.raises(BackendConfigurationError, match="CPython 3.11"):
+        verify_platform(supported.model_copy(update={"system": "Windows"}))
 
-    manifest = json.loads(Path("docs/evidence/M2/local-mlx-dependencies.json").read_text())
+    manifest = {"wheels": [
+        {"name": name, "version": "1.0", "filename": name + ".whl", "sha256": "a" * 64}
+        for name in ("torch", "transformers", "tokenizers", "safetensors", "packaging")
+    ]}
     installed = {item["name"]: item["version"] for item in manifest["wheels"]}
-    assert verify_dependency_manifest(manifest, installed).package_count == 34
-    installed["mlx"] = "0.0.0"
+    assert verify_dependency_manifest(manifest, installed).package_count == 5
+    installed["torch"] = "0.0.0"
     with pytest.raises(BackendConfigurationError, match="installed dependency"):
         verify_dependency_manifest(manifest, installed)
 
@@ -502,6 +501,8 @@ def test_backend_config_requires_existing_exact_manifests(tmp_path):
         model_directory=tmp_path / "model",
         model_manifest=tmp_path / "model.json",
         dependency_manifest=tmp_path / "dependencies.json",
+        model_id="test/causal-lm", revision="a" * 40,
+        model_manifest_sha256="a" * 64, dependency_manifest_sha256="b" * 64,
     )
     with pytest.raises(BackendConfigurationError, match="missing"):
         missing.verify()
@@ -513,6 +514,7 @@ def test_backend_config_requires_existing_exact_manifests(tmp_path):
     ):
         path.write_text("{}")
     missing.model_directory.mkdir()
+    missing = missing.model_copy(update={"python_executable": Path(sys.executable)})
     with pytest.raises(BackendConfigurationError, match="manifest identity"):
         missing.verify()
 
@@ -870,6 +872,12 @@ class FakeBackend:
     model_directory = Path("/explicit/model")
     model_manifest = Path("/explicit/model-manifest.json")
     dependency_manifest = Path("/explicit/dependencies.json")
+    model_id = "test/causal-lm"
+    revision = "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b"
+    model_manifest_sha256 = "697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0"
+    dependency_manifest_sha256 = "d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831"
+    device = "cpu"
+    dtype = "float32"
 
     def verify(self):
         return VerifiedBackend(
@@ -878,7 +886,7 @@ class FakeBackend:
                 system="Darwin", machine="arm64", macos_major=26,
             ),
             model=VerifiedModel(
-                model_id="mlx-community/Qwen3-4B-Instruct-2507-4bit",
+                model_id="test/causal-lm",
                 revision="50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
                 file_count=11,
                 total_bytes=2_278_969_697,
@@ -886,7 +894,7 @@ class FakeBackend:
                 tokenizer_sha256="aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
                 weights_sha256="2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f",
             ),
-            dependencies=VerifiedDependencies(package_count=34, versions={"mlx": "0.32.2"}),
+            dependencies=VerifiedDependencies(package_count=34, versions={"torch": "1.0"}),
             model_manifest_sha256="697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0",
             dependency_manifest_sha256="d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831",
         )
@@ -903,7 +911,7 @@ class NeverVerifiedBackend(FakeBackend):
 
 def worker_events(*, event_override=None, truncated=False):
     common = {
-        "protocol_version": 3,
+        "protocol_version": 4,
         "request_id": "REQ_CALL_1",
         "response_id": "RESP_1",
         "prompt_id": "PROMPT_1",
@@ -911,14 +919,14 @@ def worker_events(*, event_override=None, truncated=False):
     events = [
         common | {
             "event": "identity_validated",
-            "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+            "model_id": "test/causal-lm",
             "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
             "config_sha256": "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849",
             "tokenizer_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
             "weights_sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f",
             "model_manifest_sha256": "697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0",
             "dependency_manifest_sha256": "d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831",
-            "dependency_versions": {"mlx": "0.32.2"},
+            "dependency_versions": {"torch": "1.0"},
             "seed": 0,
             "prompt_sha256": "AUTO",
             "worker_source_sha256": "AUTO",
@@ -928,39 +936,35 @@ def worker_events(*, event_override=None, truncated=False):
             },
             "local_files_only": True,
             "remote_code": False,
+            "device": "cpu", "dtype": "float32",
         },
         common | {"event": "input_accepted", "actual_input_tokens": 41, "input_token_ids": list(range(41)), "max_input_tokens": 2048},
         common | {
             "event": "memory_controls_set",
-            "mlx_memory_guideline_bytes": 3_758_096_384,
-            "mlx_cache_limit_bytes": 0,
-            "mlx_wired_limit_bytes": 3_758_096_384,
-            "previous_memory_limit_bytes": 5_000_000_000,
-            "previous_cache_limit_bytes": 5_000_000_000,
-            "previous_wired_limit_bytes": 0,
+            "device": "cpu", "cuda_memory_bytes": None,
         },
         common | {
             "event": "model_loaded",
-            "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+            "model_id": "test/causal-lm",
             "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
             "fresh_process": True, "fresh_prompt_cache": True,
-            "active_memory_bytes": 2_000_000_000,
-            "peak_memory_bytes": 2_100_000_000,
-            "cache_memory_bytes": 0,
+            "active_memory_bytes": None,
+            "peak_memory_bytes": None,
+            "cache_memory_bytes": None,
         },
         common | {"event": "token", "position": 1, "token_id": 100, "selected_model_logprob": -0.25, "text_fragment": "{"},
         common | {
             "event": "completed",
-            "model_id": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+            "model_id": "test/causal-lm",
             "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
             "input_tokens": 41, "output_tokens": 1, "max_output_tokens": 128,
             "finish_reason": "stop", "sampling_policy": "greedy_argmax",
             "truncated": truncated,
             "output_text": json.dumps({"response_id":"RESP_1","source_ids":["SRC_1"],"requirement_ids":["FEATURE_1"],"content":{"ok":True,"nonce":"unit"}}),
             "inference_seconds": 0.5, "total_seconds": 1.0,
-            "active_memory_bytes": 2_050_000_000,
-            "peak_memory_bytes": 2_100_000_000,
-            "cache_memory_bytes": 0,
+            "active_memory_bytes": None,
+            "peak_memory_bytes": None,
+            "cache_memory_bytes": None,
             "fresh_process": True, "fresh_prompt_cache": True,
         },
     ]
@@ -1083,20 +1087,18 @@ def test_provider_validates_envelope_and_archives_complete_call(tmp_path):
     attempt_receipt = json.loads(store.get_bytes(result.record.archives["attempt"]))
     assert usage_receipt["accepted_response_usage"] is True
     assert usage_receipt["accepted"]["token_ids"] == [100]
-    assert attempt_receipt["protocol_version"] == 3
+    assert attempt_receipt["protocol_version"] == 4
     assert attempt_receipt["producer"] == "feature_rl.generation.LocalGenerationProvider"
     assert attempt_receipt["recorded_at"].endswith("Z")
     assert attempt_receipt["source_sha256"]["provider.py"] == hashlib.sha256(
         Path("src/feature_rl/generation/provider.py").read_bytes()
     ).hexdigest()
-    assert attempt_receipt["model_config_sha256"] == (
-        "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849"
-    )
+    assert attempt_receipt["model_config_sha256"] is None
     assert response_receipt["max_sampled_physical_footprint_bytes"] == 2_000_000_000
     assert response_receipt["max_reported_lifetime_physical_footprint_bytes"] == 2_100_000_000
     assert response_receipt["process_group_cleanup_verified"] is True
     sent = json.loads(runner.calls[0]["stdin"])
-    assert sent["protocol_version"] == 3
+    assert sent["protocol_version"] == 4
     assert sent["response_id"] == "RESP_1"
     assert sent["max_output_tokens"] == 128
     assert "SRC_1" in sent["prompt"]
@@ -1719,7 +1721,7 @@ def test_provider_preserves_actual_m0_schema_json_transport(
 @pytest.mark.parametrize(
     ("event_index", "field", "wrong_value"),
     [
-        (0, "protocol_version", 3.0),
+        (0, "protocol_version", 4.0),
         (0, "local_files_only", 1),
         (0, "remote_code", 0),
         (3, "fresh_process", 1),
@@ -1736,14 +1738,14 @@ def test_event_protocol_rejects_numeric_equivalents_for_literals(
     events[0]["worker_source_sha256"] = "b" * 64
     assert _decode_event(json.dumps(events[event_index])).event == events[event_index]["event"]
     events[event_index][field] = wrong_value
-    with pytest.raises(ValueError, match="protocol v3"):
+    with pytest.raises(ValueError, match="protocol v4"):
         _decode_event(json.dumps(events[event_index]))
 
 
 @pytest.mark.parametrize("field", ["model_load_started", "inference_started"])
 def test_input_rejection_protocol_rejects_numeric_false(field):
     rejected = {
-        "protocol_version": 3,
+        "protocol_version": 4,
         "request_id": "REQ_CALL_1",
         "response_id": "RESP_1",
         "prompt_id": "PROMPT_1",
@@ -1755,7 +1757,7 @@ def test_input_rejection_protocol_rejects_numeric_false(field):
     }
     assert _decode_event(json.dumps(rejected)).event == "input_rejected"
     rejected[field] = 0
-    with pytest.raises(ValueError, match="protocol v3"):
+    with pytest.raises(ValueError, match="protocol v4"):
         _decode_event(json.dumps(rejected))
 
 
@@ -1767,7 +1769,7 @@ def test_input_rejection_protocol_rejects_numeric_false(field):
         (0, "weights_sha256", "0" * 64),
         (0, "model_manifest_sha256", "0" * 64),
         (0, "dependency_manifest_sha256", "0" * 64),
-        (0, "dependency_versions", {"mlx": "0.0.0"}),
+        (0, "dependency_versions", {"torch": "0.0.0"}),
         (0, "seed", 1),
         (0, "prompt_sha256", "0" * 64),
         (0, "worker_source_sha256", "0" * 64),
@@ -1775,7 +1777,7 @@ def test_input_rejection_protocol_rejects_numeric_false(field):
         (0, "remote_code", True),
         (0, "unexpected", "forbidden"),
         (1, "max_input_tokens", 2047),
-        (2, "previous_cache_limit_bytes", None),
+        (2, "cuda_memory_bytes", 1),
         (3, "model_id", "different/model"),
         (4, "selected_model_logprob", 0.01),
         (4, "text_fragment", 123),
@@ -1840,7 +1842,7 @@ def test_provider_retains_pre_inference_rejection_count_as_partial_cost(tmp_path
     """A rejected prompt's known token count is cost evidence, never successful usage."""
     identity = json.loads(worker_events().splitlines()[0])
     rejected = {
-        "protocol_version": 3, "request_id": "REQ_CALL_1", "response_id": "RESP_1",
+        "protocol_version": 4, "request_id": "REQ_CALL_1", "response_id": "RESP_1",
         "prompt_id": "PROMPT_1", "event": "input_rejected",
         "actual_input_tokens": 381, "max_input_tokens": 16,
         "model_load_started": False, "inference_started": False,

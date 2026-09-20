@@ -1,6 +1,6 @@
-"""Real causal SFT/GRPO tensor updates and strict local optimizer checkpoints.
+"""Real causal GRPO tensor updates and strict local optimizer checkpoints.
 
-This low-level engine is also usable for CPU diagnostics. Task/supervision admission
+This low-level engine is also usable for CPU diagnostics. Task admission
 belongs to the training service; an optimizer receipt is not feature-learning evidence.
 Torch imports are lazy so the core package remains usable without the training extra.
 """
@@ -34,10 +34,6 @@ def _masked(values, mask):
     if not torch.isfinite(selected).all():
         raise ValueError('Nonfinite trainable values')
     return selected
-
-
-def supervised_loss(logprobs, mask):
-    return -_masked(logprobs, mask).mean()
 
 
 def clipped_surrogate(logprobs, behavior, advantages, mask, epsilon_low: float, epsilon_high: float):
@@ -150,13 +146,11 @@ class TorchUpdater:
         torch = _torch()
         if self.failed:
             raise ValueError('Updater must reload after failed optimizer mutation')
-        if algorithm not in ('sft', 'grpo') or not turns:
-            raise ValueError('Nonempty explicit SFT/GRPO batch required')
+        if algorithm != 'grpo' or not turns:
+            raise ValueError('Nonempty explicit GRPO batch required')
         for turn in turns:
             turn.validate(self.settings['max_seq_len'])
-            if algorithm == 'sft' and (turn.behavior is not None or turn.advantage is not None):
-                raise ValueError('Supervised targets must not masquerade as sampled RL traces')
-            if algorithm == 'grpo' and (turn.behavior is None or turn.advantage is None):
+            if turn.behavior is None or turn.advantage is None:
                 raise ValueError('GRPO requires exact behavior probabilities and group advantage')
         before = model_digest(self.model)
         self.optimizer.zero_grad(set_to_none=True)
@@ -165,18 +159,15 @@ class TorchUpdater:
             logp = self.logprobs(turn)
             mask = torch.tensor(turn.mask, dtype=torch.bool, device=logp.device)
             tokens = int(mask.sum())
-            if algorithm == 'sft':
-                loss = supervised_loss(logp, mask)
-            else:
-                old = torch.tensor(turn.behavior, dtype=logp.dtype, device=logp.device)
-                adv = torch.full_like(logp, turn.advantage)
-                loss = clipped_surrogate(logp, old, adv, mask, self.settings['epsilon_low'], self.settings['epsilon_high'])
-                if self.settings['kl_coefficient']:
-                    with torch.no_grad():
-                        ref = self.logprobs(turn, reference=True)
-                    delta = _masked(ref - logp, mask)
-                    kl = (delta.exp() - delta - 1).mean()
-                    loss = loss + self.settings['kl_coefficient'] * kl
+            old = torch.tensor(turn.behavior, dtype=logp.dtype, device=logp.device)
+            adv = torch.full_like(logp, turn.advantage)
+            loss = clipped_surrogate(logp, old, adv, mask, self.settings['epsilon_low'], self.settings['epsilon_high'])
+            if self.settings['kl_coefficient']:
+                with torch.no_grad():
+                    ref = self.logprobs(turn, reference=True)
+                delta = _masked(ref - logp, mask)
+                kl = (delta.exp() - delta - 1).mean()
+                loss = loss + self.settings['kl_coefficient'] * kl
             terms.append(loss * tokens / total_tokens)
         objective = torch.stack(terms).sum()
         if not torch.isfinite(objective):

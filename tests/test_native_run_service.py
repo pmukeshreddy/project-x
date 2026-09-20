@@ -122,7 +122,7 @@ def test_checkpoint_selection_ignores_unrelated_blocked_descendants(tmp_path,mon
     from feature_rl.agents.native_service import NativeRunService
     from feature_rl.registry import JobSpec
     f=service_fixture(tmp_path,monkeypatch)
-    trained=f.service.train(f.config,invocation='selected-success',demonstrations=(f.demo,))
+    trained=f.service.train(f.config,invocation='selected-success')
     ref=next(r for r in trained.artifacts if r.kind=='TrainingCheckpoint');checkpoint=f.fixture.store.get_artifact(ref)
     request=f.fixture.store.put_bytes(b'diagnostic later budget stop','diagnostic-request',c.Visibility.PRIVATE)
     f.fixture.registry.register(request,dependencies=(ref,))

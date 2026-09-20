@@ -37,8 +37,7 @@ def validate_rules(rules):
 
 def apply_delta(baseline,archive,deletions,rules,policy):
     rules=validate_rules(rules)
-    from feature_rl.environments.profiles import runtime_profile
-    runtime_profile(policy).validate_allowed_changes(rules)
+    policy.profile.validate_allowed_changes(rules)
     if type(deletions) is not tuple or len(deletions)>policy.max_files:raise SourceRejected('deletion count/type')
     changes=SourceArchive.read(archive,policy).without_pytest_cache(baseline)
     # M3 accepts benign baseline directory entries. A submission is a strict file

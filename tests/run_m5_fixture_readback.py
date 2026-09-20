@@ -1,4 +1,5 @@
 """Read-only M5 validation of retained TEST-only Docker receipts; never rerun Docker."""
+from m4_fixtures import runtime_policy
 import copy
 import json
 from pathlib import Path
@@ -23,7 +24,7 @@ def main():
     events=registry.events(limit=1000)
     context=receipt['context'];checked=load_verifier(store,c.ArtifactRef.model_validate_json(json.dumps(context['task'])))
     runtime=object.__new__(EnvironmentRuntime)
-    runtime.store=store;runtime.policy=SandboxPolicy();runtime.revision=context['runtime_revision']
+    runtime.store=store;runtime.policy=runtime_policy();runtime.revision=context['runtime_revision']
     # No engine exists on this read-only object: worker execution cannot occur.
     grader=GradingService(store=store,runtime=runtime,revision=context['grading_revision'])
     seen=set();checked_runs=0;resets=0;negative_checks=0

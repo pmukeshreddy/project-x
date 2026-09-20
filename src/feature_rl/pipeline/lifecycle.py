@@ -103,8 +103,8 @@ class TaskLifecycle:
         return typed(self.store, reference, c.TaskBundle)
 
     def _built(self, task_ref, report_ref):
-        # Actual M5 authenticates accepted origin, all frozen gates, current
-        # enrollment/revocation, human payload and full T0 equality.
+        # M5 authenticates selected execution, all frozen gates and full T0
+        # equality.
         accepted = self.qualification.verify_accepted(task_ref, report_ref)
         built = self._task(accepted.task)
         if built.state != c.TaskState.BUILT or built.qualification is not None:
@@ -217,7 +217,7 @@ class TaskLifecycle:
             disposition,reason = c.Disposition.SUCCESS,'Exact accepted T0 payload selected as '+destination+'; solver bytes unchanged'
         except (ArtifactError,OSError,RegistryError,QualificationRejected,ValueError) as exc:
             if isinstance(exc,QualificationRejected):
-                disposition = c.Disposition.PROVISIONAL if exc.code in ('provisional','unverified_human_review') else c.Disposition.INVALID
+                disposition = c.Disposition.PROVISIONAL if exc.code == 'provisional' else c.Disposition.INVALID
             elif isinstance(exc,QuarantinedError):disposition=c.Disposition.BLOCKED
             elif isinstance(exc,RegistryError):disposition=c.Disposition.BLOCKED
             elif isinstance(exc,OSError):disposition=c.Disposition.INFRASTRUCTURE

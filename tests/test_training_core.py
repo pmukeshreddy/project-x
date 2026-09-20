@@ -14,7 +14,7 @@ def test_valid_only_groups_do_not_reward_singletons_or_drop_uniform_costs():
     assert group_advantages((1, 1, 1, 1)) == (0., 0., 0., 0.)
     assert group_advantages((None, None, None, None)) == (None,)*4
     with pytest.raises(ValueError):
-        group_advantages((1, 0))
+        group_advantages((1,))
     with pytest.raises(ValueError):
         group_advantages((True, 0, 0, 0))
 
@@ -35,20 +35,6 @@ def test_sampler_is_balanced_seeded_and_resume_exact():
         BalancedSampler(slots[:-1], seed=11).load_state_dict(state)
 
 
-def test_signal_gate_counts_once_and_stops_at_bounded_probe():
-    from feature_rl.training.core import SignalGate
-    gate = SignalGate()
-    for n in range(8):
-        gate.observe(str(n), str(n % 4), (1, 0, 0, 0))
-    assert gate.ready
-    with pytest.raises(ValueError):
-        gate.observe('0', '0', (1, 0, 0, 0))
-    empty = SignalGate()
-    for n in range(64):
-        empty.observe(str(n), 'task', (0, 0, 0, 0))
-    with pytest.raises(ValueError):
-        empty.observe('65', 'task', (0, 0, 0, 0))
-    assert not empty.ready
 
 
 def test_exact_context_and_policy_are_validated_without_prefix_flattening():

@@ -1,4 +1,4 @@
-"""Exact JSONL event protocol emitted by the isolated MLX worker."""
+"""Exact JSONL event protocol emitted by the isolated Transformers worker."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from feature_rl.contracts import Digest, NonnegativeFloat, NonnegativeInt, Stric
 
 from .models import GenerationIdentifier
 
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 
 
 def _exact_literal(expected):
@@ -24,7 +24,7 @@ def _exact_literal(expected):
     return validate
 
 
-ExactProtocolVersion = Annotated[Literal[3], BeforeValidator(_exact_literal(3))]
+ExactProtocolVersion = Annotated[Literal[4], BeforeValidator(_exact_literal(4))]
 ExactTrue = Annotated[Literal[True], BeforeValidator(_exact_literal(True))]
 ExactFalse = Annotated[Literal[False], BeforeValidator(_exact_literal(False))]
 
@@ -52,6 +52,8 @@ class IdentityValidated(EventIdentity):
     offline_environment: dict[str, str]
     local_files_only: ExactTrue
     remote_code: ExactFalse
+    device: str
+    dtype: str
 
 
 class InputAccepted(EventIdentity):
@@ -71,12 +73,8 @@ class InputRejected(EventIdentity):
 
 class MemoryControlsSet(EventIdentity):
     event: Literal["memory_controls_set"]
-    mlx_memory_guideline_bytes: NonnegativeInt
-    mlx_cache_limit_bytes: NonnegativeInt
-    mlx_wired_limit_bytes: NonnegativeInt
-    previous_memory_limit_bytes: NonnegativeInt
-    previous_cache_limit_bytes: NonnegativeInt
-    previous_wired_limit_bytes: NonnegativeInt
+    device: str
+    cuda_memory_bytes: NonnegativeInt | None
 
 
 class ModelLoaded(EventIdentity):
@@ -85,9 +83,9 @@ class ModelLoaded(EventIdentity):
     revision: str
     fresh_process: ExactTrue
     fresh_prompt_cache: ExactTrue
-    active_memory_bytes: NonnegativeInt
-    peak_memory_bytes: NonnegativeInt
-    cache_memory_bytes: NonnegativeInt
+    active_memory_bytes: NonnegativeInt | None
+    peak_memory_bytes: NonnegativeInt | None
+    cache_memory_bytes: NonnegativeInt | None
 
 
 class TokenEmitted(EventIdentity):
@@ -111,9 +109,9 @@ class Completed(EventIdentity):
     output_text: str
     inference_seconds: NonnegativeFloat
     total_seconds: NonnegativeFloat
-    active_memory_bytes: NonnegativeInt
-    peak_memory_bytes: NonnegativeInt
-    cache_memory_bytes: NonnegativeInt
+    active_memory_bytes: NonnegativeInt | None
+    peak_memory_bytes: NonnegativeInt | None
+    cache_memory_bytes: NonnegativeInt | None
     fresh_process: ExactTrue
     fresh_prompt_cache: ExactTrue
 

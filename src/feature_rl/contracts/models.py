@@ -107,7 +107,6 @@ class ArtifactRef(StrictModel):
     encoding: Literal['json', 'bytes']
 
 
-
 EvidenceRefs = Annotated[tuple[ArtifactRef, ...], Field(min_length=1)]
 
 
@@ -212,7 +211,7 @@ class TrainingConfig(StrictModel):
     tasks: EvidenceRefs
     limits: ResourceLimits
     seeds: SeedPolicy
-    algorithm: Literal['grpo', 'sft']
+    algorithm: Literal['grpo']
     group_size: Annotated[int, Field(ge=2)]
     max_updates: PositiveInt
     learning_rate: Annotated[float, Field(gt=0)]
@@ -223,7 +222,7 @@ class TrainingConfig(StrictModel):
 
 
 class EvaluationArm(StrictModel):
-    arm: Literal['A', 'B', 'C', 'D', 'E']
+    arm: Literal['base', 'feature_grpo']
     policy: PolicyConfig
     checkpoint: ArtifactRef
     training_config: ArtifactRef | None
@@ -275,7 +274,6 @@ class ArtifactModel(StrictModel):
     visibility: Visibility
     provenance: Provenance
     costs: Costs
-
 
 
 class SourceSnapshot(StrictModel):
@@ -479,7 +477,7 @@ class NeutralRepair(StrictModel):
 class EnvironmentRecipe(ArtifactModel):
     kind: Literal['EnvironmentRecipe']
     image_digest: Annotated[str, Field(pattern=r'^.+@sha256:[0-9a-f]{64}$')]
-    runtime_image: ArtifactRef | None = Field(default=None, exclude_if=lambda value: value is None)
+    runtime_image: ArtifactRef
     interpreter_version: Text
     dependencies: tuple[DependencyPin, ...]
     setup: Annotated[tuple[CommandSpec, ...], Field(min_length=1)]
@@ -614,7 +612,6 @@ class QualificationReport(ArtifactModel):
     controls: tuple[RunAssessment, ...]
     fresh_runs: tuple[RunAssessment, ...]
     interrupted_reset_runs: tuple[RunAssessment, ...]
-    human_reviews: tuple[HumanReview, ...]
     rejection_reasons: tuple[Text, ...]
     repair_attempts: NonnegativeInt
     policy_version: Text
@@ -624,15 +621,13 @@ class QualificationReport(ArtifactModel):
         require_ref(self.task,'TaskBundle')
         if self.repair_attempts > 4: raise ValueError('pilot repair budget exceeded')
         if self.disposition == Disposition.SUCCESS:
-            if any(x is None for x in (self.baseline_health,self.baseline_absence,self.reference_run)) or not self.controls or len(self.fresh_runs)<3 or len(self.interrupted_reset_runs)<3 or not self.human_reviews:
+            if any(x is None for x in (self.baseline_health,self.baseline_absence,self.reference_run)) or not self.controls or len(self.fresh_runs)<3 or len(self.interrupted_reset_runs)<3:
                 raise ValueError('successful qualification requires all gate records')
             gates = (self.baseline_health,self.baseline_absence,self.reference_run)+self.controls+self.fresh_runs+self.interrupted_reset_runs
             if any(g.disposition != Disposition.SUCCESS or g.passed is not True for g in gates):
                 raise ValueError('successful qualification cannot contain failed gates')
             if any(not any(e.scope == 'real_integration' for e in g.evidence) for g in gates):
                 raise ValueError('qualification gates require real integration evidence')
-            if any(r.decision != 'approved' or r.subject_sha256 != self.task.sha256 for r in self.human_reviews):
-                raise ValueError('human review must approve the exact task version')
             if self.rejection_reasons:
                 raise ValueError('successful qualification cannot contain rejection reasons')
         return self
@@ -732,7 +727,7 @@ class TrialResult(StrictModel):
     trial_id: Identifier
     task: ArtifactRef
     repository_family: Identifier
-    arm: Literal['A','B','C','D','E']
+    arm: Literal['base','feature_grpo']
     policy_seed: NonnegativeInt
     case_seed: NonnegativeInt
     rollout: ArtifactRef | None

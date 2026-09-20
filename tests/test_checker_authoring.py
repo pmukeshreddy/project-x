@@ -1,4 +1,5 @@
 """CPU diagnostic proposals/events only; no model, H, or feature qualification."""
+from m4_fixtures import runtime_policy
 from datetime import datetime, timezone
 import json
 import pytest
@@ -14,17 +15,17 @@ def checker_fixture(tmp_path):
     store = ArtifactStore(tmp_path / 'objects', c.ActorRole.CONTROLLER)
     task = store.get_artifact(diagnostic(store))
     from feature_rl.environments import SandboxPolicy
-    policy_ref = store.put_bytes(canonical_json(SandboxPolicy().model_dump(mode='json')), 'sandbox-policy', c.Visibility.AUTHORING)
+    policy_ref = store.put_bytes(canonical_json(runtime_policy().model_dump(mode='json')), 'sandbox-policy', c.Visibility.AUTHORING)
     recipe = store.get_artifact(task.environment)
     task = task.model_copy(update={'environment': replace_artifact(store, task.environment, visibility='authoring', provenance=recipe.provenance.model_copy(update={'inputs': recipe.provenance.inputs+(policy_ref,)}))})
     old = store.get_artifact(task.contract)
     request = store.put_bytes(b'DIAGNOSTIC ONLY', 'authoring-request', c.Visibility.AUTHORING)
     discovery_text = bound_discovery_text(baseline=task.baseline, recipe=task.environment)
-    discovery = store.put_bytes(discovery_text.encode(), 'click-runtime-discovery', c.Visibility.AUTHORING)
+    discovery = store.put_bytes(discovery_text.encode(), 'runtime-discovery', c.Visibility.AUTHORING)
     sources = (
         GroundedSource(context_id='REQUEST', role='request', source=request, locator='authoring-request:whole', text='DIAGNOSTIC ONLY', provenance_label='reconstructed_specification'),
         GroundedSource(context_id='BASELINE', role='baseline', source=task.baseline, locator='src/click/__init__.py:1-1', text='# diagnostic\n', provenance_label='existing_obligation'),
-        GroundedSource(context_id='DISCOVERY', role='baseline', source=discovery, locator='m3:click-runtime-discovery-v1', text=discovery_text, provenance_label='existing_obligation'),
+        GroundedSource(context_id='DISCOVERY', role='baseline', source=discovery, locator='m3:runtime-discovery-v1', text=discovery_text, provenance_label='existing_obligation'),
     )
     provenance = old.provenance.model_copy(update={'inputs': (request, task.baseline, discovery)})
     origin = c.EvidenceLink(source=request, locator='authoring-request:whole', quote='DIAGNOSTIC ONLY', provenance_label='reconstructed_specification')

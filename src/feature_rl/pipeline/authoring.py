@@ -6,7 +6,6 @@ import uuid
 
 from feature_rl import contracts as c
 from feature_rl.artifacts import canonical_json
-from feature_rl.environments.runtime import REPAIR
 from feature_rl.generation import LocalGenerationProvider, GenerationResult, GenerationUsage, GenerationCallRecord
 from feature_rl.generation.provider import GenerationProviderError
 from feature_rl.requirements import (AuthoringEvidenceResolver, ContractAuthoringService,
@@ -140,8 +139,10 @@ def validate_call(factory,candidate,call):
     if (pair.candidate!=candidate or pair.relationship!=value.commits or pair.baseline!=call.resolver.baseline
             or recipe.baseline!=pair.baseline or call.environment.policy not in recipe.provenance.inputs):
         raise ValueError('authoring candidate/source pair/B/environment binding differs')
-    if any(read_bytes(factory.store,r.patch,16384,kind='neutral-environment-repair')!=canonical_json(REPAIR) for r in recipe.neutral_repairs):
-        raise ValueError('unrecognized environment repair consumes unresolved history')
+    from feature_rl.environments import SandboxPolicy
+    from feature_rl.environments.profiles import validate_recipe_profile
+    policy=read_record(factory.store,call.environment.policy,SandboxPolicy,'sandbox-policy')
+    validate_recipe_profile(recipe,policy,factory.store)
     resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump())
     resolver.resolve(call.sources)
     if isinstance(call.inputs,ContractFinalizationInputs):

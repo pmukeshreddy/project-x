@@ -1,11 +1,9 @@
 """Local, strict runtime records; ordinary JSON, never executable serialization."""
 from typing import Annotated, Literal
-from pydantic import Field, model_validator
+from pydantic import Field
 from feature_rl.contracts import ArtifactRef, CommandSpec, CostRecord, StrictModel
 from .profiles import RuntimeProfile
 
-IMAGE = 'python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333'
-REPAIRED_IMAGE = 'feature-rl-m3-less@sha256:b28d3b1eeaa6251e82354fa61dc28a29afead9e2d7179436e77ca8ba612032fa'
 SECCOMP_SHA256 = '005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44'
 
 class EnvironmentError(Exception):
@@ -31,11 +29,11 @@ class EvidencePublicationFailed(EnvironmentError):
 
 
 class SandboxPolicy(StrictModel):
-    version: Literal['docker-click-v1', 'docker-python-v2'] = 'docker-click-v1'
-    image: Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$')] = REPAIRED_IMAGE
+    version: Literal['docker-python-v2'] = 'docker-python-v2'
+    image: Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$')]
     seccomp_sha256: Literal[SECCOMP_SHA256] = SECCOMP_SHA256
-    platform: Literal['linux/arm64', 'linux/amd64'] = 'linux/arm64'
-    profile: RuntimeProfile | None = Field(default=None, exclude_if=lambda value: value is None)
+    platform: Literal['linux/arm64', 'linux/amd64']
+    profile: RuntimeProfile
     cpus: Annotated[float,Field(ge=0.1,le=2.0)] = 0.5
     cpu_seconds: Annotated[float,Field(ge=1,le=600)] = 60.0
     memory_bytes: Annotated[int,Field(ge=64*1024*1024,le=1024*1024*1024)] = 512*1024*1024
@@ -51,6 +49,7 @@ class SandboxPolicy(StrictModel):
     cleanup_seconds: Annotated[float,Field(gt=0,le=30)] = 10.0
     control_seconds: Annotated[float,Field(gt=0,le=10)] = 5.0
     save_policy: Literal['last-confirmed-source'] = 'last-confirmed-source'
+
 
 class ProcessObservation(StrictModel):
     argv: tuple[str,...]

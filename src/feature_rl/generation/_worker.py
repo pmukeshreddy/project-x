@@ -1,69 +1,23 @@
 #!/usr/bin/env python3
-"""Standalone, local-only MLX worker staged into a fresh directory per call."""
+"""Offline Transformers worker, staged in a fresh directory for each call."""
 
 from __future__ import annotations
 
 import hashlib
 import importlib.metadata
+import inspect
 import json
 import math
 import os
-import pathlib
+from pathlib import Path
+import re
 import sys
 import time
 
-MODEL_ID = "mlx-community/Qwen3-4B-Instruct-2507-4bit"
-REVISION = "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b"
-PROTOCOL_VERSION = 3
-MODEL_MANIFEST_SHA256 = "697253a717e5857f1dfe3c14594f747c9c8118e6bc9c877bfc0c6faa6a7f50a0"
-DEPENDENCY_MANIFEST_SHA256 = "d2db652d0634ff87b38ea93de0c54cb75560b209c783e6409937903a03f5a831"
-FILES = {
-    "added_tokens.json": (707, "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"),
-    "chat_template.jinja": (4040, "40c21f34cf67d8c760ef72f8ad3ae5afad514299d4b06e91dd9a8d705af7b541"),
-    "config.json": (938, "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849"),
-    "generation_config.json": (238, "835fffe355c9438e7a25be099b3fccaa98350b83451f9fd2d99512e74f1ade48"),
-    "merges.txt": (1671853, "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"),
-    "model.safetensors": (2263022417, "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f"),
-    "model.safetensors.index.json": (63964, "388d811b8b7c2608dd04cce1bcb04a8bf715d19b42790894e6d3427ff429a777"),
-    "special_tokens_map.json": (613, "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"),
-    "tokenizer.json": (11422654, "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"),
-    "tokenizer_config.json": (5440, "4397cc477eb6d79715ccd2000accd6b3531928f30029665832fa1b255f24d2b9"),
-    "vocab.json": (2776833, "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"),
-}
-VERSIONS = {
-    "annotated-doc": "0.0.5", "anyio": "4.15.1", "certifi": "2026.7.22",
-    "click": "8.5.0", "filelock": "4.0.1", "fsspec": "2026.9.0", "h11": "0.16.0",
-    "hf-xet": "1.6.0", "httpcore": "1.0.9", "httpx": "0.28.1",
-    "huggingface-hub": "1.32.0", "idna": "3.20", "jinja2": "3.1.6",
-    "markdown-it-py": "4.2.0", "markupsafe": "3.0.3", "mdurl": "0.1.2",
-    "mlx": "0.32.2", "mlx-lm": "0.31.3", "mlx-metal": "0.32.2",
-    "numpy": "2.5.3", "packaging": "26.3", "protobuf": "7.36.2",
-    "pygments": "2.21.0", "pyyaml": "6.0.3", "regex": "2026.9.10",
-    "rich": "15.0.0", "safetensors": "0.8.0", "sentencepiece": "0.2.2",
-    "shellingham": "1.5.4", "tokenizers": "0.23.2", "tqdm": "4.70.1",
-    "transformers": "5.17.0", "typer": "0.27.2", "typing-extensions": "4.16.0",
-}
+PROTOCOL_VERSION = 4
 
 
-def emit(request: dict, event: str, **values: object) -> None:
-    print(
-        json.dumps(
-            {
-                "event": event,
-                "protocol_version": PROTOCOL_VERSION,
-                "request_id": request["request_id"],
-                "response_id": request["response_id"],
-                "prompt_id": request["prompt_id"],
-                **values,
-            },
-            sort_keys=True,
-            allow_nan=False,
-        ),
-        flush=True,
-    )
-
-
-def digest(path: pathlib.Path) -> str:
+def digest(path: Path) -> str:
     result = hashlib.sha256()
     with path.open("rb") as source:
         for block in iter(lambda: source.read(4 << 20), b""):
@@ -71,184 +25,277 @@ def digest(path: pathlib.Path) -> str:
     return result.hexdigest()
 
 
+def _pairs(items):
+    result = {}
+    for key, value in items:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def checked_manifest(path: Path, expected: str) -> dict:
+    path = Path(path)
+    if path.is_symlink() or not path.is_file() or digest(path) != expected:
+        raise ValueError("manifest identity differs from its configured SHA-256")
+    result = json.loads(path.read_text(), object_pairs_hook=_pairs)
+    if not isinstance(result, dict):
+        raise ValueError("manifest must be an object")
+    return result
+
+
+def dependency_versions(manifest, installed=None) -> dict[str, str]:
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("wheels"), list):
+        raise ValueError("dependency manifest must contain pinned wheels")
+    versions = {}
+    for record in manifest["wheels"]:
+        if not isinstance(record, dict):
+            raise ValueError("invalid dependency record")
+        name, version = record.get("name"), record.get("version")
+        if not isinstance(name, str) or not isinstance(version, str) or not version:
+            raise ValueError("dependency name and version required")
+        name = re.sub(r"[-_.]+", "-", name).lower()
+        if name in versions or not record.get("filename", "").endswith(".whl"):
+            raise ValueError("dependency closure must contain distinct pinned wheels")
+        if not re.fullmatch(r"[0-9a-f]{64}", record.get("sha256", "")):
+            raise ValueError("dependency wheel SHA-256 required")
+        versions[name] = version
+    if not {"torch", "transformers", "tokenizers", "safetensors", "packaging"} <= versions.keys():
+        raise ValueError("dependency closure must include Torch, Transformers, tokenizers, safetensors and packaging")
+    try:
+        actual = installed if installed is not None else {
+            name: importlib.metadata.version(name) for name in versions
+        }
+    except importlib.metadata.PackageNotFoundError as error:
+        raise ValueError(f"missing pinned dependency: {error}") from error
+    for name, version in versions.items():
+        if actual.get(name) != version:
+            raise ValueError(f"installed dependency {name} must be exactly {version}")
+    if installed is None:
+        from packaging.requirements import Requirement
+        for name in versions:
+            for text in importlib.metadata.requires(name) or ():
+                requirement = Requirement(text)
+                if requirement.marker and not requirement.marker.evaluate({"extra": ""}):
+                    continue
+                dependency = re.sub(r"[-_.]+", "-", requirement.name).lower()
+                if (requirement.url or dependency not in versions
+                        or not requirement.specifier.contains(versions[dependency], prereleases=True)):
+                    raise ValueError(f"dependency manifest omits or conflicts with {name}: {text}")
+    return versions
+
+
+def model_files(manifest, model: Path) -> dict:
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("model_id"), str):
+        raise ValueError("model manifest must name a model")
+    if not re.fullmatch(r"[0-9a-f]{40,64}", manifest.get("revision", "")):
+        raise ValueError("model revision must be an immutable commit hash")
+    if model.is_symlink() or not model.is_dir():
+        raise ValueError("model directory must be a regular directory")
+    records = manifest.get("files")
+    if not isinstance(records, list) or not records:
+        raise ValueError("model file manifest required")
+    files = {}
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError("invalid model file record")
+        name = record.get("path")
+        if (not isinstance(name, str) or Path(name).name != name or name in {".", ".."}
+                or name in files or not name.endswith((".json", ".txt", ".model", ".jinja", ".safetensors"))):
+            raise ValueError("model files must be distinct inert files in one directory")
+        path = model / name
+        if (path.is_symlink() or not path.is_file() or type(record.get("bytes")) is not int
+                or path.stat().st_size != record["bytes"] or digest(path) != record.get("sha256")):
+            raise ValueError(f"model file identity mismatch: {name}")
+        files[name] = record
+    if ({path.name for path in model.iterdir()} != files.keys()
+            or set(manifest.get("runtime_positive_allowlist", ())) != files.keys()):
+        raise ValueError("model directory differs from the pinned positive allowlist")
+    if not {"config.json", "tokenizer.json", "tokenizer_config.json"} <= files.keys():
+        raise ValueError("local model and fast-tokenizer configs required")
+    total = sum(record["bytes"] for record in files.values())
+    if total != manifest.get("actual_total_bytes"):
+        raise ValueError("model total bytes differ from manifest")
+    for name in ("config.json", "tokenizer_config.json"):
+        config = json.loads((model / name).read_text(), object_pairs_hook=_pairs)
+        if not isinstance(config, dict) or any(key in config for key in (
+            "auto_map", "model_file", "quantization_config", "quantization",
+        )):
+            raise ValueError("custom code and quantized checkpoints are unsupported")
+    weights = {name for name in files if name.endswith(".safetensors")}
+    if "model.safetensors" in weights:
+        if weights != {"model.safetensors"} or "model.safetensors.index.json" in files:
+            raise ValueError("ambiguous model weight files")
+    elif "model.safetensors.index.json" in files:
+        index = json.loads((model / "model.safetensors.index.json").read_text(), object_pairs_hook=_pairs)
+        mapping = index.get("weight_map")
+        if not isinstance(mapping, dict) or not weights or set(mapping.values()) != weights:
+            raise ValueError("weight index must name exactly the pinned safetensors shards")
+    else:
+        raise ValueError("standard Transformers safetensors weights required")
+    # Single-file identity stays its file hash; sharded identity binds names and hashes.
+    weights_hash = (files["model.safetensors"]["sha256"] if "model.safetensors" in weights else
+        hashlib.sha256(json.dumps(
+            {name: files[name]["sha256"] for name in sorted(weights)},
+            sort_keys=True, separators=(",", ":"),
+        ).encode()).hexdigest())
+    return dict(model_id=manifest["model_id"], revision=manifest["revision"],
+                file_count=len(files), total_bytes=total,
+                config_sha256=files["config.json"]["sha256"],
+                tokenizer_sha256=files["tokenizer.json"]["sha256"], weights_sha256=weights_hash)
+
+
+def emit(request: dict, event: str, **values) -> None:
+    print(json.dumps(dict(event=event, protocol_version=PROTOCOL_VERSION,
+        request_id=request["request_id"], response_id=request["response_id"],
+        prompt_id=request["prompt_id"], **values), sort_keys=True, allow_nan=False), flush=True)
+
+
 def exact_request() -> dict:
     raw = sys.stdin.buffer.read(1_048_577)
     if len(raw) > 1_048_576:
-        raise RuntimeError("worker stdin exceeds absolute cap")
-    request = json.loads(raw)
+        raise ValueError("worker stdin exceeds absolute cap")
+    request = json.loads(raw, object_pairs_hook=_pairs)
     expected = {
         "protocol_version", "model_directory", "model_id", "revision", "response_id", "prompt",
-        "request_id", "prompt_id", "max_input_tokens", "max_output_tokens", "seed", "memory",
+        "request_id", "prompt_id", "max_input_tokens", "max_output_tokens", "seed", "cuda_memory_bytes",
+        "model_manifest", "dependency_manifest", "model_manifest_sha256", "dependency_manifest_sha256",
+        "device", "dtype",
     }
-    if not isinstance(request, dict) or set(request) != expected:
-        raise RuntimeError("worker request fields differ from protocol")
-    if request["protocol_version"] != PROTOCOL_VERSION or request["model_id"] != MODEL_ID or request["revision"] != REVISION:
-        raise RuntimeError("worker request identity mismatch")
-    if type(request["max_input_tokens"]) is not int or not 0 < request["max_input_tokens"] <= 262_144:
-        raise RuntimeError("worker input-token cap is invalid")
-    if type(request["max_output_tokens"]) is not int or not 0 < request["max_output_tokens"] <= 262_144:
-        raise RuntimeError("worker output-token cap is invalid")
-    if request["max_input_tokens"] + request["max_output_tokens"] > 262_144:
-        raise RuntimeError("worker token envelope exceeds the model context")
+    if not isinstance(request, dict) or set(request) != expected or request["protocol_version"] != PROTOCOL_VERSION:
+        raise ValueError("worker request differs from protocol")
+    for name in ("max_input_tokens", "max_output_tokens"):
+        if type(request[name]) is not int or not 0 < request[name] <= 262_144:
+            raise ValueError("invalid token cap")
     if type(request["seed"]) is not int or request["seed"] < 0:
-        raise RuntimeError("worker seed is invalid")
+        raise ValueError("invalid seed")
     if not isinstance(request["prompt"], str) or not request["prompt"].strip():
-        raise RuntimeError("worker prompt is empty")
-    if request["memory"] != {
-        "guideline_bytes": 3_758_096_384,
-        "wired_limit_bytes": 3_758_096_384,
-        "cache_limit_bytes": 0,
-    }:
-        raise RuntimeError("worker memory policy differs from the qualified policy")
+        raise ValueError("empty prompt")
+    if (not re.fullmatch(r"cpu|cuda:[0-9]+", request["device"])
+            or request["dtype"] not in {"float32", "float16", "bfloat16"}):
+        raise ValueError("unsupported explicit device or dtype")
+    if request["device"] == "cpu":
+        if request["cuda_memory_bytes"] is not None:
+            raise ValueError("CPU authoring must not declare a CUDA memory limit")
+    elif type(request["cuda_memory_bytes"]) is not int or request["cuda_memory_bytes"] <= 0:
+        raise ValueError("CUDA authoring requires an explicit positive allocator limit")
     return request
-
-
-def verify_runtime(request: dict) -> tuple[pathlib.Path, dict]:
-    if any(
-        os.environ.get(name) != "1"
-        for name in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_DATASETS_OFFLINE")
-    ):
-        raise RuntimeError("offline inference environment is required")
-    model = pathlib.Path(request["model_directory"])
-    if not model.is_absolute() or not model.is_dir() or model.is_symlink():
-        raise RuntimeError("model directory must be an explicit regular absolute directory")
-    if {path.name for path in model.iterdir()} != set(FILES):
-        raise RuntimeError("model directory violates the positive file allowlist")
-    for name, (size, sha256) in FILES.items():
-        path = model / name
-        if path.is_symlink() or not path.is_file() or path.stat().st_size != size or digest(path) != sha256:
-            raise RuntimeError(f"model file identity mismatch: {name}")
-    config = json.loads((model / "config.json").read_text())
-    if config.get("model_type") != "qwen3" or config.get("architectures") != ["Qwen3ForCausalLM"]:
-        raise RuntimeError("model architecture mismatch")
-    if "auto_map" in config or "model_file" in config:
-        raise RuntimeError("remote or custom model code is forbidden")
-    actual_versions = {name: importlib.metadata.version(name) for name in VERSIONS}
-    if actual_versions != VERSIONS:
-        raise RuntimeError("installed dependency closure mismatch")
-    emit(
-        request,
-        "identity_validated", model_id=MODEL_ID, revision=REVISION,
-        config_sha256=FILES["config.json"][1], tokenizer_sha256=FILES["tokenizer.json"][1],
-        weights_sha256=FILES["model.safetensors"][1], dependency_versions=actual_versions,
-        model_manifest_sha256=MODEL_MANIFEST_SHA256,
-        dependency_manifest_sha256=DEPENDENCY_MANIFEST_SHA256,
-        seed=request["seed"],
-        prompt_sha256=hashlib.sha256(request["prompt"].encode("utf-8")).hexdigest(),
-        worker_source_sha256=digest(pathlib.Path(__file__)),
-        offline_environment={
-            "HF_HUB_OFFLINE": os.environ.get("HF_HUB_OFFLINE"),
-            "TRANSFORMERS_OFFLINE": os.environ.get("TRANSFORMERS_OFFLINE"),
-            "HF_DATASETS_OFFLINE": os.environ.get("HF_DATASETS_OFFLINE"),
-        },
-        local_files_only=True, remote_code=False,
-    )
-    return model, config
 
 
 def main() -> int:
     started = time.monotonic()
     request = exact_request()
-    model_dir, config = verify_runtime(request)
-    from mlx_lm.utils import load_tokenizer
+    offline = {name: os.environ.get(name) for name in (
+        "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_DATASETS_OFFLINE",
+    )}
+    if any(value != "1" for value in offline.values()):
+        raise ValueError("offline inference environment required")
+    model_dir = Path(request["model_directory"])
+    if not model_dir.is_absolute():
+        raise ValueError("model directory must be an explicit absolute path")
+    manifest = checked_manifest(Path(request["model_manifest"]), request["model_manifest_sha256"])
+    identity = model_files(manifest, model_dir)
+    if (identity["model_id"], identity["revision"]) != (request["model_id"], request["revision"]):
+        raise ValueError("worker model identity mismatch")
+    versions = dependency_versions(checked_manifest(
+        Path(request["dependency_manifest"]), request["dependency_manifest_sha256"],
+    ))
+    emit(request, "identity_validated", **{name: identity[name] for name in (
+        "model_id", "revision", "config_sha256", "tokenizer_sha256", "weights_sha256",
+    )}, dependency_versions=versions, model_manifest_sha256=request["model_manifest_sha256"],
+        dependency_manifest_sha256=request["dependency_manifest_sha256"], seed=request["seed"],
+        prompt_sha256=hashlib.sha256(request["prompt"].encode()).hexdigest(),
+        worker_source_sha256=digest(Path(__file__)), offline_environment=offline,
+        local_files_only=True, remote_code=False, device=request["device"], dtype=request["dtype"])
 
-    tokenizer = load_tokenizer(
-        model_dir,
-        {"trust_remote_code": False, "local_files_only": True},
-        eos_token_ids=config.get("eos_token_id"),
-    )
-    input_ids = list(
-        tokenizer.apply_chat_template(
-            [{"role": "user", "content": request["prompt"]}],
-            tokenize=True,
-            add_generation_prompt=True,
-            enable_thinking=False,
-        )
-    )
-    if len(input_ids) > request["max_input_tokens"]:
-        emit(
-            request,
-            "input_rejected", actual_input_tokens=len(input_ids),
-            max_input_tokens=request["max_input_tokens"], model_load_started=False,
-            inference_started=False,
-        )
+    import torch
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+
+    torch.set_num_threads(1)
+    torch.manual_seed(request["seed"])
+    torch.use_deterministic_algorithms(True)
+    device = torch.device(request["device"])
+    if device.type == "cuda":
+        if not torch.cuda.is_available() or device.index >= torch.cuda.device_count():
+            raise ValueError("configured CUDA device is unavailable; no CPU fallback")
+        torch.cuda.set_device(device)
+        total = torch.cuda.get_device_properties(device).total_memory
+        if request["cuda_memory_bytes"] > total:
+            raise ValueError("configured CUDA allocator limit exceeds device memory")
+        torch.cuda.set_per_process_memory_fraction(request["cuda_memory_bytes"] / total, device)
+        torch.cuda.reset_peak_memory_stats(device)
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
+    tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True, trust_remote_code=False, use_fast=True)
+    input_ids = list(tokenizer.apply_chat_template(
+        [{"role": "user", "content": request["prompt"]}], tokenize=True,
+        add_generation_prompt=True, enable_thinking=False,
+    ))
+    config = json.loads((model_dir / "config.json").read_text())
+    context = config.get("max_position_embeddings")
+    if type(context) is not int or context <= 0 or len(input_ids) + request["max_output_tokens"] > context:
+        raise ValueError("declared generation exceeds the model context")
+    if not input_ids or len(input_ids) > request["max_input_tokens"]:
+        emit(request, "input_rejected", actual_input_tokens=len(input_ids),
+             max_input_tokens=request["max_input_tokens"], model_load_started=False, inference_started=False)
         return 65
-    emit(
-        request,
-        "input_accepted", actual_input_tokens=len(input_ids), input_token_ids=input_ids,
-        max_input_tokens=request["max_input_tokens"],
+    emit(request, "input_accepted", actual_input_tokens=len(input_ids), input_token_ids=input_ids,
+         max_input_tokens=request["max_input_tokens"])
+    emit(request, "memory_controls_set", device=request["device"], cuda_memory_bytes=request["cuda_memory_bytes"])
+    model, loading = AutoModelForCausalLM.from_pretrained(
+        model_dir, local_files_only=True, trust_remote_code=False, use_safetensors=True,
+        dtype=getattr(torch, request["dtype"]), attn_implementation="eager", output_loading_info=True,
     )
+    if any(loading.get(key) for key in ("missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs")):
+        raise ValueError("checkpoint did not load exactly; initialized or unused weights are forbidden")
+    model = model.to(device).eval()
+    # Avoid materializing a vocabulary-sized logit row for every prefill token
+    # on models exposing Transformers' last-token optimization.
+    forward_options = {"logits_to_keep": 1} if "logits_to_keep" in inspect.signature(model.forward).parameters else {}
 
-    import mlx.core as mx
-    from mlx_lm.generate import generate_step
-    from mlx_lm.utils import load_model
-
-    previous_memory = mx.set_memory_limit(request["memory"]["guideline_bytes"])
-    previous_cache = mx.set_cache_limit(request["memory"]["cache_limit_bytes"])
-    previous_wired = mx.set_wired_limit(request["memory"]["wired_limit_bytes"])
-    mx.reset_peak_memory()
-    emit(
-        request,
-        "memory_controls_set",
-        mlx_memory_guideline_bytes=request["memory"]["guideline_bytes"],
-        mlx_cache_limit_bytes=request["memory"]["cache_limit_bytes"],
-        mlx_wired_limit_bytes=request["memory"]["wired_limit_bytes"],
-        previous_memory_limit_bytes=previous_memory,
-        previous_cache_limit_bytes=previous_cache,
-        previous_wired_limit_bytes=previous_wired,
-    )
-    model, loaded_config = load_model(model_dir, lazy=False)
-    model.eval()
-    if loaded_config.get("model_type") != "qwen3":
-        raise RuntimeError("loaded model identity mismatch")
-    emit(
-        request, "model_loaded", model_id=MODEL_ID, revision=REVISION,
-        fresh_process=True, fresh_prompt_cache=True,
-        active_memory_bytes=mx.get_active_memory(), peak_memory_bytes=mx.get_peak_memory(),
-        cache_memory_bytes=mx.get_cache_memory(),
-    )
-    mx.random.seed(request["seed"])
-    generated: list[int] = []
-    eos_ids = set(tokenizer.eos_token_ids)
-    finish_reason = "length"
-    inference_started = time.monotonic()
-    for position, (token, logprobs) in enumerate(
-        generate_step(
-            mx.array(input_ids), model, max_tokens=request["max_output_tokens"],
-            prefill_step_size=min(512, request["max_input_tokens"]),
-        ),
-        start=1,
-    ):
-        token_id = int(token)
-        selected_model_logprob = float(logprobs[token_id].item())
-        if not math.isfinite(selected_model_logprob):
-            raise RuntimeError("selected model logprob is nonfinite")
-        generated.append(token_id)
-        emit(
-            request,
-            "token", position=position, token_id=token_id,
-            selected_model_logprob=selected_model_logprob,
-            text_fragment=tokenizer.decode([token_id], skip_special_tokens=False),
+    def memory():
+        return dict(
+            active_memory_bytes=torch.cuda.memory_allocated(device) if device.type == "cuda" else None,
+            peak_memory_bytes=torch.cuda.max_memory_allocated(device) if device.type == "cuda" else None,
+            cache_memory_bytes=torch.cuda.memory_reserved(device) if device.type == "cuda" else None,
         )
-        if token_id in eos_ids:
-            finish_reason = "stop"
-            break
-    if len(generated) > request["max_output_tokens"]:
-        raise RuntimeError("emitted output token cap violated")
-    truncated = finish_reason == "length" and len(generated) == request["max_output_tokens"]
-    emit(
-        request,
-        "completed", model_id=MODEL_ID, revision=REVISION,
-        input_tokens=len(input_ids),
-        output_tokens=len(generated), max_output_tokens=request["max_output_tokens"],
-        finish_reason=finish_reason, truncated=truncated,
-        sampling_policy="greedy_argmax",
-        output_text=tokenizer.decode(generated, skip_special_tokens=True),
-        inference_seconds=time.monotonic() - inference_started,
-        total_seconds=time.monotonic() - started,
-        active_memory_bytes=mx.get_active_memory(), peak_memory_bytes=mx.get_peak_memory(),
-        cache_memory_bytes=mx.get_cache_memory(), fresh_process=True, fresh_prompt_cache=True,
-    )
+
+    emit(request, "model_loaded", model_id=identity["model_id"], revision=identity["revision"],
+         fresh_process=True, fresh_prompt_cache=True, **memory())
+    eos = model.generation_config.eos_token_id
+    eos_ids = {eos} if type(eos) is int else set(eos or ())
+    if not eos_ids:
+        raise ValueError("model must define an EOS token")
+    generated, cache = [], None
+    tokens = torch.tensor([input_ids], dtype=torch.long, device=device)
+    inference_started = time.monotonic()
+    finish_reason = "length"
+    with torch.inference_mode():
+        for position in range(1, request["max_output_tokens"] + 1):
+            output = model(input_ids=tokens, past_key_values=cache, use_cache=True, **forward_options)
+            logprobs = output.logits[0, -1].float().log_softmax(-1)
+            token_id = int(logprobs.argmax().item())
+            logprob = float(logprobs[token_id].item())
+            if not math.isfinite(logprob):
+                raise ValueError("nonfinite selected token logprob")
+            generated.append(token_id)
+            emit(request, "token", position=position, token_id=token_id,
+                 selected_model_logprob=logprob,
+                 text_fragment=tokenizer.decode([token_id], skip_special_tokens=False))
+            if token_id in eos_ids:
+                finish_reason = "stop"
+                break
+            cache = output.past_key_values
+            if cache is None:
+                raise ValueError("causal model did not return a KV cache")
+            tokens = torch.tensor([[token_id]], dtype=torch.long, device=device)
+            del output, logprobs
+    emit(request, "completed", model_id=identity["model_id"], revision=identity["revision"],
+         input_tokens=len(input_ids), output_tokens=len(generated), max_output_tokens=request["max_output_tokens"],
+         finish_reason=finish_reason, sampling_policy="greedy_argmax", truncated=finish_reason == "length",
+         output_text=tokenizer.decode(generated, skip_special_tokens=True),
+         inference_seconds=time.monotonic() - inference_started, total_seconds=time.monotonic() - started,
+         fresh_process=True, fresh_prompt_cache=True, **memory())
     return 0
 
 

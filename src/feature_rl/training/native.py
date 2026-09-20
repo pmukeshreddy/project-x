@@ -25,7 +25,7 @@ from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_local
 from .files import inspect_directory,publish_directory,verify_directory
 from .state import PolicyBarrier,PolicyStamp
-from .skyrl_bridge import (PINNED_SKYRL,PINNED_HARBOR,GRPO_LOSS,SFT_LOSS,
+from .skyrl_bridge import (PINNED_SKYRL,PINNED_HARBOR,GRPO_LOSS,
     SkyRLUpdateBridge,register_losses,verify_installed_pins)
 
 
@@ -91,9 +91,11 @@ class NativeSettings(c.StrictModel):
 
 def native_overrides(settings:NativeSettings,config:c.TrainingConfig):
     """Closed overrides of actual pinned dataclass fields; no arbitrary plugins/commands."""
-    if config.group_size!=4 or config.initial_policy.temperature!=1. or config.initial_policy.top_p!=1.:
-        raise ValueError('Four episodes and unit-temperature/full-support native training required')
-    if config.algorithm=='grpo' and settings.lora.enabled and settings.lora.dropout!=0:
+    if type(config.group_size) is not int or config.group_size<2:
+        raise ValueError('At least two assigned GRPO episodes required')
+    if config.initial_policy.temperature!=1. or config.initial_policy.top_p!=1.:
+        raise ValueError('Unit-temperature/full-support native training required for exact behavior probabilities')
+    if settings.lora.enabled and settings.lora.dropout!=0:
         raise ValueError('GRPO requires zero LoRA dropout for inference/training probability alignment')
     work=Path(settings.work_directory)
     return {
@@ -122,7 +124,7 @@ def native_overrides(settings:NativeSettings,config:c.TrainingConfig):
         'trainer.max_training_steps':config.max_updates,'trainer.seed':config.seeds.seeds[0],
         'trainer.max_prompt_length':settings.max_seq_len-1,
         'trainer.algorithm.max_seq_len':settings.max_seq_len,
-        'trainer.algorithm.policy_loss_type':GRPO_LOSS if config.algorithm=='grpo' else SFT_LOSS,
+        'trainer.algorithm.policy_loss_type':GRPO_LOSS,
         'trainer.algorithm.advantage_estimator':'grpo',
         'trainer.algorithm.loss_reduction':'token_mean',
         'trainer.algorithm.advantage_batch_normalize':False,
@@ -134,7 +136,7 @@ def native_overrides(settings:NativeSettings,config:c.TrainingConfig):
         'trainer.algorithm.eps_clip_high':settings.clip_epsilon,
         'trainer.algorithm.use_kl_in_reward':False,
         'trainer.algorithm.kl_estimator_type':'k3',
-        'trainer.algorithm.use_kl_loss':config.algorithm=='grpo' and settings.kl_coefficient>0,
+        'trainer.algorithm.use_kl_loss':settings.kl_coefficient>0,
         'trainer.algorithm.kl_loss_coef':settings.kl_coefficient,
         'trainer.update_ref_every_epoch':False,'trainer.fully_async.simulate_training':False,
         'trainer.resume_mode':'none','trainer.max_ckpts_to_keep':-1,
@@ -144,7 +146,7 @@ def native_overrides(settings:NativeSettings,config:c.TrainingConfig):
         'trainer.dump_data_batch':False,'trainer.dump_eval_results':False,
         'trainer.print_example_interval':-1,'trainer.num_logger_train_samples':-1,
         'trainer.enable_ray_gpu_monitor':False,
-        'generator.n_samples_per_prompt':4,'generator.step_wise_trajectories':True,
+        'generator.n_samples_per_prompt':config.group_size,'generator.step_wise_trajectories':True,
         'generator.merge_stepwise_output':False,'generator.apply_overlong_filtering':False,
         'generator.sampling_params.temperature':1.,'generator.sampling_params.top_p':1.,
         'generator.inference_engine.num_engines':1,

@@ -9,6 +9,7 @@ ATTACKS={'forged_verdict','evaluator_detection','hardcoded_inputs','skipped_exec
 
 def disposition_for(issues):
     """Missing evidence is provisional; observed defects retain their failure type."""
+    if not issues:return Disposition.SUCCESS
     codes={issue.split(':',1)[0] for issue in issues}
     if codes&{'false_acceptance','false_rejection','oracle_disagreement','ambiguous_requirement','budget_exhausted'}:return Disposition.REJECTED
     if codes&{'flaky_task','invalid_evidence'}:return Disposition.INVALID
@@ -69,11 +70,12 @@ def validate_repairs(history, candidate, neutral_repairs):
     return len(attempts)
 
 
-def validate_control_plan(checked, policy):
+def validate_control_plan(checked, policy, *, generated=()):
     """Return missing gates while rejecting contradictory/leaking declarations."""
     controls={p.control_id:p for p in checked.verifier.controls}
-    diagnoses={p.control_id:p for p in policy.controls}
-    if len(controls)!=len(checked.verifier.controls) or len(diagnoses)!=len(policy.controls):
+    declared=(*policy.controls,*generated)
+    diagnoses={p.control_id:p for p in declared}
+    if len(controls)!=len(checked.verifier.controls) or len(diagnoses)!=len(declared):
         raise QualificationRejected('invalid_evidence','duplicate control/diagnosis identity')
     if set(diagnoses)-set(controls):raise QualificationRejected('invalid_evidence','diagnosis names an unknown control')
     mandatory={r.requirement_id for r in checked.contract.requirements+checked.contract.compatibility_obligations if r.mandatory}
@@ -118,3 +120,138 @@ def validate_control_plan(checked, policy):
     if not targets or not targets<=feature or len(set(policy.baseline_missing_requirements))!=len(policy.baseline_missing_requirements):
         raise QualificationRejected('invalid_evidence','baseline missing-feature targets must be distinct mandatory feature IDs')
     return tuple(sorted(missing)),tuple(sorted(targets))
+
+
+def control_origins(service, checked):
+    """Read selected M6 control authorship, including the actual archived prompt.
+
+    An author's intended category is not a passing diagnosis. These records only
+    bind targets/attack identity and establish what the independent author saw.
+    """
+    from feature_rl.contracts import Visibility
+    from feature_rl.generation import GenerationResult, GenerationStage
+    from feature_rl.pipeline.authoring import archived_outcome, observation
+    from feature_rl.pipeline.authoring_models import AuthoringReceipt, AuthoringRequest
+    from feature_rl.verifiers.control_authoring import ControlRecord, ControlProposal, ControlFinalizationInputs
+    from feature_rl.verifiers.loader import read_local
+    if service.policy.repair_history is None:
+        return {}
+    history=read_local(service.store,service.policy.repair_history,RepairHistory,'m5-repair-history',1024*1024)
+    if not history.complete:
+        return {}
+    selected={control.control_id:control for control in checked.verifier.controls}
+    origins={}
+    for receipt_ref in history.journal_refs:
+        if receipt_ref.kind!='m6-authoring-receipt':continue
+        receipt=read_local(service.store,receipt_ref,AuthoringReceipt,'m6-authoring-receipt',4*1024*1024)
+        if receipt.disposition!=Disposition.SUCCESS:continue
+        for record_ref in receipt.outputs:
+            if record_ref.kind!='m4-control-record':continue
+            record=read_local(service.store,record_ref,ControlRecord,'m4-control-record',2*1024*1024)
+            control=record.control
+            if selected.get(control.control_id)!=control:continue
+            if control.control_id in origins:
+                raise QualificationRejected('invalid_evidence','ambiguous selected control authorship')
+            for ref in (receipt_ref,receipt.request,record_ref):service.registry.assert_usable(ref)
+            author=read_local(service.store,receipt.request,AuthoringRequest,'m6-authoring-request',4*1024*1024)
+            job=service.registry.job(receipt.claim.job_id)
+            inputs=author.call.inputs
+            if (job.state!='completed' or job.result is None or job.result.disposition!=Disposition.SUCCESS
+                    or job.result.artifacts!=(*receipt.outputs,receipt_ref)
+                    or job.spec.operation!='construct' or job.spec.invocation!='m6-author:'+author.lane
+                    or job.spec.inputs!=(history.candidate,receipt.request)
+                    or job.spec.implementation!=service.policy.factory_revision
+                    or receipt.revision!=job.spec.implementation
+                    or not any(a.claim==receipt.claim and a.state=='completed' for a in service.registry.attempts(job.job_id))
+                    or author.candidate!=history.candidate or author.call.source_pair!=checked.task.source_pair
+                    or not isinstance(inputs,ControlFinalizationInputs)
+                    or (inputs.control_id,inputs.category,inputs.requirement_ids,inputs.expected_valid,inputs.expected_reason)
+                        !=(control.control_id,control.category,control.requirement_ids,control.expected_valid,control.expected_reason)
+                    or (inputs.baseline,inputs.contract,inputs.environment)!=(record.baseline,record.contract,record.environment)
+                    or (record.baseline,record.contract,record.environment)!=(checked.task.baseline,checked.task.contract,checked.task.environment)
+                    or record.author_contexts!=author.call.generation.request.contexts
+                    or control.author_provenance.inputs!=tuple(dict.fromkeys(c.source for c in record.author_contexts))):
+                raise QualificationRejected('invalid_evidence','control authorship differs from selected Factory execution')
+            if author.origin!='factory_dispatch':continue
+            snapshot=observation(service,receipt.claim,'m6-generation')
+            if snapshot is None:continue
+            generated=archived_outcome(service,author,receipt.claim,ControlProposal)
+            if not isinstance(generated,GenerationResult):continue
+            evidence=record.generation_provenance.evidence[-1:]
+            if (len(evidence)!=1 or evidence[0].producer!='feature_rl.generation.LocalGenerationProvider'
+                    or evidence[0].scope!='real_integration' or evidence[0].exit_status!=0
+                    or evidence[0].command!=('generate',author.call.generation.request.request_id)
+                    or evidence[0].recorded_at!=generated.record.recorded_at
+                    or set(evidence[0].artifacts)!=set(generated.record.archives.values())
+                    or record.rationale!=generated.content.rationale):
+                continue
+            contexts=record.author_contexts
+            permitted={checked.task.baseline,checked.task.contract,*checked.contract.public_checks}
+            independent=(author.call.generation.request.stage==GenerationStage.ALTERNATIVE_AUTHORING
+                and {ctx.source for ctx in contexts}<=permitted
+                and {checked.task.baseline,checked.task.contract}<={ctx.source for ctx in contexts}
+                and all(ctx.source.visibility in {Visibility.PUBLIC,Visibility.AUTHORING} for ctx in contexts))
+            origins[control.control_id]=(author.call.attack,(record_ref,receipt.request,receipt_ref),independent)
+    return origins
+
+
+def diagnose_control(service, checked, control, receipt, binding_ref, origins):
+    """Classify observed frozen-case behavior; never infer equivalence from a pass.
+
+    A passing negative or a crashing semantic mutant stays unresolved. These
+    diagnoses establish only observed behavior, not correctness on unseen cases.
+    """
+    from feature_rl.contracts import EvidenceRecord
+    from .models import ControlDiagnosis
+    origin=origins.get(control.control_id)
+    mode='positive' if control.category=='alternative_positive' else 'semantic_negative'
+    targets=() if mode=='positive' else control.requirement_ids
+    if control.category=='adversarial':
+        if receipt.reason.startswith('source submission rejected:'):
+            mode='source_rejection'
+        elif any(case.status=='protocol_failure' for case in receipt.cases):
+            mode='protocol_failure'
+        elif any(case.status=='candidate_failure' and case.reason in {
+            'candidate timeout','candidate output_limit','candidate cpu_limit','candidate memory_limit'
+        } for case in receipt.cases):
+            mode='resource_failure'
+    outcome=assess_outcome(checked,receipt,mode,targets,store=service.store)
+    attack=origin[0] if origin else None
+    refs=origin[1] if origin else ()
+    independent=bool(origin and origin[2])
+    settled=bool(origin and outcome.passed)
+    mechanism_matches=True
+    if control.category=='adversarial':
+        allowed={
+            'forged_verdict':{'semantic_negative','protocol_failure'},
+            'evaluator_detection':{'semantic_negative'},
+            'hardcoded_inputs':{'semantic_negative'},
+            'skipped_execution':{'semantic_negative','protocol_failure'},
+            'protocol_manipulation':{'protocol_failure'},
+            'excessive_output':{'resource_failure'},
+            'dependency_shadowing':{'semantic_negative','source_rejection'},
+            'path_link':{'semantic_negative','source_rejection','protocol_failure'},
+            'retained_state':{'semantic_negative'},
+        }
+        mechanism_matches=mode in allowed.get(attack,set())
+        if attack=='excessive_output':
+            mechanism_matches=mechanism_matches and any(case.status=='candidate_failure' and case.reason=='candidate output_limit' for case in receipt.cases)
+        settled=settled and mechanism_matches
+    if control.category=='alternative_positive' and not independent:settled=False
+    note=('Observed frozen-case behavior matches the declared control targets and rejection mechanism.' if settled else
+          'Unresolved: '+('selected real Factory authoring evidence is missing' if origin is None else
+          'alternative authoring independence is unverified' if mode=='positive' and not independent else
+          outcome.detail if not outcome.passed else 'observed failure mechanism does not establish the named attack'))
+    ev=EvidenceRecord(producer='feature_rl.qualification',revision=service.revision,
+        command=('QualificationService.diagnose',control.control_id,checked.task_ref.sha256),
+        recorded_at=receipt.recorded_at,exit_status=0,artifacts=(binding_ref,*refs),
+        scope='real_integration' if receipt.build_evidence is not None else 'source_inspection')
+    independence=() if not independent else (ev.model_copy(update={
+        'command':('QualificationService.control_inputs',control.control_id,checked.task_ref.sha256),
+        'artifacts':refs,'scope':'source_inspection'}),)
+    diagnosis=ControlDiagnosis(control_id=control.control_id,
+        validity=('valid' if mode=='positive' else 'invalid') if settled else 'unresolved',
+        mode=mode,targets=targets,attack=attack,evidence=(ev,),independence_evidence=independence,note=note)
+    if not settled and outcome.code!='environment_failure':
+        outcome=GateOutcome(passed=False,code='provisional',detail=note)
+    return diagnosis,outcome

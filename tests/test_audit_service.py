@@ -100,7 +100,7 @@ def diagnostic_service(tmp_path):
         PatchFrameEntry, SourceFrameEntry, derive_selection_manifest,
     )
     from feature_rl.pipeline import Factory, read_source_disposition
-    from feature_rl.qualification.attestation import SSHHumanVerifier
+    from feature_rl.audits.attestation import SSHHumanVerifier
 
     store = ArtifactStore(tmp_path / "objects", c.ActorRole.CONTROLLER)
     registry = Registry(tmp_path / "registry", store)
@@ -152,7 +152,7 @@ def test_service_registers_opaque_frame_plan_selection_and_configuration_depende
         AuditPopulationFrame, AuditSamplingPlan, AuditService, AuditStratum,
         PatchFrameEntry, SourceFrameEntry, derive_selection_manifest,
     )
-    from feature_rl.qualification.attestation import SSHHumanVerifier
+    from feature_rl.audits.attestation import SSHHumanVerifier
 
     store = ArtifactStore(tmp_path / "objects", c.ActorRole.CONTROLLER)
     registry = Registry(tmp_path / "registry", store)

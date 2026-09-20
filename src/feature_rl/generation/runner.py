@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import platform
 import resource
 import signal
 import subprocess
@@ -22,10 +23,10 @@ class _RUsageInfoV4(ctypes.Structure):
 
 @dataclass(frozen=True)
 class FootprintSample:
-    wired_bytes: int
+    wired_bytes: int | None
     resident_bytes: int
-    physical_footprint_bytes: int
-    lifetime_max_physical_footprint_bytes: int
+    physical_footprint_bytes: int | None
+    lifetime_max_physical_footprint_bytes: int | None
 
 
 @dataclass(frozen=True)
@@ -47,7 +48,8 @@ class ProcessOutcome:
     cleanup_error: str | None = None
     cpu_limit_enforcement: str = "kernel_rlimit_cpu"
     file_size_limit_enforcement: str = "kernel_rlimit_fsize"
-    memory_limit_enforcement: str = "sampled_proc_pid_rusage_20ms"
+    memory_limit_enforcement: str = "sampled_process_memory"
+    max_sampled_resident_bytes: int | None = None
 
 
 class ProcessBoundaryError(RuntimeError):
@@ -55,6 +57,10 @@ class ProcessBoundaryError(RuntimeError):
 
 
 def _libproc():
+    if platform.system() == "Linux":
+        return None
+    if platform.system() != "Darwin":
+        raise ProcessBoundaryError("process memory monitoring requires Linux or macOS")
     try:
         library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
     except OSError as error:
@@ -65,6 +71,18 @@ def _libproc():
 
 
 def _footprint(library, pid: int) -> FootprintSample | None:
+    if library is None:
+        try:
+            status = Path(f"/proc/{pid}/status").read_text()
+        except FileNotFoundError:
+            return None
+        for line in status.splitlines():
+            if line.startswith("VmRSS:"):
+                _, value, unit = line.split()
+                if unit != "kB":
+                    raise ProcessBoundaryError("unexpected Linux RSS unit")
+                return FootprintSample(None, int(value) * 1024, None, None)
+        return None
     info = _RUsageInfoV4()
     if library.proc_pid_rusage(pid, 4, ctypes.byref(info)) != 0:
         return None
@@ -142,6 +160,7 @@ class BoundedProcessRunner:
                 monitoring_failures = 0
                 max_physical = 0
                 max_lifetime = 0
+                max_resident = 0
                 breach: FootprintSample | None = None
                 monitor_error_type: str | None = None
                 monitor_error: str | None = None
@@ -159,17 +178,22 @@ class BoundedProcessRunner:
                             break
                         sample = _footprint(library, process.pid)
                         if sample is None:
+                            if process.poll() is not None:
+                                break
                             monitoring_failures += 1
                             monitor_error_type = "ObservationUnavailable"
-                            monitor_error = "proc_pid_rusage returned no observation"
+                            monitor_error = "process memory monitor returned no observation"
                             termination = "monitoring_failure"
                             break
                         samples += 1
-                        max_physical = max(max_physical, sample.physical_footprint_bytes)
+                        max_resident = max(max_resident, sample.resident_bytes)
+                        max_physical = max(max_physical, sample.physical_footprint_bytes or 0)
                         max_lifetime = max(
-                            max_lifetime, sample.lifetime_max_physical_footprint_bytes
+                            max_lifetime, sample.lifetime_max_physical_footprint_bytes or 0
                         )
-                        if sample.physical_footprint_bytes > limits.physical_footprint_kill_bytes:
+                        memory_bytes = (sample.physical_footprint_bytes if library is not None
+                                        else sample.resident_bytes)
+                        if memory_bytes > limits.physical_footprint_kill_bytes:
                             breach = sample
                             termination = "memory_cap"
                             break
@@ -237,12 +261,14 @@ class BoundedProcessRunner:
             stdout=stdout,
             stderr=stderr,
             memory_samples=samples,
-            max_sampled_physical_footprint_bytes=max_physical if samples else None,
-            max_reported_lifetime_physical_footprint_bytes=max_lifetime if samples else None,
+            max_sampled_physical_footprint_bytes=max_physical if samples and library is not None else None,
+            max_reported_lifetime_physical_footprint_bytes=max_lifetime if samples and library is not None else None,
             breach_sample=breach,
             process_group_cleanup_verified=cleanup,
             monitoring_failures=monitoring_failures,
             monitor_error_type=monitor_error_type,
             monitor_error=monitor_error,
             cleanup_error=cleanup_error,
+            max_sampled_resident_bytes=max_resident if samples else None,
+            memory_limit_enforcement=("sampled_proc_pid_rusage" if library is not None else "sampled_linux_rss"),
         )

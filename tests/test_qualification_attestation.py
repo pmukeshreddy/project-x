@@ -31,7 +31,7 @@ def diagnostic_signature():
 
 @pytest.mark.parametrize('defect',['none','replay','payload','key','principal','namespace','malformed'])
 def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_key(defect):
-    from feature_rl.qualification.attestation import verify_sshsig
+    from feature_rl.audits.attestation import verify_sshsig
     payload,namespace,keys,signatures=diagnostic_signature()
     principal='synthetic-diagnostic'
     allowed=principal.encode()+b' namespaces="'+namespace.encode()+b'" '+keys[0]
@@ -51,7 +51,7 @@ def test_native_signature_authenticates_only_exact_synthetic_bytes_and_allowed_k
 
 
 def test_agent_owned_enrollment_cannot_turn_a_model_key_into_human_authority(tmp_path):
-    from feature_rl.qualification.attestation import SSHHumanVerifier
+    from feature_rl.audits.attestation import SSHHumanVerifier
     file=tmp_path/'enrollment.json';file.write_text('{}');file.chmod(0o444)
     verifier=SSHHumanVerifier(enrollment_path=file,expected_enrollment_sha256=hashlib.sha256(file.read_bytes()).hexdigest())
     with pytest.raises(QualificationRejected,match='externally administered'):
@@ -59,11 +59,6 @@ def test_agent_owned_enrollment_cannot_turn_a_model_key_into_human_authority(tmp
 
 
 def test_native_verifier_never_runs_arbitrary_binary_path(tmp_path):
-    from feature_rl.qualification.attestation import verify_sshsig
+    from feature_rl.audits.attestation import verify_sshsig
     fake=tmp_path/'fake-keygen';fake.write_text('#!/bin/sh\nexit 0\n');fake.chmod(0o755)
     with pytest.raises(QualificationRejected):verify_sshsig(b'diagnostic',b'bad',b'', 'x','diagnostic',binary=fake)
-
-
-def test_human_payload_schema_rejects_model_actor_even_with_person_looking_identity():
-    from feature_rl.qualification import ReviewPayload
-    with pytest.raises(ValueError):ReviewPayload.model_validate_json('{"actor_type":"model","human_identity":"A Person","decision":"approved"}')

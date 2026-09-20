@@ -6,6 +6,78 @@ complete strict JSON schema without opening an artifact store, Registry, daemon,
 model or trust file. A normal installation also exposes `feature-rl` through the
 M0 console entry point. No installation is needed for the repository commands here.
 
+For a selected GitHub feature, prepare the existing workflow's source
+inputs without manually cloning a repository or assembling its HTTP cache:
+
+```sh
+PYTHONPATH=src .venv/bin/python -m feature_rl prepare-github --request github-source.json --output /srv/feature-rl/captures/feature-001
+```
+
+This command needs no controller configuration, Docker or model. An example
+`github-source.json` follows; replace the repository, numbers, lineage identifiers,
+integration method and cutoff with the actual selected feature's values:
+
+```json
+{
+  "repository_url": "https://github.com/OWNER/REPO",
+  "pull_request": 123,
+  "issue": 100,
+  "repository_family": "chosen-family",
+  "request_lineage": ["chosen-feature"],
+  "partition_source_ids": ["chosen-pr", "chosen-issue"],
+  "integration": "squash",
+  "admissible_cutoff": "2026-01-01T00:00:00Z",
+  "license_path": "LICENSE"
+}
+```
+
+The command writes raw responses, `sources.tsv`, a bare `repository.git`, and
+`prepared.json`, and prints the last document. Construction consumes it directly:
+
+```sh
+PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json construct-feature --request feature.json --prepared /srv/feature-rl/captures/feature-001/prepared.json
+```
+
+Alternatively, capture and construct in one command:
+
+```sh
+PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json construct-feature --request feature.json --github github-source.json --capture /srv/feature-rl/captures/feature-001
+```
+
+With either option, omit `intake` from `feature.json` and the capture's source
+paths/hash/limits from `controller.json`'s `workflow`; the CLI fills and validates
+them before composing the existing services. Supplied conflicting values reject.
+Keep authoring, dependency, runtime, episode-budget and partition settings
+explicit; the partition manifest must cover the selected `partition_source_ids`.
+The original complete cached-input command remains supported.
+
+For a private repository, set `token_env` to `GH_TOKEN` or `GITHUB_TOKEN` in
+`github-source.json` and supply that environment variable with a token authorized
+for the selected repository's contents, pull requests and issues. The token is
+used for GitHub API and Git HTTPS authentication. It is not stored in capture
+JSON, URLs, Git configuration files or command arguments. API credentials are
+restricted to the GitHub API origin; Git credentials are scoped to GitHub HTTPS,
+with redirects disabled. Offline capture reuse needs no token. See
+[GitHub authentication](https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api)
+for token permissions.
+
+Repeating the same preparation request/output verifies and reuses the completed
+capture offline. Changed requests, damaged captures and incomplete output
+directories reject; a new capture uses a new directory. Fresh issue downloads are
+always labeled `reconstructed_specification`, never historical snapshots.
+Merged PRs with an explicit same-repository issue are supported. Missing history,
+unavailable license identity, API limits and configured byte/page/time/depth limits
+reject; there is no automatic deepening, dependency discovery or feature selection.
+Git transfer has time/depth bounds, but no aggregate pack-file disk quota.
+
+Mixed/unknown path labels do not require manual source approval. Intake retains
+those labels, and qualification records an exact projection of permitted Python
+source changes onto B. Documentation, tests, build/dependency files and changes
+outside the source policy retain their B versions. Qualification runs its real
+feature, compatibility and verifier-control checks against that projection. If a
+feature needs an excluded configuration or asset change, the reference must fail
+those checks; source screening alone never admits it to training.
+
 Create a controller-private configuration with absolute `store_root` and
 `registry_root` paths, `version: "m6-cli-v1"`, and the exact Factory `revision`.
 `builder_revision` defaults to that revision; set it to the actual reviewed
@@ -29,8 +101,11 @@ unresolved actual source disposition returns its selected retained source result
 Source and construction replay reuse the original job/output and original costs.
 
 Runtime commands additionally require `runtime` with absolute `state_root`,
-`socket_path`, exact M3 `revision`, exact `grading_revision`, and optional bounded
-`SandboxPolicy`/`grade_wall_seconds`. Composition invokes the actual M3 trusted
+`socket_path`, exact M3 `revision`, exact `grading_revision`, an explicit `policy`
+(`SandboxPolicy`), and optional bounded `grade_wall_seconds`. New policies default
+to `docker-python-v2` and must supply `image` (an immutable base digest) and
+`profile` (the repository's pinned `RuntimeProfile`) and `platform`. Legacy Click
+policies and recipes without a prebuilt image must be reconstructed. Composition invokes the actual M3 trusted
 boundary qualification. A caller flag, copied receipt or altered policy cannot
 stand in for that qualification. Candidate grades keep M3's fresh build/isolation
 rules and supported pinned image/dependency cache semantics.
@@ -51,26 +126,30 @@ qualification and execution; no per-server repository dependency installation
 or image build is needed. Keep the same `SandboxPolicy`/profile used to construct
 the recipe. The runtime manifest records Linux architecture, Docker and CPU-only
 host requirements for scheduling. See [M3 construction](interfaces-M3.md) for
-cache identity, legacy recipe compatibility and supported package constraints.
+cache identity and supported package constraints.
 
-Qualification configuration is `qualification` with the actual M5 `revision`,
-optional `QualificationPolicy`, and optional `human` containing external
-`enrollment_path` plus `enrollment_sha256`. The enrollment is read-only and subject
-to the actual M5 ownership, signature, expiry and revocation rules. The CLI creates
-no enrollment, signatures, attestations or approval. Missing human/history/control
-gates retain their actual provisional or failure outcomes.
+Qualification configuration is `qualification` with the actual M5 `revision`
+and optional `QualificationPolicy`. Passing all automated gates produces a
+successful QualificationReport directly; no SSH enrollment, signature or separate
+human acceptance step is required. Missing history, unresolved control diagnoses or execution
+evidence still blocks admission. Authenticated audits have their own human-trust
+configuration, outside task admission.
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json qualify --request built-task-request.json
-PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json accept --review-request review-ref.json --attestation attestation-ref.json
-PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json release --request built-task-request.json --accepted-report accepted-q-ref.json
+PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json release --request built-task-request.json --accepted-report qualification-report-ref.json
 PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json resolve --request released-task-request.json
 ```
 
 Task request files are the actual M0 request shape
 `{"task_version": <complete TaskBundle ArtifactRef>}`. Ref files contain a full
 M0 `ArtifactRef`, including kind, encoding and visibility. Qualify optionally takes
-`--policy`; it cannot replace selected Factory history. Release can also consume
+`--policy`; it cannot replace selected Factory history. For Factory-generated
+controls, omitted diagnosis entries are produced automatically from their selected
+authoring archives and actual qualification grades. Results are frozen in the
+qualification summary and rechecked at release; unsupported or inconclusive
+controls still block qualification. Pass the successful report
+from `qualify` directly to `release --accepted-report`. Release can also consume
 the exact QUALIFIED predecessor and its existing Q without `--accepted-report`.
 `resolve` performs current admission and prints the exact TaskBundle. It executes
 no candidate, grade, transition or model; runtime composition still establishes
@@ -101,6 +180,14 @@ Authoring commands require `authoring: AuthoringSettings` in the same configurat
 actual M2 backend settings, exact M2/M4 revisions, evidence scope and a frozen
 candidate/batch budget. `authoring-call.json` is an actual `AuthoringCall`, including
 the complete M0/M3 resolver inputs and the selected M2/M4 finalization inputs.
+Authoring now uses local Transformers/PyTorch. Configure the model ID, immutable
+revision, model/dependency manifest SHA-256 pins, explicit `device` (`cpu` or
+`cuda:0`, etc.) and `dtype`. Supply materialized unquantized safetensors and install
+the chosen hash-pinned Torch/Transformers wheel closure into the controller's
+Python environment first. The old MLX model/configuration is incompatible.
+See [the M2 interface](interfaces-M2.md) for the manifest formats, resource limits,
+and offline worker contract. No dependencies or models are downloaded by authoring.
+
 Use the supported order contract → scenario → controls/alternative → final checker
 with those controls → construction. Each repeated semantic lane consumes the
 shared stage/candidate repair allowance; new request or control IDs do not create
@@ -138,29 +225,29 @@ Run, train and evaluate additionally require `native` with the actual M7
 Training uses the `TrainingConfig` in its request. Evaluation additionally requires
 `evaluation: {"revision": "<actual M8 revision>"}`. All three require configured
 M3/M4 and current M5/M6 admission; source-only and provisional TEST tasks cannot
-stand in for released tasks. The concrete external-origin Factory is passed into
-M8, which authenticates its frozen training/source roster itself.
+stand in for released tasks. M8 authenticates the frozen feature-training source
+roster and its selected construction receipts.
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m feature_rl --config native-controller.json run --request run-request.json --invocation run-001
-PYTHONPATH=src .venv/bin/python -m feature_rl --config native-controller.json train --request train-request.json --invocation smoke-sft-001 --demonstrations demonstrations.json
-PYTHONPATH=src .venv/bin/python -m feature_rl --config native-controller.json train --request train-request.json --invocation recovery-001 --resume checkpoint-ref.json --demonstrations demonstrations.json
+PYTHONPATH=src .venv/bin/python -m feature_rl --config native-controller.json train --request train-request.json --invocation grpo-001
+PYTHONPATH=src .venv/bin/python -m feature_rl --config native-controller.json train --request train-request.json --invocation recovery-001 --resume checkpoint-ref.json
 PYTHONPATH=src .venv/bin/python -m feature_rl --config native-controller.json evaluate --request evaluate-request.json
 ```
 
 `RunRequest` contains `task_version`, `policy`, `limits`, and optional `case_seed`;
 omission passes `None` through to the ordinary policy seed default. `TrainRequest`
 and `EvaluateRequest` contain `{"config": <actual TrainingConfig/EvaluationConfig>}`.
-Demonstrations are an array of actual M7 `SourceDemonstration` or
-`TrajectoryDemonstration` records and are accepted only for SFT. GRPO retains its
-actual mixed-signal gate. Evaluation requires its preregistration, roster, selected
-checkpoints and matched training/source evidence; CLI flags cannot replace them.
+Training accepts only `algorithm="grpo"` and starts updates from useful groups without a separate difficulty gate.
+Evaluation compares `base` with `feature_grpo`. It requires a
+preregistration, held-out roster, selected checkpoint and feature-construction
+evidence; CLI flags cannot replace them.
 The run result's `RolloutRecord.run_id` is the selected child Registry run job ID;
 the native parent separately retains startup/activation/shutdown and child costs.
 
 Native launch is deferred and unverified. The executable Linux setup, pinned
 SkyRL/Harbor versions, model/reference/tokenizer manifest imports, exact probe
-inputs, one-update SFT smoke and interrupted-update recovery are specified in
+inputs, GRPO launch and interrupted-update recovery are specified in
 [the M7 native launch contract](reports/M7-native-launch.md). Use the qualified
 Linux Python 3.12/CUDA environment's interpreter with the same `-m feature_rl`
 commands. This Mac's CPU tests and arm64 Docker worker do not establish GPU fit or

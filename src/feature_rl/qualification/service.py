@@ -1,9 +1,9 @@
-"""Execute qualification through M4/M3 and freeze external-review subjects.
+"""Execute qualification through M4/M3 and freeze admission evidence.
 
 Registry job selection, not arbitrary stored report booleans, is the operation
 origin. This module never signs human evidence or constructs a solver package.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import time
 import uuid
@@ -14,16 +14,16 @@ from feature_rl.grading import GradingService, GradePublicationFailed
 from feature_rl.registry import Registry, JobSpec, CostObservation, RegistryError
 from feature_rl.verifiers import load_verifier
 from feature_rl.verifiers.loader import read_local, read_bytes
-from .models import (QualificationRejected, QualificationPolicy, RepairHistory, ReviewRequest,
+from .models import (QualificationRejected, QualificationPolicy, RepairHistory,
     RunBinding, ResetReceipt, ReferenceProjection, QualificationPublicationFailed, QualificationRecoveryRequired,
     CompletionPending, FrozenPublication, GradePending, RunCompletionPending)
 from .projection import derive_reference
-from .controls import assess_outcome, validate_control_plan, validate_repairs
+from .controls import assess_outcome, validate_control_plan, validate_repairs, control_origins, diagnose_control
 from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade, validate_reset, check_consumed
 
 
 class QualificationService:
-    def __init__(self,*,store,registry,grader,builder,revision,policy=None,attestation_verifier=None):
+    def __init__(self,*,store,registry,grader,builder,revision,policy=None):
         if not isinstance(store,ArtifactStore) or store.role!=c.ActorRole.CONTROLLER or not isinstance(registry,Registry) or registry.store is not store:
             raise TypeError('M5 requires the same actual controller store and Registry')
         if not isinstance(grader,GradingService) or grader.store is not store:raise TypeError('actual same-store M4 GradingService required')
@@ -34,7 +34,6 @@ class QualificationService:
         if type(revision) is not str or len(revision) not in (40,64) or any(ch not in '0123456789abcdef' for ch in revision):raise ValueError('exact M5 implementation revision required')
         self.store=store;self.registry=registry;self.grader=grader;self.builder=builder;self.revision=revision
         self.policy=QualificationPolicy() if policy is None else QualificationPolicy.model_validate(policy)
-        self.attestation_verifier=attestation_verifier
         self.policy_ref=put_record(store,self.policy,'m5-qualification-policy')
         self.configuration=put_record(store,{'version':'m5-configuration-v1','policy':self.policy_ref.model_dump(mode='json'),
             'grading_revision':grader.revision,'runtime_revision':grader.runtime.revision,
@@ -114,7 +113,7 @@ class QualificationService:
         if isinstance(pending,CompletionPending):
             if pending.result.operation=='qualify' and pending.result.disposition==c.Disposition.SUCCESS:
                 from .admission import validate_pending_admission
-                validate_pending_admission(self,pending.result)
+                validate_pending_admission(self,pending.result,pending.claim)
             selected=self._complete(pending.claim,pending.result)
             if selected.operation=='qualify' and selected.artifacts[0].kind=='QualificationReport':
                 report=self.store.get_artifact(selected.artifacts[0],max_envelope_bytes=4*1024*1024)
@@ -137,9 +136,6 @@ class QualificationService:
         if isinstance(pending,FrozenPublication):
             try:
                 if pending.purpose=='qualification':return self._publish_qualification(pending.claim,pending.payload)
-                from .admission import publish_verification,publish_admission
-                if pending.purpose=='human_verification':return publish_verification(self,pending.claim,pending.payload)
-                if pending.purpose=='admission':return publish_admission(self,pending.claim,pending.payload)
             except QualificationPublicationFailed:raise
             except Exception as exc:raise error from exc
         raise TypeError('unknown M5 publication payload')
@@ -177,8 +173,9 @@ class QualificationService:
 
     def _execute(self,task_version,claim):
         checked=None;projection_ref=None;bindings=[];assessments={};costs=[];issues=[];count=None
+        diagnoses=[];origins={}
         started=self._intent(claim);seen=set();calls=0;signatures={}
-        def run(name,submission,seed,mode,targets,reset=False):
+        def run(name,submission,seed,mode,targets,reset=False,control=None):
             nonlocal calls
             calls+=1
             if calls>self.policy.max_grade_calls or (datetime.now(timezone.utc)-started).total_seconds()>=self.policy.max_wall_seconds:
@@ -189,7 +186,11 @@ class QualificationService:
                 signature=tuple((item.status,tuple(a.passed for a in item.assertions)) for item in receipt.cases)
                 if seed in signatures and signatures[seed]!=signature:issues.append('flaky_task: repeated reference inputs produced different outcomes')
                 signatures[seed]=signature
-            outcome=assess_outcome(checked,receipt,mode,targets,store=self.store)
+            if control is not None:
+                diagnosis,outcome=diagnose_control(self,checked,control,receipt,binding,origins)
+                diagnoses.append(diagnosis)
+            else:
+                outcome=assess_outcome(checked,receipt,mode,targets,store=self.store)
             if not outcome.passed:issues.append(outcome.code+': '+name+': '+outcome.detail)
             gate=c.RunAssessment(name=name,subject=task_version,disposition=c.Disposition.SUCCESS if outcome.passed else c.Disposition.REJECTED,
                 passed=outcome.passed,requirement_ids=targets,reason=outcome.detail,
@@ -207,9 +208,12 @@ class QualificationService:
             projection=derive_reference(self.store,task_version,self.grader.runtime.policy)
             projection_ref=put_record(self.store,projection,'m5-reference-projection')
             self.registry.register(projection_ref,dependencies=(task_version,projection.submission,projection.projected_source))
-            missing,targets=validate_control_plan(checked,self.policy);issues.extend(missing)
+            _,targets=validate_control_plan(checked,self.policy)
             count,history_issue=self._history(checked)
             if history_issue:issues.append(history_issue)
+            supplied={d.control_id for d in self.policy.controls}
+            if not history_issue and any(control.control_id not in supplied for control in checked.verifier.controls):
+                origins=control_origins(self,checked)
             baseline=self.grader.submissions.create(checked.task.baseline,SourceArchive({}).to_tar(),(),checked.contract.allowed_changes)
             first=run('baseline_absence',baseline,self.policy.fresh_seeds[0],'semantic_negative',targets)
             healthy=assess_outcome(checked,first,'baseline_health',())
@@ -222,18 +226,25 @@ class QualificationService:
             by_id={d.control_id:d for d in self.policy.controls}
             for control in checked.verifier.controls:
                 diagnosis=by_id.get(control.control_id)
-                if diagnosis is None or diagnosis.validity in {'equivalent','unresolved'}:continue
-                run('control_'+control.control_id,control.patch,self.policy.fresh_seeds[0],diagnosis.mode,diagnosis.targets)
+                if diagnosis is None:
+                    run('control_'+control.control_id,control.patch,self.policy.fresh_seeds[0],None,
+                        control.requirement_ids,control=control)
+                elif diagnosis.validity not in {'equivalent','unresolved'}:
+                    run('control_'+control.control_id,control.patch,self.policy.fresh_seeds[0],diagnosis.mode,diagnosis.targets)
             for index,seed in enumerate(self.policy.reset_seeds):run('reset_'+str(index),projection.submission,seed,'positive',(),True)
         except QualificationRejected as exc:issues.append(exc.code+': '+exc.detail)
         except (ArtifactError,ValueError,EnvironmentError) as exc:issues.append('environment_failure: '+type(exc).__name__+': '+str(exc)[:1200])
+        if checked is not None:
+            try:
+                missing,_=validate_control_plan(checked,self.policy,generated=diagnoses)
+                issues.extend(missing)
+            except QualificationRejected as exc:issues.append(exc.code+': '+exc.detail)
         frozen_time=datetime.now(timezone.utc)
         elapsed=(frozen_time-started).total_seconds()
         if elapsed<0 or elapsed>self.policy.max_wall_seconds:issues.append('budget_exhausted: qualification wall budget exceeded or clock moved backwards')
-        issues.append('unverified_human_review: external authenticated human review is required')
         frozen={'task':task_version,'projection':projection_ref,'bindings':tuple(bindings),'assessments':assessments,
             'costs':tuple(costs),'issues':tuple(sorted(set(issues))),'count':count,'recorded_at':frozen_time,
-            'wall_seconds':max(0.0,elapsed),'challenge':uuid.uuid4().hex+uuid.uuid4().hex}
+            'wall_seconds':max(0.0,elapsed),'control_diagnoses':tuple(diagnoses)}
         return self._publish_qualification(claim,frozen)
 
     def _publish_qualification(self,claim,frozen):
@@ -244,8 +255,9 @@ class QualificationService:
             assessments=frozen['assessments'];issues=frozen['issues'];count=frozen['count'];frozen_time=frozen['recorded_at']
             summary=put_record(self.store,QualificationSummary(task=task_version,policy=self.policy_ref,projection=projection_ref,
                 bindings=bindings,issues=issues,repair_count=count,qualification_job=claim.job_id,
-                wall_seconds=frozen['wall_seconds']),'m5-qualification-summary')
-            dependencies=tuple(dict.fromkeys((task_version,self.policy_ref,*bindings,*([projection_ref] if projection_ref else []))))
+                wall_seconds=frozen['wall_seconds'],control_diagnoses=frozen.get('control_diagnoses',())),'m5-qualification-summary')
+            diagnosis_refs=tuple(r for d in frozen.get('control_diagnoses',()) for ev in (*d.evidence,*d.independence_evidence) for r in ev.artifacts)
+            dependencies=tuple(dict.fromkeys((task_version,self.policy_ref,*bindings,*diagnosis_refs,*([projection_ref] if projection_ref else []))))
             self.registry.register(summary,dependencies=dependencies)
             ev=evidence(summary,self.revision,('QualificationService.qualify',task_version.sha256),scope='real_integration' if bindings else 'source_inspection').model_copy(update={'recorded_at':frozen_time})
             disposition=disposition_for(issues)
@@ -257,23 +269,21 @@ class QualificationService:
                 controls=tuple(v for name,v in assessments.items() if name.startswith('control_')),
                 fresh_runs=tuple(v for name,v in assessments.items() if name.startswith('fresh_')),
                 interrupted_reset_runs=tuple(v for name,v in assessments.items() if name.startswith('reset_')),
-                human_reviews=(),rejection_reasons=issues,repair_attempts=count or 0,policy_version=self.policy.policy_id)
+                rejection_reasons=issues,repair_attempts=count or 0,policy_version=self.policy.policy_id)
             report_ref=self.store.put_artifact(report)
             outputs=[report_ref,summary]
-            if issues==('unverified_human_review: external authenticated human review is required',) and count is not None:
-                request=ReviewRequest(task=task_version,report=report_ref,policy=self.policy_ref,challenge=frozen['challenge'],
-                    issued_at=frozen_time,expires_at=frozen_time+timedelta(seconds=self.policy.review_seconds),qualification_job=claim.job_id)
-                request_ref=put_record(self.store,request,'m5-review-request')
-                self.registry.register(request_ref,dependencies=(task_version,report_ref,self.policy_ref))
-                outputs.append(request_ref)
             result=c.OperationResult(operation='qualify',disposition=disposition,artifacts=tuple(outputs),
-                evidence=(ev,),costs=report.costs,reason='; '.join(issues))
+                evidence=(ev,),costs=report.costs,reason='; '.join(issues) or 'All automated qualification gates passed')
+            if disposition==c.Disposition.SUCCESS:
+                from .admission import validate_pending_admission
+                self.registry.register(report_ref)
+                validate_pending_admission(self,result,claim)
             selected=self._complete(claim,result)
             self._quarantine_defect(task_version,summary,claim.job_id,issues)
             return selected
         except QualificationPublicationFailed:raise
         except Exception as exc:
-            raise QualificationPublicationFailed('retain frozen qualification package without new controls, challenge or timestamps',
+            raise QualificationPublicationFailed('retain frozen qualification package without new controls or timestamps',
                 pending=FrozenPublication(claim,frozen,'qualification'),claim=claim) from exc
 
     def _quarantine_defect(self,task,summary,job_id,issues):
@@ -379,9 +389,6 @@ class QualificationService:
         self.registry.register(ref,dependencies=(checked.task_ref,projection_ref,mutation.evidence,interrupted.evidence,restored.artifact))
         return ref,(mutation.cost,interrupted.cost)
 
-    def accept(self,review_request,attestation):
-        from .admission import accept
-        return accept(self,review_request,attestation)
 
     def verify_accepted(self,task_ref,report_ref):
         from .admission import verify_accepted

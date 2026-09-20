@@ -55,14 +55,13 @@ print(json.dumps(out,sort_keys=True))
 '''
 
 def check_boundary(obs,policy):
-    from .profiles import runtime_profile
     expected={'uid':65534,'gid':65534,'seccomp':2,'no_new_privs':1,'caps':[0,0,0,0,0],
         'memory.max':policy.memory_bytes,'memory.swap.max':0,'pids.max':policy.pids,
         'cpu.max':f'{int(policy.cpus*100000)} 100000','root_write_errno':30,'cgroup_write_errno':30,
         'setuid_errno':1,'ptrace_errno':1,'unshare_errno':1,'ipv4_errno':101,'ipv6_errno':101,
         'socket_38_errno':1,'socket_40_errno':1,'dns_udp_errno':101,'host_socket_present':False,'host_users_present':False,
         'noexec_errno':13,'fork_errno':11,'/workspace_disk_errno':28,'/tmp_disk_errno':28,'/dev/shm_disk_errno':28}
-    expected['interpreter_version']=runtime_profile(policy).interpreter_version
+    expected['interpreter_version']=policy.profile.interpreter_version
     for key,value in expected.items():
         if type(obs.get(key)) is not type(value) or obs[key]!=value:raise PolicyRejected('boundary observation missing/mismatch: '+key)
     if obs.get('memory_oom_delta',0)<1 or obs.get('memory_child_exit',0)==0:raise PolicyRejected('memory denial not observed')

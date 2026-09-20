@@ -20,8 +20,7 @@ from pydantic import Field, model_validator
 from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import StrictModel, Digest, UTCDateTime
 from feature_rl.verifiers.language import decode_json
-from feature_rl.verifiers.loader import read_bytes, read_local
-from .models import QualificationRejected, ReviewPayload, ReviewRequest, DetachedAttestation
+from feature_rl.qualification.models import QualificationRejected
 
 BINARY=Path('/usr/bin/ssh-keygen')
 BINARY_SHA256='6949a5fb9e80c47f2126e523db7b232b37794fb33da9f70b2dd8b8742802248e'
@@ -170,30 +169,3 @@ class SSHHumanVerifier:
         except ValueError as exc:raise QualificationRejected('unverified_human_review','invalid external enrollment') from exc
         if not value.valid_after<=now<=value.valid_before:raise QualificationRejected('unverified_human_review','external enrollment is outside its current validity interval')
         return value
-
-    def verify(self,store,request_ref,attestation_ref,*,consumed_at=None):
-        now=datetime.now(timezone.utc)
-        request=read_local(store,request_ref,ReviewRequest,'m5-review-request')
-        envelope=read_local(store,attestation_ref,DetachedAttestation,'m5-sshsig-attestation')
-        raw=read_bytes(store,envelope.payload,65536,'m5-human-review-payload',True)
-        try:payload=ReviewPayload.model_validate_json(canonical_json(decode_json(raw,65536)))
-        except ValueError as exc:raise QualificationRejected('unverified_human_review','human payload schema/origin invalid') from exc
-        if raw!=canonical_json(payload.model_dump(mode='json')):raise QualificationRejected('unverified_human_review','human payload must use the exact canonical signing bytes')
-        if (payload.request,payload.task,payload.report,payload.policy,payload.challenge)!=(request_ref,request.task,request.report,request.policy,request.challenge):
-            raise QualificationRejected('unverified_human_review','human attestation task/package/policy/challenge mismatch')
-        when=now if consumed_at is None else consumed_at
-        if not request.issued_at<=when<=request.expires_at or payload.decision!='approved':
-            raise QualificationRejected('unverified_human_review','review decision or challenge validity does not approve this request')
-        enrollment=self.enrollment(now)
-        matches=[r for r in enrollment.reviewers if r.human_identity==payload.human_identity]
-        if len(matches)!=1 or matches[0].fingerprint in enrollment.revoked_fingerprints:
-            raise QualificationRejected('unverified_human_review','human signer absent or revoked in external enrollment')
-        reviewer=matches[0]
-        allowed=(reviewer.human_identity+' namespaces="'+NAMESPACE+'" '+reviewer.public_key+'\n').encode()
-        signature=read_bytes(store,envelope.signature,16384,'m5-sshsig',True)
-        result=verify_sshsig(raw,signature,allowed,reviewer.human_identity,NAMESPACE,binary_sha256=enrollment.binary_sha256)
-        self.enrollment(datetime.now(timezone.utc))  # Refuse a changed trust snapshot during verification.
-        result.update(human_origin_verified=True,enrollment_sha256=self.expected_enrollment_sha256,
-            human_identity=payload.human_identity,fingerprint=reviewer.fingerprint,
-            request=request_ref.model_dump(mode='json'),attestation=attestation_ref.model_dump(mode='json'))
-        return payload,result

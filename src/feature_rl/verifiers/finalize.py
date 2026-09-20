@@ -60,7 +60,7 @@ def resolve_checker_inputs(store, resolver, inputs, sources):
     if plan.contract != inputs.contract or inputs.contract not in plan.provenance.inputs:
         raise ValueError('scenario does not bind the exact frozen contract')
     expected = {ref for ref in contract.provenance.inputs if ref.kind in {
-        'authoring-request', 'source-archive', 'click-runtime-discovery', 'runtime-discovery'}} | set(contract.public_checks)
+        'authoring-request', 'source-archive', 'runtime-discovery'}} | set(contract.public_checks)
     if {source.source for source in sources} != expected:
         raise ValueError('checker evidence differs from frozen contract inputs')
     if resolver.baseline != inputs.baseline or set(resolver.public_checks) != set(contract.public_checks):
@@ -82,7 +82,7 @@ def resolve_checker_inputs(store, resolver, inputs, sources):
 
 
 def validate_discovery_environment(sources, environment):
-    discoveries = [source for source in sources if source.source.kind in {'click-runtime-discovery', 'runtime-discovery'}]
+    discoveries = [source for source in sources if source.source.kind in {'runtime-discovery'}]
     if len(discoveries) != 1 or parse_discovery(discoveries[0].source, discoveries[0].text).recipe != environment:
         raise ValueError('runtime discovery does not bind exact checker/control environment')
 

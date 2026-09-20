@@ -1,4 +1,5 @@
 """Actual M4 pre-execution/Registry joins; no worker, model or approval."""
+from m4_fixtures import runtime_policy
 import json
 import pytest
 from feature_rl import contracts as c
@@ -14,7 +15,7 @@ def setup(tmp_path):
     store=ArtifactStore(tmp_path/'store',c.ActorRole.CONTROLLER);registry=Registry(tmp_path/'registry',store)
     task=task_fixture(store)
     runtime=object.__new__(EnvironmentRuntime)
-    runtime.store=store;runtime.policy=SandboxPolicy();runtime.revision='a'*40
+    runtime.store=store;runtime.policy=runtime_policy();runtime.revision='a'*40
     grader=GradingService(store=store,runtime=runtime,revision='b'*40)
     assert hasattr(Factory,'grade'),'actual Factory grade orchestration is missing'
     factory=Factory(store=store,registry=registry,revision='c'*40,grading=grader)

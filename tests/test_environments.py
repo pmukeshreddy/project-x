@@ -1,4 +1,5 @@
 """Controller boundaries; no historical or downloaded code runs in these tests."""
+from m4_fixtures import runtime_policy
 import io
 import tarfile
 import pytest
@@ -19,10 +20,10 @@ def archive(entries):
 
 def test_archive_canonicalizes_data_without_executing_it():
     from feature_rl.environments import SourceArchive, SandboxPolicy
-    result=SourceArchive.read(archive([('src/a.py',b'raise RuntimeError("must never import")','file')]),SandboxPolicy())
+    result=SourceArchive.read(archive([('src/a.py',b'raise RuntimeError("must never import")','file')]),runtime_policy())
     assert result.files['src/a.py'].data==b'raise RuntimeError("must never import")'
     assert len(result.tree_sha256)==64
-    assert SourceArchive.read(result.to_tar(),SandboxPolicy()).tree_sha256==result.tree_sha256
+    assert SourceArchive.read(result.to_tar(),runtime_policy()).tree_sha256==result.tree_sha256
 
 
 @pytest.mark.parametrize('name,kind,data',[
@@ -32,18 +33,18 @@ def test_archive_canonicalizes_data_without_executing_it():
 ])
 def test_archive_rejects_escape_links_and_history(name,kind,data):
     from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
-    with pytest.raises(SourceRejected):SourceArchive.read(archive([(name,data,kind)]),SandboxPolicy())
+    with pytest.raises(SourceRejected):SourceArchive.read(archive([(name,data,kind)]),runtime_policy())
 
 
 def test_archive_rejects_duplicate_paths_and_expanded_limit():
     from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
-    with pytest.raises(SourceRejected):SourceArchive.read(archive([('a',b'a','file'),('a',b'b','file')]),SandboxPolicy())
-    with pytest.raises(SourceRejected):SourceArchive.read(archive([('a',b'12345','file')]),SandboxPolicy(max_source_bytes=4))
+    with pytest.raises(SourceRejected):SourceArchive.read(archive([('a',b'a','file'),('a',b'b','file')]),runtime_policy())
+    with pytest.raises(SourceRejected):SourceArchive.read(archive([('a',b'12345','file')]),runtime_policy(max_source_bytes=4))
 
 
 def test_saved_source_cannot_modify_build_manifest_outside_allowed_roots():
     from feature_rl.environments import SourceArchive,SandboxPolicy,SourceRejected
-    p=SandboxPolicy();b=SourceArchive.read(archive([('pyproject.toml',b'old','file'),('src/a.py',b'a','file')]),p)
+    p=runtime_policy();b=SourceArchive.read(archive([('pyproject.toml',b'old','file'),('src/a.py',b'a','file')]),p)
     good=SourceArchive.read(archive([('pyproject.toml',b'old','file'),('src/a.py',b'b','file')]),p)
     good.validate_changes(b,('src',),())
     bad=SourceArchive.read(archive([('pyproject.toml',b'new','file'),('src/a.py',b'a','file')]),p)
@@ -53,20 +54,20 @@ def test_saved_source_cannot_modify_build_manifest_outside_allowed_roots():
 def test_policy_rejects_nonfinite_and_unbounded_inputs():
     from feature_rl.environments import SandboxPolicy
     for kw in [{'lifecycle_seconds':float('inf')},{'max_source_bytes':0},{'cleanup_seconds':0},{'cpus':1000.0}]:
-        with pytest.raises(ValueError):SandboxPolicy(**kw)
+        with pytest.raises(ValueError):runtime_policy(**kw)
 
 
 def test_admitted_long_paths_survive_canonical_archive_roundtrip():
     from feature_rl.environments import SourceArchive,SandboxPolicy
     name='src/'+'x'*180+'.py'
-    result=SourceArchive.read(archive([(name,b'valid','file')]),SandboxPolicy())
-    assert SourceArchive.read(result.to_tar(),SandboxPolicy()).files[name].data==b'valid'
+    result=SourceArchive.read(archive([(name,b'valid','file')]),runtime_policy())
+    assert SourceArchive.read(result.to_tar(),runtime_policy()).files[name].data==b'valid'
 
 
 def test_boundary_gate_rejects_printed_unexpected_success():
     from feature_rl.environments.probes import check_boundary
     from feature_rl.environments import PolicyRejected,SandboxPolicy
-    with pytest.raises(PolicyRejected):check_boundary({'uid':0},SandboxPolicy())
+    with pytest.raises(PolicyRejected):check_boundary({'uid':0},runtime_policy())
 
 
 def test_runtime_refuses_unqualified_engine_before_source_execution(tmp_path):

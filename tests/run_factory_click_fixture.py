@@ -4,6 +4,8 @@ Run from the repository root with PYTHONPATH=src. Both phases retain one receipt
 The source archive and wheels are copied inertly; candidate code executes only
 inside the actual M3 Docker boundary. No human approval is created here.
 """
+import os
+from m4_fixtures import runtime_policy
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -211,7 +213,7 @@ def fixture(store, baseline, prepared, runtime, revision):
 
 def make_runtime(state, store, setup, revision):
     print('Actual M3 boundary qualification using the cached pinned image', flush=True)
-    engine = DockerEngine(state_root=state/'runtime', socket_path=Path(setup['socket_path']), policy=SandboxPolicy())
+    engine = DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=state/'runtime', socket_path=Path(setup['socket_path']), policy=runtime_policy())
     engine.qualify_boundary()
     return EnvironmentRuntime(store=store, engine=engine, revision=revision)
 
@@ -252,7 +254,7 @@ def runtime_phase(path, receipt, setup):
     source_evidence = c.EvidenceRecord(producer=LABEL + '; actual B/wheel hash inspection',
         command=('tests/run_factory_click_fixture.py','runtime'), recorded_at=datetime.now(timezone.utc),
         exit_status=0, artifacts=(baseline,*(pin.artifact for pin in pins)), revision=revision, scope='source_inspection')
-    prepared = runtime.create_click_recipe(baseline, tuple(pins), source_evidence=source_evidence)
+    prepared = runtime.create_recipe(baseline, tuple(pins), source_evidence=source_evidence)
     inputs, context = fixture(store, baseline, prepared, runtime, revision)
     registry = Registry(state/'registry', store)
     builder = TaskBuilder(store=store, registry=registry, revision=revision)
@@ -332,7 +334,7 @@ def qualification_phase(path, receipt, setup):
     receipt['qualification'].update(status='returned',result=doc(result),report=doc(report),summary=summary,ended_at=now())
     save(path,receipt)
     assert result.disposition == c.Disposition.PROVISIONAL and report.disposition == c.Disposition.PROVISIONAL
-    assert report.human_reviews == () and not any(r.kind == 'm5-review-request' for r in result.artifacts)
+    assert not any(r.kind == 'm5-review-request' for r in result.artifacts)
     assert len(report.fresh_runs) == 3 and len(report.interrupted_reset_runs) == 3 and len(report.controls) == 2
     gates = (report.baseline_health,report.baseline_absence,report.reference_run,*report.fresh_runs,*report.interrupted_reset_runs,*report.controls)
     assert all(gate is not None and gate.passed for gate in gates)

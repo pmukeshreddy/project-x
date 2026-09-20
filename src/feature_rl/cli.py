@@ -79,21 +79,23 @@ def parser():
     root.add_argument('--config',help='strict local CLIConfiguration JSON; config-schema prints its schema')
     commands=root.add_subparsers(dest='command',required=True)
     commands.add_parser('config-schema',help='print the strict composition schema without opening state or a runtime')
+    preparation=commands.add_parser('prepare-github',help='capture one GitHub PR/issue and Git objects for construct-feature; no model or Docker required')
+    preparation.add_argument('--request',required=True,help='strict GitHubPreparationRequest JSON')
+    preparation.add_argument('--output',required=True,help='absolute new capture directory; completed captures are reused offline')
     automatic=commands.add_parser('construct-feature',help='cached PR intake, real environment discovery, bounded M2/M4 authoring and immutable BUILT construction')
     automatic.add_argument('--request',required=True,help='strict FeatureWorkflowRequest JSON; pinned local inputs and budgets are in configuration.workflow')
+    source=automatic.add_mutually_exclusive_group()
+    source.add_argument('--prepared',help='verified prepared.json; fills workflow source settings and request.intake')
+    source.add_argument('--github',help='GitHubPreparationRequest JSON; capture and construct in one command')
+    automatic.add_argument('--capture',help='absolute capture directory required with --github; completed captures are reused')
     for name,help_text in (
         ('screen-source','retain actual CandidateRecord screening/license outcome and original costs'),
         ('construct','build from actual supplied BuildInputs; missing inputs remain a selected blocked outcome'),
         ('qualify','execute actual M5 gates on complete BUILT T0; requires configured M3/M5'),
-        ('accept','consume external human attestation through actual M5; requires configured M3/M5'),
         ('release','apply exact accepted qualification and both legal lifecycle transitions'),
         ('resolve','verify current released-task admission through the actual selected chain')):
         command=commands.add_parser(name,help=help_text)
-        if name=='accept':
-            command.add_argument('--review-request',required=True,help='JSON ArtifactRef of selected M5 review request')
-            command.add_argument('--attestation',required=True,help='JSON ArtifactRef of actual external detached attestation')
-        else:
-            command.add_argument('--request',required=True,help='JSON M0 ConstructRequest or task request')
+        command.add_argument('--request',required=True,help='JSON M0 ConstructRequest or task request')
         if name=='construct':command.add_argument('--inputs',help='complete M6 BuildInputs JSON; no automatic generation')
         if name=='qualify':command.add_argument('--policy',help='actual QualificationPolicy JSON; selected Factory history is enforced')
         if name=='release':command.add_argument('--accepted-report',help='JSON ArtifactRef of accepted Q when request is BUILT')
@@ -109,7 +111,6 @@ def parser():
         if name=='grade':command.add_argument('--invocation',default='grade',help='stable grade invocation; new value requests a distinct cost-bearing grade')
         if name=='train':
             command.add_argument('--resume',help='exact selected TrainingCheckpoint ArtifactRef JSON')
-            command.add_argument('--demonstrations',help='JSON array of actual M7 source/trajectory demonstrations; SFT only')
     audit=commands.add_parser('audit',help='actual frozen M8 selection plus external attestations; no generated human approval')
     selection=audit.add_mutually_exclusive_group(required=True)
     selection.add_argument('--request',help='M0 AuditRequest JSON with the selected patch run IDs')
@@ -182,7 +183,7 @@ def _with_cleanup(app,action):
 
 def _composition(args):
     service=args.service if args.command in ('recover','retry-publication') else args.command
-    return {'runtime':service=='grade','qualification':service in ('qualify','accept','release','resolve','qualification','lifecycle'),
+    return {'runtime':service=='grade','qualification':service in ('qualify','release','resolve','qualification','lifecycle'),
         'authoring':args.command in ('author','import-authoring'),
         'native_operation':service if service in ('run','train','evaluate') else None,'audit':service=='audit',
         'workflow':service in ('construct-feature','workflow')}
@@ -197,27 +198,60 @@ def _factory_receipt(value):
     return pending
 
 
+def _feature_inputs(args):
+    if args.capture is not None and args.github is None:
+        raise ValueError('--capture requires --github')
+    if args.github is None and args.prepared is None:
+        return read_json(args.config,CLIConfiguration),read_json(args.request,FeatureWorkflowRequest)
+    raw=TypeAdapter(dict[str,object])
+    config=read_json(args.config,raw);request=read_json(args.request,raw)
+    if not isinstance(config.get('workflow'),dict):
+        raise ConfigurationRequired('construction requires workflow authoring settings and dependency pins')
+    from feature_rl.intake.prepare import GitHubPreparationRequest, prepare_github, load_prepared
+    if args.github is not None:
+        if args.capture is None:raise ValueError('--github requires --capture')
+        prepared=prepare_github(read_json(args.github,GitHubPreparationRequest),Path(args.capture))
+    else:
+        prepared=load_prepared(Path(args.prepared))
+    for key,value in prepared['workflow'].items():
+        if key in config['workflow'] and config['workflow'][key]!=value:
+            raise ValueError('configured workflow source differs from capture: '+key)
+        config['workflow'][key]=value
+    if 'intake' in request and request['intake']!=prepared['intake']:
+        raise ValueError('request intake differs from the selected capture')
+    request['intake']=prepared['intake']
+    return (CLIConfiguration.model_validate_json(canonical_json(config)),
+            FeatureWorkflowRequest.model_validate_json(canonical_json(request)))
+
+
 def main(argv=None):
     args=parser().parse_args(argv)
     if args.command=='config-schema':
         _emit(CLIConfiguration.model_json_schema(),None);return 0
-    operation={'screen-source':'construct','construct-feature':'construct','author':'construct','import-authoring':'construct',
-        'accept':'qualify','resolve':'release','recover':'construct','retry-publication':'construct'}.get(args.command,args.command)
+    operation={'prepare-github':'construct','screen-source':'construct','construct-feature':'construct','author':'construct','import-authoring':'construct',
+        'resolve':'release','recover':'construct','retry-publication':'construct'}.get(args.command,args.command)
     try:
+        if args.command=='prepare-github':
+            from feature_rl.intake.prepare import GitHubPreparationRequest, prepare_github
+            request=read_json(args.request,GitHubPreparationRequest)
+            _emit(prepare_github(request,Path(args.output)),None)
+            return 0
         if args.config is None:raise ConfigurationRequired('--config is required for actual operations')
-        config=read_json(args.config,CLIConfiguration)
-        # Validate all supplied request bytes before any state or runtime is opened.
-        inputs=policy=report=attestation=call=resume=None;journals=demonstrations=()
+        request=None
         if args.command=='construct-feature':
-            request=read_json(args.request,FeatureWorkflowRequest)
+            config,request=_feature_inputs(args)
+        else:
+            config=read_json(args.config,CLIConfiguration)
+        # Acquisition may create a separate capture; service inputs are validated
+        # before opening the Registry, Docker runtime or model services.
+        inputs=policy=report=call=resume=None;journals=()
+        if args.command=='construct-feature':
+            pass  # Source preparation has already produced the validated request.
         elif args.command in ('screen-source','construct','author','import-authoring'):
             request=read_json(args.request,c.ConstructRequest)
             if args.command=='construct' and args.inputs:inputs=read_json(args.inputs,BuildInputs)
             if args.command in ('author','import-authoring'):call=read_json(args.call,AuthoringCall)
             if args.command=='import-authoring':journals=read_json(args.journals,TypeAdapter(tuple[c.ArtifactRef,...]))
-        elif args.command=='accept':
-            request=read_json(args.review_request,c.ArtifactRef)
-            attestation=read_json(args.attestation,c.ArtifactRef)
         elif args.command=='audit':
             request=() if args.source_only else read_json(args.request,c.AuditRequest).run_ids
         elif args.command=='recover':
@@ -232,9 +266,7 @@ def main(argv=None):
             if args.command=='qualify' and args.policy:policy=read_json(args.policy,QualificationPolicy)
             if args.command=='release' and args.accepted_report:report=read_json(args.accepted_report,c.ArtifactRef)
             if args.command=='train':
-                from feature_rl.training.service import Demonstration
                 if args.resume:resume=read_json(args.resume,c.ArtifactRef)
-                if args.demonstrations:demonstrations=read_json(args.demonstrations,TypeAdapter(tuple[Demonstration,...]))
         app=compose(config,**_composition(args))
         factory=app.factory
         if args.command in ('recover','retry-publication'):
@@ -247,12 +279,11 @@ def main(argv=None):
             if args.command=='author':return factory.author(request.candidate,call=call)
             if args.command=='import-authoring':return factory.import_rejected_authoring(request.candidate,call=call,journal_refs=journals)
             if args.command=='qualify':return factory.qualify(request.task_version,policy=policy)
-            if args.command=='accept':return factory.accept(request,attestation)
             if args.command=='release':return factory.release(request.task_version,accepted_report=report)
             if args.command=='resolve':return app.resolver.resolve_released(request.task_version)
             if args.command=='grade':return factory.grade(request.task_version,request.submission,request.case_seed,invocation=args.invocation)
             if args.command=='run':return factory.run(request.task_version,request.policy,request.limits,case_seed=request.case_seed,invocation=args.invocation)
-            if args.command=='train':return factory.train(request.config,invocation=args.invocation,resume=resume,demonstrations=demonstrations)
+            if args.command=='train':return factory.train(request.config,invocation=args.invocation,resume=resume)
             if args.command=='evaluate':return factory.evaluate(request.config)
             if args.command=='audit':return factory.audit(request)
             if args.command=='recover':return factory.recover(request)

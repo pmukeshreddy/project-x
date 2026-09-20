@@ -14,7 +14,8 @@ class QualificationRejected(ValueError):
 
 class ProjectionPath(StrictModel):
     path: Annotated[str,Field(min_length=1,max_length=1024)]
-    action: Literal['included_implementation','excluded_documentation','excluded_tests']
+    action: Literal['included_implementation','excluded_documentation','excluded_tests',
+                    'excluded_dependency_build','excluded_out_of_policy']
     rationale: Annotated[str,Field(min_length=1,max_length=4096)]
     before_sha256: Digest | None
     after_sha256: Digest | None
@@ -83,38 +84,10 @@ class QualificationPolicy(StrictModel):
     reset_seeds: Annotated[tuple[Annotated[int,Field(ge=0,lt=2**63)],...],Field(min_length=3,max_length=10)]=(11,11,11)
     max_grade_calls: Annotated[int,Field(ge=7,le=256)]=64
     max_wall_seconds: Annotated[float,Field(gt=0,le=21600)]=3600.0
-    review_seconds: Annotated[int,Field(ge=60,le=604800)]=86400
     repair_history: ArtifactRef | None=None
     repair_history_job: Annotated[str,Field(pattern=r'^[0-9a-f]{64}$')] | None=None
     factory_revision: Revision | None=None
 
-class ReviewRequest(StrictModel):
-    version: Literal['m5-review-request-v1']='m5-review-request-v1'
-    task: ArtifactRef
-    report: ArtifactRef
-    policy: ArtifactRef
-    challenge: Digest
-    issued_at: UTCDateTime
-    expires_at: UTCDateTime
-    qualification_job: Digest
-
-class ReviewPayload(StrictModel):
-    version: Literal['m5-human-review-v1']='m5-human-review-v1'
-    actor_type: Literal['human']
-    human_identity: Annotated[str,Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$')]
-    decision: Literal['approved','rejected','unresolved']
-    request: ArtifactRef
-    task: ArtifactRef
-    report: ArtifactRef
-    policy: ArtifactRef
-    challenge: Digest
-    human_minutes: Annotated[float,Field(ge=0,le=100000)]
-    statement: Literal['I reviewed the frozen contract, complete execution evidence, control validity and alternative independence.']
-
-class DetachedAttestation(StrictModel):
-    version: Literal['m5-sshsig-attestation-v1']='m5-sshsig-attestation-v1'
-    payload: ArtifactRef
-    signature: ArtifactRef
 
 class RunBinding(StrictModel):
     version: Literal['m5-run-binding-v1']='m5-run-binding-v1'
@@ -124,7 +97,8 @@ class RunBinding(StrictModel):
     submission: ArtifactRef
     seed: Annotated[int,Field(ge=0,lt=2**63)]
     grade: ArtifactRef
-    mode: Mode
+    # Null freezes an automatic diagnostic run before its outcome is known.
+    mode: Mode | None
     targets: tuple[Name,...]
     operation_ids: tuple[Name,...]
     grade_job: Digest
@@ -150,21 +124,12 @@ class QualificationSummary(StrictModel):
     policy: ArtifactRef
     projection: ArtifactRef | None
     bindings: Annotated[tuple[ArtifactRef,...],Field(max_length=256)]
+    control_diagnoses: Annotated[tuple[ControlDiagnosis,...],Field(max_length=128)]=()
     issues: Annotated[tuple[str,...],Field(max_length=1024)]
     repair_count: Annotated[int,Field(ge=0,le=4)] | None
     qualification_job: Digest
     wall_seconds: Annotated[float,Field(ge=0)] | None=None
 
-class VerifiedAttestation(StrictModel):
-    version: Literal['m5-verified-attestation-v2']='m5-verified-attestation-v2'
-    request: ArtifactRef
-    attestation: ArtifactRef
-    payload: ArtifactRef
-    signature: ArtifactRef
-    verification: ArtifactRef
-    consumed_at: UTCDateTime
-    verification_job: Digest
-    admission_job: Digest
 
 from dataclasses import dataclass
 
@@ -191,7 +156,7 @@ class FrozenPublication:
     """Retained bytes/costs after work, before CAS or Registry publication."""
     claim: object
     payload: object
-    purpose: Literal['qualification','human_verification','admission']
+    purpose: Literal['qualification']
 
 class QualificationPublicationFailed(Exception):
     """Exact operation payload retained; no execution retry is authorized."""

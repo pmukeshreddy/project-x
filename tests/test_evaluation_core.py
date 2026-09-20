@@ -41,7 +41,7 @@ def policy(arm, checkpoint):
             weights=checkpoint,
             tokenizer_digest="f" * 64,
         ),
-        policy_version=f"policy-{arm.lower()}",
+        policy_version=f"policy-{arm}",
         temperature=0.0,
         top_p=1.0,
         seed=7,
@@ -101,25 +101,23 @@ def study_objects():
     )
     initial = ref("checkpoint", c.Visibility.TRAINING, "9")
     checkpoints = {
-        "A": initial,
-        "B": ref("checkpoint", c.Visibility.TRAINING, "a"),
-        "C": ref("checkpoint", c.Visibility.TRAINING, "b"),
-        "D": ref("checkpoint", c.Visibility.TRAINING, "c"),
+        "base": initial,
+        "feature_grpo": ref("checkpoint", c.Visibility.TRAINING, "c"),
     }
     budget = BudgetLimit(max_updates=10, max_rollouts=40, max_assistant_tokens=4000, gpu_seconds=500.0, usd=None)
     arms = tuple(
         ArmProtocol(
             arm=arm,
-            method={"A": "starting", "B": "sft", "C": "external_rl", "D": "factory_rl"}[arm],
+            method={"base": "starting", "feature_grpo": "factory_rl"}[arm],
             policy=policy(arm, checkpoint),
             checkpoint=checkpoint,
-            training_config=None if arm == "A" else ref("training-config", c.Visibility.TRAINING, arm.lower()),
+            training_config=None if arm == "base" else ref("training-config", c.Visibility.TRAINING, "d"),
             initial_checkpoint=initial,
             tools=ref("tool-protocol", c.Visibility.PUBLIC, "d"),
             action_format="actions-v1",
             optimizer_family="adamw",
             harness_version="runner-v1",
-            training_budget=None if arm == "A" else budget,
+            training_budget=None if arm == "base" else budget,
             development_budget=BudgetLimit(max_updates=2, max_rollouts=8, max_assistant_tokens=800, gpu_seconds=100.0, usd=None),
         )
         for arm, checkpoint in checkpoints.items()
@@ -134,7 +132,7 @@ def study_objects():
             episode_index=0,
         )
         for task in (task_one, task_two)
-        for arm in ("A", "B", "C", "D")
+        for arm in ("base", "feature_grpo")
     )
     prereg = EvaluationPreregistration(
         version="m8-preregistration-v1",
@@ -148,7 +146,7 @@ def study_objects():
         checkpoint_selection_rule="development-only fixed rule",
         invalid_trial_rule="report all assigned and valid-only",
         locked_test_access_rule="one final run after freeze",
-        comparisons=(("A", "D"), ("B", "D"), ("C", "D")),
+        comparisons=(("base", "feature_grpo"),),
         created_at=NOW,
     )
     config = c.EvaluationConfig(
@@ -210,18 +208,17 @@ def test_preregistration_rejects_missing_trial_and_case_seed_drift_across_arms()
         validate_preregistration(roster, prereg.model_copy(update={"trials": tuple(trials)}), config)
 
 
-def test_preregistration_rejects_c_d_budget_or_protocol_drift():
+def test_preregistration_rejects_protocol_drift():
     from feature_rl.evaluation import FrozenStudyError, validate_preregistration
 
     roster, prereg, config = study_objects()
     arms = list(prereg.arms)
-    arms[3] = arms[3].model_copy(
+    arms[1] = arms[1].model_copy(
         update={
-            "training_budget": arms[3].training_budget.model_copy(update={"max_rollouts": 39}),
             "action_format": "different-actions",
         }
     )
-    with pytest.raises(FrozenStudyError, match="C and D"):
+    with pytest.raises(FrozenStudyError, match="all arms must share"):
         validate_preregistration(roster, prereg.model_copy(update={"arms": tuple(arms)}), config)
 
 
@@ -230,48 +227,5 @@ def test_valid_preregistration_is_complete_and_paired():
 
     roster, prereg, config = study_objects()
     validated = validate_preregistration(roster, prereg, config)
-    assert len(validated.trials) == 8
-    assert {item.arm for item in validated.arms} == {"A", "B", "C", "D"}
-
-
-def test_adaptation_funnel_rejects_hidden_losses_and_accepts_accounted_stages():
-    from feature_rl.evaluation import AdaptationFunnel, AdaptationStage
-
-    common = dict(
-        version="m8-adaptation-funnel-v1",
-        corpus_id="TuringEnterprises.SWE-Bench-plus-plus",
-        release_revision="d" * 40,
-        upstream_split="test",
-        local_partition=c.Partition.TRAIN,
-        license_constraint="non-commercial research, academic, or educational use",
-        source_frame=ref("external-source-frame", c.Visibility.PRIVATE, "1"),
-        stages=(
-            AdaptationStage(name="metadata", entered=500, accepted=500, rejected=0, invalid=0, reasons=()),
-            AdaptationStage(name="reconstruction", entered=500, accepted=300, rejected=150, invalid=50, reasons=("history", "license")),
-        ),
-        selection_bias=("Python CLI/API support only",),
-        costs=(
-            c.CostRecord(
-                category="construction",
-                wall_seconds=None,
-                cpu_seconds=None,
-                gpu_seconds=None,
-                input_tokens=None,
-                output_tokens=None,
-                human_minutes=None,
-                usd=None,
-                measurement="unknown",
-                note="not incurred in metadata-only research",
-            ),
-        ),
-        disposition=c.Disposition.PROVISIONAL,
-    )
-    funnel = AdaptationFunnel(**common)
-    assert funnel.stages[-1].accepted == 300
-    broken = common | {
-        "stages": (
-            common["stages"][0].model_copy(update={"accepted": 499}),
-        )
-    }
-    with pytest.raises(ValueError, match="account"):
-        AdaptationFunnel(**broken)
+    assert len(validated.trials) == 4
+    assert {item.arm for item in validated.arms} == {"base", "feature_grpo"}

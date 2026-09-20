@@ -1,5 +1,9 @@
 # Feature RL Factory Implementation Plan
 
+Historical implementation plan. The cleanup recorded in [current progress](progress.md)
+supersedes its SFT/external-RL study arms, human admission gate, and local MLX/Click
+assumptions. Current APIs are documented in the interfaces and runbook.
+
 > **For agentic workers:** Use superpowers:subagent-driven-development. The user explicitly authorized continuous execution with real module owners and independent review. Read your scoped brief and binding specification sections; do not spawn agents.
 
 **Goal:** Convert completed real feature requests into qualified coding environments, collect genuine solver submissions, connect real GRPO updates, and independently evaluate transfer.

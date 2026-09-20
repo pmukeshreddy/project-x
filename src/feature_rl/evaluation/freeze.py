@@ -86,9 +86,9 @@ def validate_preregistration(
 
     protocols = {item.arm: item for item in preregistration.arms}
     configured = {item.arm: item for item in config.arms}
-    if set(protocols) != {"A", "B", "C", "D"} or set(configured) != set(protocols):
-        raise FrozenStudyError("the frozen study requires exactly arms A, B, C, and D")
-    expected_methods = {"A": "starting", "B": "sft", "C": "external_rl", "D": "factory_rl"}
+    if set(protocols) != {"base", "feature_grpo"} or set(configured) != set(protocols):
+        raise FrozenStudyError("evaluation requires base and feature-env GRPO")
+    expected_methods = {"base": "starting", "feature_grpo": "factory_rl"}
     if any(protocols[name].method != method for name, method in expected_methods.items()):
         raise FrozenStudyError("arm method differs from the frozen study")
     for name, arm in configured.items():
@@ -96,24 +96,17 @@ def validate_preregistration(
         if arm.policy != protocol.policy or arm.checkpoint != protocol.checkpoint or arm.training_config != protocol.training_config:
             raise FrozenStudyError(f"configured arm {name} differs from its preregistered protocol")
 
-    initial = protocols["A"].initial_checkpoint
+    initial = protocols["base"].initial_checkpoint
     if any(item.initial_checkpoint != initial for item in protocols.values()):
         raise FrozenStudyError("all arms must share the same initial checkpoint")
-    if protocols["A"].checkpoint != initial or protocols["A"].training_config is not None or protocols["A"].training_budget is not None:
-        raise FrozenStudyError("arm A must be the untrained starting checkpoint")
-    if any(protocols[name].training_config is None or protocols[name].training_budget is None for name in ("B", "C", "D")):
-        raise FrozenStudyError("trained arms require frozen configurations and budgets")
+    if protocols["base"].checkpoint != initial or protocols["base"].training_config is not None or protocols["base"].training_budget is not None:
+        raise FrozenStudyError("base arm must be the untrained starting checkpoint")
+    if protocols["feature_grpo"].training_config is None or protocols["feature_grpo"].training_budget is None:
+        raise FrozenStudyError("feature-env GRPO requires a frozen training configuration and budget")
 
     shared = ("tools", "action_format", "optimizer_family", "harness_version", "development_budget")
     if any(len({getattr(protocol, field) for protocol in protocols.values()}) != 1 for field in shared):
-        raise FrozenStudyError("arms C and D, together with A and B, must share tools, actions, optimizer, harness, and development budget")
-    if protocols["B"].training_budget != protocols["C"].training_budget or \
-            protocols["C"].training_budget != protocols["D"].training_budget:
-        raise FrozenStudyError("trained arms B, C, and D must use the matched training-resource budget")
-    if any(getattr(protocols["C"], field) != getattr(protocols["D"], field) for field in shared) or \
-            protocols["C"].training_budget != protocols["D"].training_budget or \
-            protocols["C"].development_budget != protocols["D"].development_budget:
-        raise FrozenStudyError("arms C and D must use identical protocols and budgets")
+        raise FrozenStudyError("all arms must share tools, actions, optimizer, harness, and development budget")
 
     locked_values = (
         (preregistration.limits, config.limits, "resource limits"),

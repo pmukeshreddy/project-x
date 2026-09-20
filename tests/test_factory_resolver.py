@@ -93,5 +93,5 @@ def test_real_m5_gate_remains_denied_for_diagnostic_chain(tmp_path, monkeypatch)
     original = QualificationService.verify_accepted
     _, resolver, _, _, _, released = configured(tmp_path, monkeypatch)
     monkeypatch.setattr(QualificationService, 'verify_accepted', original)
-    with pytest.raises(AdmissionRejected, match='human'):
+    with pytest.raises(AdmissionRejected, match='automated gates'):
         resolver.resolve_released(released[0])

@@ -14,10 +14,10 @@ Every artifact requires `kind`, strict integer `schema_version` (`2` for Candida
 | SourcePair | `provenance_label`, `candidate`, `baseline_commit`, `reference_commit`, `baseline`, `reference`, `relationship`, `changed_files`, `admissible_cutoff`, `verification` |
 | RequirementContract | `visible_request`, `capability`, `entry_points`, `requirements`, `compatibility_obligations`, `ambiguities`, `allowed_changes`, `public_checks`, `episode_limits`, `provenance_label` |
 | ScenarioPlan | `contract`, `mandatory_requirement_ids`, `scenarios`, `seed_policy` |
-| EnvironmentRecipe | `image_digest`, `interpreter_version`, `dependencies`, `setup`, `reset`, `services`, `limits`, `neutral_repairs`, `locale`, `timezone`, `environment`, `randomness`, `network_policy`, `baseline` |
+| EnvironmentRecipe | `image_digest`, `runtime_image`, `interpreter_version`, `dependencies`, `setup`, `reset`, `services`, `limits`, `neutral_repairs`, `locale`, `timezone`, `environment`, `randomness`, `network_policy`, `baseline` |
 | VerifierBundle | `contract`, `scenario_plan`, `cases`, `completion_manifest`, `worker_adapter`, `public_examples`, `controls`, `permissions` |
 | TaskBundle | `state`, `partition`, `repository_family`, `request_lineage`, `source_pair`, `baseline`, `solver_view`, `contract`, `environment`, `adapter_version`, `private_oracle`, `reference_solution`, `qualification` |
-| QualificationReport | `task`, `disposition`, `baseline_health`, `baseline_absence`, `reference_run`, `controls`, `fresh_runs`, `interrupted_reset_runs`, `human_reviews`, `rejection_reasons`, `repair_attempts`, `policy_version` |
+| QualificationReport | `task`, `disposition`, `baseline_health`, `baseline_absence`, `reference_run`, `controls`, `fresh_runs`, `interrupted_reset_runs`, `rejection_reasons`, `repair_attempts`, `policy_version` |
 | RolloutRecord | `run_id`, `task`, `policy`, `limits`, `seeds`, `steps`, `submission`, `stopping_reason`, `disposition`, `reward`, `grading_evidence`, `training_eligible` |
 | TrainingCheckpoint | `weights`, `optimizer_state`, `reference_checkpoint`, `data_position`, `policy_version`, `configuration`, `consumed_tasks`, `optimizer_steps`, `update_evidence`, `reload_evidence` |
 | EvaluationReport | `configuration`, `frozen_task_roster`, `trials`, `paired_metrics`, `audits`, `disposition`, `limitations` |

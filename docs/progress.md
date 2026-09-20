@@ -1,5 +1,37 @@
 # Feature-RL progress
 
+## Current cleanup — 2026-09-20
+
+The active architecture is feature environments → GRPO/RLVR → held-out evaluation,
+with `base` versus `feature_grpo`. SFT and external-RL adaptation have been removed.
+Authoring uses local Transformers/PyTorch with explicit immutable model/dependency
+manifests. Repository execution requires a pinned runtime profile, explicit platform
+and cached prebuilt image. Click-only runtime/discovery and MLX compatibility paths
+are removed, including the fallback that installed dependencies for every rollout.
+
+Task admission uses automated execution evidence, generated control diagnoses and
+verified construction history; signed human task acceptance has been removed.
+Independent historical human audits remain separate from task admission. Mixed-file
+uncertainty is carried into permitted-source qualification rather than a manual gate.
+`construct-feature --github` captures a selected GitHub PR/issue directly; completed
+captures are reusable offline and private sources support explicit token selection.
+GRPO group size is part of group/checkpoint identity. There is no difficulty warm-up
+gate or required count of mixed tasks; zero-advantage groups retain their costs and
+positions without an optimizer step.
+
+These are breaking interface changes: old Click policies, recipes lacking runtime
+images, MLX requests, signed task admissions and A/D study inputs require reconstruction
+under the current contracts. Historical artifacts are not rewritten or silently upgraded.
+The cleanup is local and uncommitted. Only syntax, local import and diff checks were
+performed; no tests, model calls, image builds or training/evaluation jobs were run.
+There is still no real task qualified and released through this updated path, and
+no end-to-end training/evaluation result validating it.
+
+## Historical checkpoint before cleanup
+
+The following records describe the cited earlier revisions. Their completed-test
+claims and architecture do not validate or prescribe the current implementation.
+
 Read this first after a context reset. Both attachments were fully read: `feature_rl_pipeline.md` is the architecture/execution specification and `codex_multi_agent_implementation_prompt.md` establishes module ownership. Detailed earlier progress is preserved at Git `c7fea17:docs/progress.md`; existing reports and evidence remain unchanged.
 
 ## Scope and current milestone

@@ -17,30 +17,16 @@ from pathlib import Path
 from feature_rl.artifacts import ArtifactStore,canonical_json
 from feature_rl.contracts import (ActorRole,AllowedChanges,ArtifactRef,CommandSpec,CostRecord,
     DependencyPin,EnvironmentRecipe,EnvironmentVariable,EvidenceRecord,Provenance,
-    ResourceLimits,SeedPolicy,SourcePair,Visibility,NeutralRepair)
+    ResourceLimits,SeedPolicy,SourcePair,Visibility)
 from .archive import SourceArchive,SourceFile,safe_path
 from .docker import DockerEngine,utc_now,observation_json,stream_process
 from .models import (BuildResult,EnvironmentError,ExecutionRequest,ExecutionResult,PolicyRejected,
-    PreparedEnvironment,SandboxPolicy,SavedSource,SourceRejected,WorkspaceHandle,SourceUnavailable,REPAIRED_IMAGE,IMAGE,CleanupUnverified,DockerUnavailable,EvidencePublicationFailed,CpuBudgetExceeded)
+    PreparedEnvironment,SandboxPolicy,SavedSource,SourceRejected,WorkspaceHandle,SourceUnavailable,CleanupUnverified,DockerUnavailable,EvidencePublicationFailed,CpuBudgetExceeded)
 from .workers import STAGE_CODE
-from .profiles import runtime_profile, dependency_files, validate_recipe_profile, click_profile
+from .profiles import dependency_files, validate_recipe_profile
 import time
 
-# Exact inert acquisition identities; no solver-visible target-package wheel.
-WHEELS={
- 'pytest':('9.0.2','pytest-9.0.2-py3-none-any.whl','711ffd45bf766d5264d487b917733b453d917afd2b0ad65223959f59089f875b'),
- 'iniconfig':('2.3.0','iniconfig-2.3.0-py3-none-any.whl','f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12'),
- 'packaging':('26.0','packaging-26.0-py3-none-any.whl','b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529'),
- 'pluggy':('1.6.0','pluggy-1.6.0-py3-none-any.whl','e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746'),
- 'pygments':('2.20.0','pygments-2.20.0-py3-none-any.whl','81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176'),
- 'flit-core':('3.11.0','flit_core-3.11.0-py3-none-any.whl','fe464c086f630f106c0fc5001ee377980f45938f03f8f0d03da08a4841748541'),
-}
-ENV=(('PYTHONPATH','/workspace/site:/workspace/deps'),('PYTHONSAFEPATH','1'),('PYTEST_DISABLE_PLUGIN_AUTOLOAD','1'))
-DEV_ENV=(('PYTHONPATH','/workspace/source/src:/workspace/deps'),('PYTHONSAFEPATH','1'),('PYTEST_DISABLE_PLUGIN_AUTOLOAD','1'))
-REPAIR={'kind':'system-pager-repair-v1','base_manifest':IMAGE,'image_manifest':REPAIRED_IMAGE,'package':'less_590-2.1~deb12u2_arm64.deb','package_sha256':'eb430d92921f98b163031ee3ac81a96110d1f20bd84f67faab06dad50c75d744','binary_sha256':'2dd8d7734f5b43961b1d7243198ffaf1037539b122f2e266fccc9621104ed33b','changes':['COPY /usr/bin/less mode 0755','COPY copyright mode 0644'],'environment_repair':1,'environment_repair_budget':2,'candidate_repair':1,'candidate_repair_budget':4}
-DEPS=CommandSpec(argv=('python','-I','-m','pip','--isolated','install','--no-index','--no-deps','--require-hashes','--find-links','/workspace/supply','--target','/workspace/deps','--no-compile','--ignore-installed','-r','/workspace/supply/requirements.txt'),working_directory='/workspace',timeout_seconds=30.0)
 BUILD=CommandSpec(argv=('python','-m','pip','--isolated','wheel','--no-build-isolation','--no-deps','--no-index','--wheel-dir','/workspace/built','/workspace/source'),working_directory='/workspace',timeout_seconds=30.0)
-INSTALL=CommandSpec(argv=('python','-I','-m','pip','--isolated','install','--no-index','--no-deps','--no-compile','--target','/workspace/site','/workspace/built/click-8.3.3-py3-none-any.whl'),working_directory='/workspace',timeout_seconds=30.0)
 
 class BuildFailed(EnvironmentError):
     """Attributable build outcome; infrastructure failures are never candidate verdicts."""
@@ -68,10 +54,9 @@ class EnvironmentRuntime:
         if not isinstance(store,ArtifactStore) or store.role!=ActorRole.CONTROLLER:raise PolicyRejected('controller store required')
         if len(revision) not in (40,64) or any(c not in '0123456789abcdef' for c in revision):raise PolicyRejected('implementation revision required')
         self.store=store;self.engine=engine;self.policy=engine.policy;self.revision=revision
-        self.profile=runtime_profile(self.policy)
+        self.profile=self.policy.profile
         self.qualification_ref=self.publish(engine.qualification,'sandbox-qualification')
         self.qualification_summary_ref=self.publish({'qualified':True,'policy':self.policy.model_dump(mode='json'),'observations':engine.qualification['observations']},'sandbox-qualification-summary',Visibility.AUTHORING)
-        self.repair_ref=self.publish(REPAIR,'neutral-environment-repair',Visibility.AUTHORING) if self.policy.profile is None else None
     def publish(self,value,kind,visibility=Visibility.PRIVATE):
         data=canonical_json(value)
         if len(data)>64*1024*1024:raise EnvironmentError('evidence publication limit')
@@ -88,27 +73,21 @@ class EnvironmentRuntime:
         return SourceArchive.read(self.read_bytes(ref,self.policy.max_archive_bytes),self.policy)
     def dependency_bytes(self,pins):
         return dependency_files(self.store,pins,self.policy)
-    def create_click_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
-        if self.profile!=click_profile():raise PolicyRejected('Click recipe requested for a different runtime profile')
-        return self.create_recipe(baseline,pins,source_evidence=source_evidence)
     def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
         from .images import prepare_runtime_image, validate_baseline
         baseline=ArtifactRef.model_validate(baseline);pins=tuple(DependencyPin.model_validate(x) for x in pins)
-        if self.policy.profile is None and self.policy.image!=REPAIRED_IMAGE:raise PolicyRejected('legacy Click requires the pinned system pager repair')
         source=self.source(baseline);self.profile.validate_source(source);self.dependency_bytes(pins)
         if baseline.visibility not in {Visibility.AUTHORING,Visibility.PUBLIC}:raise PolicyRejected('B-only recipe requires authoring/public baseline')
         image,image_ref=prepare_runtime_image(self,pins)
-        construction_evidence=validate_baseline(self,image,baseline,source,pins)
+        construction_evidence=validate_baseline(self,image,baseline,source)
         p=self.policy;policy_ref=self.publish(p.model_dump(mode='json'),'sandbox-policy',Visibility.AUTHORING)
         now=datetime.now(timezone.utc)
         repairs=self.profile.neutral_repairs
-        if self.policy.profile is None:
-            repairs=(NeutralRepair(description='Add pinned Debian less binary and copyright only; environment repair 1/2, candidate repair 1/4',patch=self.repair_ref,neutrality_evidence=(EvidenceRecord(producer='feature_rl.environments trusted package-only image qualification',command=('verify pinned image and base layers','machine-check hardened boundary'),recorded_at=now,exit_status=0,artifacts=(self.repair_ref,self.qualification_summary_ref),revision=self.revision,scope='real_integration'),)),)
         recipe=EnvironmentRecipe(kind='EnvironmentRecipe',schema_version=1,visibility=Visibility.AUTHORING,
             provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=(baseline,policy_ref,image_ref,image.context,*[pin.artifact for pin in pins]),evidence=(source_evidence,
                 EvidenceRecord(producer='feature_rl.environments runtime image construction',command=('build pinned runtime image','verify offline baseline dependency closure'),recorded_at=now,exit_status=0,artifacts=(image_ref,construction_evidence),revision=self.revision,scope='real_integration'))),
             costs=(CostRecord(category='construction',wall_seconds=None,cpu_seconds=None,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='unknown',note='Recipe publication; execution measured separately'),),
-            image_digest=image.image_digest,runtime_image=image_ref,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.prebuilt_setup,reset=self.profile.prebuilt_setup,services=(),
+            image_digest=image.image_digest,runtime_image=image_ref,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.setup,reset=self.profile.setup,services=(),
             limits=ResourceLimits(wall_seconds=p.lifecycle_seconds,cpu_seconds=p.cpu_seconds,memory_bytes=p.memory_bytes,pids=p.pids,output_bytes=p.output_bytes,disk_bytes=p.disk_bytes,tool_calls=100,input_tokens=1,output_tokens=1),
             neutral_repairs=repairs,locale='C.UTF-8',timezone='UTC',environment=tuple(EnvironmentVariable(name=k,value=v) for k,v in self.profile.environment),
             randomness=SeedPolicy(algorithm='PYTHONHASHSEED',seeds=(0,),same_cases_within_group=True),network_policy='none',baseline=baseline)
@@ -122,9 +101,6 @@ class EnvironmentRuntime:
         if policy!=self.policy or prepared.policy not in recipe.provenance.inputs:raise PolicyRejected('recipe/policy binding mismatch')
         validate_recipe_profile(recipe,policy,self.store)
         return recipe
-    @staticmethod
-    def validate_click_manifest(source):
-        click_profile().validate_source(source)
     def saved(self,source,version,visibility=Visibility.PRIVATE):
         data=source.to_tar()
         if len(data)>self.policy.max_archive_bytes:raise SourceRejected('saved archive exceeds cap')
@@ -156,9 +132,8 @@ class EnvironmentRuntime:
         saved=SavedSource.model_validate_json(canonical_json(value['saved']));source=self.source(saved.artifact)
         if hashlib.sha256(self.read_bytes(saved.artifact,self.policy.max_archive_bytes)).hexdigest()!=saved.raw_sha256 or source.tree_sha256!=saved.tree_sha256:raise SourceRejected('saved source binding mismatch')
         return value,prepared,recipe,saved,source
-    def stage(self,session,source,pins,*,wheel=None,prebuilt=False):
+    def stage(self,session,source,*,wheel=None):
         files={'source/'+name:entry for name,entry in source.files.items()}
-        if not prebuilt:files.update({'supply/'+name:entry for name,entry in self.dependency_bytes(pins).items()})
         if wheel is not None:files['built/'+self.profile.wheel_filename]=SourceFile(wheel,False)
         data=SourceArchive(files).to_tar()
         if len(data)>self.policy.max_staging_bytes:raise PolicyRejected('aggregate stage archive cap')
@@ -221,7 +196,7 @@ class EnvironmentRuntime:
         s=self.engine.session(binding=self.binding(prepared,saved,'build',value),saved_source=saved.model_dump(mode='json'),image=recipe.image_digest);error=None;data=None
         try:
             with s:
-                self.stage(s,source,recipe.dependencies,prebuilt=recipe.runtime_image is not None)
+                self.stage(s,source)
                 for command in recipe.setup[:2]:
                     r=s.execute(command,environment=self.profile.environment)
                     if r.reason!='exited' or r.exit_code!=0:
@@ -275,7 +250,7 @@ class EnvironmentRuntime:
         environment=self.profile.development_environment if development else self.profile.environment
         try:
             with s:
-                self.stage(s,source,recipe.dependencies,wheel=wheel,prebuilt=recipe.runtime_image is not None)
+                self.stage(s,source,wheel=wheel)
                 for command in ((recipe.setup[0],) if development else (recipe.setup[0],recipe.setup[2])):
                     r=s.execute(command,environment=environment)
                     if r.reason=='cpu_limit':raise CpuBudgetExceeded('CPU budget exhausted during offline execution setup')

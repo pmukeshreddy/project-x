@@ -4,12 +4,6 @@ from .runtime_discovery import RuntimeDiscoveryService, RuntimeDiscoveryObservat
 
 from .finalize import ContractFinalizer, GroundingError, validate_link
 from .evidence import AuthoringEvidenceResolver, EvidenceResolutionError
-from .discovery import (
-    ClickDiscoveryError,
-    ClickDiscoveryObservation,
-    ClickDiscoveryResult,
-    ClickDiscoveryService,
-)
 from .models import (
     ContractFinalizationInputs,
     GroundedSource,
@@ -39,10 +33,6 @@ __all__ = [
     "AuthoringPublicationPending",
     "AuthoringEvidenceResolver",
     "BaselineRetriever",
-    "ClickDiscoveryError",
-    "ClickDiscoveryObservation",
-    "ClickDiscoveryResult",
-    "ClickDiscoveryService",
     "RuntimeDiscoveryService",
     "RuntimeDiscoveryObservation",
     "RuntimeDiscoveryResult",

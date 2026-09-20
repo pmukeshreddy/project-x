@@ -23,7 +23,7 @@ from feature_rl.artifacts import ArtifactStore,canonical_json
 from feature_rl.contracts import ActorRole,CommandSpec
 from .archive import SourceArchive,SourceFile
 from .models import (CleanupUnverified,DockerUnavailable,EnvironmentError,Ownership,
-                     PolicyRejected,ProcessObservation,SandboxPolicy,SECCOMP_SHA256,SourceRejected,SourceUnavailable,IMAGE,REPAIRED_IMAGE,CpuBudgetExceeded)
+                     PolicyRejected,ProcessObservation,SandboxPolicy,SECCOMP_SHA256,SourceRejected,SourceUnavailable,CpuBudgetExceeded)
 
 
 def utc_now():return datetime.now(timezone.utc).isoformat()
@@ -288,12 +288,6 @@ class DockerSession:
             image=self.engine.ensure_image(selected_image)
             if image.get('Os')!='linux' or image.get('Architecture')!=self.policy.platform.split('/')[1] or image['Config'].get('Volumes') or image['Config'].get('OnBuild'):
                 raise PolicyRejected('image platform/volume/build policy mismatch')
-            if selected_image==REPAIRED_IMAGE:
-                base=self.engine.ensure_image(IMAGE)
-                layers=image['RootFS']['Layers'];original=base['RootFS']['Layers']
-                if layers[:len(original)]!=original or len(layers)!=len(original)+2:
-                    raise PolicyRejected('repaired image base layer identity mismatch')
-                self.receipts.append({'image_manifest':selected_image,'image_inspect_id':image['Id'],'base_manifest':IMAGE,'base_layers':original,'image_layers':layers})
             self.receipts.append({'image_manifest':selected_image,'image_inspect_id':image['Id']})
             # Image transfer has its own bounded deadline, outside task CPU/wall budgets.
             self.deadline=time.monotonic()+self.policy.lifecycle_seconds

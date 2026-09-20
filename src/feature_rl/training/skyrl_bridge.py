@@ -18,7 +18,6 @@ from .torch_backend import CausalTurn, _masked, _torch
 PINNED_SKYRL = 'f5bc3b78dfddfb352870d5d7430cd226e5785838'
 PINNED_HARBOR = '3de07a0e01f3368921766437fc7afece3ddec23d'
 GRPO_LOSS = 'feature_rl_sampled_clipped'
-SFT_LOSS = 'feature_rl_supervised'
 _LOSS_REGISTRATION_LOCK = threading.RLock()
 
 
@@ -44,15 +43,6 @@ def feature_grpo_loss(log_probs, old_log_probs, advantages, config, loss_mask=No
     return loss, {'clip_ratio': float(((ratio < low) | (ratio > high)).float().mean().detach())}
 
 
-def feature_sft_loss(log_probs, old_log_probs, advantages, config, loss_mask=None, rollout_logprobs=None):
-    """Supervised cross entropy; normalized unit weights use SkyRL's reduction path."""
-    if rollout_logprobs is not None or loss_mask is None or not (log_probs.shape == advantages.shape == loss_mask.shape):
-        raise ValueError('Supervised targets require aligned masks and no sampled probabilities')
-    mask = loss_mask.bool()
-    if not mask.any(): return log_probs.reshape(-1)[:0].sum(), {'clip_ratio': 0.}
-    return -(_masked(log_probs, mask) * _masked(advantages.detach(), mask)).sum(), {'clip_ratio': 0.}
-
-
 def _same_loss(actual, expected):
     if actual is expected:
         return True
@@ -71,7 +61,7 @@ def register_losses():
     import ray
     import cloudpickle
     from skyrl.backends.skyrl_train.utils.ppo_utils import PolicyLossRegistry, sync_registries
-    losses = {GRPO_LOSS: feature_grpo_loss, SFT_LOSS: feature_sft_loss}
+    losses = {GRPO_LOSS: feature_grpo_loss}
     with _LOSS_REGISTRATION_LOCK:
         if not ray.is_initialized():
             raise ValueError('Ray must be initialized before feature loss registration')
@@ -128,7 +118,7 @@ def group_rows(groups):
     """Only already-admitted/validated PreparedGroup inputs from TrainingDataGate."""
     rows = []
     for group in groups:
-        if group.effective_size < 2: continue
+        if group.effective_size < 2 or not any(a is not None and a != 0 for a in group.advantages): continue
         for n, turns in enumerate(group.turns):
             for t, turn in enumerate(turns):
                 last = t == len(turns)-1
@@ -149,14 +139,15 @@ def convert_eligible_batch(trainer, output, uids):
     from skyrl.train.dataset.preprocess import compute_prompt_mini_batch_boundaries
     if not uids or any(not isinstance(uid, str) or not uid for uid in uids):
         raise ValueError('Nonempty eligible group identities required')
+    cfg = trainer.cfg
+    group_size = cfg.generator.n_samples_per_prompt
+    if not cfg.generator.step_wise_trajectories or type(group_size) is not int or group_size < 2:
+        raise ValueError('Stepwise conversion requires at least two assigned episodes per group')
     count = len(set(uids))
     try:
-        prompts = compute_prompt_mini_batch_boundaries(uids, 1, count, True, 4)
+        prompts = compute_prompt_mini_batch_boundaries(uids, 1, count, True, group_size)
     except AssertionError as exc:
         raise ValueError('Eligible group rows must be contiguous') from exc
-    cfg = trainer.cfg
-    if not cfg.generator.step_wise_trajectories or cfg.generator.n_samples_per_prompt != 4:
-        raise ValueError('Four-episode stepwise conversion required')
     sizes = {'policy': cfg.trainer.policy_mini_batch_size}
     if cfg.trainer.critic.model.path is not None:
         sizes['critic'] = cfg.trainer.critic_mini_batch_size
@@ -178,7 +169,7 @@ def convert_eligible_batch(trainer, output, uids):
 class SkyRLUpdateBridge:
     """Drive a constructed RayPPOTrainer with exact per-turn rows and explicit advantages.
 
-    The caller owns task collection/admission, sampler/cost/signal state and worker
+    The caller owns task collection/admission, sampler/cost state and worker
     policy acknowledgments. initialize_sync/update are real native operations.
     No private grader material enters this tensor bridge or a candidate worker.
     """
@@ -189,14 +180,15 @@ class SkyRLUpdateBridge:
         self.trainer = trainer
         cfg = trainer.cfg
         if (cfg.trainer.strategy != 'fsdp' or cfg.trainer.update_epochs_per_batch != 1
-                or cfg.generator.n_samples_per_prompt != 4 or not cfg.generator.step_wise_trajectories
+                or type(cfg.generator.n_samples_per_prompt) is not int or cfg.generator.n_samples_per_prompt < 2
+                or not cfg.generator.step_wise_trajectories
                 or cfg.generator.merge_stepwise_output or cfg.generator.apply_overlong_filtering
                 or cfg.trainer.algorithm.dynamic_sampling.type is not None
                 or cfg.trainer.algorithm.zero_variance_filter or cfg.trainer.algorithm.advantage_batch_normalize
                 or cfg.trainer.algorithm.loss_reduction != 'token_mean'
                 or cfg.trainer.algorithm.use_kl_in_reward or cfg.trainer.update_ref_every_epoch
                 or trainer.has_critic):
-            raise ValueError('Expected synchronous four-episode FSDP/token-mean configuration without filtering/critic/ref updates')
+            raise ValueError('Expected synchronous grouped FSDP/token-mean configuration without filtering/critic/ref updates')
         self.ready = False
 
     async def initialize_sync(self):
@@ -211,24 +203,19 @@ class SkyRLUpdateBridge:
         trainer = self.trainer
         if not self.ready:
             raise ValueError('Initial native weight synchronization required')
+        if algorithm != 'grpo' or trainer.cfg.trainer.algorithm.policy_loss_type != GRPO_LOSS:
+            raise ValueError('Explicit registered GRPO policy loss required')
         if not rows:
             return {'optimizer_skipped': True, 'reason': 'no valid group with at least two outcomes'}
-        expected = {'grpo': GRPO_LOSS, 'sft': SFT_LOSS}.get(algorithm)
-        if expected is None or trainer.cfg.trainer.algorithm.policy_loss_type != expected:
-            raise ValueError('Explicit registered policy loss does not match requested arm')
-        if algorithm == 'sft' and trainer.cfg.trainer.algorithm.use_kl_loss:
-            raise ValueError('Declared SFT uses supervised loss only')
         for row in rows:
             row.turn.validate(trainer.cfg.trainer.algorithm.max_seq_len)
-            if algorithm == 'grpo' and (row.turn.behavior is None or row.turn.advantage is None):
+            if row.turn.behavior is None or row.turn.advantage is None:
                 raise ValueError('GRPO rows require validated sampled behavior and group advantage')
-            if algorithm == 'sft' and (row.turn.behavior is not None or row.turn.advantage is not None):
-                raise ValueError('SFT rows are deterministic targets, not sampled RL')
         output = GeneratorOutput(
             prompt_token_ids=[list(r.turn.context) for r in rows], response_ids=[list(r.turn.targets) for r in rows],
             loss_masks=[list(map(int, r.turn.mask)) for r in rows],
             rewards=[[0.]*(len(r.turn.targets)-1)+[r.reward] for r in rows],
-            rollout_logprobs=[list(r.turn.behavior) for r in rows] if algorithm == 'grpo' else None,
+            rollout_logprobs=[list(r.turn.behavior) for r in rows],
             trajectory_ids=[TrajectoryID(r.instance_id, r.repetition_id) for r in rows],
             is_last_step=[r.is_last_step for r in rows], stop_reasons=['complete']*len(rows), rollout_metrics=None)
         validate_generator_output(len(rows), output, step_wise=True)
@@ -241,7 +228,7 @@ class SkyRLUpdateBridge:
         # Avoid stock singleton/invalid-peer estimator. Padding rows retain zero weight.
         advantages = torch.zeros_like(data['loss_mask'])
         for n, row in enumerate(rows):
-            advantages[n] = float(row.turn.advantage if algorithm == 'grpo' else 1.) * data['loss_mask'][n]
+            advantages[n] = float(row.turn.advantage) * data['loss_mask'][n]
         data['advantages'] = advantages
         data['returns'] = torch.zeros_like(advantages)
         data.pop('rewards')

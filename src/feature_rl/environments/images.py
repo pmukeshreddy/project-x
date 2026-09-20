@@ -13,7 +13,7 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import ArtifactRef, CommandSpec, StrictModel, Visibility
 from .archive import SourceArchive, SourceFile
 from .models import PolicyRejected
-from .profiles import dependency_files, runtime_profile
+from .profiles import dependency_files
 
 
 ImageDigest = Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$')]
@@ -107,7 +107,7 @@ print('runtime dependency closure verified')
 
 def image_context(store, pins, policy):
     """Canonical, source-free recipe; the tar hash is also the cache key."""
-    profile = runtime_profile(policy)
+    profile = policy.profile
     files = {'supply/'+name: entry for name, entry in dependency_files(store, pins, policy).items()}
     files['profile.json'] = SourceFile(canonical_json(profile.model_dump(mode='json',
         exclude={'neutral_repairs'})), False)
@@ -231,15 +231,15 @@ def check_image(info, key, policy):
         raise PolicyRejected('prebuilt image identity/platform/reproducible timestamp mismatch')
 
 
-def validate_baseline(runtime, image, baseline, source, pins):
+def validate_baseline(runtime, image, baseline, source):
     """Reject unbuildable repositories and incomplete dependency closures early."""
     session = runtime.engine.session(binding={'purpose': 'runtime-image-construction',
         'context': image.context_sha256, 'tree': source.tree_sha256}, saved_source={}, image=image.image_digest)
     error = None
     try:
         with session:
-            runtime.stage(session, source, pins, prebuilt=True)
-            commands = (*runtime.profile.prebuilt_setup[:2], CommandSpec(
+            runtime.stage(session, source)
+            commands = (*runtime.profile.setup[:2], CommandSpec(
                 argv=('python', '-I', '-c', CHECK_CODE, '/workspace/built/'+runtime.profile.wheel_filename),
                 working_directory='/workspace', timeout_seconds=30.0))
             for command in commands:

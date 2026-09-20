@@ -9,7 +9,8 @@ from feature_rl.artifacts import ArtifactStore
 from feature_rl.environments import DockerEngine, EnvironmentRuntime, SandboxPolicy
 from feature_rl.environments.images import ImageDigest, ImageRepository
 from feature_rl.grading import GradingService
-from feature_rl.qualification import QualificationPolicy, QualificationService, SSHHumanVerifier
+from feature_rl.qualification import QualificationPolicy, QualificationService
+from feature_rl.audits.attestation import SSHHumanVerifier
 from feature_rl.registry import Registry, RegistryLimits
 from .build import TaskBuilder
 from .factory import Factory
@@ -39,7 +40,7 @@ class RuntimeConfiguration(LocalPaths):
     socket_path: str
     revision: c.Revision
     grading_revision: c.Revision
-    policy: SandboxPolicy = Field(default_factory=SandboxPolicy)
+    policy: SandboxPolicy
     image_repository: ImageRepository | None = Field(default=None, exclude_if=lambda value: value is None)
     qualification_image: ImageDigest | None = Field(default=None, exclude_if=lambda value: value is None)
     image_seconds: Annotated[float, Field(gt=0, le=3600)] = Field(default=600.0, exclude_if=lambda value: value == 600.0)
@@ -54,7 +55,6 @@ class HumanTrustConfiguration(LocalPaths):
 class QualificationSettings(c.StrictModel):
     revision: c.Revision
     policy: QualificationPolicy = Field(default_factory=QualificationPolicy)
-    human: HumanTrustConfiguration | None = None
 
 
 class NativeConfiguration(c.StrictModel):
@@ -143,11 +143,8 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
             max_wall_seconds=settings.grade_wall_seconds)
     if qualification:
         settings=config.qualification
-        human=None if settings.human is None else SSHHumanVerifier(
-            enrollment_path=settings.human.enrollment_path,
-            expected_enrollment_sha256=settings.human.enrollment_sha256)
         q=QualificationService(store=store,registry=registry,grader=grader,builder=builder,
-            revision=settings.revision,policy=settings.policy,attestation_verifier=human)
+            revision=settings.revision,policy=settings.policy)
         lifecycle=TaskLifecycle(store=store,registry=registry,qualification=q,revision=config.revision)
         resolver=ReleasedTaskResolver(profiles=(lifecycle,),revision=config.revision)
     factory=Factory(store=store,registry=registry,revision=config.revision,builder=builder,qualification=q,
@@ -170,7 +167,7 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
                 factory.native_run=NativeRunService(**shared,native_factory=inert,revision=settings.revision)
             else:
                 from feature_rl.evaluation.service import EvaluationService
-                factory.evaluation=EvaluationService(**shared,factory=factory,native_factory=inert,revision=config.evaluation.revision)
+                factory.evaluation=EvaluationService(**shared,native_factory=inert,revision=config.evaluation.revision)
     if audit:
         from feature_rl.audits.service import AuditService
         settings=config.audit

@@ -75,7 +75,7 @@ class IntakeSelection(c.StrictModel):
     reference: c.ArtifactRef
     license_text: c.ArtifactRef
     provenance_label: Literal['historical_request','reconstructed_specification']
-    manual_review_required: tuple[str,...]
+    mixed_paths_for_qualification: tuple[str,...]
 
 
 class PreparationSelection(c.StrictModel):

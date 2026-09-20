@@ -34,7 +34,9 @@ def setup(tmp_path,monkeypatch):
         cpu_seconds=100_000.0,commands=1000,memory_bytes=5_368_709_120,spend_usd=None)
     settings=AuthoringSettings(backend=BackendConfig(python_executable=Path('/TEST/python'),
         model_directory=Path('/TEST/model'),model_manifest=Path('/TEST/model.json'),
-        dependency_manifest=Path('/TEST/deps.json')),m2_revision='a'*40,m4_revision='a'*40,evidence_scope='unit_diagnostic',
+        dependency_manifest=Path('/TEST/deps.json'),model_id=backend.model_id,revision=backend.revision,
+        model_manifest_sha256=backend.model_manifest_sha256,
+        dependency_manifest_sha256=backend.dependency_manifest_sha256),m2_revision='a'*40,m4_revision='a'*40,evidence_scope='unit_diagnostic',
         batch=AuthoringBatch(candidates=(pair.candidate,),candidate_caps=caps,batch_caps=caps,
             calibration_evidence=(inputs.environment,)))
     assert hasattr(Factory,'author'),'Factory actual authoring is missing'
@@ -242,8 +244,8 @@ def contract_call(factory,base,runner):
     from feature_rl.requirements import ContractFinalizationInputs,RequirementContractProposal,build_contract_request,GenerationCandidate
     from test_checker_authoring import configured_diagnostic_provider
     contract=factory.store.get_artifact(base.inputs.contract)
-    from feature_rl.requirements.discovery import ClickDiscoveryObservation
-    discovery=ClickDiscoveryObservation.model_validate_json(factory.store.get_bytes(base.resolver.runtime_discovery))
+    from feature_rl.requirements.runtime_discovery import RuntimeDiscoveryObservation
+    discovery=RuntimeDiscoveryObservation.model_validate_json(factory.store.get_bytes(base.resolver.runtime_discovery))
     inputs=ContractFinalizationInputs(visible_request=contract.visible_request,
         allowed_requirement_ids=tuple(r.requirement_id for r in contract.requirements+contract.compatibility_obligations),
         entry_points=discovery.entry_points,supported_observables=discovery.supported_observables,

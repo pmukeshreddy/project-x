@@ -248,7 +248,7 @@ class FeatureWorkflow:
         return IntakeSelection(candidate=result.candidate,source_pair=result.source_pair,
             request=result.authoring.request_evidence,baseline=result.authoring.baseline,
             reference=result.reference,license_text=result.authoring.license_text,
-            provenance_label=result.provenance_label,manual_review_required=result.manual_review_required),(
+            provenance_label=result.provenance_label,mixed_paths_for_qualification=result.mixed_paths_for_qualification),(
                 unknown_cost('discovery','M1 source/import costs remain on CandidateRecord and source-admission job; workflow overhead unmeasured'),)
 
     def _prepare(self,selected):
@@ -264,8 +264,7 @@ class FeatureWorkflow:
         return value,(*discovery.costs,*overhead(),unknown_cost('storage','Runtime preparation publication overhead unmeasured'))
 
     def _sources(self,selected,prepared,request):
-        from feature_rl.environments.profiles import runtime_profile
-        source=self.runtime.source(selected.baseline);profile=runtime_profile(self.runtime.policy)
+        source=self.runtime.source(selected.baseline);profile=self.runtime.policy.profile
         profile.validate_source(source)
         text=read_bytes(self.store,selected.request,MAX_DOCUMENT,kind='authoring-request').decode()
         terms=set(re.findall(r'[A-Za-z_]{3,}',text.lower()))-{'the','and','with','this','that','from','true','false','null'}
@@ -386,8 +385,7 @@ class FeatureWorkflow:
         prepared,_=self._step(claim,ref,'preparation',document(selected),lambda:self._prepare(selected))
         sources,resolver,baseline=self._sources(selected,prepared,request)
         author=self._author_factory(selected)
-        from feature_rl.environments.profiles import runtime_profile
-        profile=runtime_profile(self.runtime.policy)
+        profile=self.runtime.policy.profile
         allowed=c.AllowedChanges(source_roots=profile.source_roots,forbidden_paths=('.feature-rl','controller_checks','reference','tests','docs'),
             dependencies='forbidden',dependency_artifacts=(),additional_artifact_types=())
         profile.validate_allowed_changes(allowed)

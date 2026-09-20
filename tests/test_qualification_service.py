@@ -1,4 +1,5 @@
 """M5 orchestration boundary diagnostics. Full worker path belongs to TEST fixture."""
+from m4_fixtures import runtime_policy
 import pytest
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactStore
@@ -12,7 +13,7 @@ def service(tmp_path):
     from feature_rl.qualification import QualificationService
     store=ArtifactStore(tmp_path/'store',c.ActorRole.CONTROLLER)
     registry=Registry(tmp_path/'registry',store)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=SandboxPolicy();runtime.revision='a'*40
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.revision='a'*40
     grader=GradingService(store=store,runtime=runtime,revision='b'*40)
     return QualificationService(store=store,registry=registry,grader=grader,builder=None,revision='c'*40)
 
@@ -31,11 +32,6 @@ def test_forged_accepted_report_without_authenticated_origin_is_rejected(tmp_pat
     with pytest.raises(QualificationRejected):q.verify_accepted(task,task)
 
 
-def test_missing_human_origin_is_not_authenticated_by_identity_text(tmp_path):
-    from feature_rl.qualification import QualificationRejected
-    q=service(tmp_path);task=task_fixture(q.store)
-    fake=q.store.put_bytes(b'{"human_identity":"A Person","decision":"approved"}','m5-sshsig-attestation',c.Visibility.PRIVATE)
-    with pytest.raises(QualificationRejected):q.accept(task,fake)
 
 
 def test_verified_history_uses_actual_registry_candidate_trace_jobs(tmp_path):

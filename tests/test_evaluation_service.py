@@ -46,16 +46,16 @@ def evaluation_inputs(tmp_path, monkeypatch):
                          gpu_seconds=1.0, usd=None)
     arms = []
     assignments = []
-    for arm, method in (("A", "starting"), ("B", "sft"), ("C", "external_rl"), ("D", "factory_rl")):
-        checkpoint = initial if arm == "A" else _opaque(context.store, "checkpoint", {"arm": arm})
-        training = None if arm == "A" else _opaque(context.store, "training-config", {"arm": arm})
+    for arm, method in (("base", "starting"), ("feature_grpo", "factory_rl")):
+        checkpoint = initial if arm == "base" else _opaque(context.store, "checkpoint", {"arm": arm})
+        training = None if arm == "base" else _opaque(context.store, "training-config", {"arm": arm})
         policy = context.policy.model_copy(update={"policy_version": f"diagnostic-{arm}", "seed": 11})
         arms.append(ArmProtocol(
             arm=arm, method=method, policy=policy, checkpoint=checkpoint,
             training_config=training, initial_checkpoint=initial, tools=tools,
             action_format="actions-v1", optimizer_family="adamw",
             harness_version=context.policy.harness_version,
-            training_budget=None if arm == "A" else budget,
+            training_budget=None if arm == "base" else budget,
             development_budget=budget,
         ))
         assignments.append(TrialAssignment(
@@ -71,7 +71,7 @@ def evaluation_inputs(tmp_path, monkeypatch):
         checkpoint_selection_rule="development-only fixed rule",
         invalid_trial_rule="report all assigned and valid-only",
         locked_test_access_rule="one final run after freeze",
-        comparisons=(("A", "D"), ("B", "D"), ("C", "D")), created_at=NOW,
+        comparisons=(("base", "feature_grpo"),), created_at=NOW,
     )
     prereg_ref = _opaque(context.store, "m8-preregistration", prereg.model_dump(mode="json"))
     config = c.EvaluationConfig(
@@ -98,8 +98,8 @@ def test_arm_protocol_freezes_training_source_roots(tmp_path, monkeypatch):
     prereg = EvaluationPreregistration.model_validate_json(
         context.store.get_bytes(config.preregistration)
     )
-    source = _opaque(context.store, "m8-external-adaptation-batch", {"diagnostic": True})
-    payload = prereg.arms[2].model_dump(mode="json")
+    source = _opaque(context.store, "m6-construction-result", {"diagnostic": True})
+    payload = prereg.arms[1].model_dump(mode="json")
     payload["training_sources"] = (source.model_dump(mode="json"),)
     protocol = ArmProtocol.model_validate_json(canonical_json(payload))
     assert protocol.training_sources == (source,)
@@ -133,18 +133,18 @@ def test_evaluation_service_runs_each_frozen_assignment_once_with_explicit_case_
     assert result.operation == "evaluate" and result.disposition == c.Disposition.SUCCESS
     report = context.store.get_artifact(result.artifacts[0])
     assert type(report) is c.EvaluationReport
-    assert len(report.trials) == 4
+    assert len(report.trials) == 2
     assert {trial.case_seed for trial in report.trials} == {73}
     assert {trial.policy_seed for trial in report.trials} == {11}
-    assert len(context.backend.calls) == len(context.grades) == 4
-    assert [seed for _, _, seed in context.grades] == [73, 73, 73, 73]
+    assert len(context.backend.calls) == len(context.grades) == 2
+    assert [seed for _, _, seed in context.grades] == [73, 73]
     assert all(context.runner.validate_record(context.store.get_artifact(trial.rollout)).run_id
                == context.store.get_artifact(trial.rollout).run_id
                for trial in report.trials)
 
     replay = service.evaluate(config)
     assert replay == result
-    assert len(context.backend.calls) == len(context.grades) == 4
+    assert len(context.backend.calls) == len(context.grades) == 2
 
 
 def test_evaluation_service_keeps_authenticated_invalid_assignments_provisional(tmp_path, monkeypatch):
@@ -191,22 +191,18 @@ def test_evaluation_recovery_replays_assigned_runner_receipts_without_new_episod
     monkeypatch.setattr(context.store, "put_artifact", fail_report)
     with pytest.raises(EvaluationRecoveryRequired) as caught:
         service.evaluate(config)
-    assert len(context.backend.calls) == len(context.grades) == 4
+    assert len(context.backend.calls) == len(context.grades) == 2
     monkeypatch.setattr(context.store, "put_artifact", put)
     result = service.recover(caught.value.claim)
     assert result.disposition == c.Disposition.SUCCESS
-    assert len(context.backend.calls) == len(context.grades) == 4
+    assert len(context.backend.calls) == len(context.grades) == 2
 
 
 def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_contract(tmp_path, monkeypatch):
     from feature_rl.agents import AgentRunner
     from feature_rl.evaluation import (
-        AdaptationBatch, AdaptationFunnel, AdaptationItem, AdaptationStage,
-        EvaluationPreregistration, EvaluationService, ExternalAdaptationConfig,
-        ExternalCorpusAdapter, ExternalCorpusFrame, ExternalCorpusRow, ExternalOriginMapping,
-        ExternalSourceAssignment, FrozenRoster, SourceAssignment,
+        EvaluationPreregistration, EvaluationService, FrozenRoster, SourceAssignment,
     )
-    from feature_rl.pipeline import Factory
     from feature_rl.pipeline.construction import ConstructionResult
     from feature_rl.registry import CostObservation, JobSpec
     from feature_rl.training.factory import NativeSessionFactory
@@ -218,59 +214,15 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
     original = context.store.get_artifact(context.task)
     original_pair = context.store.get_artifact(original.source_pair)
     original_candidate = context.store.get_artifact(original_pair.candidate)
-    row = ExternalCorpusRow(
-        repo="example/evaluation", instance_id="external-evaluation",
-        base_commit=original_pair.baseline_commit, created_at="2026-01-01T00:00:00Z",
-        language="python", task_type="feature", repo_type="library",
-        difficulty="diagnostic", problem_statement="Add the external evaluation behavior.",
-        patch="PRIVATE DIAGNOSTIC PATCH", test_patch="PRIVATE DIAGNOSTIC TEST PATCH",
-        FAIL_TO_PASS='["external_case"]', PASS_TO_PASS='[]',
-        environment_config='{"diagnostic":true}',
-    )
-    row_raw = canonical_json(row.model_dump(mode="json"))
-    row_ref = context.store.put_bytes(row_raw, "m8-external-row", c.Visibility.PRIVATE)
-    digest = lambda value: __import__("hashlib").sha256(value.encode()).hexdigest()
-    proof = {
-        "baseline_commit": original_pair.baseline_commit,
-        "reference_commit": original_pair.reference_commit,
-        "baseline_tree": "a" * 40, "reference_tree": "b" * 40,
-        "patch_sha256": digest(row.patch),
-        "partition_assignments": [{"partition": c.Partition.TRAIN.value}],
-    }
-    proof_ref = context.store.put_bytes(
-        canonical_json(proof), "source-inspection-log", c.Visibility.PRIVATE,
-    )
-    origin_evidence = (c.EvidenceRecord(
-        producer="feature_rl.intake.GitHubPullRequestIntake",
-        command=("diagnostic-external-origin",), recorded_at=NOW, exit_status=0,
-        artifacts=(proof_ref,), revision="1" * 40, scope="source_inspection",
-    ),)
-    external_candidate_value = original_candidate.model_copy(update={
-        "repository_family": "external-family", "request_lineage": ("external-source",),
-        "partition": c.Partition.TRAIN,
-        "provenance": original_candidate.provenance.model_copy(update={"evidence": origin_evidence}),
-        "license": original_candidate.license.model_copy(update={"evidence": origin_evidence}),
-        "commits": original_candidate.commits.model_copy(update={"evidence": origin_evidence}),
-        "screening": original_candidate.screening.model_copy(update={"evidence": origin_evidence}),
-    })
-    external_candidate = context.store.put_artifact(external_candidate_value)
-    external_pair_value = original_pair.model_copy(update={
-        "candidate": external_candidate,
-        "provenance": original_pair.provenance.model_copy(update={
-            "inputs": (external_candidate, original_pair.baseline, original_pair.reference),
-            "evidence": origin_evidence,
-        }),
-        "relationship": original_pair.relationship.model_copy(update={"evidence": origin_evidence}),
-        "verification": origin_evidence,
-    })
-    external_pair = context.store.put_artifact(external_pair_value)
-    factory_candidate_value = external_candidate_value.model_copy(update={
+    origin_evidence = original.provenance.evidence
+    factory_candidate_value = original_candidate.model_copy(update={
         "repository_family": "factory-family", "request_lineage": ("factory-source",),
+        "partition": c.Partition.TRAIN,
     })
     factory_candidate = context.store.put_artifact(factory_candidate_value)
-    factory_pair = context.store.put_artifact(external_pair_value.model_copy(update={
+    factory_pair = context.store.put_artifact(original_pair.model_copy(update={
         "candidate": factory_candidate,
-        "provenance": external_pair_value.provenance.model_copy(update={
+        "provenance": original_pair.provenance.model_copy(update={
             "inputs": (factory_candidate, original_pair.baseline, original_pair.reference),
         }),
     }))
@@ -291,7 +243,7 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
             costs=original.costs,
             task=built_ref, disposition=c.Disposition.PROVISIONAL,
             baseline_health=None, baseline_absence=None, reference_run=None,
-            controls=(), fresh_runs=(), interrupted_reset_runs=(), human_reviews=(),
+            controls=(), fresh_runs=(), interrupted_reset_runs=(),
             rejection_reasons=("labeled lifecycle diagnostic",), repair_attempts=0,
             policy_version="diagnostic-" + label,
         )
@@ -303,13 +255,10 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
             context.registry.register(ref)
         return built_ref, released_ref
 
-    external_built, external_task = released_training_task(
-        "external", external_pair, "external-family", "external-source",
-    )
     factory_built, factory_task = released_training_task(
         "factory", factory_pair, "factory-family", "factory-source",
     )
-    assert external_built != external_task and factory_built != factory_task
+    assert factory_built != factory_task
     locked_task = context.store.put_artifact(
         original.model_copy(update={"partition": c.Partition.LOCKED_TEST})
     )
@@ -319,11 +268,6 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
         "locked_tasks": (locked_task,),
         "sources": (
             roster.sources[0].model_copy(update={"task": locked_task}),
-            SourceAssignment(
-                source_id="external-source", task=external_task,
-                repository_family="external-family", request_lineage=("external-source",),
-                partition=c.Partition.TRAIN, evidence=roster.sources[0].evidence,
-            ),
             SourceAssignment(
                 source_id="factory-source", task=factory_task,
                 repository_family="factory-family", request_lineage=("factory-source",),
@@ -431,9 +375,7 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
         return checkpoint_ref, policy, request_ref
 
     selected = {
-        "B": selected_checkpoint("B", "sft", factory_task),
-        "C": selected_checkpoint("C", "grpo", external_task),
-        "D": selected_checkpoint("D", "grpo", factory_task),
+        "feature_grpo": selected_checkpoint("feature_grpo", "grpo", factory_task),
     }
 
     construction_cost = c.CostRecord(
@@ -513,137 +455,12 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
         )
         return receipt_ref, history, source, candidate
 
-    external_receipt, external_history, external_source, _ = selected_construction(
-        "external", external_built, external_candidate,
-    )
     factory_receipt, factory_history, _, _ = selected_construction(
         "factory", factory_built, factory_candidate,
     )
-    request_locator = "https://example.invalid/evaluation/issues/1"
-    request_ref = context.store.put_bytes(canonical_json({
-        "issue": {
-            "url": request_locator, "body": row.problem_statement,
-            "source_response_sha256": external_candidate_value.sources[0].content.sha256,
-        },
-    }), "authoring-request", c.Visibility.AUTHORING)
-    mapping_value = ExternalOriginMapping(
-        version="m8-external-origin-v1", row=row_ref,
-        row_payload_sha256=__import__("hashlib").sha256(row_raw).hexdigest(),
-        dataset_repository=row.repo,
-        canonical_origin_url=external_candidate_value.repository_url,
-        request_locator=request_locator, candidate=external_candidate,
-        source_pair=external_pair, authoring_request=request_ref,
-        authoring_baseline=external_pair_value.baseline,
-        authoring_license=external_candidate_value.license.license_text,
-        reference_commit=external_pair_value.reference_commit,
-        normalized_request_sha256=digest(" ".join(row.problem_statement.split())),
-        patch_sha256=digest(row.patch), test_patch_sha256=digest(row.test_patch),
-        native_case_ids_sha256=digest(row.FAIL_TO_PASS + "\0" + row.PASS_TO_PASS),
-        environment_config_sha256=digest(row.environment_config),
-        changed_paths=tuple(sorted(item.path for item in external_pair_value.changed_files)),
-        intended_use="noncommercial_research", evidence=origin_evidence,
-    )
-    mapping = context.store.put_bytes(
-        canonical_json(mapping_value.model_dump(mode="json")),
-        "m8-external-origin", c.Visibility.PRIVATE,
-    )
-    exclusions = FrozenRoster(
-        version="m8-frozen-roster-v1", locked_tasks=(locked_task,),
-        sources=(roster.sources[0].model_copy(update={"task": locked_task}),),
-        relations=(), test_source_frame=proof_ref, exclusions=proof_ref, created_at=NOW,
-    )
-    exclusions_ref = context.store.put_bytes(
-        canonical_json(exclusions.model_dump(mode="json")),
-        "m8-frozen-roster", c.Visibility.PRIVATE,
-    )
-    assignment = ExternalSourceAssignment(
-        instance_id=row.instance_id, row=row_ref, candidate=external_candidate,
-        repository_family=external_candidate_value.repository_family,
-        request_lineage=external_candidate_value.request_lineage,
-        local_partition=c.Partition.TRAIN,
-        normalized_request_sha256=mapping_value.normalized_request_sha256,
-        patch_sha256=mapping_value.patch_sha256,
-        test_patch_sha256=mapping_value.test_patch_sha256,
-        baseline_tree_id=proof["baseline_tree"],
-        environment_config_sha256=mapping_value.environment_config_sha256,
-        relation_evidence=proof_ref,
-    )
-    frame_value = ExternalCorpusFrame(
-        version="m8-external-source-frame-v1",
-        dataset_id="TuringEnterprises/SWE-Bench-plus-plus",
-        release_revision="da364537055b9bb5091783af78a02b6a3bc0e130",
-        upstream_split="test", assignments=(assignment,), exclusions=exclusions_ref,
-        created_at=NOW,
-    )
-    adaptation_frame = context.store.put_bytes(
-        canonical_json(frame_value.model_dump(mode="json")),
-        "m8-external-source-frame", c.Visibility.PRIVATE,
-    )
-    adaptation_config_value = ExternalAdaptationConfig(
-        version="m8-external-adaptation-v1",
-        dataset_id="TuringEnterprises/SWE-Bench-plus-plus",
-        release_revision="da364537055b9bb5091783af78a02b6a3bc0e130",
-        harness_revision="f938edd189049806fef7a76fdf01f0da55baa565",
-        upstream_config="default", upstream_split="test",
-        local_partition=c.Partition.TRAIN,
-        dataset_license="diagnostic non-commercial research",
-        intended_use="noncommercial_research", rows=(row_ref,),
-        origin_mappings=(mapping,), construction_inputs=(None,),
-        source_frame=adaptation_frame, supported_languages=("python",),
-        supported_task_types=("feature",),
-    )
-    adaptation_config = context.store.put_bytes(
-        canonical_json(adaptation_config_value.model_dump(mode="json")),
-        "m8-external-adaptation-configuration", c.Visibility.PRIVATE,
-    )
-    origin_factory = Factory(
-        store=context.store, registry=context.registry, revision="6" * 40,
-    )
-    ExternalCorpusAdapter(
-        store=context.store, factory=origin_factory,
-        configuration=adaptation_config, revision=REVISION,
-    )
-    stages = tuple(AdaptationStage(
-        name=name, entered=1, accepted=1, rejected=0, invalid=0, reasons=(),
-    ) for name in ("metadata", "origin", "source-screen", "construction"))
-    adaptation_batch = AdaptationBatch(
-        version="m8-external-adaptation-batch-v1", configuration=adaptation_config,
-        source_frame=adaptation_frame,
-        items=(AdaptationItem(
-            row=row_ref, origin_mapping=mapping, instance_id=row.instance_id,
-            candidate=external_candidate, source_pair=external_pair,
-            source_only_allowlist=(
-                request_ref, external_pair_value.baseline,
-                external_candidate_value.license.license_text,
-            ),
-            source_result=(external_source,),
-            construction_result=(external_built, external_history, external_receipt),
-            disposition=c.Disposition.SUCCESS, reason="diagnostic adapted construction",
-            costs=(construction_cost,), required_next_gates=(),
-        ),),
-        funnel=AdaptationFunnel(
-            version="m8-adaptation-funnel-v1",
-            corpus_id=adaptation_config_value.dataset_id,
-            release_revision=adaptation_config_value.release_revision,
-            upstream_split=adaptation_config_value.upstream_split,
-            local_partition=c.Partition.TRAIN,
-            license_constraint=adaptation_config_value.dataset_license,
-            source_frame=adaptation_frame, stages=stages, selection_bias=(),
-            costs=(construction_cost,), disposition=c.Disposition.SUCCESS,
-        ),
-    )
-    adaptation_ref = context.store.put_bytes(
-        canonical_json(adaptation_batch.model_dump(mode="json")),
-        "m8-external-adaptation-batch", c.Visibility.PRIVATE,
-    )
-    context.registry.register(
-        adaptation_ref,
-        dependencies=(adaptation_config, adaptation_frame, row_ref, mapping,
-                      external_source, external_built, external_history, external_receipt),
-    )
     arms = []
     for protocol in prereg.arms:
-        if protocol.arm == "A":
+        if protocol.arm == "base":
             arms.append(protocol.model_copy(update={
                 "policy": a_policy, "checkpoint": initial, "initial_checkpoint": initial,
             }))
@@ -656,10 +473,7 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
             arms.append(protocol.model_copy(update={
                 "policy": policy, "checkpoint": checkpoint, "training_config": request,
                 "initial_checkpoint": initial,
-                "training_sources": (
-                    (adaptation_ref,) if protocol.arm == "C" else
-                    (factory_receipt,) if protocol.arm == "D" else ()
-                ),
+                "training_sources": (factory_receipt,),
                 "training_budget": budget,
             }))
     prereg = prereg.model_copy(update={
@@ -678,7 +492,7 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
     })
     bootstrap = c.TrainingConfig(
         initial_policy=arms[0].policy, reference_checkpoint=initial, tasks=(factory_task,),
-        limits=config.limits, seeds=config.seeds, algorithm="sft", group_size=4,
+        limits=config.limits, seeds=config.seeds, algorithm="grpo", group_size=4,
         max_updates=1, learning_rate=1e-6, framework="skyrl",
         framework_version=PINNED_SKYRL, backend_version=PINNED_HARBOR,
         budget_usd=None,
@@ -729,7 +543,6 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
     )
     service = EvaluationService(
         store=context.store, registry=context.registry, native_factory=native_factory,
-        factory=origin_factory,
         lifecycle=context.runner.lifecycle, builder=context.runner.builder,
         runtime=context.runner.runtime, grader=context.runner.grader,
         revision=REVISION, evidence_scope="real_integration",
@@ -757,58 +570,6 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
     with pytest.raises(EvaluationRejected, match="actual runner protocol"):
         service.evaluate(altered_config(bad_protocol_arms))
 
-    drift_checkpoint, drift_policy, drift_request = selected_checkpoint(
-        "C-learning-drift", "grpo", external_task, learning_rate=2e-6,
-    )
-    learning_drift_arms = tuple(
-        arm.model_copy(update={
-            "checkpoint": drift_checkpoint, "policy": drift_policy,
-            "training_config": drift_request,
-        }) if arm.arm == "C" else arm for arm in prereg.arms
-    )
-    with pytest.raises(EvaluationRejected, match="shared TrainingConfig controls"):
-        service.evaluate(altered_config(learning_drift_arms))
-
-    drift_settings = settings.model_copy(update={"clip_epsilon": .3})
-    settings_checkpoint, settings_policy, settings_request = selected_checkpoint(
-        "C-settings-drift", "grpo", external_task, native_settings=drift_settings,
-    )
-    settings_drift_arms = tuple(
-        arm.model_copy(update={
-            "checkpoint": settings_checkpoint, "policy": settings_policy,
-            "training_config": settings_request,
-        }) if arm.arm == "C" else arm for arm in prereg.arms
-    )
-    with pytest.raises(EvaluationRejected, match="clipping or KL controls"):
-        service.evaluate(altered_config(settings_drift_arms))
-
-    relabeled_origins = tuple(
-        arm.model_copy(update={"training_sources": (factory_receipt,)})
-        if arm.arm == "C" else arm for arm in prereg.arms
-    )
-    with pytest.raises(EvaluationRejected, match="external adaptation batch"):
-        service.evaluate(altered_config(relabeled_origins))
-
-    forged_item = adaptation_batch.items[0].model_copy(update={
-        "construction_result": (factory_built, factory_history, factory_receipt),
-    })
-    forged_batch = adaptation_batch.model_copy(update={"items": (forged_item,)})
-    forged_batch_ref = context.store.put_bytes(
-        canonical_json(forged_batch.model_dump(mode="json")),
-        "m8-external-adaptation-batch", c.Visibility.PRIVATE,
-    )
-    context.registry.register(
-        forged_batch_ref,
-        dependencies=(adaptation_config, adaptation_frame, row_ref, mapping,
-                      factory_built, factory_receipt),
-    )
-    forged_origins = tuple(
-        arm.model_copy(update={"training_sources": (forged_batch_ref,)})
-        if arm.arm == "C" else arm for arm in prereg.arms
-    )
-    with pytest.raises(EvaluationRejected, match="selected construction roots"):
-        service.evaluate(altered_config(forged_origins))
-
     cleanup_prereg = prereg.model_copy(update={
         "checkpoint_selection_rule": "diagnostic startup cleanup",
     })
@@ -834,26 +595,26 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
 
     declared_locked = roster.sources[1].model_copy(update={"partition": c.Partition.LOCKED_TEST})
     bad_roster = roster.model_copy(update={
-        "locked_tasks": (external_task,), "sources": (declared_locked,),
+        "locked_tasks": (factory_task,), "sources": (declared_locked,),
     })
     bad_roster_ref = _opaque(
         context.store, "m8-frozen-roster", bad_roster.model_dump(mode="json"),
     )
     bad_task_prereg = prereg.model_copy(update={
-        "trials": tuple(trial.model_copy(update={"task": external_task}) for trial in prereg.trials),
+        "trials": tuple(trial.model_copy(update={"task": factory_task}) for trial in prereg.trials),
     })
     bad_task_prereg_ref = _opaque(
         context.store, "m8-preregistration", bad_task_prereg.model_dump(mode="json"),
     )
     with pytest.raises(EvaluationRejected, match="released task differs"):
         service.evaluate(config.model_copy(update={
-            "tasks": (external_task,), "frozen_roster": bad_roster_ref,
+            "tasks": (factory_task,), "frozen_roster": bad_roster_ref,
             "preregistration": bad_task_prereg_ref,
         }))
 
     wrong_arms = tuple(
-        arm.model_copy(update={"training_config": selected["C"][2]})
-        if arm.arm == "B" else arm for arm in prereg.arms
+        arm.model_copy(update={"training_config": initial})
+        if arm.arm == "feature_grpo" else arm for arm in prereg.arms
     )
     bad_checkpoint_prereg = prereg.model_copy(update={"arms": wrong_arms})
     bad_checkpoint_prereg_ref = _opaque(
@@ -911,16 +672,16 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
     monkeypatch.setattr(native_factory, "close", interrupted_close)
     with pytest.raises(EvaluationRecoveryRequired) as caught:
         service.evaluate(config)
-    assert len(context.backend.calls) == len(context.grades) == 4
+    assert len(context.backend.calls) == len(context.grades) == 2
     terminal_receipts = service.close()
     assert len(terminal_receipts) == 1
     result = service.recover(caught.value.claim)
     report = context.store.get_artifact(result.artifacts[0])
     assert result.disposition == c.Disposition.SUCCESS
     assert events[0] == "startup" and events[-1] == "close"
-    assert len([event for event in events if event.startswith("activate:")]) - prior_activations == 4
-    assert len([event for event in events if event.startswith("validate:")]) - prior_validations == 8
-    assert len(context.backend.calls) == len(context.grades) == 4
+    assert len([event for event in events if event.startswith("activate:")]) - prior_activations == 2
+    assert len([event for event in events if event.startswith("validate:")]) - prior_validations == 4
+    assert len(context.backend.calls) == len(context.grades) == 2
     assert close_calls == ["attempt", "attempt"]
     assert any("GPU-seconds and USD" in item for item in report.limitations)
     assert all(any(ref.kind == "m7-native-activation" for evidence in trial.evidence

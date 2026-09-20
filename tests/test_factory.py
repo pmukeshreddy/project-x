@@ -3,6 +3,7 @@
 The six wheel pins are replaced only in this test module with inert diagnostic
 bytes. These packages cannot serve as real M3 runtime or feature evidence.
 """
+from m4_fixtures import runtime_policy
 from datetime import datetime, timezone
 import hashlib
 import importlib
@@ -19,7 +20,9 @@ import pytest
 from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl import contracts as c
 from feature_rl.environments import SourceArchive, SourceFile, SandboxPolicy, PreparedEnvironment
-from feature_rl.environments.runtime import WHEELS, DEPS, BUILD, INSTALL, ENV, REPAIR
+from m4_fixtures import WHEELS
+from feature_rl.environments import WheelPin
+from feature_rl.environments.images import image_context, RuntimeImage, HostRequirements
 from feature_rl.registry import Registry
 from test_contracts_examples import examples
 
@@ -37,10 +40,11 @@ def diagnostic_pins():
 def fixture(tmp_path, monkeypatch, *, archive=None, files=None):
     m = api()
     import feature_rl.pipeline.packaging as packaging
-    monkeypatch.setattr(packaging, 'WHEELS', diagnostic_pins())
     store = ArtifactStore(tmp_path.resolve() / 'objects', c.ActorRole.CONTROLLER)
     reg = Registry(tmp_path.resolve() / 'registry', store)
-    policy = SandboxPolicy()
+    profile = runtime_policy().profile.model_copy(update={'dependencies': tuple(
+        WheelPin(name=name,version=v,filename=f,sha256=d) for name,(v,f,d) in diagnostic_pins().items())})
+    policy = runtime_policy(profile=profile)
     baseline_files = {'src/click/__init__.py': SourceFile(b'# DIAGNOSTIC baseline, no feature\n', False),
                       'pyproject.toml': SourceFile(b'[project]\nname="click"\nversion="8.3.3"\n[build-system]\nrequires=["flit_core>=3.11,<4"]\nbuild-backend="flit_core.buildapi"\n', False)}
     baseline = store.put_bytes(archive or SourceArchive(baseline_files).to_tar(), 'source-archive', c.Visibility.AUTHORING)
@@ -85,11 +89,14 @@ def fixture(tmp_path, monkeypatch, *, archive=None, files=None):
             data[kind]['permissions']['worker_inputs'] = [private.model_dump(mode='json')]
         published[kind] = store.put_artifact(c.ARTIFACT_TYPES[kind].model_validate_json(json.dumps(replace(data[kind]))))
 
-    policy_ref = store.put_bytes(canonical_json(policy.model_dump(mode='json')), 'sandbox-policy', c.Visibility.AUTHORING)
-    repair = store.put_bytes(canonical_json(REPAIR), 'neutral-environment-repair', c.Visibility.AUTHORING)
+    repair = store.put_bytes(b'DIAGNOSTIC evidence only', 'neutral-environment-repair', c.Visibility.AUTHORING)
     evidence = c.EvidenceRecord(producer='DIAGNOSTIC fixture only', command=('inert',),
         recorded_at=datetime(2026, 9, 19, tzinfo=timezone.utc), exit_status=0, artifacts=(repair,),
         revision='a' * 40, scope='unit_diagnostic')
+    profile = profile.model_copy(update={'neutral_repairs': (c.NeutralRepair(
+        description='DIAGNOSTIC shape only',patch=repair,neutrality_evidence=(evidence,)),)})
+    policy = policy.model_copy(update={'profile': profile})
+    policy_ref = store.put_bytes(canonical_json(policy.model_dump(mode='json')), 'sandbox-policy', c.Visibility.AUTHORING)
     pins = tuple(c.DependencyPin(name=name, version=value[0], sha256=value[2],
         artifact=store.put_bytes(('DIAGNOSTIC wheel ' + name).encode(), 'dependency-wheel', c.Visibility.AUTHORING))
         for name, value in diagnostic_pins().items())
@@ -97,13 +104,23 @@ def fixture(tmp_path, monkeypatch, *, archive=None, files=None):
     limits = c.ResourceLimits(wall_seconds=policy.lifecycle_seconds, cpu_seconds=policy.cpu_seconds,
         memory_bytes=policy.memory_bytes, pids=policy.pids, output_bytes=policy.output_bytes,
         disk_bytes=policy.disk_bytes, tool_calls=100, input_tokens=1, output_tokens=1)
+    payload = image_context(store, pins, policy)
+    context = store.put_bytes(payload, 'runtime-image-context', c.Visibility.AUTHORING)
+    image = RuntimeImage(image_digest='registry.example/runtime@sha256:'+'d'*64,
+        base_image=policy.image, context_sha256=hashlib.sha256(payload).hexdigest(),
+        context=context, host_requirements=HostRequirements(platform=policy.platform))
+    image_ref = store.put_bytes(canonical_json(image.model_dump(mode='json')), 'runtime-image', c.Visibility.AUTHORING)
+    summary = store.put_bytes(canonical_json(dict(baseline=baseline.model_dump(mode='json'),
+        image_digest=image.image_digest,context_sha256=image.context_sha256,cleanup_verified=True)),
+        'runtime-image-construction-summary', c.Visibility.AUTHORING)
+    evidence = evidence.model_copy(update={'artifacts': (repair, image_ref, summary)})
     recipe = c.EnvironmentRecipe(kind='EnvironmentRecipe', schema_version=1, visibility=c.Visibility.AUTHORING,
         provenance=c.Provenance(producer='DIAGNOSTIC M3 recipe shape', producer_version='1',
-            created_at=evidence.recorded_at, inputs=(baseline, policy_ref, *(p.artifact for p in pins)), evidence=(evidence,)),
-        costs=(cost,), image_digest=policy.image, interpreter_version='3.12.14', dependencies=pins,
-        setup=(DEPS, BUILD, INSTALL), reset=(DEPS, BUILD, INSTALL), services=(), limits=limits,
-        neutral_repairs=(c.NeutralRepair(description='DIAGNOSTIC shape only', patch=repair, neutrality_evidence=(evidence,)),),
-        locale='C.UTF-8', timezone='UTC', environment=tuple(c.EnvironmentVariable(name=k, value=v) for k, v in ENV),
+            created_at=evidence.recorded_at, inputs=(baseline, policy_ref, image_ref, context, *(p.artifact for p in pins)), evidence=(evidence,)),
+        costs=(cost,), image_digest=image.image_digest, runtime_image=image_ref, interpreter_version='3.12.14', dependencies=pins,
+        setup=profile.setup, reset=profile.setup, services=(), limits=limits,
+        neutral_repairs=profile.neutral_repairs,
+        locale='C.UTF-8', timezone='UTC', environment=tuple(c.EnvironmentVariable(name=k, value=v) for k, v in profile.environment),
         randomness=c.SeedPolicy(algorithm='PYTHONHASHSEED', seeds=(0,), same_cases_within_group=True),
         network_policy='none', baseline=baseline)
     prepared = PreparedEnvironment(recipe=store.put_artifact(recipe), policy=policy_ref)
@@ -128,7 +145,7 @@ def test_build_freezes_complete_safe_package_and_idempotent_root(tmp_path, monke
     task = store.get_artifact(task_ref)
     assert task.state == c.TaskState.BUILT and task.qualification is None and task.baseline == baseline
     package = builder.solver_package(task_ref)
-    files = SourceArchive.read(package, SandboxPolicy()).files
+    files = SourceArchive.read(package, runtime_policy()).files
     assert set(files) == {'instruction.md', 'runtime_manifest.json', 'workspace/src/click/__init__.py',
                          'workspace/pyproject.toml', 'public_checks/0000'}
     assert files['workspace/src/click/__init__.py'].data == b'# DIAGNOSTIC baseline, no feature\n'
@@ -329,7 +346,6 @@ root, inputs_json, point = sys.argv[1:]
 store = ArtifactStore(Path(root) / 'objects', ActorRole.CONTROLLER)
 reg = Registry(Path(root) / 'registry', store)
 builder = TaskBuilder(store=store, registry=reg, revision='a' * 40)
-packaging.WHEELS = diagnostic_pins()
 if point == 'before_freeze':
     packaging.assemble = lambda *args: os._exit(77)
 else:

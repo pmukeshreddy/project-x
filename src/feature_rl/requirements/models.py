@@ -107,7 +107,7 @@ class ContractFinalizationInputs(StrictModel):
         if any(ref.visibility is not Visibility.PUBLIC for ref in self.public_checks):
             raise ValueError("public checks must be public artifacts")
         if (
-            self.runtime_discovery.kind not in {"click-runtime-discovery", "runtime-discovery"}
+            self.runtime_discovery.kind not in {"runtime-discovery"}
             or self.runtime_discovery.visibility is not Visibility.AUTHORING
             or self.runtime_discovery.encoding != "bytes"
         ):

@@ -16,7 +16,7 @@ def factory_fixture(tmp_path,monkeypatch):
     weights=publish_directory(store=f.store,registry=f.registry,path=root)
     policy=f.policy.model_copy(update={'identity':f.policy.identity.model_copy(update={'weights':weights})})
     config=c.TrainingConfig(initial_policy=policy,reference_checkpoint=weights,tasks=(f.task,),limits=f.limits,
-        seeds=c.SeedPolicy(algorithm='diagnostic',seeds=(19,),same_cases_within_group=True),algorithm='sft',
+        seeds=c.SeedPolicy(algorithm='diagnostic',seeds=(19,),same_cases_within_group=True),algorithm='grpo',
         group_size=4,max_updates=1,learning_rate=.01,framework='skyrl',framework_version=PINNED_SKYRL,
         backend_version=PINNED_HARBOR,budget_usd=None)
     return SimpleNamespace(fixture=f,config=config,service=SimpleNamespace(store=f.store,registry=f.registry,settings=settings(tmp_path),revision='f'*40))

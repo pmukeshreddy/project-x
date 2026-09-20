@@ -21,6 +21,33 @@ from feature_rl.intake import (
 
 ## Git reconstruction and changed-file classification
 
+`feature-rl prepare-github --request <GitHubPreparationRequest.json> --output <absolute-directory>`
+captures one explicitly selected repository PR and issue for the existing
+cached intake. The request type and `prepare_github(request, Path)` are in
+`feature_rl.intake.prepare`. See the [runbook](runbook.md) for required fields and
+the direct `construct-feature --github ... --capture ...` and `--prepared ...`
+paths. Optional `token_env` selects an in-memory `GH_TOKEN` or `GITHUB_TOKEN` for
+private repositories; credentials are never written into the capture or Git
+configuration. Offline reuse does not load credentials. Preparation reuses `BoundedHttpFetcher`,
+`CachedSourceCatalog` and M1's bounded Git process runner and reconstruction proof.
+It initializes an empty bare repository with no templates, fetches only the
+selected immutable head/integration revisions to a declared depth, and performs
+no checkout, submodule fetch, repository hook, model call or task admission.
+
+Every HTTP page is retained as a separate body with its actual URL, retrieval
+time and SHA256. Pagination counts and duplicate identities are checked, PR/issue
+metadata is checked again, and commit/file lists are checked against Git. The
+implementation rejects PRs beyond the API's [250-commit](https://docs.github.com/en/rest/pulls/pulls#list-commits-on-a-pull-request)
+and [3,000-file](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests-files)
+limits; a lower configured page/byte limit can reject earlier. License metadata
+and bytes are fetched at the derived baseline revision and must match both B and
+H. Captures are labeled `reconstructed_specification`, since a fresh download
+cannot establish preimplementation edit history. Completed captures retain their
+recording time and pinned manifest on reuse; failed/partial directories are not
+silently refreshed. Git transfer is limited by time and ancestry depth, not an
+aggregate pack-file disk quota. The capture is preparation evidence, not proof of
+a buildable runtime or a qualified task.
+
 ```python
 from feature_rl.history import GitHistory, classify_changed_files
 ```
@@ -40,7 +67,16 @@ Invalid graph claims raise `ValueError`; missing or malformed objects raise `Unr
 
 Rewritten-rebase proof is a conservative pilot surface. One operation admits at most 128 mapped commits, 256 changed paths, 16,384 UTF-8 bytes per path, 1,000,000 bytes per blob, 8,000,000 total blob bytes, 8,000,000 diff/path bytes, 1,024 hunks, 500,000 split lines, and 2,000,000 bounded location-comparison units. Git diff runs inside the shared deadline with external diff, text conversion, renames, indent heuristics, and repository-selected algorithms disabled. Exhausting any deadline or work budget fails closed; it does not downgrade to a weaker patch-ID or byte-only association.
 
-`classify_changed_files(paths, *, mixed_paths=None) -> ClassificationResult` returns M0 `ChangedFile` values plus a sorted `manual_review_required` list. Explicit mixed-path reasons override path-based classification. Unknown paths stay `mixed`; M1 does not silently classify them as unrelated or automatically acceptable.
+`classify_changed_files(paths, *, mixed_paths=None) -> ClassificationResult` returns M0 `ChangedFile` values and a sorted uncertainty list under the legacy name `mixed_paths_for_qualification`. Test/fixture files under `test/` or `tests/` components (including nested directories), `test_*` files and `conftest.py` are tests. Top-level `doc/`, `docs/`, `example/` and `examples/`, GitHub issue/PR template directories, Markdown/reStructuredText and conventional extensionless or `.txt` README/changelog/contributor files are documentation. Dependency/build names, requirements text files and GitHub workflows take precedence over directory rules. Explicit mixed-path reasons override automatic categories, and unknown paths remain `mixed`.
+
+New intake does not make those labels a manual approval prerequisite: it retains
+them in `SourcePair` and the reconstruction proof's `mixed_paths_for_qualification`,
+returns an empty intake `mixed_paths_for_qualification`, and screens only source/history
+and license validity. M5 independently projects permitted source changes onto B,
+recording included/excluded paths and hashes, then requires the actual projected
+reference to pass qualification. Excluded configuration/assets stay at B; no new
+candidate write permissions or dependency changes are authorized. Frozen older
+candidate dispositions are not rewritten.
 
 ## Leakage-safe partition closure
 
@@ -68,6 +104,13 @@ result = intake.ingest(spec, partition_manifest)
 
 `PullRequestIntakeSpec` names the cached PR, issue, comment, commit, changed-file, license, and license-text responses; declares the repository family and request lineage; supplies the integration method, UTC admissible cutoff and recording time, provenance label, mixed-file reasons, and B-tree archive cap. `recorded_at` is caller-supplied so an identical retry is content-idempotent. Construction rejects a cutoff after recording. Ingestion additionally requires issue creation ≤ cutoff ≤ first source author/committer time ≤ integration time ≤ recording time, and every retrieval time ≤ recording time. Git timestamps are retained as repository assertions rather than independent clock attestations.
 
+Optional `additional_pages` maps a comments/commits/files primary source name to
+its ordered additional source names (up to 29 additional pages each). All pages
+must occur exactly once in `source_names`, and cannot alias another primary source
+or another page. Intake archives each original body and combines arrays only in
+memory; duplicate comment IDs, commit SHAs or filenames reject. Existing
+single-response specs work with the default empty mapping.
+
 `GitHubPullRequestIntake.ingest(spec, partition_manifest) -> PullRequestIntakeResult` requires one explicit partition for the full source closure. It then:
 
 1. verifies and archives the named response bodies;
@@ -77,7 +120,7 @@ result = intake.ingest(spec, partition_manifest)
 5. emits an `AuthoringSourceView` containing only the authoring-visible request evidence, B tree archive, and license text; and
 6. returns the private H tree archive separately for the controller.
 
-The connected result fields are `candidate`, `source_pair`, `authoring`, `reference`, `manual_review_required`, and `provenance_label`. The label equals the required value stored in both typed v2 artifacts. M2 receives only `result.authoring` when deriving a requirement contract. M3 may consume `result.authoring.baseline`. A controller or later privileged stage retains `candidate`, `source_pair`, and `reference`. An author role cannot read the private `SourcePair` or H archive through `ArtifactStore`.
+The connected result fields are `candidate`, `source_pair`, `authoring`, `reference`, `mixed_paths_for_qualification`, and `provenance_label`. The label equals the required value stored in both typed v2 artifacts. M2 receives only `result.authoring` when deriving a requirement contract. M3 may consume `result.authoring.baseline`. A controller or later privileged stage retains `candidate`, `source_pair`, and `reference`. An author role cannot read the private `SourcePair` or H archive through `ArtifactStore`.
 
 `historical_request` is admitted only when the exact archived issue snapshot was retrieved no later than the preimplementation cutoff and its update metadata does not postdate that snapshot. Otherwise callers must use `reconstructed_specification`, whose request bundle retains the label and caveat. A comment enters the cutoff view only when its creation and last-update times are ordered and at or before the cutoff. H IDs, source implementation commit IDs, diffs, and later comments are absent from that view. M1 does not author a `RequirementContract` or decide whether a mixed-purpose change belongs in one.
 

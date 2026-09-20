@@ -26,30 +26,13 @@ def model(torch):
     return TinyCausalModel()
 
 
-def test_assistant_mask_removes_harness_tokens_from_policy_and_sft_loss(torch):
-    from feature_rl.training.torch_backend import clipped_surrogate, supervised_loss
+def test_assistant_mask_removes_harness_tokens_from_policy_loss(torch):
+    from feature_rl.training.torch_backend import clipped_surrogate
     logits = torch.tensor([-.5, -.7, -.9], requires_grad=True)
     mask = torch.tensor([True, False, True])
-    loss = supervised_loss(logits, mask)
-    loss.backward()
-    assert logits.grad.tolist() == [-.5, 0., -.5]
-    logits.grad = None
     loss = clipped_surrogate(logits, logits.detach(), torch.ones(3), mask, .2, .2)
     loss.backward()
     assert logits.grad.tolist() == [-.5, 0., -.5]
-
-
-def test_sft_updates_real_parameters_and_frozen_reference(torch, model):
-    from feature_rl.training.torch_backend import CausalTurn, TorchUpdater, model_digest
-    updater = TorchUpdater(model, learning_rate=.01, kl_coefficient=0.)
-    reference_before = model_digest(updater.reference)
-    turn = CausalTurn((1, 2), (3, 4), (True, True))
-    receipt = updater.update([turn], algorithm='sft')
-    assert receipt.updated and receipt.gradient_norm > 0
-    assert receipt.before != receipt.after
-    assert model_digest(updater.reference) == reference_before
-    assert updater.optimizer_steps == 1
-    assert updater.optimizer.state_dict()['state']
 
 
 def test_grpo_changes_weights_using_exact_behavior_logprobs(torch, model):
@@ -78,27 +61,28 @@ def test_invalid_or_nonfinite_turn_cannot_partially_update(torch, model):
     from feature_rl.training.torch_backend import CausalTurn, TorchUpdater, model_digest
     updater = TorchUpdater(model, learning_rate=.01)
     before = model_digest(model)
-    for turn in [CausalTurn((1,), (3,), (False,)), CausalTurn((1,), (99,), (True,))]:
-        with pytest.raises(ValueError): updater.update([turn], algorithm='sft')
+    for turn in [CausalTurn((1,), (3,), (False,), (-1.,), .5), CausalTurn((1,), (99,), (True,), (-1.,), .5)]:
+        with pytest.raises(ValueError): updater.update([turn], algorithm='grpo')
         assert model_digest(model) == before
 
 
 def test_checkpoint_resume_preserves_optimizer_rng_and_next_update(torch, model, tmp_path):
     from feature_rl.training.torch_backend import CausalTurn, TorchUpdater, model_digest
     updater = TorchUpdater(model, learning_rate=.01, kl_coefficient=0.)
-    turn = CausalTurn((1, 2), (3, 4), (True, True))
-    updater.update([turn], algorithm='sft')
+    raw = CausalTurn((1, 2), (3, 4), (True, True))
+    turn = CausalTurn(raw.context, raw.targets, raw.mask, tuple(updater.logprobs(raw).detach().tolist()), .5)
+    updater.update([turn], algorithm='grpo')
     binding = {'configuration': 'a'*64, 'tasks': ['b'*64], 'reference': 'c'*64,
                'tokenizer': 'd'*64, 'template': 'e'*64}
     checkpoint = updater.save_checkpoint(tmp_path / 'checkpoint', binding=binding,
                                          progress={'sampler': {'position': 1}, 'signal': {}}, policy_version='p1')
     expected_random = torch.rand(4)
-    expected_receipt = updater.update([turn], algorithm='sft')
+    expected_receipt = updater.update([turn], algorithm='grpo')
     restored = TorchUpdater(copy.deepcopy(model), learning_rate=.01, kl_coefficient=0.)
     state = restored.load_checkpoint(tmp_path / 'checkpoint', expected_digest=checkpoint, binding=binding)
     assert state['progress']['sampler']['position'] == 1 and state['policy_version'] == 'p1'
     assert torch.equal(expected_random, torch.rand(4))
-    actual_receipt = restored.update([turn], algorithm='sft')
+    actual_receipt = restored.update([turn], algorithm='grpo')
     assert actual_receipt.after == expected_receipt.after
     assert restored.optimizer_steps == updater.optimizer_steps == 2
     with pytest.raises(ValueError):

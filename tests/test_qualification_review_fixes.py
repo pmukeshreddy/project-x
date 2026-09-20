@@ -13,8 +13,7 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.environments import SourceArchive
 from feature_rl.environments.models import Ownership
 from feature_rl.grading import AssertionResult,CaseResult
-from feature_rl.qualification import (QualificationRejected,ReviewRequest,DetachedAttestation,
-    SSHHumanVerifier,derive_reference,assess_outcome)
+from feature_rl.qualification import (QualificationRejected,derive_reference,assess_outcome)
 from feature_rl.qualification.evidence import put_record,_assert_case_observation
 from feature_rl.registry import QuarantinedError
 from feature_rl.submission.source import Submission
@@ -123,46 +122,3 @@ def test_quarantined_source_delta_is_rejected_before_grade_job_enqueue(tmp_path,
     before=q.registry.trace(checked.task_ref).jobs
     with pytest.raises(QuarantinedError):q._run(checked,projection,submission,11,'fresh_0','positive',(),parent,False,set())
     assert q.registry.trace(checked.task_ref).jobs==before
-
-
-def failed_attestation(tmp_path):
-    q=service(tmp_path);task=task_fixture(q.store);report=q.qualify(task).artifacts[0]
-    now=datetime.now(timezone.utc)
-    request=ReviewRequest(task=task,report=report,policy=q.policy_ref,challenge='0'*64,
-        issued_at=now,expires_at=now+timedelta(hours=1),qualification_job=q._job(task,'m5-qualify').job_id)
-    request_ref=put_record(q.store,request,'m5-review-request')
-    q.registry.register(request_ref,dependencies=(task,report,q.policy_ref))
-    payload=q.store.put_bytes(b'{"actor_type":"model","diagnostic":"NO_TASK_APPROVAL"}', 'm5-human-review-payload',c.Visibility.PRIVATE)
-    signature=q.store.put_bytes(b'not a signature; synthetic failed verification only','m5-sshsig',c.Visibility.PRIVATE)
-    attestation=put_record(q.store,DetachedAttestation(payload=payload,signature=signature),'m5-sshsig-attestation')
-    # Simulate an already-registered opaque envelope. Its dependencies must not
-    # be retrofitted; new M5 records and current leaf checks provide the boundary.
-    q.registry.register(attestation)
-    q.attestation_verifier=SSHHumanVerifier(enrollment_path=tmp_path/'absent-enrollment',expected_enrollment_sha256='0'*64)
-    return q,request_ref,attestation,payload,signature
-
-
-@pytest.mark.parametrize('leaf',['payload','signature'])
-def test_failed_verification_records_consumed_leaves_and_quarantine_blocks_reuse(tmp_path,leaf):
-    from feature_rl.qualification.admission import _verification
-    q,request,attestation,payload,signature=failed_attestation(tmp_path)
-    with pytest.raises(QualificationRejected,match='payload schema/origin invalid'):_verification(q,request,attestation)
-    ref=payload if leaf=='payload' else signature
-    trace=q.registry.trace(ref)
-    jobs=[q.registry.job(job) for job in trace.jobs if q.registry.job(job).spec.invocation=='m5-human-verification']
-    assert len(jobs)==1 and jobs[0].result.disposition==c.Disposition.PROVISIONAL
-    output=jobs[0].result.artifacts[0]
-    q.registry.quarantine(ref,notice_id='synthetic-signed-leaf',reason='Synthetic consumed-leaf quarantine',evidence=(ref,))
-    with pytest.raises(QuarantinedError):q.registry.assert_usable(output)
-    with pytest.raises(QuarantinedError):_verification(q,request,attestation)
-    assert all(r.kind!='QualificationReport' for r in jobs[0].result.artifacts)
-
-
-def test_signature_quarantine_is_checked_before_native_verification_attempt(tmp_path):
-    from feature_rl.qualification.admission import _verification
-    q,request,attestation,payload,signature=failed_attestation(tmp_path)
-    q.registry.register(signature)
-    q.registry.quarantine(signature,notice_id='synthetic-before-verify',reason='Synthetic preexisting signature quarantine',evidence=(signature,))
-    before=q.registry.trace(request).jobs
-    with pytest.raises(QuarantinedError):_verification(q,request,attestation)
-    assert q.registry.trace(request).jobs==before

@@ -1,4 +1,5 @@
 """Real required Docker checks. Missing Docker is a failure, never a skip."""
+from m4_fixtures import runtime_policy
 import json
 from pathlib import Path
 import pytest
@@ -6,7 +7,7 @@ import pytest
 @pytest.fixture
 def engine(tmp_path):
     from feature_rl.environments import DockerEngine,SandboxPolicy
-    return DockerEngine(state_root=tmp_path/'runtime',socket_path=Path.home()/'.docker/run/docker.sock',policy=SandboxPolicy(lifecycle_seconds=15.0,cleanup_seconds=8.0,memory_bytes=128*1024*1024,pids=32,disk_bytes=32*1024*1024))
+    return DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=tmp_path/'runtime',socket_path=Path.home()/'.docker/run/docker.sock',policy=runtime_policy(lifecycle_seconds=15.0,cleanup_seconds=8.0,memory_bytes=128*1024*1024,pids=32,disk_bytes=32*1024*1024))
 
 
 def test_actual_denials_are_machine_checked(engine):
@@ -50,7 +51,7 @@ def test_output_overflow_kills_container_not_only_attach_client(engine):
 
 def test_missing_daemon_is_not_verified_absence(tmp_path):
     from feature_rl.environments import DockerEngine,SandboxPolicy,DockerUnavailable
-    with pytest.raises(DockerUnavailable):DockerEngine(state_root=tmp_path/'r',socket_path=tmp_path/'missing.sock',policy=SandboxPolicy())
+    with pytest.raises(DockerUnavailable):DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=tmp_path/'r',socket_path=tmp_path/'missing.sock',policy=runtime_policy())
 
 
 def test_actual_memory_exhaustion_remains_inside_cgroup(engine):
@@ -68,7 +69,7 @@ def runtime_fixture(engine,tmp_path):
     from feature_rl.artifacts import ArtifactStore
     from feature_rl.contracts import ActorRole,Visibility,DependencyPin,EvidenceRecord
     from feature_rl.environments import EnvironmentRuntime
-    from feature_rl.environments.runtime import WHEELS
+    from m4_fixtures import WHEELS
     import io,tarfile
     store=ArtifactStore(tmp_path/'artifacts',ActorRole.CONTROLLER)
     data=io.BytesIO()
@@ -84,7 +85,7 @@ def runtime_fixture(engine,tmp_path):
     evidence=EvidenceRecord(producer='trusted-test-fixture',command=('create synthetic inert source',),recorded_at=datetime.now(timezone.utc),exit_status=0,artifacts=(baseline,),revision='a'*40,scope='unit_diagnostic')
     engine.qualify_boundary()
     runtime=EnvironmentRuntime(store=store,engine=engine,revision='a'*40)
-    prepared=runtime.create_click_recipe(baseline,tuple(pins),source_evidence=evidence)
+    prepared=runtime.create_recipe(baseline,tuple(pins),source_evidence=evidence)
     return runtime,prepared
 
 
@@ -188,7 +189,7 @@ def test_new_controller_recovers_persisted_owned_scope(engine):
     name=session.name
     # Release only the controller lock, simulating loss after a persisted create/start.
     session._lock.__exit__(None,None,None)
-    replacement=DockerEngine(state_root=engine.state.path,socket_path=Path(engine.socket_path),policy=engine.policy)
+    replacement=DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=engine.state.path,socket_path=Path(engine.socket_path),policy=engine.policy)
     result=replacement.recover_owned()
     assert result[0]['operation_id']==session.record.operation_id and result[0]['cleanup_verified']
     assert replacement.recover_owned()==[]
@@ -213,7 +214,7 @@ def test_memory_oom_is_reported_from_kernel_events(engine):
 
 def test_cpu_budget_monitor_stops_nonterminating_command(tmp_path):
     from feature_rl.environments import DockerEngine,SandboxPolicy,CommandSpec
-    engine=DockerEngine(state_root=tmp_path/'runtime',socket_path=Path.home()/'.docker/run/docker.sock',policy=SandboxPolicy(cpu_seconds=1.0,lifecycle_seconds=12.0))
+    engine=DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=tmp_path/'runtime',socket_path=Path.home()/'.docker/run/docker.sock',policy=runtime_policy(cpu_seconds=1.0,lifecycle_seconds=12.0))
     with engine.session(binding={'test':'cpu-budget'},saved_source={}) as s:
         r=s.execute(CommandSpec(argv=('python','-I','-c','while True: pass'),working_directory='/workspace',timeout_seconds=10.0))
         assert r.reason=='cpu_limit' and s.maximum_cpu_seconds>=1.0

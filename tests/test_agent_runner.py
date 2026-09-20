@@ -4,6 +4,7 @@ No accepted Q, HumanReview, model output or released task is manufactured. The
 fixture's BUILT diagnostic task bypasses admission/package only within these tests;
 production constructors and all CAS/Registry/rollout accounting code remain actual.
 """
+from m4_fixtures import runtime_policy
 import hashlib
 import json
 from pathlib import Path
@@ -41,7 +42,7 @@ def fixture(tmp_path,monkeypatch,outputs=(' {"action":"submit"}',)):
     registry=Registry(tmp_path.resolve()/'registry',store)
     task_ref=task_fixture(store);task=store.get_artifact(task_ref)
     # Supply only the exact sandbox policy join absent from the earlier M4 inert fixture.
-    policy_ref=store.put_bytes(canonical_json(SandboxPolicy().model_dump(mode='json')),'sandbox-policy',c.Visibility.PRIVATE)
+    policy_ref=store.put_bytes(canonical_json(runtime_policy().model_dump(mode='json')),'sandbox-policy',c.Visibility.PRIVATE)
     recipe=store.get_artifact(task.environment)
     recipe=recipe.model_copy(update={'provenance':recipe.provenance.model_copy(update={'inputs':(*recipe.provenance.inputs,policy_ref)})})
     recipe_ref=store.put_artifact(recipe)
@@ -56,7 +57,7 @@ def fixture(tmp_path,monkeypatch,outputs=(' {"action":"submit"}',)):
     lifecycle.configuration=store.put_bytes(b'diagnostic only lifecycle configuration','m6-lifecycle-policy',c.Visibility.PRIVATE)
     monkeypatch.setattr(lifecycle,'resolve_released',lambda ref:store.get_artifact(ref))
     builder=TaskBuilder(store=store,registry=registry,revision='b'*40)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=SandboxPolicy();runtime.revision='c'*40
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.revision='c'*40
     handles=[];actions=[];closes=[]
     saved=SavedSource(artifact=task.baseline,raw_sha256='e'*64,tree_sha256='f'*64,version=0,saved_at='2026-09-19T00:00:00Z')
     def open_workspace(*a,**kw):

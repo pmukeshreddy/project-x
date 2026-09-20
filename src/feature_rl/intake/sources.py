@@ -118,16 +118,14 @@ class _RedirectRecorder(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, target)
 
 
-def _fetch_worker(connection, opener, url: str, max_bytes: int, timeout: float, media_type):
+def _fetch_worker(connection, opener, url: str, max_bytes: int, timeout: float, media_type,
+                  bearer_token=None, accept='application/vnd.github+json'):
     recorder = _RedirectRecorder(url)
     open_call = opener or urllib.request.build_opener(recorder).open
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "feature-rl-source-intake/1",
-        },
-    )
+    headers = {"Accept": accept, "User-Agent": "feature-rl-source-intake/1"}
+    if bearer_token is not None:
+        headers['Authorization'] = 'Bearer '+bearer_token
+    request = urllib.request.Request(url, headers=headers)
     try:
         with open_call(request, timeout=timeout) as response:
             status = int(getattr(response, "status", 200))
@@ -211,14 +209,20 @@ class BoundedHttpFetcher:
         max_bytes: int,
         timeout_seconds: float,
         opener: Callable[..., object] | None = None,
+        bearer_token: str | None = None,
     ):
         if type(max_bytes) is not int or max_bytes <= 0:
             raise ValueError("max_bytes must be a positive integer")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
+        if bearer_token is not None and (not isinstance(bearer_token, str)
+                or not 1 <= len(bearer_token) <= 4096
+                or any(not 33 <= ord(char) <= 126 for char in bearer_token)):
+            raise ValueError('GitHub token must be a nonempty printable credential')
         self.max_bytes = max_bytes
         self.timeout_seconds = timeout_seconds
         self.opener = opener
+        self.bearer_token = bearer_token
 
     def fetch(
         self,
@@ -228,8 +232,11 @@ class BoundedHttpFetcher:
         published_at: datetime | None = None,
         edited_at: datetime | None = None,
         media_type: str | None = None,
+        accept: Literal['application/vnd.github+json', 'application/vnd.github.raw+json'] = 'application/vnd.github+json',
     ) -> FetchedSource:
         _validate_url(url)
+        if self.bearer_token is not None and urlsplit(url).netloc != 'api.github.com':
+            raise ValueError('GitHub API credentials cannot be sent to another origin')
         context = multiprocessing.get_context("fork")
         parent, child = context.Pipe(duplex=False)
         process = context.Process(
@@ -241,6 +248,8 @@ class BoundedHttpFetcher:
                 self.max_bytes,
                 self.timeout_seconds,
                 media_type,
+                self.bearer_token,
+                accept,
             ),
             daemon=True,
         )

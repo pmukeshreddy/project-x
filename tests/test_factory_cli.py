@@ -205,7 +205,7 @@ def test_thin_run_train_evaluate_and_audit_forward_exact_requests(tmp_path,capsy
     from feature_rl.pipeline import Factory
     from feature_rl.pipeline.configuration import Application
     from feature_rl.agents.native_service import NativeRunService
-    from feature_rl.training.service import TrainingService,SourceDemonstration
+    from feature_rl.training.service import TrainingService
     from feature_rl.evaluation.service import EvaluationService
     from feature_rl.audits.service import AuditService
     from feature_rl.qualification.evidence import unknown_cost
@@ -237,11 +237,9 @@ def test_thin_run_train_evaluate_and_audit_forward_exact_requests(tmp_path,capsy
     assert calls[-1][2]['case_seed'] is None
     train=write(tmp_path/'train.json',{'config':f.config.model_dump(mode='json')})
     resume=write(tmp_path/'resume.json',f.config.reference_checkpoint.model_dump(mode='json'))
-    demo=SourceDemonstration(task=base.task,submission=base.task,grade=base.task)
-    demos=write(tmp_path/'demos.json',[demo.model_dump(mode='json')])
-    assert api().main(['--config',config,'train','--request',train,'--invocation','TRAIN_RECOVER','--resume',resume,'--demonstrations',demos])==1
-    assert calls[-1]==('train',(f.config,),{'invocation':'TRAIN_RECOVER','resume':f.config.reference_checkpoint,'demonstrations':(demo,)})
-    evaluation=c.EvaluationConfig(tasks=(base.task,),arms=(c.EvaluationArm(arm='A',policy=f.config.initial_policy,
+    assert api().main(['--config',config,'train','--request',train,'--invocation','TRAIN_RECOVER','--resume',resume])==1
+    assert calls[-1]==('train',(f.config,),{'invocation':'TRAIN_RECOVER','resume':f.config.reference_checkpoint})
+    evaluation=c.EvaluationConfig(tasks=(base.task,),arms=(c.EvaluationArm(arm='base',policy=f.config.initial_policy,
         checkpoint=f.config.reference_checkpoint,training_config=None),),limits=base.limits,seeds=f.config.seeds,
         partition=c.Partition.LOCKED_TEST,harness_version=f.config.initial_policy.harness_version,
         checkpoint_selection_rule='TEST frozen rule',invalid_trial_rule='TEST retain invalid',metric='pass_at_1',episodes_per_trial=1,
@@ -281,7 +279,8 @@ def test_actual_native_composition_is_inert_and_shares_real_services(tmp_path,mo
     config=CLIConfiguration.model_validate_json(canonical_json({'store_root':str(base.store.root),
         'registry_root':str(base.registry.root),'revision':'f'*40,'builder_revision':base.runner.builder.revision,
         'runtime':{'state_root':str(tmp_path/'runtime'),'socket_path':str(tmp_path/'docker.sock'),
-            'revision':base.runner.runtime.revision,'grading_revision':base.runner.grader.revision},
+            'revision':base.runner.runtime.revision,'grading_revision':base.runner.grader.revision,
+            'policy':base.runner.runtime.policy.model_dump(mode='json')},
         'qualification':{'revision':'e'*40},'native':{'revision':'f'*40,
             'settings':f.service.settings.model_dump(mode='json'),'bootstrap':f.config.model_dump(mode='json')},
         'evaluation':{'revision':'8'*40}}))
