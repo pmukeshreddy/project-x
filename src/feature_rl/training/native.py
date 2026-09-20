@@ -270,7 +270,8 @@ class NativeSession:
             or policy.system_prompt.visibility!=c.Visibility.PUBLIC):
             raise ValueError('Evaluation policy differs from native model/tokenizer/public prompt boundary')
         if checkpoint.kind=='TrainingCheckpoint':
-            value=self.store.get_artifact(checkpoint)
+            from .checkpoints import validate_selected_checkpoint
+            value=validate_selected_checkpoint(self.store,self.registry,checkpoint)
             if value.weights!=policy.identity.weights or value.policy_version!=policy.policy_version:
                 raise ValueError('Arm policy differs from frozen TrainingCheckpoint weights/version')
             progress=[ref for ref in value.provenance.inputs if ref.kind=='m7-checkpoint-progress']
@@ -348,6 +349,9 @@ class NativeSession:
     def update(self,rows,*,algorithm):
         from .worker_state import compare_states
         self.backend.verify_policy(self.policy)
+        next_step='global_step_'+str(self.trainer.global_step+1)
+        if (Path(self.trainer.cfg.trainer.export_path)/next_step).exists() or (Path(self.trainer.cfg.trainer.ckpt_path)/next_step).exists():
+            raise ValueError('Native output step already exists; recover retained work instead of overwriting immutable tensors')
         before=self.worker_snapshot()
         self.barrier.begin(self.barrier.stamp,self.barrier.probe)
         status=asyncio.run(self.bridge.update(rows,algorithm=algorithm))
@@ -379,6 +383,8 @@ class NativeSession:
         """Actual FSDP optimizer/scheduler/model/RNG save + exact-path reload + probe."""
         before=self.last_probe
         before_state=self.worker_snapshot()
+        if (Path(self.trainer.cfg.trainer.ckpt_path)/('global_step_'+str(self.trainer.global_step))).exists():
+            raise ValueError('Native checkpoint step already exists; retained files are immutable')
         path=Path(self.trainer.save_checkpoints()).resolve()
         import torch,random,numpy
         torch.save({'python':random.getstate(),'numpy':numpy.random.get_state(),

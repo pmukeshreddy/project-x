@@ -32,6 +32,7 @@ def test_native_factory_requires_selected_config_and_records_intent_before_const
         rows=service.registry.accounting(claim.job_id).observations
         assert any(r.observation.source=='m7-native-startup' and r.observation.revision==1 for r in rows)
         calls.append('initialize')
+        assert kwargs['settings'].work_directory==str(__import__('pathlib').Path(service.settings.work_directory)/'jobs'/claim.job_id)
         return SimpleNamespace(last_probe={'scope':'unit_diagnostic'},close=lambda:calls.append('close'))
     monkeypatch.setattr(module,'NativeSession',native)
     assert not calls
@@ -89,3 +90,24 @@ def test_startup_and_shutdown_publication_outages_keep_exact_live_or_closed_resu
     receipt=factory.close(handle,claim,shutdown_key='end')
     assert factory.close(handle,claim,shutdown_key='end')==receipt
     assert calls==['init','close']
+
+
+def test_current_quarantine_denies_use_but_never_owned_native_cleanup(tmp_path,monkeypatch):
+    import feature_rl.training.factory as module
+    from feature_rl.registry import QuarantinedError
+    f=factory_fixture(tmp_path,monkeypatch);service=f.service
+    factory=NativeSessionFactory(store=service.store,registry=service.registry,settings=service.settings,
+        configuration=f.config,revision=service.revision)
+    job=service.registry.enqueue(JobSpec(operation='train',inputs=f.config.tasks,configuration=factory.configuration,
+        implementation=service.revision,invocation='revocation-diagnostic',attempt_limit=1))
+    claim=service.registry.claim(job.job_id,owner='diagnostic',claim_key='revocation')
+    closed=[]
+    monkeypatch.setattr(module,'NativeSession',lambda **kw:SimpleNamespace(last_probe={'scope':'unit_diagnostic'},close=lambda:closed.append(True)))
+    handle=factory.create(claim,startup_key='start')
+    service.registry.quarantine(f.config.tasks[0],notice_id='diagnostic-revocation',reason='TEST ONLY',evidence=(factory.configuration,))
+    with pytest.raises(QuarantinedError):factory.create(claim,startup_key='another')
+    receipt=factory.close(handle,claim,shutdown_key='end')
+    assert closed==[True] and receipt[0].kind=='m7-native-shutdown'
+    with pytest.raises(QuarantinedError):service.registry.assert_usable(receipt[0])
+    assert factory.close(handle,claim,shutdown_key='end')==receipt
+    assert closed==[True]

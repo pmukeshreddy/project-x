@@ -1,11 +1,12 @@
 """Inert native configuration; startup/shutdown occur inside an existing selected job."""
 from dataclasses import dataclass
 from datetime import datetime,timezone
+from pathlib import Path
 import sys
 import time
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactStore,canonical_json
-from feature_rl.registry import Registry,CostObservation
+from feature_rl.registry import Registry,CostObservation,RegistryError
 from feature_rl.registry.core import references
 from feature_rl.agents.runner import cost
 from .native import NativeSettings,NativeSession
@@ -40,14 +41,14 @@ class NativeSessionFactory:
         self.configuration=store.put_bytes(canonical_json(payload),'m7-native-configuration',c.Visibility.PRIVATE)
         registry.register(self.configuration,dependencies=tuple(dict.fromkeys(references(configuration.model_dump(mode='json')))))
 
-    def _claim(self,claim):
+    def _claim(self,claim,*,cleanup=False):
         job=self.registry.job(claim.job_id)
-        if job.spec.operation not in ('run','train','evaluate') or job.state!='running':raise ValueError('Selected running run/train/evaluate claim required')
-        if not any(a.claim==claim and a.state=='running' for a in self.registry.attempts(job.job_id)):
+        if job.spec.operation not in ('run','train','evaluate') or (not cleanup and job.state!='running'):raise ValueError('Selected running run/train/evaluate claim required')
+        if not any(a.claim==claim and (cleanup or a.state=='running') for a in self.registry.attempts(job.job_id)):
             raise ValueError('Actual current startup claim required')
-        if job.job_id not in self.registry.trace(self.configuration).jobs:
+        if not cleanup and job.job_id not in self.registry.trace(self.configuration).jobs:
             raise ValueError('Selected job must freeze the native factory configuration dependency')
-        self.registry.assert_usable(self.configuration)
+        if not cleanup:self.registry.assert_usable(self.configuration)
         return {'run':'rollout','train':'training','evaluate':'evaluation'}[job.spec.operation]
 
     def create(self,claim,*,startup_key:str) -> NativeHandle:
@@ -62,7 +63,9 @@ class NativeSessionFactory:
         started=time.monotonic();preexisting=sys.modules.get('ray')
         owned=preexisting is None or not preexisting.is_initialized()
         try:
-            session=NativeSession(store=self.store,registry=self.registry,settings=self.settings,
+            # Native exports/checkpoints are immutable per selected job namespace.
+            effective_settings=self.settings.model_copy(update={'work_directory':str(Path(self.settings.work_directory)/'jobs'/claim.job_id)})
+            session=NativeSession(store=self.store,registry=self.registry,settings=effective_settings,
                 configuration=self.training_configuration,revision=self.revision)
         except BaseException:
             # Only this controller's newly created Ray connection is closed.
@@ -88,22 +91,34 @@ class NativeSessionFactory:
         return handle
 
     def close(self,handle:NativeHandle,claim,*,shutdown_key:str):
-        category=self._claim(claim)
+        # Revocation forbids further work, never cleanup of this owned session.
+        category=self._claim(claim,cleanup=True)
         identity=(claim.attempt_id,handle.receipt.sha256,shutdown_key)
         if identity in self._closed:return self._closed[identity]
+        if any(key[:2]==identity[:2] and key!=identity for key in self._closing):
+            raise ValueError('Shutdown publication is pending under another key; retry its exact key')
         keys=[key for key,value in self._sessions.items() if value is handle and key[0]==claim.attempt_id]
         if len(keys)!=1:raise ValueError('Retained session from this factory/claim required')
         if identity not in self._closing:
-            self.registry.reconcile(claim,CostObservation(source='m7-native-shutdown',upstream_attempt_id=shutdown_key,
-                revision=1,receipts=(handle.receipt,),costs=(cost(category,note='Owned native session shutdown dispatched; outcome/cost unknown'),)))
-            self._closing[identity]={'started':time.monotonic(),'completed':None,'receipt':None}
+            self._closing[identity]={'started':time.monotonic(),'completed':None,'receipt':None,'intent_recorded':False}
         pending=self._closing[identity]
+        accounting_error=None
+        if not pending['intent_recorded']:
+            try:
+                self.registry.reconcile(claim,CostObservation(source='m7-native-shutdown',upstream_attempt_id=shutdown_key,
+                    revision=1,receipts=(handle.receipt,),costs=(cost(category,note='Owned native session shutdown dispatched; outcome/cost unknown'),)))
+                pending['intent_recorded']=True
+            except RegistryError as exc:accounting_error=exc
         if pending['completed'] is None:handle.session.close();pending['completed']=time.monotonic()
         if pending['receipt'] is None:pending['receipt']=self.store.put_bytes(canonical_json({'version':'m7-native-shutdown-v1','startup':handle.receipt.model_dump(mode='json'),
             'native_session_wall_seconds':pending['completed']-handle.ready_at,
             'note':'Session interval includes activation/idle/assigned work; not added again to phase wall costs. GPU/currency unknown.'}),
             'm7-native-shutdown',c.Visibility.PRIVATE)
         receipt=pending['receipt']
+        if accounting_error is not None:
+            accounting_error.native_session_closed=True
+            accounting_error.native_shutdown_receipt=receipt
+            raise accounting_error
         self.registry.register(receipt,dependencies=(handle.receipt,))
         observed=self.registry.reconcile(claim,CostObservation(source='m7-native-shutdown',upstream_attempt_id=shutdown_key,
             revision=2,receipts=(handle.receipt,receipt),costs=(cost(category,wall=pending['completed']-pending['started'],

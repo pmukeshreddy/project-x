@@ -1,0 +1,168 @@
+"""Actual service/CAS/Registry with explicit native/admission diagnostic boundaries.
+
+CPU Torch performs real parameter updates and exact optimizer/RNG save/reload.
+No native stack, model generation, HumanReview or accepted task is claimed.
+"""
+from pathlib import Path
+from types import SimpleNamespace
+import pytest
+from feature_rl import contracts as c
+from feature_rl.artifacts import canonical_json
+from feature_rl.training.service import TrainingService,SourceDemonstration
+from feature_rl.training.native import NativeSettings
+from feature_rl.training.supervision import SupervisedExample
+from feature_rl.training.torch_backend import CausalTurn,TorchUpdater
+from feature_rl.training.files import publish_directory
+
+
+def service_fixture(tmp_path,monkeypatch):
+    from test_agent_runner import fixture
+    from m4_fixtures import replace_artifact
+    from feature_rl.training.skyrl_bridge import PINNED_SKYRL,PINNED_HARBOR
+    import feature_rl.training.service as service_module
+    import torch
+    f=fixture(tmp_path,monkeypatch)
+    task=replace_artifact(f.store,f.task,partition=c.Partition.TRAIN)
+    directory=tmp_path/'model';directory.mkdir();(directory/'model.pt').write_bytes(b'inert initial manifest')
+    weights=publish_directory(store=f.store,registry=f.registry,path=directory)
+    policy=f.policy.model_copy(update={'identity':f.policy.identity.model_copy(update={'weights':weights})})
+    config=c.TrainingConfig(initial_policy=policy,reference_checkpoint=weights,tasks=(task,),limits=f.limits,
+        seeds=c.SeedPolicy(algorithm='diagnostic',seeds=(19,),same_cases_within_group=True),algorithm='sft',
+        group_size=4,max_updates=1,learning_rate=.01,framework='skyrl',framework_version=PINNED_SKYRL,
+        backend_version=PINNED_HARBOR,budget_usd=None)
+    settings=NativeSettings(skyrl_checkout=str(tmp_path/'checkout'),model_directory=str(directory),
+        reference_directory=str(tmp_path/'reference'),tokenizer_directory=str(tmp_path/'tokenizer'),
+        work_directory=str(tmp_path/'work'),tokenizer_sha256='c'*64,probe_tokens=(1,2),max_seq_len=8192)
+    calls=[]
+    class Model(torch.nn.Module):
+        def __init__(self):super().__init__();self.embedding=torch.nn.Embedding(8,4);self.head=torch.nn.Linear(4,8)
+        def forward(self,input_ids,attention_mask=None):return SimpleNamespace(logits=self.head(self.embedding(input_ids)))
+    class CPU:
+        def __init__(self,**kwargs):
+            import json
+            journals=list((Path(kwargs['settings'].work_directory).parents[1]/'controller').glob('*.json'))
+            assert any(json.loads(path.read_text())['phase']=='initializing' for path in journals)
+            calls.append('initialize');torch.manual_seed(4);self.updater=TorchUpdater(Model(),learning_rate=.01,kl_coefficient=0,max_seq_len=8192)
+            self.policy=config.initial_policy;self.backend=f.backend;self.trainer=SimpleNamespace(global_step=0)
+            self.last_probe={'scope':'unit_diagnostic','no_native_inference':True}
+        def update(self,rows,algorithm):
+            from feature_rl.training.worker_state import snapshot_state,compare_states
+            before=snapshot_state(self.updater.model,self.updater.optimizer,rank=0)
+            calls.append('update');receipt=self.updater.update([row.turn for row in rows],algorithm=algorithm)
+            after=snapshot_state(self.updater.model,self.updater.optimizer,rank=0)
+            self.trainer.global_step+=1
+            path=tmp_path/('export-'+str(self.trainer.global_step));path.mkdir()
+            torch.save(self.updater.model.state_dict(),path/'model.pt')
+            ref=publish_directory(store=f.store,registry=f.registry,path=path)
+            self.policy=self.policy.model_copy(update={'identity':self.policy.identity.model_copy(update={'weights':ref}),
+                'policy_version':'diagnostic-step-'+str(self.trainer.global_step)})
+            return {'grad_norm':receipt.gradient_norm,'weights':ref.model_dump(mode='json'),'cpu_tensor_before':receipt.before,'cpu_tensor_after':receipt.after,
+                **compare_states([before],[after])}
+        def save_reload(self):
+            calls.append('save-reload');path=tmp_path/('checkpoint-'+str(self.trainer.global_step))
+            digest=self.updater.save_checkpoint(path,binding={'diagnostic':True},progress={'position':1},policy_version=self.policy.policy_version)
+            self.updater.load_checkpoint(path,expected_digest=digest,binding={'diagnostic':True})
+            ref=publish_directory(store=f.store,registry=f.registry,path=path)
+            return {'checkpoint':ref.model_dump(mode='json'),'path':str(path),'global_step':self.trainer.global_step,
+                'diagnostic_updater_digest':digest,'scope':'unit_diagnostic'}
+        def resume(self,checkpoint,path,policy):
+            calls.append('resume');self.policy=policy
+            import hashlib
+            from feature_rl.training.files import verify_directory
+            verify_directory(store=f.store,ref=checkpoint,path=Path(path))
+            metadata=self.updater.load_checkpoint(Path(path),expected_digest=hashlib.sha256((Path(path)/'manifest.json').read_bytes()).hexdigest(),binding={'diagnostic':True})
+            self.trainer.global_step=metadata['optimizer_steps']
+            return self.last_probe
+        def close(self):calls.append('close')
+    monkeypatch.setattr(service_module,'NativeSession',CPU)
+    import feature_rl.training.factory as factory_module
+    monkeypatch.setattr(factory_module,'NativeSession',CPU)
+    demo=SourceDemonstration(task=task,submission=f.store.put_bytes(b'explicit diagnostic source','m4-submission',c.Visibility.PRIVATE),
+        grade=f.store.put_bytes(b'explicit diagnostic grade','m4-grade-receipt',c.Visibility.PRIVATE))
+    def imported(self,**kwargs):return SupervisedExample(task,demo.submission,demo.grade,
+        (CausalTurn((1,2),(3,4),(True,True)),),(task,demo.submission,demo.grade))
+    monkeypatch.setattr(service_module.DemonstrationImporter,'source',imported)
+    service=TrainingService(store=f.store,registry=f.registry,lifecycle=f.runner.lifecycle,builder=f.runner.builder,
+        runtime=f.runner.runtime,grader=f.runner.grader,settings=settings,revision='f'*40,evidence_scope='unit_diagnostic')
+    return SimpleNamespace(service=service,config=config,demo=demo,calls=calls,fixture=f)
+
+
+def test_real_cpu_sft_service_update_checkpoint_and_selected_job_replay(tmp_path,monkeypatch):
+    f=service_fixture(tmp_path,monkeypatch)
+    result=f.service.train(f.config,invocation='diagnostic-sft',demonstrations=(f.demo,))
+    assert result.disposition==c.Disposition.SUCCESS
+    checkpoint=f.fixture.store.get_artifact(result.artifacts[0])
+    assert isinstance(checkpoint,c.TrainingCheckpoint) and checkpoint.optimizer_steps==1
+    assert checkpoint.data_position==1 and checkpoint.weights!=f.config.initial_policy.identity.weights
+    assert checkpoint.update_evidence[0].scope=='unit_diagnostic'
+    from feature_rl.training.checkpoints import validate_selected_checkpoint
+    assert validate_selected_checkpoint(f.fixture.store,f.fixture.registry,result.artifacts[0],configuration=f.config)==checkpoint
+    altered=f.fixture.store.put_artifact(checkpoint.model_copy(update={'optimizer_steps':2}))
+    f.fixture.registry.register(altered)
+    with pytest.raises(ValueError,match='sole selected'):validate_selected_checkpoint(f.fixture.store,f.fixture.registry,altered)
+    assert f.calls==['initialize','update','save-reload','close']
+    assert all(cost.usd is None for cost in result.costs)
+    assert f.service.train(f.config,invocation='diagnostic-sft',demonstrations=(f.demo,))==result
+    assert f.calls==['initialize','update','save-reload','close']
+
+
+def test_admission_and_supervised_arm_and_currency_gates_precede_native(tmp_path,monkeypatch):
+    f=service_fixture(tmp_path,monkeypatch)
+    with pytest.raises(ValueError,match='exclusive'):f.service.train(f.config.model_copy(update={'algorithm':'grpo'}),invocation='forbidden',demonstrations=(f.demo,))
+    with pytest.raises(ValueError,match='actual native cost meter'):f.service.train(f.config.model_copy(update={'budget_usd':1.}),invocation='budget',demonstrations=(f.demo,))
+    def denied(ref):raise ValueError('actual current admission denied')
+    monkeypatch.setattr(f.service.lifecycle,'resolve_released',denied)
+    with pytest.raises(ValueError,match='admission denied'):f.service.train(f.config,invocation='denied',demonstrations=(f.demo,))
+    assert not f.calls
+
+
+def test_grpo_assigns_four_real_runner_jobs_same_cases_and_stops_without_signal(tmp_path,monkeypatch):
+    from feature_rl.agents import AgentRunner
+    f=service_fixture(tmp_path,monkeypatch)
+    f.config=f.config.model_copy(update={'algorithm':'grpo'})
+    f.service.settings=f.service.settings.model_copy(update={'max_groups':1})
+    # Only public-package/admission/native boundaries are substituted. Actual
+    # runner jobs, saved submission, selected diagnostic M4 receipts and gate run.
+    monkeypatch.setattr(AgentRunner,'_messages',lambda self,task:[{'role':'user','content':'DIAGNOSTIC public instruction only'}])
+    f.fixture.backend.outputs=['{"action":"submit"}']*4
+    result=f.service.train(f.config,invocation='diagnostic-grpo')
+    assert result.disposition==c.Disposition.BLOCKED
+    assert f.calls==['initialize','close']
+    assert len(f.fixture.backend.calls)==len(f.fixture.grades)==4
+    assert len({call[1].seed for call in f.fixture.backend.calls})==4
+    assert len({call[2] for call in f.fixture.grades})==1
+    assert len(f.service.state['group_receipts'])==1 and f.service.state['groups']==1
+    assert not any(ref.kind=='TrainingCheckpoint' for ref in result.artifacts)
+
+
+def test_interrupted_collection_recovers_same_sft_positions_without_skipping_targets(tmp_path,monkeypatch):
+    f=service_fixture(tmp_path,monkeypatch)
+    update=f.service._update
+    interrupted=[]
+    def once(rows):
+        if not interrupted:interrupted.append(True);raise OSError('diagnostic interruption before update dispatch')
+        return update(rows)
+    monkeypatch.setattr(f.service,'_update',once)
+    with pytest.raises(OSError,match='before update'):f.service.train(f.config,invocation='interrupted',demonstrations=(f.demo,))
+    assert f.service.state['data_position']==1 and f.service.state['supervised_positions']==[0]
+    assert f.calls==['initialize','close']
+    result=f.service.train(f.config,invocation='interrupted',demonstrations=(f.demo,))
+    assert result.disposition==c.Disposition.SUCCESS
+    assert f.service.state['data_position']==1 and f.service.state['updates']==1
+    assert f.calls==['initialize','close','initialize','update','save-reload','close']
+
+
+def test_checkpointed_service_resume_restores_real_cpu_optimizer_and_next_position(tmp_path,monkeypatch):
+    f=service_fixture(tmp_path,monkeypatch);f.config=f.config.model_copy(update={'max_updates':2})
+    update=f.service._update;attempts=[]
+    def interrupted(rows):
+        attempts.append(True)
+        if len(attempts)==2:raise OSError('diagnostic between checkpoint and next update')
+        return update(rows)
+    monkeypatch.setattr(f.service,'_update',interrupted)
+    with pytest.raises(OSError,match='between checkpoint'):f.service.train(f.config,invocation='resume-cpu',demonstrations=(f.demo,))
+    assert f.service.state['updates']==1 and f.service.state['data_position']==2
+    result=f.service.train(f.config,invocation='resume-cpu',demonstrations=(f.demo,))
+    checkpoint=f.fixture.store.get_artifact(result.artifacts[0])
+    assert result.disposition==c.Disposition.SUCCESS and checkpoint.optimizer_steps==2 and checkpoint.data_position==2
+    assert f.calls==['initialize','update','save-reload','close','initialize','resume','update','save-reload','close']
