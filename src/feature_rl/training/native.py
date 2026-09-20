@@ -206,6 +206,8 @@ class NativeSession:
         from skyrl.train.config import SkyRLTrainConfig
         from skyrl.train.utils import validate_cfg
         from skyrl.train.utils.utils import initialize_ray
+        import ray
+        if ray.is_initialized():raise ValueError('NativeSession requires its own controller process/Ray connection; reuse its existing session for other arms')
         cfg=SkyRLTrainConfig.from_cli_overrides([k+'='+json.dumps(v) for k,v in native_overrides(settings,configuration).items()])
         # Registration must precede validation/worker construction for custom losses.
         initialize_ray(cfg);register_losses();validate_cfg(cfg)
@@ -213,11 +215,22 @@ class NativeSession:
         tokenizer=AutoTokenizer.from_pretrained(settings.tokenizer_directory,local_files_only=True,trust_remote_code=False)
         from skyrl.train.entrypoints.main_base import BasePPOExp
         from skyrl.train.trainer import RayPPOTrainer
+        from skyrl.backends.skyrl_train.workers.fsdp.fsdp_worker import FSDPPolicyWorkerBase
+        import ray
+
+        class VerifiedPolicyWorker(FSDPPolicyWorkerBase):
+            def feature_rl_snapshot(inner):
+                from feature_rl.training.worker_state import snapshot_state
+                return snapshot_state(inner.model,inner.optimizer,rank=torch.distributed.get_rank())
+
+        verified_policy=ray.remote(num_gpus=1)(VerifiedPolicyWorker)
 
         class ExternalTrainer(RayPPOTrainer):
             def _build_train_dataloader_and_compute_training_steps(inner):
                 # Actual documented trainer hook for externally supplied data.
                 inner.train_dataloader=None;inner.total_training_steps=configuration.max_updates
+            def build_models(inner,PolicyWorker,CriticWorker,RefWorker):
+                return super().build_models(verified_policy,CriticWorker,RefWorker)
 
         class SourceExperiment(BasePPOExp):
             def __init__(inner):
@@ -333,14 +346,18 @@ class NativeSession:
             'outputs':results,'scope':'native_execution','trust':'Controller-owned native broadcast plus endpoint probes; not cryptographic remote tensor attestation'}
 
     def update(self,rows,*,algorithm):
+        from .worker_state import compare_states
         self.backend.verify_policy(self.policy)
+        before=self.worker_snapshot()
         self.barrier.begin(self.barrier.stamp,self.barrier.probe)
         status=asyncio.run(self.bridge.update(rows,algorithm=algorithm))
         if status.get('optimizer_skipped'):
             self.last_probe=self.synchronize(self.policy);return status
+        status={key:float(value) for key,value in status.items()}
         norm=status.get('grad_norm')
         if type(norm) not in (float,int) or not math.isfinite(norm) or norm<0:
             raise ValueError('Actual finite native optimizer gradient norm missing')
+        after=self.worker_snapshot();change=compare_states(before,after)
         self.trainer.save_models()
         path=Path(self.trainer.cfg.trainer.export_path)/('global_step_'+str(self.trainer.global_step))/'policy'
         weights=publish_directory(store=self.store,registry=self.registry,path=path)
@@ -349,11 +366,19 @@ class NativeSession:
         policy=self.policy.model_copy(update={'identity':identity,'policy_version':version})
         self.last_probe=self.synchronize(policy)
         return {**status,'weights':weights.model_dump(mode='json'),'policy_version':version,
-            'export_path':str(path),'probe':self.last_probe}
+            'export_path':str(path),'probe':self.last_probe,'before_worker_state':before,
+            'after_worker_state':after,**change}
+
+    def worker_snapshot(self):
+        """Call our declared method on the actual pinned policy actor handles."""
+        import ray
+        return ray.get([self.trainer._get_dp_group_models(rank,'policy_model').feature_rl_snapshot.remote()
+            for rank in range(self.settings.num_gpus)])
 
     def save_reload(self):
         """Actual FSDP optimizer/scheduler/model/RNG save + exact-path reload + probe."""
         before=self.last_probe
+        before_state=self.worker_snapshot()
         path=Path(self.trainer.save_checkpoints()).resolve()
         import torch,random,numpy
         torch.save({'python':random.getstate(),'numpy':numpy.random.get_state(),
@@ -362,10 +387,12 @@ class NativeSession:
         verify_directory(store=self.store,ref=ref,path=path)
         self._load(path)
         after=self.synchronize(self.policy)
+        after_state=self.worker_snapshot()
         if before['outputs']!=after['outputs']: raise ValueError('Checkpoint reload changes fixed-input inference')
+        if before_state!=after_state:raise ValueError('Native reload changes actual trainable tensors or optimizer state')
         self.last_probe=after
         return {'checkpoint':ref.model_dump(mode='json'),'path':str(path),'global_step':self.trainer.global_step,
-            'before_probe':before,'after_probe':after}
+            'before_probe':before,'after_probe':after,'before_worker_state':before_state,'after_worker_state':after_state}
 
     def _load(self,path):
         require_private_tree(Path(path))
@@ -388,3 +415,9 @@ class NativeSession:
         verify_directory(store=self.store,ref=self.configuration.reference_checkpoint,path=Path(self.settings.reference_directory))
         self._load(Path(path));self.last_probe=self.synchronize(policy)
         return self.last_probe
+
+    def close(self):
+        """Revoke inference, then close this controller's owned Ray connection."""
+        self.barrier.begin(self.barrier.stamp,self.barrier.probe)
+        import ray
+        ray.shutdown()
