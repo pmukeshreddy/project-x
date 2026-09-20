@@ -63,3 +63,11 @@ Remaining confirmed interface finding: matching declarative optimizer/tools/budg
 ## M0 command transport — PASS
 
 Reviewed `60ff9a7`: optional strict nonnegative `RunRequest.case_seed` defaults to None, preserving ordinary runner behavior, and `feature-rl` points to the real `feature_rl.cli:main`. Reuse121 focused contract checks, actual module help and metadata resolution. No dependency installation was needed.
+
+## M6 authoring and repair history — PASS
+
+Reviewed `117b175`: one selected Registry attempt per actual M2/M4 call, frozen candidate/batch reservations, shared stage/candidate repair limits, semantic control slots, exact provider archive/cost closure and publication-only recovery. The confirmed retained-receipt cost substitution and previous-journal findings are fixed and covered by focused mutation checks. Null USD remains explicitly unknown; finite monetary caps reject without a meter.
+
+Construction V2 freezes history before TaskBuilder execution and preserves original V1 readback. The complete branch joins the actual terminal contract, scenario, M4 control record and final checker; historical imports and external artifacts retain incomplete history. Reuse35 focused CPU checks in145.48s with unchanged tested source hashes, including the four-stage TEST sequence and affected construction/qualification joins. This does not establish human approval or successful real generation.
+
+The retained Click import selects the three original failed journals and their measured costs without provider execution or changes to the original stores. Source remains provisional, contract rejected and contract repairs exhausted. Detailed receipt and scope are in `docs/evidence/M6/authoring/` and `docs/reports/M6-authoring.md`. Remaining M6 review is grade/CLI composition.
