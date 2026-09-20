@@ -237,6 +237,13 @@ class SourceAuditOutcome(c.StrictModel):
     issue: c.Text
 
 
+class QuarantineAction(c.StrictModel):
+    root: c.ArtifactRef
+    notice_id: c.Identifier
+    reason: c.Text
+    evidence: Annotated[tuple[c.ArtifactRef, ...], Field(min_length=1)]
+
+
 class AuditExecutionReport(c.StrictModel):
     version: Literal["m8-audit-report-v2"]
     population_frame: c.ArtifactRef
@@ -250,4 +257,5 @@ class AuditExecutionReport(c.StrictModel):
     quarantined_sources: tuple[c.ArtifactRef, ...]
     affected_runs: tuple[c.ArtifactRef, ...]
     affected_checkpoints: tuple[c.ArtifactRef, ...]
+    quarantine_actions: tuple[QuarantineAction, ...] = ()
     required_action: tuple[c.Text, ...]

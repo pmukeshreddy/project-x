@@ -2,15 +2,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import uuid
 from typing import Mapping
 
 from feature_rl import contracts as c
-from feature_rl.artifacts import ArtifactStore, canonical_json
+from feature_rl.artifacts import ArtifactError, ArtifactStore, canonical_json
 from feature_rl.grading import read_grade
 from feature_rl.pipeline import read_source_disposition
+from feature_rl.pipeline.factory import source_decision
 from feature_rl.qualification.attestation import NAMESPACE, SSHHumanVerifier, verify_sshsig
-from feature_rl.registry import CostObservation, JobSpec, Registry
+from feature_rl.registry import Claim, CostObservation, JobSpec, Registry, RegistryError
 from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_bytes, read_local
 
@@ -26,6 +28,7 @@ from .models import (
     PatchAuditOutcome,
     PatchAuditSelection,
     PatchFrameEntry,
+    QuarantineAction,
     SourceAuditAdjudication,
     SourceAuditOutcome,
     SourceAuditSelection,
@@ -37,6 +40,25 @@ from .statistics import summarize_audits, summarize_source_audits
 
 class AuditRejected(ValueError):
     """The frame, receipt, selection, or human attestation is not exact."""
+
+
+class AuditRecoveryRequired(Exception):
+    """A selected audit attempt must be recovered without redoing human work."""
+
+    def __init__(self, message: str, claim: Claim):
+        super().__init__(message)
+        self.claim = claim
+
+
+class AuditPublicationFailed(AuditRecoveryRequired):
+    """Exact frozen report bytes can be published again without re-auditing."""
+
+    def __init__(self, message: str, claim: Claim, *, payload: bytes, dependencies: tuple[c.ArtifactRef, ...], kind: str):
+        super().__init__(message, claim)
+        self.payload = payload
+        self.dependencies = dependencies
+        self.kind = kind
+        self.sha256 = hashlib.sha256(payload).hexdigest()
 
 
 def _unknown_audit_cost() -> c.CostRecord:
@@ -89,9 +111,11 @@ class AuditService:
         registry.register(self.population_ref, dependencies=frame_dependencies)
         registry.register(self.plan_ref, dependencies=(self.population_ref,))
         registry.register(self.selection_ref, dependencies=(self.population_ref, self.plan_ref))
+        attestation_parts = []
         for reference in self.attestations.values():
             envelope = read_local(store, reference, DetachedAuditAttestation, "m8-detached-audit-attestation")
             registry.register(reference, dependencies=(envelope.payload, envelope.signature))
+            attestation_parts.extend((reference, envelope.payload, envelope.signature))
         config_bytes = canonical_json({
             "version": "m8-audit-configuration-v2",
             "selection": self.selection_ref.model_dump(mode="json"),
@@ -105,6 +129,11 @@ class AuditService:
             self.configuration,
             dependencies=(self.selection_ref, *tuple(value for _, value in sorted(self.attestations.items()))),
         )
+        self.audit_protected = tuple(dict.fromkeys((
+            self.population_ref, self.plan_ref, self.selection_ref,
+            self.configuration, *attestation_parts,
+        )))
+        self.audit_configuration = self.configuration
 
     def _rollout_and_grade(self, run_id: str):
         try:
@@ -186,7 +215,6 @@ class AuditService:
         if (
             type(candidate) is not c.CandidateRecord
             or candidate.repository_family != entry.repository_family
-            or candidate.screening.disposition != c.Disposition.REJECTED
             or entry.failure_category != job.result.disposition.value
             or receipt.claim.job_id != job.job_id
             or receipt.candidate != entry.candidate
@@ -198,6 +226,7 @@ class AuditService:
             or receipt.original_costs != candidate.costs
             or receipt.source_status != "rejected"
             or receipt.disposition != c.Disposition.REJECTED
+            or (receipt.source_status, receipt.disposition, receipt.reason) != source_decision(candidate)
         ):
             raise AuditRejected("rejected-source frame differs from actual candidate/result disposition")
         evidence = tuple(dict.fromkeys((entry.source_disposition, *_refs(candidate.screening.evidence), *_refs(job.result.evidence))))
@@ -257,8 +286,8 @@ class AuditService:
         )
         return payload, evidence, verification_ref
 
-    def _execute(self):
-        subjects = self._population_subjects()
+    def _execute(self, subjects=None):
+        subjects = self._population_subjects() if subjects is None else subjects
         patch_outcomes, source_outcomes = [], []
         patch_samples, source_samples = [], []
         defects, source_defects = {}, {}
@@ -352,22 +381,22 @@ class AuditService:
                 if payload.source_assessment == "defect":
                     source_defects.setdefault(selection.candidate, []).append((payload.counterexample, verification_ref))
 
-        quarantined, quarantined_sources = [], []
+        quarantined, quarantined_sources, quarantine_actions = [], [], []
         affected_runs, affected_checkpoints = set(), set()
         for root, findings, target in (
             *((root, findings, quarantined) for root, findings in defects.items()),
             *((root, findings, quarantined_sources) for root, findings in source_defects.items()),
         ):
             evidence_refs = tuple(dict.fromkeys(ref for finding in findings for ref in finding))
-            self.registry.quarantine(
-                root, notice_id="m8-audit-" + root.sha256[:24],
-                reason="authenticated M8 human audit found a decision defect",
-                evidence=evidence_refs,
-            )
             trace = self.registry.trace(root)
             target.append(root)
             affected_runs.update(trace.runs)
             affected_checkpoints.update(trace.checkpoints)
+            quarantine_actions.append(QuarantineAction(
+                root=root, notice_id="m8-audit-" + root.sha256[:24],
+                reason="authenticated M8 human audit found a decision defect",
+                evidence=evidence_refs,
+            ))
         actions = () if not defects and not source_defects else (
             "regrade saved submissions after checker defects with an unaffected verifier",
             "restart training from an unaffected checkpoint or disclose contamination after weight updates",
@@ -383,16 +412,136 @@ class AuditService:
             quarantined_sources=tuple(sorted(quarantined_sources, key=lambda ref: ref.sha256)),
             affected_runs=tuple(sorted(affected_runs, key=lambda ref: ref.sha256)),
             affected_checkpoints=tuple(sorted(affected_checkpoints, key=lambda ref: ref.sha256)),
+            quarantine_actions=tuple(sorted(quarantine_actions, key=lambda action: action.root.sha256)),
             required_action=actions,
         )
         complete = all(item.attestation_status == "authenticated" for item in (*patch_samples, *source_samples))
         return report, tuple(dict.fromkeys(dependencies)), tuple(human_evidence), complete
 
-    def _spec(self):
+    def _spec(self, configuration=None):
         return JobSpec(
-            operation="audit", inputs=(self.selection_ref,), configuration=self.configuration,
+            operation="audit", inputs=(self.selection_ref,),
+            configuration=self.audit_configuration if configuration is None else configuration,
             implementation=self.revision, invocation="m8-audit-v2", attempt_limit=1,
         )
+
+    def _subject_roots(self, subjects):
+        roots = []
+        for entry in self.population.entries:
+            actual = subjects[entry.subject_id]
+            if entry.unit == "patch":
+                _, rollout, _, grade, _ = actual
+                roots.extend((rollout.task, grade.submission, grade.verifier))
+            else:
+                roots.extend((entry.candidate, entry.source_disposition))
+        return tuple(dict.fromkeys(roots))
+
+    def _result(self, reference, payload):
+        if reference.kind == "m8-audit-report":
+            report = AuditExecutionReport.model_validate_json(payload)
+            expected_patch = tuple(
+                item for item in self.selection.selections if item.unit == "patch"
+            )
+            expected_source = tuple(
+                item for item in self.selection.selections if item.unit == "source"
+            )
+            if (
+                (report.population_frame, report.sampling_plan, report.selection_manifest)
+                != (self.population_ref, self.plan_ref, self.selection_ref)
+                or tuple(item.selection for item in report.patch_outcomes) != expected_patch
+                or tuple(item.selection for item in report.source_outcomes) != expected_source
+                or {item.root for item in report.quarantine_actions}
+                != set((*report.quarantined_verifiers, *report.quarantined_sources))
+            ):
+                raise ValueError("report differs from the frozen audit inputs or effects")
+            complete = all(
+                outcome.adjudication is not None
+                for outcome in (*report.patch_outcomes, *report.source_outcomes)
+            )
+            human_evidence = tuple(
+                evidence
+                for outcome in report.patch_outcomes if outcome.record is not None
+                for evidence in outcome.record.evidence
+            ) + tuple(
+                evidence
+                for outcome in report.source_outcomes
+                for evidence in outcome.evidence
+            )
+            evidence = c.EvidenceRecord(
+                producer="feature_rl.audits", command=("AuditService.audit", *tuple(sorted(
+                    item.run_id for item in self.selection.selections if item.unit == "patch"
+                ))), recorded_at=self.selection.created_at, exit_status=0,
+                artifacts=(reference,), revision=self.revision,
+                scope="human_review" if human_evidence else "source_inspection",
+            )
+            return c.OperationResult(
+                operation="audit",
+                disposition=c.Disposition.SUCCESS if complete else c.Disposition.PROVISIONAL,
+                artifacts=(reference,), evidence=(evidence, *human_evidence),
+                costs=(_unknown_audit_cost(),),
+                reason="complete frozen audit selection recorded; unavailable adjudications remain explicit",
+            ), report
+        failure = decode_json(payload, 65536)
+        if (
+            type(failure) is not dict
+            or failure.get("version") != "m8-audit-failure-v1"
+            or failure.get("configuration") != self.configuration.model_dump(mode="json")
+            or type(failure.get("reason")) is not str
+            or type(failure.get("recorded_at")) is not str
+        ):
+            raise ValueError("failure report differs from the frozen audit configuration")
+        evidence = c.EvidenceRecord(
+            producer="feature_rl.audits", command=("AuditService.audit",),
+            recorded_at=datetime.fromisoformat(failure["recorded_at"]), exit_status=1,
+            artifacts=(reference,), revision=self.revision, scope="source_inspection",
+        )
+        return c.OperationResult(
+            operation="audit", disposition=c.Disposition.INVALID,
+            artifacts=(reference,), evidence=(evidence,), costs=(_unknown_audit_cost(),),
+            reason=failure["reason"],
+        ), None
+
+    def _apply_effects(self, report):
+        for action in report.quarantine_actions:
+            matching = [notice for notice in self.registry.trace(action.root).notices
+                        if notice.notice_id == action.notice_id]
+            if matching:
+                notice = matching[0]
+                if (notice.root, notice.reason, notice.evidence, notice.active) != (
+                    action.root, action.reason, action.evidence, True,
+                ):
+                    raise AuditRejected("quarantine action identity conflicts with retained history")
+                continue
+            self.registry.quarantine(
+                action.root, notice_id=action.notice_id,
+                reason=action.reason, evidence=action.evidence,
+            )
+
+    def _publish(self, claim, *, payload, dependencies, kind):
+        try:
+            reference = self.store.put_bytes(payload, kind, c.Visibility.PRIVATE)
+            self.registry.register(reference, dependencies=dependencies)
+            result, report = self._result(reference, payload)
+            observation = self.registry.reconcile(claim, CostObservation(
+                source="m8-audit", upstream_attempt_id=claim.attempt_id,
+                revision=1, receipts=(self.audit_configuration, reference),
+                costs=result.costs,
+            ))
+        except (ArtifactError, RegistryError, OSError) as exc:
+            raise AuditPublicationFailed(
+                "retain exact audit bytes and dependencies; publication can be replayed",
+                claim, payload=payload, dependencies=dependencies, kind=kind,
+            ) from exc
+        try:
+            if report is not None:
+                self._apply_effects(report)
+            return self.registry.complete(
+                claim, result, observations=(observation.observation_id,),
+            ).result
+        except (ArtifactError, RegistryError, OSError, AuditRejected) as exc:
+            raise AuditRecoveryRequired(
+                "audit report is frozen; recover its durable effects and completion", claim,
+            ) from exc
 
     def audit(self, run_ids: tuple[str, ...]) -> c.OperationResult:
         if type(run_ids) is not tuple or any(type(item) is not str for item in run_ids):
@@ -402,6 +551,12 @@ class AuditService:
         ))
         if tuple(sorted(run_ids)) != expected or len(run_ids) != len(set(run_ids)):
             raise AuditRejected("audit must account for the complete frozen patch selection")
+        subjects = self._population_subjects()
+        self.audit_configuration = self.registry.historical_audit_configuration(
+            self.configuration,
+            subjects=self._subject_roots(subjects),
+            protected=self.audit_protected,
+        )
         job = self.registry.enqueue(self._spec())
         if job.state == "completed":
             return job.result
@@ -411,45 +566,51 @@ class AuditService:
             job.job_id, owner="feature_rl.audits.AuditService", claim_key=uuid.uuid4().hex,
         )
         try:
-            report, dependencies, human_evidence, complete = self._execute()
-            report_ref = self.store.put_bytes(
-                canonical_json(report.model_dump(mode="json")), "m8-audit-report", c.Visibility.PRIVATE,
-            )
-            self.registry.register(report_ref, dependencies=dependencies)
-            evidence = c.EvidenceRecord(
-                producer="feature_rl.audits", command=("AuditService.audit", *expected),
-                recorded_at=datetime.now(timezone.utc), exit_status=0, artifacts=(report_ref,),
-                revision=self.revision, scope="human_review" if human_evidence else "source_inspection",
-            )
-            result = c.OperationResult(
-                operation="audit",
-                disposition=c.Disposition.SUCCESS if complete else c.Disposition.PROVISIONAL,
-                artifacts=(report_ref,), evidence=(evidence, *human_evidence),
-                costs=(_unknown_audit_cost(),),
-                reason="complete frozen audit selection recorded; unavailable adjudications remain explicit",
-            )
+            report, dependencies, human_evidence, complete = self._execute(subjects)
+            payload = canonical_json(report.model_dump(mode="json"))
+            kind = "m8-audit-report"
         except AuditRejected as exc:
             payload = canonical_json({
                 "version": "m8-audit-failure-v1", "configuration": self.configuration.model_dump(mode="json"),
                 "reason": str(exc), "recorded_at": datetime.now(timezone.utc).isoformat(),
             })
-            failure_ref = self.store.put_bytes(payload, "m8-audit-failure", c.Visibility.PRIVATE)
-            self.registry.register(failure_ref, dependencies=(self.configuration,))
-            evidence = c.EvidenceRecord(
-                producer="feature_rl.audits", command=("AuditService.audit", *expected),
-                recorded_at=datetime.now(timezone.utc), exit_status=1, artifacts=(failure_ref,),
-                revision=self.revision, scope="source_inspection",
-            )
-            result = c.OperationResult(
-                operation="audit", disposition=c.Disposition.INVALID,
-                artifacts=(failure_ref,), evidence=(evidence,), costs=(_unknown_audit_cost(),),
-                reason=str(exc),
-            )
-        observation = self.registry.reconcile(claim, CostObservation(
-            source="m8-audit", upstream_attempt_id=claim.attempt_id,
-            revision=1, receipts=(self.configuration, *result.artifacts),
-            costs=result.costs,
-        ))
+            dependencies = (self.configuration,)
+            kind = "m8-audit-failure"
+        return self._publish(claim, payload=payload, dependencies=dependencies, kind=kind)
+
+    def recover(self, claim: Claim) -> c.OperationResult:
+        claim = Claim.model_validate(claim)
+        job = self.registry.job(claim.job_id)
+        if job.spec != self._spec(job.spec.configuration) or not any(
+            attempt.claim == claim for attempt in self.registry.attempts(job.job_id)
+        ):
+            raise ValueError("claim is not this audit service configuration")
+        if job.state == "completed":
+            return job.result
+        observations = [item for item in self.registry.accounting(job.job_id).observations
+                        if item.attempt_id == claim.attempt_id and item.observation.revision == 1]
+        if len(observations) != 1:
+            raise AuditRecoveryRequired("audit outcome was not frozen; retained claim requires reconciliation", claim)
+        refs = tuple(ref for ref in observations[0].observation.receipts
+                     if ref.kind in {"m8-audit-report", "m8-audit-failure"})
+        if len(refs) != 1:
+            raise AuditRecoveryRequired("audit accounting lacks one frozen outcome", claim)
+        reference = refs[0]
+        payload = self.store.get_bytes(reference, max_envelope_bytes=8 * 1024 * 1024,
+                                       max_payload_bytes=4 * 1024 * 1024)
+        result, report = self._result(reference, payload)
+        if report is not None:
+            self._apply_effects(report)
         return self.registry.complete(
-            claim, result, observations=(observation.observation_id,),
+            claim, result, observations=(observations[0].observation_id,),
         ).result
+
+    def retry_publication(self, pending: AuditPublicationFailed) -> c.OperationResult:
+        if (type(pending) is not AuditPublicationFailed
+                or hashlib.sha256(pending.payload).hexdigest() != pending.sha256
+                or pending.kind not in {"m8-audit-report", "m8-audit-failure"}):
+            raise ValueError("invalid retained audit publication")
+        return self._publish(
+            pending.claim, payload=pending.payload,
+            dependencies=pending.dependencies, kind=pending.kind,
+        )
