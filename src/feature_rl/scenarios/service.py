@@ -180,6 +180,7 @@ class ScenarioAuthoringService:
                 "authoring-request",
                 "source-archive",
                 "click-runtime-discovery",
+                "runtime-discovery",
             }
         } | set(contract.public_checks)
         actual_source_refs = {source.source for source in sources}

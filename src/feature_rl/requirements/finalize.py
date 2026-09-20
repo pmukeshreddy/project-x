@@ -67,9 +67,9 @@ class ContractFinalizer:
         if len(runtime_sources) != 1:
             raise GroundingError("exact validated runtime discovery context is required")
         try:
-            from .discovery import ClickDiscoveryObservation
+            from .runtime_discovery import parse_discovery
 
-            discovery = ClickDiscoveryObservation.model_validate_json(runtime_sources[0].text)
+            discovery = parse_discovery(inputs.runtime_discovery, runtime_sources[0].text)
         except (ValidationError, ValueError) as error:
             raise GroundingError("runtime discovery context is invalid") from error
         if any(entry not in discovery.entry_points for entry in inputs.entry_points):

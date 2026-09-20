@@ -1,4 +1,4 @@
-"""Click's pinned offline recipe and saved-source workspace API.
+"""Profile-pinned offline recipes and saved-source workspace API.
 
 No submitted module/build hook is imported by this controller. Worker-produced
 bytes remain untrusted and are validated before publication or reuse.
@@ -23,6 +23,7 @@ from .docker import DockerEngine,utc_now,observation_json,stream_process
 from .models import (BuildResult,EnvironmentError,ExecutionRequest,ExecutionResult,PolicyRejected,
     PreparedEnvironment,SandboxPolicy,SavedSource,SourceRejected,WorkspaceHandle,SourceUnavailable,REPAIRED_IMAGE,IMAGE,CleanupUnverified,DockerUnavailable,EvidencePublicationFailed,CpuBudgetExceeded)
 from .workers import STAGE_CODE
+from .profiles import runtime_profile, dependency_files, validate_recipe_profile, click_profile
 import time
 
 # Exact inert acquisition identities; no solver-visible target-package wheel.
@@ -67,9 +68,10 @@ class EnvironmentRuntime:
         if not isinstance(store,ArtifactStore) or store.role!=ActorRole.CONTROLLER:raise PolicyRejected('controller store required')
         if len(revision) not in (40,64) or any(c not in '0123456789abcdef' for c in revision):raise PolicyRejected('implementation revision required')
         self.store=store;self.engine=engine;self.policy=engine.policy;self.revision=revision
+        self.profile=runtime_profile(self.policy)
         self.qualification_ref=self.publish(engine.qualification,'sandbox-qualification')
         self.qualification_summary_ref=self.publish({'qualified':True,'policy':self.policy.model_dump(mode='json'),'observations':engine.qualification['observations']},'sandbox-qualification-summary',Visibility.AUTHORING)
-        self.repair_ref=self.publish(REPAIR,'neutral-environment-repair',Visibility.AUTHORING)
+        self.repair_ref=self.publish(REPAIR,'neutral-environment-repair',Visibility.AUTHORING) if self.policy.profile is None else None
     def publish(self,value,kind,visibility=Visibility.PRIVATE):
         data=canonical_json(value)
         if len(data)>64*1024*1024:raise EnvironmentError('evidence publication limit')
@@ -85,49 +87,40 @@ class EnvironmentRuntime:
         if ref.kind!='source-archive' or ref.encoding!='bytes':raise SourceRejected('source-archive byte ref required')
         return SourceArchive.read(self.read_bytes(ref,self.policy.max_archive_bytes),self.policy)
     def dependency_bytes(self,pins):
-        if len(pins)!=len(WHEELS) or {p.name for p in pins}!=set(WHEELS):raise PolicyRejected('exact six approved dependency pins required')
-        result={};total=0
-        for pin in pins:
-            version,filename,digest=WHEELS[pin.name]
-            if pin.version!=version or pin.sha256!=digest or pin.artifact.kind!='dependency-wheel':raise PolicyRejected('unapproved dependency identity')
-            data=self.read_bytes(pin.artifact,2*1024*1024);total+=len(data)
-            if hashlib.sha256(data).hexdigest()!=digest or total>self.policy.max_staging_bytes:raise PolicyRejected('dependency bytes/aggregate mismatch')
-            result[filename]=SourceFile(data,False)
-        requirements=''.join(f'{name}=={v[0]} --hash=sha256:{v[2]}\n' for name,v in sorted(WHEELS.items())).encode()
-        result['requirements.txt']=SourceFile(requirements,False);return result
+        return dependency_files(self.store,pins,self.policy)
     def create_click_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
+        if self.profile!=click_profile():raise PolicyRejected('Click recipe requested for a different runtime profile')
+        return self.create_recipe(baseline,pins,source_evidence=source_evidence)
+    def create_recipe(self,baseline,pins,*,source_evidence:EvidenceRecord):
         baseline=ArtifactRef.model_validate(baseline);pins=tuple(DependencyPin.model_validate(x) for x in pins)
-        if self.policy.image!=REPAIRED_IMAGE:raise PolicyRejected('Click requires the pinned system pager repair')
-        source=self.source(baseline);self.validate_click_manifest(source);self.dependency_bytes(pins)
+        if self.policy.profile is None and self.policy.image!=REPAIRED_IMAGE:raise PolicyRejected('legacy Click requires the pinned system pager repair')
+        source=self.source(baseline);self.profile.validate_source(source);self.dependency_bytes(pins)
         if baseline.visibility not in {Visibility.AUTHORING,Visibility.PUBLIC}:raise PolicyRejected('B-only recipe requires authoring/public baseline')
         p=self.policy;policy_ref=self.publish(p.model_dump(mode='json'),'sandbox-policy',Visibility.AUTHORING)
         now=datetime.now(timezone.utc)
+        repairs=self.profile.neutral_repairs
+        if self.policy.profile is None:
+            repairs=(NeutralRepair(description='Add pinned Debian less binary and copyright only; environment repair 1/2, candidate repair 1/4',patch=self.repair_ref,neutrality_evidence=(EvidenceRecord(producer='feature_rl.environments trusted package-only image qualification',command=('verify pinned image and base layers','machine-check hardened boundary'),recorded_at=now,exit_status=0,artifacts=(self.repair_ref,self.qualification_summary_ref),revision=self.revision,scope='real_integration'),)),)
         recipe=EnvironmentRecipe(kind='EnvironmentRecipe',schema_version=1,visibility=Visibility.AUTHORING,
             provenance=Provenance(producer='feature_rl.environments',producer_version='1',created_at=now,inputs=(baseline,policy_ref,*[pin.artifact for pin in pins]),evidence=(source_evidence,)),
             costs=(CostRecord(category='construction',wall_seconds=None,cpu_seconds=None,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='unknown',note='Recipe publication; execution measured separately'),),
-            image_digest=p.image,interpreter_version='3.12.14',dependencies=pins,setup=(DEPS,BUILD,INSTALL),reset=(DEPS,BUILD,INSTALL),services=(),
+            image_digest=p.image,interpreter_version=self.profile.interpreter_version,dependencies=pins,setup=self.profile.setup,reset=self.profile.setup,services=(),
             limits=ResourceLimits(wall_seconds=p.lifecycle_seconds,cpu_seconds=p.cpu_seconds,memory_bytes=p.memory_bytes,pids=p.pids,output_bytes=p.output_bytes,disk_bytes=p.disk_bytes,tool_calls=100,input_tokens=1,output_tokens=1),
-            neutral_repairs=(NeutralRepair(description='Add pinned Debian less binary and copyright only; environment repair 1/2, candidate repair 1/4',patch=self.repair_ref,neutrality_evidence=(EvidenceRecord(producer='feature_rl.environments trusted package-only image qualification',command=('verify pinned image and base layers','machine-check hardened boundary'),recorded_at=now,exit_status=0,artifacts=(self.repair_ref,self.qualification_summary_ref),revision=self.revision,scope='real_integration'),)),),locale='C.UTF-8',timezone='UTC',environment=tuple(EnvironmentVariable(name=k,value=v) for k,v in ENV),
+            neutral_repairs=repairs,locale='C.UTF-8',timezone='UTC',environment=tuple(EnvironmentVariable(name=k,value=v) for k,v in self.profile.environment),
             randomness=SeedPolicy(algorithm='PYTHONHASHSEED',seeds=(0,),same_cases_within_group=True),network_policy='none',baseline=baseline)
+        validate_recipe_profile(recipe,p,self.store)
         ref=self.store.put_artifact(recipe);return PreparedEnvironment(recipe=ref,policy=policy_ref)
     def recipe(self,prepared):
         prepared=PreparedEnvironment.model_validate(prepared)
         recipe=self.store.get_artifact(prepared.recipe,max_envelope_bytes=256*1024)
         if not isinstance(recipe,EnvironmentRecipe):raise PolicyRejected('EnvironmentRecipe required')
-        policy=SandboxPolicy.model_validate_json(self.read_bytes(prepared.policy,16384))
+        policy=SandboxPolicy.model_validate_json(self.read_bytes(prepared.policy,65536))
         if policy!=self.policy or prepared.policy not in recipe.provenance.inputs:raise PolicyRejected('recipe/policy binding mismatch')
-        if recipe.image_digest!=policy.image or recipe.interpreter_version!='3.12.14' or recipe.services or recipe.network_policy!='none':raise PolicyRejected('unsupported image/interpreter/service/network')
-        if recipe.setup!=(DEPS,BUILD,INSTALL) or recipe.reset!=recipe.setup or len(recipe.neutral_repairs)!=1 or recipe.neutral_repairs[0].patch!=self.repair_ref:raise PolicyRejected('unapproved setup/reset/repair policy')
-        if tuple((x.name,x.value) for x in recipe.environment)!=ENV or recipe.locale!='C.UTF-8' or recipe.timezone!='UTC' or recipe.randomness.seeds!=(0,):raise PolicyRejected('unapproved process environment')
-        for field in ('memory_bytes','pids','output_bytes','disk_bytes','cpu_seconds'):
-            if getattr(recipe.limits,field)!=getattr(policy,field):raise PolicyRejected('recipe resource binding mismatch')
-        if recipe.limits.wall_seconds!=policy.lifecycle_seconds:raise PolicyRejected('recipe wall binding mismatch')
-        self.dependency_bytes(recipe.dependencies);return recipe
+        validate_recipe_profile(recipe,policy,self.store)
+        return recipe
     @staticmethod
     def validate_click_manifest(source):
-        try:project=tomllib.loads(source.files['pyproject.toml'].data.decode())
-        except (KeyError,ValueError,UnicodeError) as exc:raise PolicyRejected('invalid Click build manifest') from exc
-        if project.get('project',{}).get('name')!='click' or project['project'].get('version')!='8.3.3' or project.get('build-system')!={'requires':['flit_core>=3.11,<4'],'build-backend':'flit_core.buildapi'}:raise PolicyRejected('unsupported Click build identity')
+        click_profile().validate_source(source)
     def saved(self,source,version,visibility=Visibility.PRIVATE):
         data=source.to_tar()
         if len(data)>self.policy.max_archive_bytes:raise SourceRejected('saved archive exceeds cap')
@@ -140,12 +133,12 @@ class EnvironmentRuntime:
             if source_pair is None:raise PolicyRejected('reference requires private M1 source join')
             pair=self.store.get_artifact(source_pair,max_envelope_bytes=512*1024)
             if not isinstance(pair,SourcePair) or pair.baseline!=recipe.baseline or pair.reference!=initial:raise PolicyRejected('M1 source pair mismatch')
-        policy=allowed_changes or AllowedChanges(source_roots=('src',),forbidden_paths=(),dependencies='forbidden',dependency_artifacts=(),additional_artifact_types=())
+        policy=allowed_changes or AllowedChanges(source_roots=self.profile.source_roots,forbidden_paths=(),dependencies='forbidden',dependency_artifacts=(),additional_artifact_types=())
         policy=AllowedChanges.model_validate(policy)
         if policy.dependencies!='forbidden' or policy.dependency_artifacts or policy.additional_artifact_types:raise PolicyRejected('only source-only fixed-dependency changes supported')
         for path in (*policy.source_roots,*policy.forbidden_paths):safe_path(path)
-        if any(root!='src' and not root.startswith('src/') for root in policy.source_roots):raise PolicyRejected('Click source-only roots must stay beneath src; manifests and tests are immutable')
-        baseline=self.source(recipe.baseline);tree=self.source(initial);self.validate_click_manifest(tree)
+        self.profile.validate_allowed_changes(policy)
+        baseline=self.source(recipe.baseline);tree=self.source(initial);self.profile.validate_source(tree)
         if role=='candidate':tree.validate_changes(baseline,policy.source_roots,policy.forbidden_paths)
         snapshot=self.saved(tree,0)
         handle=WorkspaceHandle(workspace_id=uuid.uuid4().hex)
@@ -162,7 +155,7 @@ class EnvironmentRuntime:
     def stage(self,session,source,pins,*,wheel=None):
         files={'source/'+name:entry for name,entry in source.files.items()}
         files.update({'supply/'+name:entry for name,entry in self.dependency_bytes(pins).items()})
-        if wheel is not None:files['built/click-8.3.3-py3-none-any.whl']=SourceFile(wheel,False)
+        if wheel is not None:files['built/'+self.profile.wheel_filename]=SourceFile(wheel,False)
         data=SourceArchive(files).to_tar()
         if len(data)>self.policy.max_staging_bytes:raise PolicyRejected('aggregate stage archive cap')
         command=CommandSpec(argv=('python','-I','-c',STAGE_CODE,str(self.policy.max_staging_bytes)),working_directory='/workspace',timeout_seconds=20.0)
@@ -181,13 +174,32 @@ class EnvironmentRuntime:
                 if len(infos)>self.policy.max_files or sum(x.file_size for x in infos)>self.policy.max_source_bytes+1024*1024:raise SourceRejected('expanded wheel cap')
                 names=[safe_path(x.filename) for x in infos]
                 if len(set(names))!=len(names):raise SourceRejected('duplicate wheel paths')
-                actual={}
+                actual={};metadata=self.profile.wheel_stem+'.dist-info/'
+                from email.parser import BytesParser
+                import re
+                headers={}
+                for filename in ('METADATA','WHEEL'):
+                    if metadata+filename not in names:raise SourceRejected('missing built wheel identity metadata')
+                    headers[filename]=BytesParser().parsebytes(z.read(metadata+filename))
+                normalize=lambda name:re.sub(r'[-_.]+','-',name).lower()
+                package=headers['METADATA'];tags=headers['WHEEL']
+                if (len(package.get_all('Name',[]))!=1 or len(package.get_all('Version',[]))!=1
+                        or normalize(package['Name'])!=normalize(self.profile.project_name)
+                        or package['Version']!=self.profile.project_version
+                        or tags.get_all('Root-Is-Purelib',[])!=['true']
+                        or tags.get_all('Wheel-Version',[])!=['1.0']
+                        or tags.get_all('Tag',[])!=['py3-none-any']):
+                    raise SourceRejected('built wheel project/version/platform identity mismatch')
                 for info,name in zip(infos,names):
-                    if name.startswith('click/'):
-                        value=z.read(info);actual['src/'+name]=value
-                    elif not name.startswith('click-8.3.3.dist-info/'):raise SourceRejected('unexpected wheel root')
-                expected={name:file.data for name,file in source.files.items() if name.startswith('src/click/')}
-                if actual!=expected:raise SourceRejected('built Click wheel differs from supplied source')
+                    if info.is_dir():continue
+                    matches=[m for m in self.profile.source_mappings if name==m.wheel or name.startswith(m.wheel+'/')]
+                    if matches:
+                        mapping=matches[0]
+                        actual[mapping.source+name[len(mapping.wheel):]]=z.read(info)
+                    elif not name.startswith(metadata):raise SourceRejected('unexpected wheel root')
+                expected={name:file.data for name,file in source.files.items() if any(
+                    name==m.source or name.startswith(m.source+'/') for m in self.profile.source_mappings)}
+                if actual!=expected:raise SourceRejected('built repository wheel differs from supplied source')
         except (zipfile.BadZipFile,ValueError,OSError) as exc:raise SourceRejected('invalid built wheel') from exc
         return data
     def build_snapshot(self,handle):
@@ -198,13 +210,13 @@ class EnvironmentRuntime:
         try:
             with s:
                 self.stage(s,source,recipe.dependencies)
-                for command in (DEPS,BUILD):
-                    r=s.execute(command,environment=ENV)
+                for command in self.profile.setup[:2]:
+                    r=s.execute(command,environment=self.profile.environment)
                     if r.reason!='exited' or r.exit_code!=0:
                         category='infrastructure' if command==DEPS or r.reason=='monitor_failure' else 'candidate'
                         reason='infrastructure_failure' if r.reason=='monitor_failure' else ('setup_failed' if command==DEPS else ('command_failed' if r.reason=='exited' else r.reason))
-                        raise StageFailure('offline '+('dependency setup' if command==DEPS else 'Click build')+' failed',reason,category)
-                command=CommandSpec(argv=('python','-I','-c',"import pathlib,sys;p=pathlib.Path('/workspace/built/click-8.3.3-py3-none-any.whl');data=p.read_bytes();assert len(data)<8388608;sys.stdout.buffer.write(data)"),working_directory='/workspace',timeout_seconds=5.0)
+                        raise StageFailure('offline '+('dependency setup' if command==DEPS else 'repository build')+' failed',reason,category)
+                command=CommandSpec(argv=('python','-I','-c',"import pathlib,sys;p=pathlib.Path(sys.argv[1]);data=p.read_bytes();assert len(data)<=int(sys.argv[2]);sys.stdout.buffer.write(data)",'/workspace/built/'+self.profile.wheel_filename,str(self.policy.max_source_bytes)),working_directory='/workspace',timeout_seconds=5.0)
                 r=s.execute(command,output_limit=self.policy.max_source_bytes)
                 if r.reason=='monitor_failure':raise DockerUnavailable('wheel capture monitor failed')
                 if r.reason!='exited' or r.exit_code!=0:raise SourceRejected('built wheel capture failed')
@@ -251,17 +263,17 @@ class EnvironmentRuntime:
         phase='development' if development else 'execute'
         s=self.engine.session(binding=self.binding(prepared,saved,phase,value),saved_source=saved.model_dump(mode='json'),cpu_seconds=request.remaining_cpu_seconds)
         start=time.monotonic();result=None;error=None;save_status='last_confirmed';next_saved=saved
-        environment=DEV_ENV if development else ENV
+        environment=self.profile.development_environment if development else self.profile.environment
         try:
             with s:
                 self.stage(s,source,recipe.dependencies,wheel=wheel)
-                for command in ((DEPS,) if development else (DEPS,INSTALL)):
+                for command in ((DEPS,) if development else (DEPS,self.profile.setup[2])):
                     r=s.execute(command,environment=environment)
                     if r.reason=='cpu_limit':raise CpuBudgetExceeded('CPU budget exhausted during offline execution setup')
                     if r.reason!='exited' or r.exit_code!=0:raise StageFailure('offline execution setup failed','infrastructure_failure' if r.reason=='monitor_failure' else 'setup_failed','infrastructure')
                 result=s.execute(request.command,request.stdin,environment=environment)
                 if result.reason=='exited' and request.save_source:
-                    captured=s.export_source();rules=AllowedChanges.model_validate_json(canonical_json(value['allowed_changes']))
+                    captured=s.export_source().without_pytest_cache(source);rules=AllowedChanges.model_validate_json(canonical_json(value['allowed_changes']))
                     captured.validate_changes(source,rules.source_roots,rules.forbidden_paths)
                     if captured.tree_sha256==source.tree_sha256:save_status='unchanged'
                     else:
@@ -272,7 +284,7 @@ class EnvironmentRuntime:
         elif result.reason=='monitor_failure':reason,category='infrastructure_failure','infrastructure'
         elif result.reason=='exited':reason,category=('command_failed','candidate') if result.exit_code else ('completed','none')
         else:reason,category=result.reason,'candidate'
-        evidence=self.evidence(s,phase,{'error':repr(error) if error else None,'reason':reason,'failure_category':category,'saved_source':next_saved.model_dump(mode='json'),'save_status':save_status,'import_policy':'current source first; no installed Click' if development else 'fresh exact-source wheel installed outside source','build_evidence':build.evidence.model_dump(mode='json') if build else None})
+        evidence=self.evidence(s,phase,{'error':repr(error) if error else None,'reason':reason,'failure_category':category,'saved_source':next_saved.model_dump(mode='json'),'save_status':save_status,'import_policy':'current source first; no installed target package' if development else 'fresh exact-source wheel installed outside source','build_evidence':build.evidence.model_dump(mode='json') if build else None})
         cost=CostRecord(category='execution',wall_seconds=time.monotonic()-start,cpu_seconds=s.maximum_cpu_seconds,gpu_seconds=None,input_tokens=None,output_tokens=None,human_minutes=None,usd=None,measurement='partial',note='CPU/memory maximum from Docker cgroup samples; wall includes setup/export/cleanup; no currency estimate')
         if error and not isinstance(error,Exception):raise error
         return ExecutionResult(operation_id=s.record.operation_id,reason=reason,failure_category=category,exit_code=result.exit_code if result else None,stdout=result.stdout if result else b'',stderr=result.stderr if result else b'',

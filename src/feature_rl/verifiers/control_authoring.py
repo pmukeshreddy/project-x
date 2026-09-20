@@ -102,7 +102,7 @@ def resolve_control_inputs(store, resolver, inputs, sources):
     sources = tuple(resolver.resolve(sources))
     contract = _artifact(store, inputs.contract, RequirementContract)
     expected = {ref for ref in contract.provenance.inputs if ref.kind in {
-        'authoring-request', 'source-archive', 'click-runtime-discovery'}} | set(contract.public_checks)
+        'authoring-request', 'source-archive', 'click-runtime-discovery', 'runtime-discovery'}} | set(contract.public_checks)
     if {source.source for source in sources} != expected or resolver.baseline != inputs.baseline or set(resolver.public_checks) != set(contract.public_checks):
         raise ValueError('control evidence differs from exact contract/B sources')
     requests = [source for source in sources if source.role == 'request']
@@ -269,11 +269,13 @@ class ControlAuthoringService(CheckerAuthoringService):
     def generate(self, candidates, inputs, sources, *, prior_journal_refs=(), recovered_result=None, recovered_error=None):
         inputs, sources, contract, _, _, contexts = resolve_control_inputs(self.store, self.resolver, inputs, sources)
         stage = GenerationStage.ALTERNATIVE_AUTHORING if inputs.category=='alternative_positive' else GenerationStage.CONTROL_AUTHORING
-        # Control identity/target/category and optional H are frozen across repair.
+        # Identity/target/category/B/environment and optional H remain frozen.
+        # Contract/scenario revisions may change, without resetting the journal.
         binding = inputs.model_dump(mode='json', exclude={'provenance', 'costs'})
         return run_authoring(self, candidates, stage=stage, schema=ControlProposal,
             contexts=contexts, ids=tuple(r.requirement_id for r in contract.requirements+contract.compatibility_obligations),
             binding=binding, inputs=inputs, sources=sources, prior_journal_refs=prior_journal_refs,
             recovered_result=recovered_result, recovered_error=recovered_error,
             prepare=lambda proposal, frozen: ControlFinalizer(store=self.store, resolver=self.resolver).prepare(proposal, frozen, sources),
-            journal_kind='control-authoring-journal', pending_type=ControlPublicationPending)
+            journal_kind='control-authoring-journal', pending_type=ControlPublicationPending,
+            repairable_binding_fields=('contract', 'scenario_plan'))

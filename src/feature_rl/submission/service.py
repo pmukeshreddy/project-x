@@ -24,7 +24,7 @@ class SubmissionService:
         return self.store.put_bytes(canonical_json(value.model_dump(mode='json')),'m4-submission',Visibility.PRIVATE)
 
     def from_saved(self,baseline,saved_source,allowed_changes):
-        old=self.source(baseline);new=self.source(saved_source)
+        old=self.source(baseline);new=self.source(saved_source).without_pytest_cache(old)
         changes={k:v for k,v in new.files.items() if old.files.get(k)!=v}
         deletions=tuple(sorted(old.files.keys()-new.files.keys()))
         return self.create(baseline,SourceArchive(changes).to_tar(),deletions,allowed_changes)

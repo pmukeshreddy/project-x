@@ -1,5 +1,7 @@
 """Grounded requirement-contract proposal and finalization APIs."""
 
+from .runtime_discovery import RuntimeDiscoveryService, RuntimeDiscoveryObservation, RuntimeDiscoveryResult
+
 from .finalize import ContractFinalizer, GroundingError, validate_link
 from .evidence import AuthoringEvidenceResolver, EvidenceResolutionError
 from .discovery import (
@@ -41,6 +43,9 @@ __all__ = [
     "ClickDiscoveryObservation",
     "ClickDiscoveryResult",
     "ClickDiscoveryService",
+    "RuntimeDiscoveryService",
+    "RuntimeDiscoveryObservation",
+    "RuntimeDiscoveryResult",
     "ContractAuthoringResult",
     "ContractAuthoringService",
     "ContractFinalizationInputs",

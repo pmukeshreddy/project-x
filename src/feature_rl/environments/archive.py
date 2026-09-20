@@ -29,6 +29,24 @@ class SourceFile:
 class SourceArchive:
     files: dict[str,SourceFile]
 
+    def without_pytest_cache(self, baseline):
+        """Drop only new, ordinary pytest metadata, never tracked source changes.
+
+        Link/device rejection and byte/count bounds happen before this projection.
+        Existing baseline files, executable files and unknown cache payloads stay
+        in the delta so the ordinary change policy still rejects them.
+        """
+        metadata = {'.gitignore', 'CACHEDIR.TAG', 'README.md',
+                    'v/cache/nodeids', 'v/cache/lastfailed', 'v/cache/stepwise'}
+        def transient(name, entry):
+            parts = name.split('/')
+            if name in baseline.files or entry.executable or '.pytest_cache' not in parts:
+                return False
+            index = parts.index('.pytest_cache')
+            return '/'.join(parts[index+1:]) in metadata
+        return SourceArchive({name: entry for name, entry in self.files.items()
+                              if not transient(name, entry)})
+
     @classmethod
     def read(cls,data: bytes,policy: SandboxPolicy):
         if type(data) is not bytes or len(data)>policy.max_archive_bytes:
@@ -73,5 +91,6 @@ class SourceArchive:
         if not roots:raise SourceRejected('source change roots required')
         for name in set(self.files)|set(baseline.files):
             if self.files.get(name)==baseline.files.get(name):continue
+            if '.pytest_cache' in name.split('/'):raise SourceRejected('unauthorized pytest cache change: '+name)
             if not any(name==r or name.startswith(r+'/') for r in roots):raise SourceRejected('change outside allowed source roots: '+name)
             if any(name==r or name.startswith(r+'/') for r in forbidden):raise SourceRejected('forbidden source change: '+name)

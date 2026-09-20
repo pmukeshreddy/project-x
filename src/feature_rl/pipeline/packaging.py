@@ -9,7 +9,7 @@ from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl import contracts as c
 from feature_rl.environments import SourceArchive, SourceFile, SandboxPolicy
 from feature_rl.environments.archive import safe_path
-from feature_rl.environments.runtime import WHEELS, DEPS, BUILD, INSTALL, ENV, DEV_ENV, REPAIR, EnvironmentRuntime
+from feature_rl.environments.profiles import runtime_profile, validate_recipe_profile
 from .models import BuildInputs, BuildRejected, InventoryEntry, SolverInventory
 
 MAX_DOCUMENT = 1024 * 1024
@@ -106,34 +106,13 @@ def resolve(store, inputs):
             or allowed.dependency_artifacts or allowed.additional_artifact_types
             or verifier.permissions.controller_role != c.ActorRole.CONTROLLER):
         raise BuildRejected('unsupported submission/controller policy')
-    for path in (*allowed.source_roots, *allowed.forbidden_paths):
+    for path in allowed.source_roots:
         source_path(path)
-    if any(path != 'src' and not path.startswith('src/') for path in allowed.source_roots):
-        raise BuildRejected('supported change roots must be beneath src')
-    if (inputs.environment.policy not in recipe.provenance.inputs or recipe.image_digest != policy.image
-            or policy.image != REPAIR['image_manifest'] or recipe.interpreter_version != '3.12.14'
-            or recipe.services or recipe.network_policy != 'none'
-            or recipe.setup != (DEPS, BUILD, INSTALL) or recipe.reset != recipe.setup
-            or tuple((item.name, item.value) for item in recipe.environment) != ENV
-            or recipe.locale != 'C.UTF-8' or recipe.timezone != 'UTC'
-            or recipe.randomness != c.SeedPolicy(algorithm='PYTHONHASHSEED', seeds=(0,), same_cases_within_group=True)):
-        raise BuildRejected('unsupported pinned M3 runtime recipe')
-    if len(recipe.neutral_repairs) != 1 or read_bytes(store, recipe.neutral_repairs[0].patch, 16384, kind='neutral-environment-repair') != canonical_json(REPAIR):
-        raise BuildRejected('unapproved neutral image repair')
-    for field in ('cpu_seconds', 'memory_bytes', 'pids', 'disk_bytes', 'output_bytes'):
-        if getattr(recipe.limits, field) != getattr(policy, field):
-            raise BuildRejected('runtime resource policy drift')
-    if recipe.limits.wall_seconds != policy.lifecycle_seconds:
-        raise BuildRejected('runtime wall policy drift')
-    if len(recipe.dependencies) != len(WHEELS) or {pin.name for pin in recipe.dependencies} != set(WHEELS):
-        raise BuildRejected('exact approved dependency pins required')
-    total = 0
-    for pin in recipe.dependencies:
-        version, _, digest = WHEELS[pin.name]
-        data = read_bytes(store, pin.artifact, 2 * 1024 * 1024, kind='dependency-wheel')
-        total += len(data)
-        if pin.version != version or pin.sha256 != digest or hashlib.sha256(data).hexdigest() != digest or total > policy.max_staging_bytes:
-            raise BuildRejected('dependency raw bytes/pin mismatch')
+    profile = runtime_profile(policy)
+    profile.validate_allowed_changes(allowed)
+    if inputs.environment.policy not in recipe.provenance.inputs:
+        raise BuildRejected('runtime recipe omits its exact policy')
+    validate_recipe_profile(recipe, policy, store)
     raw = read_bytes(store, pair.baseline, policy.max_archive_bytes, kind='source-archive')
     source = SourceArchive.read(raw, policy)
     # M3 bounds and rejects links; additionally reject ambiguous regular-file names
@@ -149,7 +128,7 @@ def resolve(store, inputs):
         source_path(name)
     if len({name.casefold() for name in allowlist}) != len(allowlist):
         raise BuildRejected('case-colliding source paths')
-    EnvironmentRuntime.validate_click_manifest(source)
+    profile.validate_source(source)
     read_bytes(store, pair.reference, policy.max_archive_bytes, kind='source-archive')
     dependencies = tuple(dict.fromkeys((inputs.source_pair, pair.candidate, inputs.contract, inputs.scenario_plan,
         inputs.verifier, inputs.environment.recipe, inputs.environment.policy, pair.baseline, pair.reference)))
@@ -171,9 +150,14 @@ def public_values(store, resolved):
         'dependencies': [{'name': p.name, 'version': p.version, 'sha256': p.sha256} for p in recipe.dependencies],
         'setup': [document(command) for command in recipe.setup], 'reset': [document(command) for command in recipe.reset],
         'environment': [document(item) for item in recipe.environment],
-        'development_environment': [{'name': key, 'value': value} for key, value in DEV_ENV],
+        'development_environment': [{'name': key, 'value': value} for key, value in runtime_profile(resolved.policy).development_environment],
         'limits': document(recipe.limits), 'locale': recipe.locale, 'timezone': recipe.timezone,
         'randomness': document(recipe.randomness), 'network_policy': recipe.network_policy}
+    # Legacy policies retain the exact public bytes of their frozen packages.
+    # New profiles disclose their full safe runtime contract and platform.
+    if resolved.policy.profile is not None:
+        runtime.update(profile=resolved.policy.profile.model_dump(mode='json', exclude={'neutral_repairs'}),
+                       platform=resolved.policy.platform)
     checks = tuple(dict.fromkeys((*contract.public_checks, *resolved.verifier.public_examples)))
     if len(checks) > 64:
         raise BuildRejected('public-check count limit')

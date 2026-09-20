@@ -160,7 +160,7 @@ class GenerationRequest(StrictModel):
                 elif item.role == "baseline":
                     baselines += 1
                     valid = (
-                        item.source.kind in {"source-archive", "click-runtime-discovery"}
+                        item.source.kind in {"source-archive", "click-runtime-discovery", "runtime-discovery"}
                         and item.source.encoding == "bytes"
                         and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
                     )
@@ -209,7 +209,7 @@ class GenerationRequest(StrictModel):
                 elif item.role == "baseline":
                     baselines += 1
                     valid = (
-                        item.source.kind in {"source-archive", "click-runtime-discovery"}
+                        item.source.kind in {"source-archive", "click-runtime-discovery", "runtime-discovery"}
                         and item.source.encoding == "bytes"
                         and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
                     )

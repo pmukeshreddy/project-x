@@ -1,10 +1,13 @@
 """Validation of immutable evaluation rosters and preregistrations."""
 from __future__ import annotations
 
+import hashlib
+
 from feature_rl import contracts as c
+from feature_rl.artifacts import canonical_json
 from feature_rl.splits import Relation, SplitConflict, SplitPlanner
 
-from .models import EvaluationPreregistration, FrozenRoster
+from .models import EvaluationPreregistration, FrozenRoster, TrialAssignment
 
 
 class FrozenStudyError(ValueError):
@@ -17,6 +20,23 @@ class LineageLeakage(FrozenStudyError):
 
 def _ref_key(ref: c.ArtifactRef) -> tuple[str, int, str]:
     return ref.sha256, ref.schema_version, ref.kind
+
+
+def episode_sampling_seed(
+    preregistration: EvaluationPreregistration,
+    assignment: TrialAssignment,
+) -> int:
+    """Return the actual policy seed while retaining pass@1 seed semantics."""
+    if preregistration.metric == "pass_at_1":
+        return assignment.policy_seed
+    payload = canonical_json((
+        "m8-best-of-k-episode-seed-v1",
+        preregistration.seeds.algorithm,
+        assignment.policy_seed,
+        _ref_key(assignment.task),
+        assignment.episode_index,
+    ))
+    return int(hashlib.sha256(payload).hexdigest()[:15], 16)
 
 
 def validate_lineage_freeze(roster: FrozenRoster) -> FrozenRoster:
@@ -121,6 +141,18 @@ def validate_preregistration(
     }
     if actual != expected or len(actual) != len(preregistration.trials):
         raise FrozenStudyError("assigned trial roster is not the complete frozen Cartesian product")
+
+    if preregistration.metric == "best_of_k":
+        cells = {
+            (_ref_key(trial.task), trial.policy_seed, trial.episode_index): trial
+            for trial in preregistration.trials
+        }
+        sampling_seeds = {
+            key: episode_sampling_seed(preregistration, trial)
+            for key, trial in cells.items()
+        }
+        if len(set(sampling_seeds.values())) != len(sampling_seeds):
+            raise FrozenStudyError("best-of-k episode sampling seed collision")
 
     case_seeds: dict[tuple[tuple[str, int, str], int, int], set[int]] = {}
     for trial in preregistration.trials:

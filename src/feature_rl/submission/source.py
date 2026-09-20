@@ -17,9 +17,10 @@ class Submission(StrictModel):
 
 def change_path(path,rules):
     if safe_path(path)!=path:raise SourceRejected('ambiguous source path')
+    if '.pytest_cache' in path.split('/'):raise SourceRejected('unauthorized pytest cache change')
     if not any(path==r or path.startswith(r+'/') for r in rules.source_roots):raise SourceRejected('outside source roots')
     if any(path==r or path.startswith(r+'/') for r in rules.forbidden_paths):raise SourceRejected('forbidden path')
-    # Reviewed Click profile only supports Python source; caches, packages, tests,
+    # Python runtime profiles transfer source only; caches, packages, tests,
     # arbitrary binary artifacts and replacement controller files are not transfers.
     if not path.endswith('.py'):raise SourceRejected('only Python source changes supported')
 
@@ -31,14 +32,15 @@ def validate_rules(rules):
     if len(set(rules.source_roots))!=len(rules.source_roots):raise SourceRejected('duplicate roots')
     for path in (*rules.source_roots,*rules.forbidden_paths):
         if safe_path(path)!=path:raise SourceRejected('ambiguous rule path')
-    if any(r!='src' and not r.startswith('src/') for r in rules.source_roots):raise SourceRejected('unsupported source root')
     return rules
 
 
 def apply_delta(baseline,archive,deletions,rules,policy):
     rules=validate_rules(rules)
+    from feature_rl.environments.profiles import runtime_profile
+    runtime_profile(policy).validate_allowed_changes(rules)
     if type(deletions) is not tuple or len(deletions)>policy.max_files:raise SourceRejected('deletion count/type')
-    changes=SourceArchive.read(archive,policy)
+    changes=SourceArchive.read(archive,policy).without_pytest_cache(baseline)
     # M3 accepts benign baseline directory entries. A submission is a strict file
     # delta: directory aliases or trailing-slash regular files are ambiguous.
     with tarfile.open(fileobj=io.BytesIO(archive),mode='r:') as stream:

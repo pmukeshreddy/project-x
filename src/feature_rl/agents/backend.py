@@ -62,7 +62,8 @@ class SkyRLTokenBackend(PolicyBackend):
     """
     def __init__(self, *, tokenizer_directory: Path, tokenizer_sha256: str,
                  endpoint: str, model_name: str, barrier: PolicyBarrier,
-                 max_seq_len: int, response_bytes: int = 4*1024*1024):
+                 max_seq_len: int, response_bytes: int = 4*1024*1024,
+                 adapter_name: str | None = None):
         from transformers import AutoTokenizer
         root=Path(tokenizer_directory)
         if root.is_symlink() or not root.is_dir(): raise ValueError('trusted local tokenizer directory required')
@@ -91,6 +92,9 @@ class SkyRLTokenBackend(PolicyBackend):
         self.template_digest=hashlib.sha256(self.tokenizer.chat_template.encode()).hexdigest()
         self.vocab_size=len(self.tokenizer);self.max_seq_len=max_seq_len
         self.endpoint=endpoint.rstrip('/');self.model_name=model_name;self.barrier=barrier;self.response_bytes=response_bytes
+        if adapter_name not in (None,'skyrl-lora'):
+            raise ValueError('Only the pinned single-policy SkyRL adapter alias is supported')
+        self.inference_model=adapter_name or model_name
 
     def verify_policy(self, policy):
         if (policy.harness_version!=HARNESS or policy.identity.provider!='skyrl'
@@ -113,7 +117,7 @@ class SkyRLTokenBackend(PolicyBackend):
         self.verify_policy(policy)
         if timeout<=0 or not context or max_tokens<=0 or len(context)+max_tokens>self.max_seq_len:
             raise InvalidGeneration('generation exceeds explicit context/budget')
-        payload={'model':self.model_name,'token_ids':list(context),'cache_salt':policy.policy_version,
+        payload={'model':self.inference_model,'token_ids':list(context),'cache_salt':policy.policy_version,
             'sampling_params':{'n':1,'temperature':policy.temperature,'top_p':policy.top_p,'top_k':-1,
                 'seed':policy.seed,'max_tokens':max_tokens,'logprobs':0}}
         request=Request(self.endpoint+'/inference/v1/generate',data=canonical_json(payload),

@@ -13,14 +13,14 @@ from typing import Annotated,Literal
 from pydantic import BaseModel,Field,TypeAdapter
 from feature_rl import contracts as c
 from feature_rl.artifacts import canonical_json
-from feature_rl.pipeline import BuildInputs,AuthoringCall
+from feature_rl.pipeline import BuildInputs,AuthoringCall,FeatureWorkflowRequest
 from feature_rl.pipeline.configuration import CLIConfiguration, ConfigurationRequired, compose
 from feature_rl.qualification import QualificationPolicy
 from feature_rl.qualification.evidence import unknown_cost
 from feature_rl.registry import Claim
 
 MAX_INPUT=1024*1024
-SERVICES=('factory','grade','qualification','lifecycle','run','evaluate','audit')
+SERVICES=('factory','workflow','grade','qualification','lifecycle','run','evaluate','audit')
 
 
 class RetainedClaim(c.StrictModel):
@@ -37,7 +37,7 @@ class RetainedFactoryState(c.StrictModel):
     payload: RetainedBytes
     sha256: c.Digest
     kind: Literal['m6-source-disposition','m6-construction-result','m6-authoring-receipt',
-        'm6-frozen-grade','m6-pending-grade-result']
+        'm6-frozen-grade','m6-pending-grade-result','m6-feature-step','m6-feature-outcome']
 
 
 class RetainedFactoryError(c.StrictModel):
@@ -79,6 +79,8 @@ def parser():
     root.add_argument('--config',help='strict local CLIConfiguration JSON; config-schema prints its schema')
     commands=root.add_subparsers(dest='command',required=True)
     commands.add_parser('config-schema',help='print the strict composition schema without opening state or a runtime')
+    automatic=commands.add_parser('construct-feature',help='cached PR intake, real environment discovery, bounded M2/M4 authoring and immutable BUILT construction')
+    automatic.add_argument('--request',required=True,help='strict FeatureWorkflowRequest JSON; pinned local inputs and budgets are in configuration.workflow')
     for name,help_text in (
         ('screen-source','retain actual CandidateRecord screening/license outcome and original costs'),
         ('construct','build from actual supplied BuildInputs; missing inputs remain a selected blocked outcome'),
@@ -182,7 +184,8 @@ def _composition(args):
     service=args.service if args.command in ('recover','retry-publication') else args.command
     return {'runtime':service=='grade','qualification':service in ('qualify','accept','release','resolve','qualification','lifecycle'),
         'authoring':args.command in ('author','import-authoring'),
-        'native_operation':service if service in ('run','train','evaluate') else None,'audit':service=='audit'}
+        'native_operation':service if service in ('run','train','evaluate') else None,'audit':service=='audit',
+        'workflow':service in ('construct-feature','workflow')}
 
 
 def _factory_receipt(value):
@@ -198,14 +201,16 @@ def main(argv=None):
     args=parser().parse_args(argv)
     if args.command=='config-schema':
         _emit(CLIConfiguration.model_json_schema(),None);return 0
-    operation={'screen-source':'construct','author':'construct','import-authoring':'construct',
+    operation={'screen-source':'construct','construct-feature':'construct','author':'construct','import-authoring':'construct',
         'accept':'qualify','resolve':'release','recover':'construct','retry-publication':'construct'}.get(args.command,args.command)
     try:
         if args.config is None:raise ConfigurationRequired('--config is required for actual operations')
         config=read_json(args.config,CLIConfiguration)
         # Validate all supplied request bytes before any state or runtime is opened.
         inputs=policy=report=attestation=call=resume=None;journals=demonstrations=()
-        if args.command in ('screen-source','construct','author','import-authoring'):
+        if args.command=='construct-feature':
+            request=read_json(args.request,FeatureWorkflowRequest)
+        elif args.command in ('screen-source','construct','author','import-authoring'):
             request=read_json(args.request,c.ConstructRequest)
             if args.command=='construct' and args.inputs:inputs=read_json(args.inputs,BuildInputs)
             if args.command in ('author','import-authoring'):call=read_json(args.call,AuthoringCall)
@@ -237,6 +242,7 @@ def main(argv=None):
             operation=factory.registry.job(claim.job_id).spec.operation
         def dispatch():
             if args.command=='screen-source':return factory.screen_source(request.candidate)
+            if args.command=='construct-feature':return factory.construct_feature(request)
             if args.command=='construct':return factory.construct(request.candidate,inputs=inputs)
             if args.command=='author':return factory.author(request.candidate,call=call)
             if args.command=='import-authoring':return factory.import_rejected_authoring(request.candidate,call=call,journal_refs=journals)

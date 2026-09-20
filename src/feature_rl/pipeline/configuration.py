@@ -15,6 +15,7 @@ from .factory import Factory
 from .lifecycle import TaskLifecycle
 from .resolver import ReleasedTaskResolver
 from .authoring_models import AuthoringSettings
+from .workflow_models import FeatureWorkflowSettings
 from feature_rl.training.native import NativeSettings
 
 
@@ -79,6 +80,7 @@ class CLIConfiguration(LocalPaths):
     runtime: RuntimeConfiguration | None = None
     qualification: QualificationSettings | None = None
     authoring: AuthoringSettings | None = None
+    workflow: FeatureWorkflowSettings | None = None
     native: NativeConfiguration | None = None
     evaluation: EvaluationSettings | None = None
     audit: AuditSettings | None = None
@@ -97,7 +99,7 @@ class Application:
 
 
 def compose(config: CLIConfiguration, *, runtime=False, qualification=False, authoring=False,
-            native_operation: Literal['run','train','evaluate'] | None=None, audit=False) -> Application:
+            native_operation: Literal['run','train','evaluate'] | None=None, audit=False, workflow=False) -> Application:
     """Create real services, qualifying the M3 boundary only when requested.
 
     Source and complete-artifact construction require neither a daemon nor model.
@@ -108,6 +110,9 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
         raise TypeError('validated CLIConfiguration required')
     if native_operation not in (None,'run','train','evaluate'):raise ValueError('unknown native operation')
     if authoring and config.authoring is None:raise ConfigurationRequired('actual M2/M4 authoring settings and frozen batch budget are required')
+    if workflow:
+        if config.workflow is None:raise ConfigurationRequired('automatic construction requires pinned intake, runtime and bounded authoring settings')
+        runtime=True
     if native_operation is not None:
         if config.native is None:raise ConfigurationRequired('actual inert M7 native settings are required')
         if native_operation in ('run','evaluate') and config.native.bootstrap is None:
@@ -143,6 +148,9 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
         resolver=ReleasedTaskResolver(profiles=(lifecycle,),revision=config.revision)
     factory=Factory(store=store,registry=registry,revision=config.revision,builder=builder,qualification=q,
         authoring=config.authoring,grading=grader)
+    if workflow:
+        from .workflow import FeatureWorkflow
+        factory.feature_workflow=FeatureWorkflow(factory=factory,runtime=actual_runtime,settings=config.workflow)
     if native_operation is not None:
         settings=config.native
         shared=dict(store=store,registry=registry,lifecycle=resolver,builder=builder,runtime=actual_runtime,grader=grader)

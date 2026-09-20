@@ -2,9 +2,10 @@
 from .models import PolicyRejected
 
 BOUNDARY_CODE = r'''
-import ctypes,json,os,pathlib,socket,subprocess,time
+import ctypes,json,os,pathlib,platform,socket,subprocess,time
 p=pathlib.Path
 out={"uid":os.getuid(),"gid":os.getgid()}
+out['interpreter_version']=platform.python_version()
 status=dict(line.split(':',1) for line in p('/proc/self/status').read_text().splitlines() if ':' in line)
 out['seccomp']=int(status['Seccomp']);out['no_new_privs']=int(status['NoNewPrivs']);out['caps']=[int(status[n],16) for n in ['CapInh','CapPrm','CapEff','CapBnd','CapAmb']]
 for n in ['memory.max','memory.swap.max','pids.max'] :out[n]=int(p('/sys/fs/cgroup/'+n).read_text())
@@ -17,7 +18,7 @@ out['cgroup_write_errno']=errno_of(lambda:p('/sys/fs/cgroup/pids.max').write_tex
 out['setuid_errno']=errno_of(lambda:os.setuid(0))
 libc=ctypes.CDLL(None,use_errno=True)
 ctypes.set_errno(0);r=libc.ptrace(0,0,None,None);out['ptrace_errno']=ctypes.get_errno() if r==-1 else 0
-ctypes.set_errno(0);r=libc.syscall(97,0x10000000);out['unshare_errno']=ctypes.get_errno() if r==-1 else 0
+ctypes.set_errno(0);r=libc.unshare(0x10000000);out['unshare_errno']=ctypes.get_errno() if r==-1 else 0
 for name,family,address in [('ipv4_errno',socket.AF_INET,('1.1.1.1',443)),('ipv6_errno',socket.AF_INET6,('2606:4700:4700::1111',443))]:
  s=socket.socket(family);s.settimeout(.5);out[name]=errno_of(lambda:s.connect(address));s.close()
 for fam in [38,40]:out['socket_'+str(fam)+'_errno']=errno_of(lambda:socket.socket(fam,socket.SOCK_STREAM))
@@ -54,12 +55,14 @@ print(json.dumps(out,sort_keys=True))
 '''
 
 def check_boundary(obs,policy):
+    from .profiles import runtime_profile
     expected={'uid':65534,'gid':65534,'seccomp':2,'no_new_privs':1,'caps':[0,0,0,0,0],
         'memory.max':policy.memory_bytes,'memory.swap.max':0,'pids.max':policy.pids,
         'cpu.max':f'{int(policy.cpus*100000)} 100000','root_write_errno':30,'cgroup_write_errno':30,
         'setuid_errno':1,'ptrace_errno':1,'unshare_errno':1,'ipv4_errno':101,'ipv6_errno':101,
         'socket_38_errno':1,'socket_40_errno':1,'dns_udp_errno':101,'host_socket_present':False,'host_users_present':False,
         'noexec_errno':13,'fork_errno':11,'/workspace_disk_errno':28,'/tmp_disk_errno':28,'/dev/shm_disk_errno':28}
+    expected['interpreter_version']=runtime_profile(policy).interpreter_version
     for key,value in expected.items():
         if type(obs.get(key)) is not type(value) or obs[key]!=value:raise PolicyRejected('boundary observation missing/mismatch: '+key)
     if obs.get('memory_oom_delta',0)<1 or obs.get('memory_child_exit',0)==0:raise PolicyRejected('memory denial not observed')

@@ -7,7 +7,7 @@ from typing import Literal
 from feature_rl.artifacts import ArtifactStore
 from feature_rl.contracts import ActorRole, ArtifactRef
 
-from .discovery import ClickDiscoveryObservation
+from .runtime_discovery import parse_discovery, discovery_locator
 from .models import GroundedSource
 from .retrieval import BaselineRetriever, RetrievalPolicy, RetrievalRequest
 
@@ -62,7 +62,7 @@ class AuthoringEvidenceResolver:
         if self.baseline.kind != "source-archive" or self.baseline.encoding != "bytes":
             raise EvidenceResolutionError("exact baseline source archive is required")
         if (
-            self.runtime_discovery.kind != "click-runtime-discovery"
+            self.runtime_discovery.kind not in {"click-runtime-discovery", "runtime-discovery"}
             or self.runtime_discovery.encoding != "bytes"
         ):
             raise EvidenceResolutionError("exact validated runtime discovery is required")
@@ -118,7 +118,7 @@ class AuthoringEvidenceResolver:
             elif source.source == self.runtime_discovery:
                 text = self._read(self.runtime_discovery, 128 * 1024).decode()
                 try:
-                    discovery = ClickDiscoveryObservation.model_validate_json(text)
+                    discovery = parse_discovery(self.runtime_discovery, text)
                 except ValueError as error:
                     raise EvidenceResolutionError("stored runtime discovery is invalid") from error
                 if discovery.baseline != self.baseline:
@@ -127,7 +127,7 @@ class AuthoringEvidenceResolver:
                     context_id=source.context_id,
                     role="baseline",
                     source=self.runtime_discovery,
-                    locator="m3:click-runtime-discovery-v1",
+                    locator=discovery_locator(self.runtime_discovery),
                     text=text,
                     provenance_label="existing_obligation",
                 )

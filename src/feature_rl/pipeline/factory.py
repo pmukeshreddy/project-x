@@ -76,7 +76,8 @@ def source_decision(candidate):
 
 class Factory:
     def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None, qualification=None,
-                 authoring=None, grading=None, native_run=None, training=None, evaluation=None, audit=None):
+                 authoring=None, grading=None, native_run=None, training=None, evaluation=None, audit=None,
+                 feature_workflow=None):
         if (not isinstance(store, ArtifactStore) or store.role != c.ActorRole.CONTROLLER
                 or not isinstance(registry, Registry) or registry.store is not store):
             raise TypeError('Factory requires the same actual controller store and Registry')
@@ -99,6 +100,7 @@ class Factory:
             raise TypeError('Factory grading must use the actual same-store M4 service')
         self.grading=grading
         self.native_run,self.training,self.evaluation,self.audit_service=native_run,training,evaluation,audit
+        self.feature_workflow=feature_workflow
         self.source_configuration = store.put_bytes(self._source_policy(revision),
             'm6-source-policy', c.Visibility.PRIVATE)
         registry.register(self.source_configuration)
@@ -106,6 +108,11 @@ class Factory:
     def construct(self, candidate: c.ArtifactRef, *, inputs: BuildInputs | None=None) -> c.OperationResult:
         from .construction import construct
         return construct(self,candidate,inputs)
+
+    def construct_feature(self, request) -> c.OperationResult:
+        """Run cached intake, actual runtime discovery and bounded authoring to BUILT."""
+        from .workflow import FeatureWorkflow
+        return self._execution_service('feature_workflow',FeatureWorkflow).construct(request)
 
     def author(self, candidate: c.ArtifactRef, *, call) -> c.OperationResult:
         from .authoring import author
@@ -305,6 +312,9 @@ class Factory:
         job = self.registry.job(claim.job_id)
         if not any(item.claim==claim for item in self.registry.attempts(job.job_id)):
             raise ValueError('recovery requires an actual selected Registry claim')
+        if job.spec.invocation=='m6-feature':
+            from .workflow import FeatureWorkflow
+            return self._execution_service('feature_workflow',FeatureWorkflow).recover(claim)
         if job.spec.configuration.kind=='m7-native-run-configuration':
             from feature_rl.agents.native_service import NativeRunService
             return self._execution_service('native_run',NativeRunService).recover(claim)
@@ -351,6 +361,9 @@ class Factory:
         if (type(pending) is not FactoryPublicationFailed or type(pending.payload) is not bytes
                 or hashlib.sha256(pending.payload).hexdigest()!=pending.sha256):
             raise ValueError('invalid retained Factory source publication')
+        if pending.kind in ('m6-feature-step','m6-feature-outcome'):
+            from .workflow import FeatureWorkflow
+            return self._execution_service('feature_workflow',FeatureWorkflow).retry_publication(pending)
         if pending.kind=='m6-construction-result':
             from .construction import publish
             return publish(self,pending.payload,pending.claim)

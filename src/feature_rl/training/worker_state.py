@@ -4,6 +4,28 @@ import math
 from feature_rl.artifacts import canonical_json
 
 
+def trainable_binding(model, optimizer, *, lora, trim_optimizer=False):
+    """Bind PEFT's actual gradient mask and the optimizer's parameter ownership."""
+    parameters=dict(model.named_parameters())
+    trainable={name:param for name,param in parameters.items() if param.requires_grad}
+    if not trainable or optimizer is None:
+        raise ValueError('Native policy requires trainable parameters and its optimizer')
+    if lora:
+        if len(trainable)==len(parameters) or any(
+                not any(part.startswith('lora_') for part in name.split('.')) for name in trainable):
+            raise ValueError('LoRA policy must freeze the base and train only adapter parameters')
+    expected={id(param) for param in trainable.values()}
+    if trim_optimizer:
+        if optimizer.state:
+            raise ValueError('Optimizer masking is allowed only before its first update')
+        for group in optimizer.param_groups:
+            group['params']=[param for param in group['params'] if param.requires_grad]
+    actual=[id(param) for group in optimizer.param_groups for param in group['params']]
+    if len(actual)!=len(set(actual)) or set(actual)!=expected:
+        raise ValueError('Optimizer parameters differ from the exact native trainable mask')
+    return {name:{'shape':list(param.shape),'dtype':str(param.dtype)} for name,param in trainable.items()}
+
+
 def tensor_witness(tensor):
     """Hash exact local tensor bytes including BF16, independent of checkpoint layout."""
     value=tensor.detach()

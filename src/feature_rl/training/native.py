@@ -46,6 +46,18 @@ def read_activation(store,ref):
     return read_local(store,ref,ActivationReceipt,'m7-native-activation',4*1024*1024)
 
 
+class LoRASettings(c.StrictModel):
+    enabled: bool = True
+    rank: Literal[8,16,32,64] = 16
+    alpha: Annotated[int,Field(gt=0,le=4096)] = 32
+    dropout: Annotated[float,Field(ge=0,lt=1)] = 0.0
+    target_modules: Annotated[str,Field(min_length=1,max_length=4096)] = 'all-linear'
+    exclude_modules: Annotated[str,Field(min_length=1,max_length=4096)] | None = None
+    # Use the pinned FSDP wrapper's default zero-update initialization, so the
+    # initial adapter represents the same frozen base policy before training.
+    init_method: Literal['kaiming'] = 'kaiming'
+
+
 class NativeSettings(c.StrictModel):
     version: Literal['m7-native-settings-v1']='m7-native-settings-v1'
     skyrl_checkout: str
@@ -65,6 +77,7 @@ class NativeSettings(c.StrictModel):
     probe_timeout_seconds: Annotated[float,Field(gt=0,le=120)]=60.
     max_groups: Annotated[int,Field(ge=1,le=100000)]=64
     max_wall_seconds: Annotated[float,Field(gt=0,le=604800)]=3600.
+    lora: LoRASettings = Field(default_factory=LoRASettings)
 
     @model_validator(mode='after')
     def paths_and_batches(self):
@@ -80,6 +93,8 @@ def native_overrides(settings:NativeSettings,config:c.TrainingConfig):
     """Closed overrides of actual pinned dataclass fields; no arbitrary plugins/commands."""
     if config.group_size!=4 or config.initial_policy.temperature!=1. or config.initial_policy.top_p!=1.:
         raise ValueError('Four episodes and unit-temperature/full-support native training required')
+    if config.algorithm=='grpo' and settings.lora.enabled and settings.lora.dropout!=0:
+        raise ValueError('GRPO requires zero LoRA dropout for inference/training probability alignment')
     work=Path(settings.work_directory)
     return {
         'trainer.strategy':'fsdp','trainer.policy.model.path':settings.model_directory,
@@ -87,7 +102,15 @@ def native_overrides(settings:NativeSettings,config:c.TrainingConfig):
         'trainer.policy.optimizer_config.lr':config.learning_rate,
         'trainer.policy.optimizer_config.scheduler':'constant_with_warmup',
         'trainer.policy.optimizer_config.num_warmup_steps':0,
-        'trainer.policy.model.lora.rank':0,
+        'trainer.policy.model.lora.rank':settings.lora.rank if settings.lora.enabled else 0,
+        'trainer.policy.model.lora.alpha':settings.lora.alpha,
+        'trainer.policy.model.lora.dropout':settings.lora.dropout,
+        'trainer.policy.model.lora.target_modules':settings.lora.target_modules,
+        'trainer.policy.model.lora.exclude_modules':settings.lora.exclude_modules,
+        'trainer.policy.model.lora.init_method':settings.lora.init_method,
+        'trainer.policy.model.lora.lora_sync_path':str(work/'lora-sync'),
+        'trainer.policy.model.lora.max_loras':1,
+        'trainer.ref.model.lora.rank':0,
         'trainer.placement.colocate_all':True,
         'trainer.placement.policy_num_nodes':1,'trainer.placement.ref_num_nodes':1,
         'trainer.placement.policy_num_gpus_per_node':settings.num_gpus,
@@ -128,7 +151,7 @@ def native_overrides(settings:NativeSettings,config:c.TrainingConfig):
         'generator.inference_engine.tensor_parallel_size':settings.num_gpus,
         'generator.inference_engine.served_model_name':config.initial_policy.identity.model,
         'generator.inference_engine.enable_ray_prometheus_stats':False,
-        'generator.inference_engine.enforce_eager':True,
+        'generator.inference_engine.enforce_eager':not settings.lora.enabled,
         'generator.inference_engine.engine_init_kwargs.max_model_len':settings.max_seq_len,
     }
 
@@ -190,6 +213,8 @@ class NativeSession:
         _trusted_model(settings.tokenizer_directory)
         Path(settings.work_directory).mkdir(mode=0o700,parents=True,exist_ok=True)
         require_private_tree(Path(settings.work_directory))
+        if settings.lora.enabled:
+            (Path(settings.work_directory)/'lora-sync').mkdir(mode=0o700,exist_ok=True)
         checkout=Path(settings.skyrl_checkout)
         head=subprocess.run(['git','-C',str(checkout),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
         if head!=PINNED_SKYRL: raise ValueError('Exact SkyRL source checkout required')
@@ -219,8 +244,19 @@ class NativeSession:
         import ray
 
         class VerifiedPolicyWorker(FSDPPolicyWorkerBase):
+            def init_model(inner, model_path, num_training_steps=None):
+                super().init_model(model_path,num_training_steps=num_training_steps)
+                from feature_rl.training.worker_state import trainable_binding
+                trainable_binding(inner.model,inner.optimizer,lora=inner._is_lora,trim_optimizer=True)
+
+            def feature_rl_trainable_binding(inner):
+                from feature_rl.training.worker_state import trainable_binding
+                return {'rank':torch.distributed.get_rank(),
+                    'parameters':trainable_binding(inner.model,inner.optimizer,lora=inner._is_lora)}
+
             def feature_rl_snapshot(inner):
-                from feature_rl.training.worker_state import snapshot_state
+                from feature_rl.training.worker_state import snapshot_state,trainable_binding
+                trainable_binding(inner.model,inner.optimizer,lora=inner._is_lora)
                 return snapshot_state(inner.model,inner.optimizer,rank=torch.distributed.get_rank())
 
         verified_policy=ray.remote(num_gpus=1)(VerifiedPolicyWorker)
@@ -247,10 +283,14 @@ class NativeSession:
         self.bridge=SkyRLUpdateBridge(self.trainer)
         client=self.trainer.inference_engine_client
         if not client.server_urls: raise ValueError('Actual native inference worker URLs missing')
+        if bool(client.uses_lora_weight_sync)!=settings.lora.enabled:
+            raise ValueError('Pinned inference construction differs from the configured LoRA sync mode')
+        from skyrl.backends.skyrl_train.inference_servers.remote_inference_client import SKYRL_LORA_ADAPTER_NAME
         self.barrier=PolicyBarrier(tuple(client.server_urls))
         self.backend=SkyRLTokenBackend(tokenizer_directory=Path(settings.tokenizer_directory),
             tokenizer_sha256=settings.tokenizer_sha256,endpoint=client.proxy_url,
-            model_name=policy.identity.model,barrier=self.barrier,max_seq_len=settings.max_seq_len)
+            model_name=policy.identity.model,barrier=self.barrier,max_seq_len=settings.max_seq_len,
+            adapter_name=SKYRL_LORA_ADAPTER_NAME if settings.lora.enabled else None)
         self.policy=policy
         asyncio.run(self.bridge.initialize_sync())
         self.last_probe=self.synchronize(policy)
@@ -278,7 +318,8 @@ class NativeSession:
             if len(progress)!=1:raise ValueError('Native checkpoint progress binding missing')
             metadata=decode_json(self.store.get_bytes(progress[0],max_envelope_bytes=8*1024*1024,max_payload_bytes=4*1024*1024),4*1024*1024)
             native=metadata['progress']['native']
-            if native['checkpoint']!=value.optimizer_state.model_dump(mode='json'):
+            if (native['checkpoint']!=value.optimizer_state.model_dump(mode='json')
+                or metadata['settings'].get('lora')!=self.settings.lora.model_dump(mode='json')):
                 raise ValueError('Frozen native checkpoint manifest differs')
             self.resume(checkpoint=value.optimizer_state,path=native['path'],policy=policy)
         elif checkpoint==self.configuration.initial_policy.identity.weights and checkpoint==policy.identity.weights:
@@ -323,9 +364,11 @@ class NativeSession:
         stamp=PolicyStamp(policy.policy_version,policy.identity.weights.sha256,self.backend.tokenizer_digest,self.backend.template_digest)
         self.barrier.begin(stamp,(0,))  # Revokes all old acknowledgments before any call.
         asyncio.run(self.trainer.dispatch.save_weights_for_sampler())
+        if self.settings.lora.enabled:
+            self._validate_adapter(Path(self.settings.work_directory)/'lora-sync')
         results={}
         for endpoint in self.barrier.workers:
-            payload={'model':self.backend.model_name,'token_ids':list(self.settings.probe_tokens),
+            payload={'model':self.backend.inference_model,'token_ids':list(self.settings.probe_tokens),
                 'cache_salt':policy.policy_version,'sampling_params':{'n':1,'temperature':0.,'top_p':1.,'top_k':-1,
                 'seed':0,'max_tokens':self.settings.probe_output_tokens,'logprobs':0}}
             request=Request(endpoint.rstrip('/')+'/inference/v1/generate',data=canonical_json(payload),
@@ -344,7 +387,9 @@ class NativeSession:
         for endpoint,tokens in results.items(): self.barrier.acknowledge(endpoint,stamp,tokens)
         self.barrier.require(stamp);self.policy=policy
         return {'version':'m7-native-probe-v1','stamp':asdict(stamp),'input':self.settings.probe_tokens,
-            'outputs':results,'scope':'native_execution','trust':'Controller-owned native broadcast plus endpoint probes; not cryptographic remote tensor attestation'}
+            'outputs':results,'inference_model':self.backend.inference_model,
+            'lora':self.settings.lora.model_dump(mode='json'),'scope':'native_execution',
+            'trust':'Controller-owned native broadcast plus endpoint probes; not cryptographic remote tensor attestation'}
 
     def update(self,rows,*,algorithm):
         from .worker_state import compare_states
@@ -364,7 +409,10 @@ class NativeSession:
         after=self.worker_snapshot();change=compare_states(before,after)
         self.trainer.save_models()
         path=Path(self.trainer.cfg.trainer.export_path)/('global_step_'+str(self.trainer.global_step))/'policy'
-        weights=publish_directory(store=self.store,registry=self.registry,path=path)
+        if self.settings.lora.enabled:self._validate_adapter(path)
+        self._write_binding(path)
+        weights=publish_directory(store=self.store,registry=self.registry,path=path,
+            dependencies=(self.configuration.initial_policy.identity.weights,self.configuration.reference_checkpoint))
         version='step-'+str(self.trainer.global_step)+'-'+weights.sha256[:16]
         identity=self.policy.identity.model_copy(update={'weights':weights})
         policy=self.policy.model_copy(update={'identity':identity,'policy_version':version})
@@ -389,7 +437,10 @@ class NativeSession:
         import torch,random,numpy
         torch.save({'python':random.getstate(),'numpy':numpy.random.get_state(),
             'torch':torch.get_rng_state(),'cuda':torch.cuda.get_rng_state_all()},path/'controller-state.pt')
-        ref=publish_directory(store=self.store,registry=self.registry,path=path)
+        if self.settings.lora.enabled:self._validate_adapter(path/'policy'/'lora_adapter')
+        self._write_binding(path)
+        ref=publish_directory(store=self.store,registry=self.registry,path=path,
+            dependencies=(self.configuration.initial_policy.identity.weights,self.configuration.reference_checkpoint))
         verify_directory(store=self.store,ref=ref,path=path)
         self._load(path)
         after=self.synchronize(self.policy)
@@ -402,6 +453,10 @@ class NativeSession:
 
     def _load(self,path):
         require_private_tree(Path(path))
+        binding=decode_json((Path(path)/'feature_rl_native.json').read_bytes(),4*1024*1024)
+        if binding!=self._native_binding():
+            raise ValueError('Native checkpoint base/reference/LoRA/trainable/optimizer topology differs')
+        if self.settings.lora.enabled:self._validate_adapter(Path(path)/'policy'/'lora_adapter')
         self.barrier.begin(self.barrier.stamp,self.barrier.probe)
         self.trainer.resume_mode=type(self.trainer.resume_mode)('from_path')
         self.trainer.cfg.trainer.resume_path=str(path)
@@ -413,7 +468,35 @@ class NativeSession:
         if len(state['cuda'])!=torch.cuda.device_count(): raise ValueError('Controller CUDA RNG topology differs')
         random.setstate(state['python']);numpy.random.set_state(state['numpy'])
         torch.set_rng_state(state['torch']);torch.cuda.set_rng_state_all(state['cuda'])
+        if self._native_binding()!=binding:
+            raise ValueError('Restored native optimizer or trainable parameter mask differs')
         self.bridge.ready=True
+
+    def _native_binding(self):
+        import ray
+        workers=ray.get([self.trainer._get_dp_group_models(rank,'policy_model').feature_rl_trainable_binding.remote()
+            for rank in range(self.settings.num_gpus)])
+        return {'version':'m7-native-tensor-binding-v1',
+            'base_weights':self.configuration.initial_policy.identity.weights.model_dump(mode='json'),
+            'reference_weights':self.configuration.reference_checkpoint.model_dump(mode='json'),
+            'lora':self.settings.lora.model_dump(mode='json'),'num_gpus':self.settings.num_gpus,
+            'optimizer_family':OPTIMIZER_FAMILY,'trainable_workers':workers}
+
+    def _write_binding(self,path):
+        with (Path(path)/'feature_rl_native.json').open('xb') as stream:
+            stream.write(canonical_json(self._native_binding()))
+
+    def _validate_adapter(self,path):
+        require_private_tree(Path(path))
+        config=decode_json((Path(path)/'adapter_config.json').read_bytes(),1024*1024)
+        lora=self.settings.lora
+        if (config.get('peft_type')!='LORA' or config.get('r')!=lora.rank
+            or config.get('lora_alpha')!=lora.alpha or config.get('lora_dropout')!=lora.dropout
+            or config.get('bias','none')!='none' or config.get('modules_to_save')
+            or config.get('use_dora',False) or not config.get('target_modules')
+            or not (Path(path)/'adapter_model.safetensors').is_file()
+            or (Path(path)/'adapter_model.safetensors').stat().st_size==0):
+            raise ValueError('Native PEFT export/sync differs from the configured LoRA adapter')
 
     def resume(self,*,checkpoint,path,policy):
         require_private_tree(Path(path))

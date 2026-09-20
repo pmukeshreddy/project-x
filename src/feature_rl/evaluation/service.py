@@ -24,7 +24,7 @@ from feature_rl.training.native import NativeSettings, OPTIMIZER_FAMILY
 from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_local
 
-from .freeze import validate_preregistration
+from .freeze import episode_sampling_seed, validate_preregistration
 from .adaptation import AdaptationBatch, ExternalCorpusAdapter, ExternalOriginMapping
 from .models import ArmProtocol, EvaluationPreregistration, FrozenRoster
 from .statistics import summarize_trials
@@ -416,6 +416,17 @@ class EvaluationService:
                 for field in shared_settings
             ):
                 raise EvaluationRejected("trained arms differ in shared native resource controls")
+            evaluator_lora = canonical_json(
+                self.native_factory.settings.lora.model_dump(mode="json")
+            )
+            learned_lora = tuple(
+                canonical_json(actual_training[arm][1].lora.model_dump(mode="json"))
+                for arm in ("B", "C", "D")
+            )
+            if any(value != evaluator_lora for value in learned_lora):
+                raise EvaluationRejected(
+                    "trained arms and evaluator differ in frozen LoRA controls"
+                )
             if any(
                 len({getattr(actual_training[arm][1], field) for arm in ("C", "D")}) != 1
                 for field in ("clip_epsilon", "kl_coefficient")
@@ -470,8 +481,11 @@ class EvaluationService:
             invocation="m8-evaluate-v1", attempt_limit=1,
         )
 
-    def _trial(self, runner, assignment, protocol, limits, families, activation=None):
-        policy = protocol.policy.model_copy(update={"seed": assignment.policy_seed})
+    def _trial(
+        self, runner, assignment, protocol, limits, families, sampling_seed,
+        activation=None,
+    ):
+        policy = protocol.policy.model_copy(update={"seed": sampling_seed})
         activation_evidence = ()
         if activation is not None:
             activation_ref, activation_value = activation
@@ -524,8 +538,8 @@ class EvaluationService:
             evidence=(*activation_evidence, *result.evidence),
         ), result
 
-    def _activation(self, claim, session, protocol: ArmProtocol, policy_seed: int, phase_key: str):
-        policy = protocol.policy.model_copy(update={"seed": policy_seed})
+    def _activation(self, claim, session, protocol: ArmProtocol, sampling_seed: int, phase_key: str):
+        policy = protocol.policy.model_copy(update={"seed": sampling_seed})
         self.registry.reconcile(claim, CostObservation(
             source="m8-native-activation", upstream_attempt_id=phase_key, revision=1,
             receipts=(protocol.checkpoint, self.native_factory.configuration),
@@ -586,6 +600,7 @@ class EvaluationService:
         if len(execution.trials) != len(preregistration.trials) or len(execution.run_results) != len(execution.trials):
             raise EvaluationRejected("frozen execution does not account for every assigned trial")
         families = {item.task: item.repository_family for item in roster.sources}
+        protocols = {item.arm: item for item in preregistration.arms}
         for assignment, trial, result in zip(
             preregistration.trials, execution.trials, execution.run_results,
         ):
@@ -599,11 +614,27 @@ class EvaluationService:
                 or rollout_refs != (trial.rollout,)
             ):
                 raise EvaluationRejected("frozen execution result differs from its assigned trial")
+            record = self.store.get_artifact(trial.rollout)
+            expected_policy = protocols[assignment.arm].policy.model_copy(update={
+                "seed": episode_sampling_seed(preregistration, assignment),
+            })
+            if (
+                type(record) is not c.RolloutRecord
+                or record.task != assignment.task
+                or record.policy != expected_policy
+                or record.seeds.seeds != (assignment.case_seed,)
+            ):
+                raise EvaluationRejected(
+                    "frozen rollout differs from its paired episode sampling/case seeds"
+                )
         activation_refs = tuple(dict.fromkeys(
             ref for trial in execution.trials for evidence in trial.evidence
             for ref in evidence.artifacts if ref.kind == "m7-native-activation"
         ))
-        expected_groups = len(preregistration.arms) * len(preregistration.seeds.seeds)
+        expected_groups = len({
+            (assignment.arm, episode_sampling_seed(preregistration, assignment))
+            for assignment in preregistration.trials
+        })
         if self.evidence_scope == "real_integration":
             if (
                 len(execution.activations) != expected_groups
@@ -621,6 +652,7 @@ class EvaluationService:
         for assignment in preregistration.trials:
             trial, result = self._trial(
                 self.runner, assignment, protocols[assignment.arm], config.limits, families,
+                episode_sampling_seed(preregistration, assignment),
             )
             trials.append(trial); results.append(result)
         return self._publish_execution(claim, configuration, trials, results, ())
@@ -649,23 +681,24 @@ class EvaluationService:
             )
             protocols = {item.arm: item for item in preregistration.arms}
             families = {item.task: item.repository_family for item in roster.sources}
-            by_key = {(trial.arm, trial.policy_seed): [] for trial in preregistration.trials}
+            by_key = {}
             for trial in preregistration.trials:
-                by_key[(trial.arm, trial.policy_seed)].append(trial)
+                key = (trial.arm, episode_sampling_seed(preregistration, trial))
+                by_key.setdefault(key, []).append(trial)
             trials_by_id, results_by_id, activations = {}, {}, []
             for arm in (item.arm for item in preregistration.arms):
-                for policy_seed in preregistration.seeds.seeds:
-                    assigned = by_key.get((arm, policy_seed), ())
-                    if not assigned:
+                for (group_arm, sampling_seed), assigned in by_key.items():
+                    if group_arm != arm:
                         continue
-                    phase_key = f"{startup_key}:activate:{arm}:{policy_seed}"
+                    phase_key = f"{startup_key}:activate:{arm}:{sampling_seed}"
                     activation_ref, activation, _ = self._activation(
-                        claim, handle.session, protocols[arm], policy_seed, phase_key,
+                        claim, handle.session, protocols[arm], sampling_seed, phase_key,
                     )
                     activations.append(activation_ref)
                     for assignment in assigned:
                         trial, result = self._trial(
                             runner, assignment, protocols[arm], config.limits, families,
+                            sampling_seed,
                             (activation_ref, activation),
                         )
                         trials_by_id[trial.trial_id] = trial

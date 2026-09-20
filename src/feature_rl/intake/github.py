@@ -98,8 +98,12 @@ class PullRequestIntakeSpec:
     provenance_label: Literal["historical_request", "reconstructed_specification"]
     mixed_paths: Mapping[str, str]
     max_tree_archive_bytes: int
+    license_path: str = 'LICENSE.txt'
 
     def __post_init__(self):
+        from feature_rl.environments.archive import safe_path
+        if safe_path(self.license_path) != self.license_path:
+            raise ValueError('canonical repository license path required')
         required = {
             self.pr_name,
             self.issue_name,
@@ -302,30 +306,30 @@ class GitHubPullRequestIntake:
         if not isinstance(license_blob, str) or not _REVISION.fullmatch(license_blob):
             raise ValueError("license response lacks a full Git object ID")
         baseline_license_blob = self.history.path_object(
-            reconstruction.baseline_commit, "LICENSE.txt"
+            reconstruction.baseline_commit, spec.license_path
         )
         reference_license_blob = self.history.path_object(
-            reconstruction.reference_commit, "LICENSE.txt"
+            reconstruction.reference_commit, spec.license_path
         )
         if baseline_license_blob != license_blob:
-            raise ValueError("license response does not match baseline LICENSE.txt")
+            raise ValueError("license response does not match the configured baseline license path")
         if reference_license_blob != baseline_license_blob:
-            raise ValueError("reference changes LICENSE.txt; automatic license scope is unsafe")
+            raise ValueError("reference changes the configured license; automatic license scope is unsafe")
         baseline_license_text = self.history.path_bytes(
             reconstruction.baseline_commit,
-            "LICENSE.txt",
+            spec.license_path,
             max_bytes=spec.max_tree_archive_bytes,
         )
         reference_license_text = self.history.path_bytes(
             reconstruction.reference_commit,
-            "LICENSE.txt",
+            spec.license_path,
             max_bytes=spec.max_tree_archive_bytes,
         )
         if (
             license_text_source.body != baseline_license_text
             or reference_license_text != baseline_license_text
         ):
-            raise ValueError("archived license text does not match B and H LICENSE.txt")
+            raise ValueError("archived license text does not match B and H at the configured license path")
         spdx_id = license_data["license"]["spdx_id"]
         if not isinstance(spdx_id, str) or not spdx_id:
             raise ValueError("license response lacks an SPDX identifier")

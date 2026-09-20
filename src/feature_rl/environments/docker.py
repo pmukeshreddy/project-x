@@ -153,7 +153,8 @@ class DockerEngine:
         if r.reason!='exited' or r.exit_code!=0:raise DockerUnavailable(r.stderr.decode(errors='replace')[:2000])
         try:info=json.loads(r.stdout);self.daemon_id=info['ID']
         except (ValueError,KeyError) as exc:raise DockerUnavailable('invalid daemon identity') from exc
-        if info.get('OSType')!='linux' or info.get('Architecture') not in ('aarch64','arm64'):raise PolicyRejected('requires Linux arm64 Docker')
+        architecture={'aarch64':'arm64','arm64':'arm64','x86_64':'amd64','amd64':'amd64'}.get(info.get('Architecture'))
+        if info.get('OSType')!='linux' or architecture!=self.policy.platform.split('/')[1]:raise PolicyRejected('Docker host must match the configured Linux runtime platform')
         self.info=info;self.qualified=False;self.qualification=None
 
     def session(self,*,binding,saved_source,cpu_seconds=None):return DockerSession(self,binding,saved_source,cpu_seconds=cpu_seconds)
@@ -242,7 +243,7 @@ class DockerSession:
                 if workspace['closed'] or str(workspace['generation'])!=self.record.binding['generation'] or workspace['saved']['artifact']['sha256']!=self.record.binding['source']:
                     raise PolicyRejected('workspace changed before operation admission')
             image=json.loads(self.checked(['image','inspect',self.policy.image]).stdout)[0]
-            if image.get('Os')!='linux' or image.get('Architecture')!='arm64' or image['Config'].get('Volumes') or image['Config'].get('OnBuild'):
+            if image.get('Os')!='linux' or image.get('Architecture')!=self.policy.platform.split('/')[1] or image['Config'].get('Volumes') or image['Config'].get('OnBuild'):
                 raise PolicyRejected('image platform/volume/build policy mismatch')
             if self.policy.image==REPAIRED_IMAGE:
                 base=json.loads(self.checked(['image','inspect',IMAGE]).stdout)[0]
@@ -252,7 +253,7 @@ class DockerSession:
                 self.receipts.append({'image_manifest':self.policy.image,'image_inspect_id':image['Id'],'base_manifest':IMAGE,'base_layers':original,'image_layers':layers})
             disk=self.policy.disk_bytes;tmp=min(8*1024*1024,disk//4);shm=1024*1024;workspace=disk-tmp-shm
             args=['create','--name',self.record.container_name,'--label','feature-rl.owner='+self.record.owner_token,'--label','feature-rl.operation='+self.record.operation_id,
-                '--platform','linux/arm64','--pull','never','--network','none','--ipc','private','--cgroupns','private','--read-only','--user','65534:65534','--cap-drop','ALL',
+                '--platform',self.policy.platform,'--pull','never','--network','none','--ipc','private','--cgroupns','private','--read-only','--user','65534:65534','--cap-drop','ALL',
                 '--security-opt','no-new-privileges=true','--security-opt','seccomp='+str(self.engine.profile),'--pids-limit',str(self.policy.pids),'--cpus',str(self.policy.cpus),
                 '--memory',str(self.policy.memory_bytes),'--memory-swap',str(self.policy.memory_bytes),'--shm-size',str(shm),'--ulimit','nofile=256:256','--ulimit','core=0:0',
                 '--ulimit','fsize='+str(disk)+':'+str(disk),'--log-driver','none','--restart','no',

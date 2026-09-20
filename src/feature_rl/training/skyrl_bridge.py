@@ -10,6 +10,8 @@ from dataclasses import dataclass
 import copy
 import importlib.metadata
 import json
+import threading
+import types
 
 from .torch_backend import CausalTurn, _masked, _torch
 
@@ -17,6 +19,7 @@ PINNED_SKYRL = 'f5bc3b78dfddfb352870d5d7430cd226e5785838'
 PINNED_HARBOR = '3de07a0e01f3368921766437fc7afece3ddec23d'
 GRPO_LOSS = 'feature_rl_sampled_clipped'
 SFT_LOSS = 'feature_rl_supervised'
+_LOSS_REGISTRATION_LOCK = threading.RLock()
 
 
 def feature_grpo_loss(log_probs, old_log_probs, advantages, config, loss_mask=None, rollout_logprobs=None):
@@ -50,12 +53,53 @@ def feature_sft_loss(log_probs, old_log_probs, advantages, config, loss_mask=Non
     return -(_masked(log_probs, mask) * _masked(advantages.detach(), mask)).sum(), {'clip_ratio': 0.}
 
 
+def _same_loss(actual, expected):
+    if actual is expected:
+        return True
+    if not isinstance(actual, types.FunctionType) or actual.__closure__ is not None:
+        return False
+    if (actual.__module__, actual.__qualname__, actual.__code__, actual.__defaults__, actual.__kwdefaults__) != (
+            expected.__module__, expected.__qualname__, expected.__code__, expected.__defaults__, expected.__kwdefaults__):
+        return False
+    # Equal bytecode with substituted helper globals is not the same loss.
+    return all(actual.__globals__.get(name) is expected.__globals__[name]
+               for name in expected.__code__.co_names if name in expected.__globals__)
+
+
 def register_losses():
-    """Call in the trainer process before building workers; Ray must already exist."""
+    """Idempotent within/across Ray sessions, without overwriting another loss."""
+    import ray
+    import cloudpickle
     from skyrl.backends.skyrl_train.utils.ppo_utils import PolicyLossRegistry, sync_registries
-    PolicyLossRegistry.register(GRPO_LOSS, feature_grpo_loss)
-    PolicyLossRegistry.register(SFT_LOSS, feature_sft_loss)
-    sync_registries()
+    losses = {GRPO_LOSS: feature_grpo_loss, SFT_LOSS: feature_sft_loss}
+    with _LOSS_REGISTRATION_LOCK:
+        if not ray.is_initialized():
+            raise ValueError('Ray must be initialized before feature loss registration')
+        # Pinned sync_with_actor uploads local functions before importing remote
+        # names. Inspect both sides first so it cannot silently replace a conflict.
+        for name, expected in losses.items():
+            actual = PolicyLossRegistry._functions.get(name)
+            if name in PolicyLossRegistry._functions and not _same_loss(actual, expected):
+                raise ValueError('Conflicting local SkyRL loss registration: ' + name)
+        try:
+            actor = ray.get_actor(PolicyLossRegistry._actor_name)
+        except ValueError:
+            actor = None
+        if actor is not None:
+            available = ray.get(actor.list_available.remote())
+            for name, expected in losses.items():
+                if name in available and not _same_loss(cloudpickle.loads(ray.get(actor.get.remote(name))), expected):
+                    raise ValueError('Conflicting remote SkyRL loss registration: ' + name)
+        PolicyLossRegistry._ray_actor = actor
+        PolicyLossRegistry._synced_to_actor = False
+        # Also resets the pinned registry's stale actor handle after Ray shutdown.
+        sync_registries()
+        for name, expected in losses.items():
+            if name not in PolicyLossRegistry.list_available():
+                PolicyLossRegistry.register(name, expected)
+            elif not _same_loss(PolicyLossRegistry.get(name), expected):
+                raise ValueError('Conflicting synchronized SkyRL loss registration: ' + name)
+        sync_registries()
 
 
 def verify_installed_pins():

@@ -229,7 +229,8 @@ def author(factory,candidate,call):
             raise ValueError('initial role cannot claim a repair without a retained predecessor')
         if call.control_plan is not None:
             plans=[old.call.control_plan for _,old in existing if old.call.control_plan is not None]
-            if any(plan!=call.control_plan for plan in plans):raise ValueError('the candidate control role plan was already frozen')
+            if any(plan.slots!=call.control_plan.slots for plan in plans):
+                raise ValueError('the candidate control role plan was already frozen')
         repair=previous is not None
         repairs=[old for _,old in existing if old.repair]
         if repair and (sum(old.stage==stage for old in repairs)>=2 or len(repairs)+len(recipe.neutral_repairs)>=4):
@@ -237,6 +238,8 @@ def author(factory,candidate,call):
         check_budget(factory,candidate,call,batch_ref)
         request=AuthoringRequest(candidate=candidate,frontier=front,call=call,previous=previous,
             repair=repair,stage=stage,lane=lane)
+        if isinstance(call.inputs,ControlFinalizationInputs) and len(prior_journals(factory,request))>=3:
+            raise AuthoringBudgetExceeded('budget_exhausted: this control already incurred its three permitted attempts')
         ref=put(factory,request,'m6-authoring-request',dependencies=references(document(request)))
         job=factory.registry.enqueue(spec(factory,ref,request))
         return dispatch(factory,job,request)
@@ -304,7 +307,20 @@ def prior_journals(factory,request):
             or receipt.lane!=request.lane or receipt.disposition!=matches[0].result.disposition
             or matches[0].result.artifacts!=(*receipt.outputs,matches[0].result.artifacts[-1])):
         raise ValueError('previous journal chain lacks the exact selected lane result')
+    if isinstance(request.call.inputs,ControlFinalizationInputs):
+        if receipt.disposition==c.Disposition.SUCCESS:
+            previous=read_record(factory.store,request.previous,AuthoringRequest,'m6-authoring-request')
+            if not obsolete_control_binding(document(previous.call.inputs),document(request.call.inputs)):
+                raise ValueError('an accepted control can be repaired only against an obsolete contract/scenario binding')
+        return receipt.journal_refs
     return receipt.journal_refs if receipt.disposition==c.Disposition.REJECTED else ()
+
+
+def obsolete_control_binding(previous,current):
+    ignored={'provenance','costs','contract','scenario_plan'}
+    return (isinstance(previous,dict) and isinstance(current,dict)
+        and {k:v for k,v in previous.items() if k not in ignored}=={k:v for k,v in current.items() if k not in ignored}
+        and any(previous.get(key)!=current.get(key) for key in ('contract','scenario_plan')))
 
 
 def execute(factory,claim,ref,request,*,recovered=None):
@@ -417,7 +433,11 @@ def validate_receipt(factory,request,receipt):
         value=json.loads(raw)
         if canonical_json(value)!=raw or value.get('attempt_index')!=index or value.get('stage')!=request.call.generation.request.stage.value:
             raise ValueError('authoring journal changed canonical stage/index')
-        if index<len(receipt.journal_refs) and value.get('status')!='rejected':raise ValueError('prior authoring journal must be rejected')
+        if index<len(receipt.journal_refs) and value.get('status')!='rejected':
+            if (not isinstance(request.call.inputs,ControlFinalizationInputs)
+                    or value.get('status')!='accepted'
+                    or not obsolete_control_binding(value.get('binding'),document(request.call.inputs))):
+                raise ValueError('accepted prior journal requires an obsolete exact control contract/scenario binding')
         values.append(value)
     last=values[-1]
     semantic=semantic_request_sha256(request.call.generation.request)
