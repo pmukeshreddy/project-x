@@ -1,0 +1,279 @@
+{
+  "scope": "TEST fixture CPU CLI subprocess integration; actual M0/Registry/Factory. No generated feature, accepted qualification, model call or worker execution.",
+  "completed_at": "2026-09-20T00:47:15.095535+00:00",
+  "implementation_checkpoint": "fc08386",
+  "state_root": "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/cli-dbf0b076909b43b782f6874c83c8bb36",
+  "source_hashes_before": {
+    "src/feature_rl/cli.py": "2942e9fa3c7207cf15becce6d6afe7f68821158ec5b406085448cc8e57a481ca",
+    "src/feature_rl/__main__.py": "b2c4535633b57caf3d0640a6e81c9ff50fd3236f1c4028acaec1f760d4799374",
+    "src/feature_rl/pipeline/configuration.py": "b0f024ff6bc9663c0553c4705f63991df459a01b8daa375c74fef7e903110e1f",
+    "src/feature_rl/pipeline/factory.py": "294b562e8e805b667c20eae96d6510c25ad7d9be8024f31a28a6a046312396d2",
+    "src/feature_rl/pipeline/construction.py": "9082a9c6b9cba1a6b2aa17c0cfe12b3aa995f27527dc0193251d7575a2d86e7c",
+    "src/feature_rl/pipeline/qualification.py": "a1b6cfa916f510e8c853873da04eeb4d0d8453a3443cab6927a44e86663370eb"
+  },
+  "source_hashes_after": {
+    "src/feature_rl/cli.py": "2942e9fa3c7207cf15becce6d6afe7f68821158ec5b406085448cc8e57a481ca",
+    "src/feature_rl/__main__.py": "b2c4535633b57caf3d0640a6e81c9ff50fd3236f1c4028acaec1f760d4799374",
+    "src/feature_rl/pipeline/configuration.py": "b0f024ff6bc9663c0553c4705f63991df459a01b8daa375c74fef7e903110e1f",
+    "src/feature_rl/pipeline/factory.py": "294b562e8e805b667c20eae96d6510c25ad7d9be8024f31a28a6a046312396d2",
+    "src/feature_rl/pipeline/construction.py": "9082a9c6b9cba1a6b2aa17c0cfe12b3aa995f27527dc0193251d7575a2d86e7c",
+    "src/feature_rl/pipeline/qualification.py": "a1b6cfa916f510e8c853873da04eeb4d0d8453a3443cab6927a44e86663370eb"
+  },
+  "checks": [
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "feature_rl",
+        "--config",
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/cli-dbf0b076909b43b782f6874c83c8bb36/config.json",
+        "screen-source",
+        "--request",
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/cli-dbf0b076909b43b782f6874c83c8bb36/request.json"
+      ],
+      "exit_status": 0,
+      "result": {
+        "artifacts": [
+          {
+            "encoding": "bytes",
+            "kind": "m6-source-disposition",
+            "schema_version": 1,
+            "sha256": "2cf656e58230afdd0ccf93895c6be23d5eb0db21b62739e2f9f92abce67c5ca5",
+            "visibility": "private"
+          }
+        ],
+        "costs": [
+          {
+            "category": "construction",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "partial",
+            "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results.",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": 7.333001121878624e-06
+          },
+          {
+            "category": "storage",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results.",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          },
+          {
+            "category": "verifier",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results.",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          }
+        ],
+        "disposition": "success",
+        "evidence": [
+          {
+            "artifacts": [
+              {
+                "encoding": "bytes",
+                "kind": "m6-source-disposition",
+                "schema_version": 1,
+                "sha256": "2cf656e58230afdd0ccf93895c6be23d5eb0db21b62739e2f9f92abce67c5ca5",
+                "visibility": "private"
+              }
+            ],
+            "command": [
+              "Factory.screen_source",
+              "8d9ed6fbfce6d3c2a5f0c64b5ba2504f55723bbb0f21152a8f8f0c4902208455"
+            ],
+            "exit_status": 0,
+            "producer": "feature_rl.pipeline.Factory",
+            "recorded_at": "2026-09-20T00:46:14.073819Z",
+            "revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "scope": "source_inspection"
+          }
+        ],
+        "operation": "construct",
+        "reason": "Frozen candidate source prerequisites are eligible; no BUILT or released task is asserted"
+      },
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "feature_rl",
+        "--config",
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/cli-dbf0b076909b43b782f6874c83c8bb36/config.json",
+        "screen-source",
+        "--request",
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/cli-dbf0b076909b43b782f6874c83c8bb36/request.json"
+      ],
+      "exit_status": 0,
+      "result": {
+        "artifacts": [
+          {
+            "encoding": "bytes",
+            "kind": "m6-source-disposition",
+            "schema_version": 1,
+            "sha256": "2cf656e58230afdd0ccf93895c6be23d5eb0db21b62739e2f9f92abce67c5ca5",
+            "visibility": "private"
+          }
+        ],
+        "costs": [
+          {
+            "category": "construction",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "partial",
+            "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results.",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": 7.333001121878624e-06
+          },
+          {
+            "category": "storage",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results.",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          },
+          {
+            "category": "verifier",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Sum of attributable records; any unknown constituent keeps its channel unknown. Original records retained in upstream Registry results.",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          }
+        ],
+        "disposition": "success",
+        "evidence": [
+          {
+            "artifacts": [
+              {
+                "encoding": "bytes",
+                "kind": "m6-source-disposition",
+                "schema_version": 1,
+                "sha256": "2cf656e58230afdd0ccf93895c6be23d5eb0db21b62739e2f9f92abce67c5ca5",
+                "visibility": "private"
+              }
+            ],
+            "command": [
+              "Factory.screen_source",
+              "8d9ed6fbfce6d3c2a5f0c64b5ba2504f55723bbb0f21152a8f8f0c4902208455"
+            ],
+            "exit_status": 0,
+            "producer": "feature_rl.pipeline.Factory",
+            "recorded_at": "2026-09-20T00:46:14.073819Z",
+            "revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "scope": "source_inspection"
+          }
+        ],
+        "operation": "construct",
+        "reason": "Frozen candidate source prerequisites are eligible; no BUILT or released task is asserted"
+      },
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.venv/bin/python",
+        "-m",
+        "feature_rl",
+        "--config",
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/cli-dbf0b076909b43b782f6874c83c8bb36/config.json",
+        "construct",
+        "--request",
+        "/Users/mukeshreddypochamreddy/Desktop/project x/.feature-rl/research/integration/cli-dbf0b076909b43b782f6874c83c8bb36/request.json"
+      ],
+      "exit_status": 1,
+      "result": {
+        "artifacts": [
+          {
+            "encoding": "bytes",
+            "kind": "m6-construction-result",
+            "schema_version": 1,
+            "sha256": "4041b5d616adee7f1e444f37d2647627f4979590323cc8bbf56c53ca6a002744",
+            "visibility": "private"
+          }
+        ],
+        "costs": [
+          {
+            "category": "construction",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "partial",
+            "note": "Factory controller wall excludes the source job and builder call; recovery overhead unknown",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": 1.708976924419403e-06
+          },
+          {
+            "category": "storage",
+            "cpu_seconds": null,
+            "gpu_seconds": null,
+            "human_minutes": null,
+            "input_tokens": null,
+            "measurement": "unknown",
+            "note": "Factory record/Registry publication overhead unmeasured; upstream costs remain in their original jobs",
+            "output_tokens": null,
+            "usd": null,
+            "wall_seconds": null
+          }
+        ],
+        "disposition": "blocked_dependency",
+        "evidence": [
+          {
+            "artifacts": [
+              {
+                "encoding": "bytes",
+                "kind": "m6-construction-result",
+                "schema_version": 1,
+                "sha256": "4041b5d616adee7f1e444f37d2647627f4979590323cc8bbf56c53ca6a002744",
+                "visibility": "private"
+              }
+            ],
+            "command": [
+              "Factory.construct",
+              "a518b3db21bd4e133ff7499c41f5c515f6b73a4fba728fc7f443c0acb59dc7ac"
+            ],
+            "exit_status": 1,
+            "producer": "feature_rl.pipeline.Factory",
+            "recorded_at": "2026-09-20T00:46:14.808643Z",
+            "revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "scope": "source_inspection"
+          }
+        ],
+        "operation": "construct",
+        "reason": "Complete authored BuildInputs are missing; no generated prerequisites or BUILT root were manufactured"
+      },
+      "stderr": ""
+    }
+  ],
+  "replay_result_identical": true,
+  "replay_registry_events_unchanged": true,
+  "harness_correction": "Initial subprocess diagnostic executed these operations but asserted an incorrect enum spelling blocked_external_dependency; actual documented result was blocked_dependency. Corrected to M0 enum and replayed the same selected jobs without new events or work."
+}

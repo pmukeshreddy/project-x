@@ -22,14 +22,30 @@ Reused68 focused CPU checks and the actual Docker diagnostic in `docs/reports/M7
 
 Combined stable CPU milestone at exact detached `7c79981dc58aef78b3632c2ba6a8cdd36817945d`:769 passed,1 skipped in132.92s. The skipped pinned-source symbol check then passed separately in0.14s using byte-identical retained trainer.py copied into that checkout. Tracked src/tests/pyproject hashes match before/after. Evidence: `docs/evidence/integration/runner-milestone/{receipt.json,pytest.log,source-audit.log}`. Explicitly excluded the two Docker suites, whose actual fixture/runner/cap diagnostics are retained. Known M8 interface findings and later service code are outside this passing milestone.
 
-## M8 audit/statistics and external adaptation — changes required
+## M6 qualification and initial CLI — PASS for these slices
+
+Reviewed qualification join `c33c622`: actual Factory lineage supplies M5's exact repair policy, caller substitutions reject, and acceptance/release use the existing frozen human request and both legal lifecycle transitions. Missing history remains provisional. Reused five focused checks.
+
+Reviewed CLI `fc08386`: strict bounded JSON, real service composition, actual Docker boundary qualification for runtime commands, external human verifier configuration, typed status/nonzero failure and retained publication recovery. No executable configuration or fabricated qualification flag. Reused ten focused checks and ran actual subprocesses over a labeled CPU fixture: source success, missing BuildInputs=`blocked_dependency`, and identical replay with no Registry events. Exact commands/results and the corrected diagnostic enum assertion are in `docs/evidence/integration/cli-commands.json`. This initial command slice does not claim that the remaining run/train/evaluate/audit wiring is finished.
+
+## M7 SFT/native service additions — partial review
+
+Reviewed `ebd151e` and `22ea078`: source demonstrations bind actual successful M4 source, exact public harness contexts and tokenizer prefixes; trajectory demonstrations authenticate selected runner records. A root diagnostic reproduced acceptance of a private source-SFT system prompt; `22ea078` now rejects it before rendering. Reused eight SFT/file checks and fifteen data/core checks. The same checkpoint correctly retains authenticated zero-step token/time-budget episodes in group rewards with zero optimization rows. Nontraining arbitrary records remain rejected.
+
+Native session `7e7bb1f` uses the actual pinned SkyRL trainer/dispatch/checkpoint hooks, protected local native directories, actual broadcast plus bounded worker probes and live activation checks. Root inspected the affected pinned constructor, update and checkpoint symbols. GPU execution is unverified. The owner is finishing concrete trainable-tensor/optimizer witnesses and the selected-job session factory; review identified a new post-startup publication failure that could strand a live session, now assigned to M7. Full TrainingService remains under implementation/review.
+
+## M8 audit/statistics and external adaptation — PASS for changed slices
 
 Reviewed audit/statistics `4cf94e0` and adapter `62eec0c`. The six original findings have corresponding code changes: conditional error-rate denominators, distinct source units, frozen authenticated frame/sample, independent environment/checker judgments, task-level best-of-k and explicit training-replicate limitations. Reuse21 focused audit/statistics checks and2 adapter checks; these are diagnostic evidence, not empirical audits.
 
-Confirmed remaining affected-interface defects:
+Confirmed affected-interface defects and their resolutions:
 
 1. Audit applies source/verifier quarantine before report completion, causing ordinary Registry dependency enforcement to block its own report; already-quarantined historical subjects also cannot start. Reproduced with actual Registry enqueue/claim/quarantine/register/reconcile/complete and a PROVISIONAL test-only report. Consume the new scoped M6 configuration; preserve protected current refs and confirmed effect/report recovery. Current AuditService advertises controller recovery for unfinished claims without an implemented recovery API.
 2. `_source_subject` requires the original screening disposition to be rejected. Actual M6 also rejects an ineligible license after successful screening. Reproduced via actual Factory: screening=success, source=candidate_rejection, followed by AuditRejected. Validate the exact M6 decision/selected source receipt instead.
 3. External `frame.exclusions` is registered but never enforced, while its funnel claims exclusion from locked evaluation. Enforce the actual frozen family/lineage exclusions. Origin request locator and authoring allowlist identity must join actual source artifacts, and a self-declared patch digest plus changed-path names does not establish the external patch's relation to SourcePair history. Complete those joins when delegating to actual Factory construction; unresolved input relations must remain explicit.
 
-Both root reproductions used temporary resolved paths and clearly labeled diagnostic artifacts, with no human attestations, model calls or Docker reruns. Owners received the concrete findings. Actual EvaluationService and complete construction delegation remain assigned to M8.
+All three findings now have reviewed fixes. Audit `5a71dbb`, `389e039` and `35e8c13` consume the protected historical scope, preserve license rejection, freeze effects before application, recover exact publication, distinguish findings in notice IDs, authenticate recovery against the current service configuration and retain failure-report dependencies. Reports without a human adjudication use source-inspection scope. Reused seventeen focused checks; no real human approval was created.
+
+External adaptation `3217cb0`, `591f330` and `4fcd89a` validate the actual M1 source-inspection/request/history joins and frozen locked-test exclusions, invoke Factory construction and include source, parent and selected TaskBuilder child costs once. Root caught an intermediate Git-tree-ID/archive-hash mismatch; the fix uses distinct identities and a real local Git→M1→adapter diagnostic. Reused eight focused checks. These prove local adapter behavior, not successful acquisition or qualification of a real external corpus task.
+
+Root reproductions used temporary resolved paths and labeled diagnostics with no human attestations, model calls or Docker reruns. Actual EvaluationService is the remaining M8 implementation/review scope; unchanged statistics and upstream modules remain closed.
