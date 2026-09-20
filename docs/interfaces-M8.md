@@ -43,3 +43,13 @@ The canonical signed patch payload separately binds patch validity, environment 
 Only an explicit authenticated checker-defect adjudication in a valid environment quarantines the verifier. The service traces descendant rollouts/checkpoints and records the required regrade plus unaffected-restart-or-contamination-disclosure action. Historical inspection does not grant current task or policy admission.
 
 No real human enrollment, signed adjudication, frozen task roster, learned policy checkpoint, external corpus payload, GPU run or experiment result exists in this checkpoint.
+
+## External corpus adaptation
+
+`ExternalCorpusAdapter(store, factory, configuration, revision).adapt()` consumes only caller-supplied private row artifacts. It never downloads a row or calls a model. The strict row schema binds the pinned SWE-Bench++ fields `repo`, `instance_id`, `base_commit`, `created_at`, `language`, `task_type`, `repo_type`, `difficulty`, `problem_statement`, `patch`, `test_patch`, `FAIL_TO_PASS`, `PASS_TO_PASS`, and `environment_config` at dataset revision `da364537055b9bb5091783af78a02b6a3bc0e130` and harness revision `f938edd189049806fef7a76fdf01f0da55baa565`.
+
+Every row requires a private `ExternalOriginMapping` to actual M1 `CandidateRecord` and `SourcePair` artifacts. The adapter verifies row bytes, repository origin, B/reference commits, family, request lineage, partition, changed paths, M1 evidence, repository license state, intended-use classification, and request/patch/test/native-case/environment digests against a frame frozen before row text is used. Missing PR/H origin facts, unresolved intended use, unverified repository rights, or digest drift reject before M6 screening.
+
+The only solver-facing list contains the explicit PUBLIC/AUTHORING request, fresh B archive and license evidence. The private row, solution patch, test patch, native case names, environment hint, H and private provenance never enter that allowlist. `FAIL_TO_PASS` and `PASS_TO_PASS` are fingerprinted metadata and are never treated as reward evidence.
+
+Rows inside the frozen language/task-type allowlist call the actual `Factory.screen_source(candidate)`. Its selected Registry result, exact costs and disposition feed the per-item batch and metadata → origin → source-screen funnel. A successful item means source prerequisites are eligible only. Actual M2/M3/M4 construction with fresh workers and external observations, M5 qualification/M6 release, and M7 collection/training remain explicit next gates. The published private batch and every opaque input/dependency are registered in the same Registry.
