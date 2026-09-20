@@ -1,19 +1,34 @@
 """Authenticated human audits and weighted verifier-defect statistics."""
 from .models import (
-    AdjudicatedSample,
-    AuditAdjudication,
+    AdjudicatedPatchSample,
+    AdjudicatedSourceSample,
+    AuditPopulationFrame,
+    AuditSamplingPlan,
+    AuditStratum,
     AuditExecutionReport,
-    AuditSelection,
     AuditSelectionManifest,
     AuditStatistics,
     DetachedAuditAttestation,
+    PatchAuditAdjudication,
+    PatchAuditSelection,
+    PatchFrameEntry,
+    SourceAuditAdjudication,
+    SourceAuditSelection,
+    SourceAuditStatistics,
+    SourceFrameEntry,
 )
-from .statistics import AuditStatisticsError, summarize_audits
+from .statistics import AuditStatisticsError, summarize_audits, summarize_source_audits
+from .selection import AuditSelectionError, derive_selection_manifest, validate_selection_manifest
 from .service import AuditRejected, AuditService
 
 __all__ = [
-    "AdjudicatedSample", "AuditAdjudication", "AuditSelection",
-    "AuditExecutionReport", "AuditSelectionManifest", "AuditStatistics",
-    "AuditStatisticsError", "AuditRejected", "AuditService",
-    "DetachedAuditAttestation", "summarize_audits",
+    "AdjudicatedPatchSample", "AdjudicatedSourceSample", "AuditPopulationFrame",
+    "AuditSamplingPlan", "AuditStratum", "AuditExecutionReport",
+    "AuditSelectionManifest", "AuditStatistics", "AuditStatisticsError",
+    "AuditSelectionError", "AuditRejected", "AuditService",
+    "derive_selection_manifest", "validate_selection_manifest",
+    "DetachedAuditAttestation", "PatchAuditAdjudication", "PatchAuditSelection",
+    "PatchFrameEntry", "SourceAuditAdjudication", "SourceAuditSelection",
+    "SourceAuditStatistics", "SourceFrameEntry", "summarize_audits",
+    "summarize_source_audits",
 ]

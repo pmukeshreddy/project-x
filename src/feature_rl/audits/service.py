@@ -1,30 +1,42 @@
-"""Registry-backed, externally authenticated human audit execution."""
+"""Durable Registry-backed patch and rejected-source human audits."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import uuid
 from typing import Mapping
 
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl.grading import read_grade
+from feature_rl.pipeline import read_source_disposition
 from feature_rl.qualification.attestation import NAMESPACE, SSHHumanVerifier, verify_sshsig
-from feature_rl.registry import Registry
+from feature_rl.registry import CostObservation, JobSpec, Registry
 from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_bytes, read_local
 
 from .models import (
-    AdjudicatedSample,
-    AuditAdjudication,
+    AdjudicatedPatchSample,
+    AdjudicatedSourceSample,
     AuditExecutionReport,
-    AuditSelection,
+    AuditPopulationFrame,
+    AuditSamplingPlan,
     AuditSelectionManifest,
     DetachedAuditAttestation,
+    PatchAuditAdjudication,
+    PatchAuditOutcome,
+    PatchAuditSelection,
+    PatchFrameEntry,
+    SourceAuditAdjudication,
+    SourceAuditOutcome,
+    SourceAuditSelection,
+    SourceFrameEntry,
 )
-from .statistics import summarize_audits
+from .selection import validate_selection_manifest
+from .statistics import summarize_audits, summarize_source_audits
 
 
 class AuditRejected(ValueError):
-    """The registry, receipt, sample, or human attestation is not exact."""
+    """The frame, receipt, selection, or human attestation is not exact."""
 
 
 def _unknown_audit_cost() -> c.CostRecord:
@@ -36,34 +48,63 @@ def _unknown_audit_cost() -> c.CostRecord:
     )
 
 
+def _refs(evidence: tuple[c.EvidenceRecord, ...]) -> tuple[c.ArtifactRef, ...]:
+    return tuple(dict.fromkeys(ref for item in evidence for ref in item.artifacts))
+
+
 class AuditService:
-    """Audit frozen selected runs without granting task or policy admission."""
+    """Audit an entire frozen selection; historical reads grant no admission."""
 
     def __init__(
-        self,
-        *,
-        store: ArtifactStore,
-        registry: Registry,
-        human_verifier: SSHHumanVerifier,
-        selection_manifest: c.ArtifactRef,
-        attestations: Mapping[str, c.ArtifactRef],
-        revision: str,
+        self, *, store: ArtifactStore, registry: Registry,
+        human_verifier: SSHHumanVerifier, selection_manifest: c.ArtifactRef,
+        attestations: Mapping[str, c.ArtifactRef], revision: str,
     ):
         if not isinstance(store, ArtifactStore) or not isinstance(registry, Registry) or registry.store is not store:
             raise TypeError("audit requires the controller store used by the real Registry")
         if not isinstance(human_verifier, SSHHumanVerifier):
             raise TypeError("audit requires the M5 external SSH human verifier")
         if type(attestations) is not dict or any(type(key) is not str or not isinstance(value, c.ArtifactRef) for key, value in attestations.items()):
-            raise TypeError("attestations must be an exact run-to-reference dict")
+            raise TypeError("attestations must be an exact subject-to-reference dict")
         if type(revision) is not str or len(revision) not in (40, 64) or any(char not in "0123456789abcdef" for char in revision):
             raise ValueError("implementation revision required")
-        self.store = store
-        self.registry = registry
-        self.human_verifier = human_verifier
+        self.store, self.registry = store, registry
+        self.human_verifier, self.revision = human_verifier, revision
         self.selection_ref = c.ArtifactRef.model_validate(selection_manifest)
         self.selection = read_local(store, self.selection_ref, AuditSelectionManifest, "m8-audit-selection")
+        self.population_ref = self.selection.population_frame
+        self.plan_ref = self.selection.sampling_plan
+        self.population = read_local(store, self.population_ref, AuditPopulationFrame, "m8-audit-population")
+        self.plan = read_local(store, self.plan_ref, AuditSamplingPlan, "m8-audit-sampling")
+        validate_selection_manifest(self.population_ref, self.population, self.plan_ref, self.plan, self.selection)
+        selected_ids = {item.subject_id for item in self.selection.selections}
+        if set(attestations) - selected_ids:
+            raise AuditRejected("attestation supplied for a subject outside the frozen selection")
         self.attestations = dict(attestations)
-        self.revision = revision
+
+        frame_dependencies = tuple(
+            ref for item in self.population.entries if item.unit == "source"
+            for ref in (item.candidate, item.source_disposition)
+        )
+        registry.register(self.population_ref, dependencies=frame_dependencies)
+        registry.register(self.plan_ref, dependencies=(self.population_ref,))
+        registry.register(self.selection_ref, dependencies=(self.population_ref, self.plan_ref))
+        for reference in self.attestations.values():
+            envelope = read_local(store, reference, DetachedAuditAttestation, "m8-detached-audit-attestation")
+            registry.register(reference, dependencies=(envelope.payload, envelope.signature))
+        config_bytes = canonical_json({
+            "version": "m8-audit-configuration-v2",
+            "selection": self.selection_ref.model_dump(mode="json"),
+            "attestations": {
+                key: value.model_dump(mode="json") for key, value in sorted(self.attestations.items())
+            },
+            "revision": revision,
+        })
+        self.configuration = store.put_bytes(config_bytes, "m8-audit-configuration", c.Visibility.PRIVATE)
+        registry.register(
+            self.configuration,
+            dependencies=(self.selection_ref, *tuple(value for _, value in sorted(self.attestations.items()))),
+        )
 
     def _rollout_and_grade(self, run_id: str):
         try:
@@ -88,16 +129,17 @@ class AuditService:
         grade_ref = grade_refs[0]
         grade = read_grade(self.store, grade_ref)
         if (
-            rollout.submission is None
-            or grade.task != rollout.task
+            rollout.submission is None or grade.task != rollout.task
             or grade.submission != rollout.submission
             or rollout.seeds.seeds != (grade.case_seed,)
-            or grade.disposition != rollout.disposition
-            or grade.reward != rollout.reward
+            or grade.disposition != rollout.disposition or grade.reward != rollout.reward
             or grade.verifier is None
         ):
             raise AuditRejected(f"audit run {run_id} rollout and grade bindings differ")
-        return rollout_ref, rollout, grade_ref, grade
+        task = self.store.get_artifact(rollout.task)
+        if type(task) is not c.TaskBundle:
+            raise AuditRejected("audited rollout task is not a TaskBundle")
+        return rollout_ref, rollout, grade_ref, grade, task
 
     @staticmethod
     def _verifier_decision(disposition: c.Disposition) -> str:
@@ -105,33 +147,82 @@ class AuditService:
             return "accepted"
         if disposition == c.Disposition.REJECTED:
             return "rejected"
-        return "invalid"
+        if disposition == c.Disposition.INFRASTRUCTURE:
+            return "invalid_environment"
+        return "invalid_measurement"
 
-    def _authenticate(self, selection: AuditSelection, attestation_ref: c.ArtifactRef, rollout, grade):
-        envelope = read_local(
-            self.store, attestation_ref, DetachedAuditAttestation,
-            "m8-detached-audit-attestation",
-        )
-        raw = read_bytes(
-            self.store, envelope.payload, 65536,
-            "m8-audit-adjudication", True,
-        )
+    def _patch_subject(self, entry: PatchFrameEntry):
+        subject = self._rollout_and_grade(entry.run_id)
+        _, _, _, grade, task = subject
+        expected_failure = "none" if grade.disposition == c.Disposition.SUCCESS else grade.disposition.value
+        if (
+            entry.repository_family != task.repository_family
+            or entry.verifier_decision != self._verifier_decision(grade.disposition)
+            or entry.failure_category != expected_failure
+        ):
+            raise AuditRejected("patch frame family/status/failure category differs from actual run")
+        return subject
+
+    def _source_subject(self, entry: SourceFrameEntry):
         try:
-            payload = AuditAdjudication.model_validate_json(canonical_json(decode_json(raw, 65536)))
+            job = self.registry.job(entry.construct_job_id)
+        except Exception as exc:
+            raise AuditRejected(f"unknown rejected-source construct job {entry.construct_job_id}") from exc
+        if (
+            job.job_id != entry.construct_job_id or job.state != "completed"
+            or job.result is None or job.result.operation != "construct"
+            or job.result.disposition != c.Disposition.REJECTED
+        ):
+            raise AuditRejected("rejected-source unit requires an actual completed rejected construct result")
+        candidate_inputs = tuple(ref for ref in job.spec.inputs if ref.kind == "CandidateRecord")
+        if (
+            candidate_inputs != (entry.candidate,)
+            or job.spec.invocation != "m6-source-admission"
+            or job.result.artifacts != (entry.source_disposition,)
+        ):
+            raise AuditRejected("construct job does not consume the exact selected CandidateRecord")
+        candidate = self.store.get_artifact(entry.candidate)
+        receipt = read_source_disposition(self.store, entry.source_disposition)
+        if (
+            type(candidate) is not c.CandidateRecord
+            or candidate.repository_family != entry.repository_family
+            or candidate.screening.disposition != c.Disposition.REJECTED
+            or entry.failure_category != job.result.disposition.value
+            or receipt.claim.job_id != job.job_id
+            or receipt.candidate != entry.candidate
+            or receipt.repository_family != candidate.repository_family
+            or receipt.request_lineage != candidate.request_lineage
+            or receipt.screening != candidate.screening
+            or receipt.license != candidate.license
+            or receipt.partition != candidate.partition
+            or receipt.original_costs != candidate.costs
+            or receipt.source_status != "rejected"
+            or receipt.disposition != c.Disposition.REJECTED
+        ):
+            raise AuditRejected("rejected-source frame differs from actual candidate/result disposition")
+        evidence = tuple(dict.fromkeys((entry.source_disposition, *_refs(candidate.screening.evidence), *_refs(job.result.evidence))))
+        if not evidence:
+            raise AuditRejected("rejected-source result has no retained source evidence")
+        return job, candidate, evidence
+
+    def _population_subjects(self):
+        subjects = {}
+        for entry in self.population.entries:
+            subjects[entry.subject_id] = (
+                self._patch_subject(entry) if entry.unit == "patch"
+                else self._source_subject(entry)
+            )
+        return subjects
+
+    def _verify_human(self, selection, attestation_ref, model, kind):
+        envelope = read_local(self.store, attestation_ref, DetachedAuditAttestation, "m8-detached-audit-attestation")
+        raw = read_bytes(self.store, envelope.payload, 65536, kind, True)
+        try:
+            payload = model.model_validate_json(canonical_json(decode_json(raw, 65536)))
         except ValueError as exc:
             raise AuditRejected("invalid audit adjudication payload") from exc
-        if raw != canonical_json(payload.model_dump(mode="json")):
-            raise AuditRejected("audit adjudication must use exact canonical signing bytes")
-        if (
-            payload.sample != selection
-            or payload.run_id != selection.run_id
-            or payload.task != rollout.task
-            or payload.verifier != grade.verifier
-            or payload.submission != rollout.submission
-            or payload.human_identity != envelope.principal
-        ):
-            raise AuditRejected("audit adjudication sample/task/verifier/submission binding mismatch")
-        # Existence and a bounded payload are part of a reproducible counterexample.
+        if raw != canonical_json(payload.model_dump(mode="json")) or payload.sample != selection or payload.human_identity != envelope.principal:
+            raise AuditRejected("audit adjudication canonical sample/reviewer binding mismatch")
         read_bytes(self.store, payload.counterexample, 4 * 1024 * 1024, private=True)
         now = datetime.now(timezone.utc)
         enrollment = self.human_verifier.enrollment(now)
@@ -152,111 +243,213 @@ class AuditService:
         verification.update(
             human_origin_verified=True,
             enrollment_sha256=self.human_verifier.expected_enrollment_sha256,
-            human_identity=payload.human_identity,
-            fingerprint=reviewer.fingerprint,
+            human_identity=payload.human_identity, fingerprint=reviewer.fingerprint,
             attestation=attestation_ref.model_dump(mode="json"),
         )
         verification_ref = self.store.put_bytes(
             canonical_json(verification), "m8-human-audit-verification", c.Visibility.PRIVATE,
         )
         evidence = c.EvidenceRecord(
-            producer="feature_rl.audits", command=("AuditService.audit", selection.run_id),
+            producer="feature_rl.audits", command=("AuditService.audit", selection.unit, selection.subject_id),
             recorded_at=datetime.now(timezone.utc), exit_status=0,
             artifacts=(attestation_ref, verification_ref, payload.counterexample),
             revision=self.revision, scope="human_review",
         )
-        human_review = c.HumanReview(
-            actor_type="human", human_identity=payload.human_identity,
-            subject_sha256=payload.submission.sha256,
-            decision=("approved" if payload.human_decision == "valid" else "rejected" if payload.human_decision == "invalid" else "unresolved"),
-            evidence=(evidence,), attestation=attestation_ref,
-        )
-        record = c.AuditRecord(
-            submission=payload.submission, task=payload.task, verifier=payload.verifier,
-            sampling_probability=selection.sampling_probability,
-            sampling_kind=selection.sampling_kind, verdict=payload.human_decision,
-            human_review=human_review, evidence=(evidence,),
-        )
-        return payload, record, verification_ref
+        return payload, evidence, verification_ref
 
-    def audit(self, run_ids: tuple[str, ...]) -> c.OperationResult:
-        if type(run_ids) is not tuple or not run_ids or any(type(item) is not str for item in run_ids):
-            raise TypeError("audit run IDs must be a nonempty tuple")
-        if len(set(run_ids)) != len(run_ids):
-            raise AuditRejected("duplicate audit run ID")
-        selections = {item.run_id: item for item in self.selection.selections}
-        if set(run_ids) - selections.keys():
-            raise AuditRejected("audit run is absent from the frozen selection manifest")
-        if set(run_ids) - self.attestations.keys():
-            raise AuditRejected("audit run has no detached human adjudication")
+    def _execute(self):
+        subjects = self._population_subjects()
+        patch_outcomes, source_outcomes = [], []
+        patch_samples, source_samples = [], []
+        defects, source_defects = {}, {}
+        dependencies = [self.configuration, self.selection_ref, self.population_ref, self.plan_ref]
+        for entry in self.population.entries:
+            actual = subjects[entry.subject_id]
+            if entry.unit == "patch":
+                rollout_ref, rollout, grade_ref, grade, _ = actual
+                dependencies.extend((rollout_ref, grade_ref, rollout.task, grade.submission, grade.verifier))
+            else:
+                job, _, source_evidence = actual
+                dependencies.extend((entry.candidate, entry.source_disposition, *job.result.artifacts, *_refs(job.result.evidence), *source_evidence))
+        human_evidence = []
+        for selection in self.selection.selections:
+            actual = subjects[selection.subject_id]
+            attestation_ref = self.attestations.get(selection.subject_id)
+            if selection.unit == "patch":
+                _, rollout, _, grade, _ = actual
+                if attestation_ref is None:
+                    patch_samples.append(AdjudicatedPatchSample(
+                        selection=selection, patch_validity="unresolved",
+                        environment_validity="unresolved", checker_assessment="unresolved",
+                        attestation_status="unavailable",
+                    ))
+                    patch_outcomes.append(PatchAuditOutcome(
+                        selection=selection, adjudication=None, record=None,
+                        issue="selected patch has no authenticated adjudication",
+                    ))
+                    continue
+                payload, evidence, verification_ref = self._verify_human(
+                    selection, attestation_ref, PatchAuditAdjudication,
+                    "m8-patch-audit-adjudication",
+                )
+                if payload.task != rollout.task or payload.verifier != grade.verifier or payload.submission != rollout.submission:
+                    raise AuditRejected("patch adjudication task/verifier/submission binding mismatch")
+                review = c.HumanReview(
+                    actor_type="human", human_identity=payload.human_identity,
+                    subject_sha256=payload.submission.sha256,
+                    decision=("approved" if payload.patch_validity == "valid" else "rejected" if payload.patch_validity == "invalid" else "unresolved"),
+                    evidence=(evidence,), attestation=attestation_ref,
+                )
+                record = c.AuditRecord(
+                    submission=payload.submission, task=payload.task, verifier=payload.verifier,
+                    sampling_probability=selection.sampling_probability,
+                    sampling_kind=selection.sampling_kind, verdict=payload.patch_validity,
+                    human_review=review, evidence=(evidence,),
+                )
+                patch_samples.append(AdjudicatedPatchSample(
+                    selection=selection, patch_validity=payload.patch_validity,
+                    environment_validity=payload.environment_validity,
+                    checker_assessment=payload.checker_assessment,
+                    attestation_status="authenticated",
+                ))
+                patch_outcomes.append(PatchAuditOutcome(
+                    selection=selection, adjudication=payload, record=record,
+                    issue="authenticated patch adjudication",
+                ))
+                dependencies.extend((attestation_ref, verification_ref, payload.counterexample))
+                human_evidence.append(evidence)
+                if payload.checker_assessment == "defect":
+                    defects.setdefault(payload.verifier, []).append((payload.counterexample, verification_ref))
+            else:
+                _, candidate, source_evidence = actual
+                if attestation_ref is None:
+                    source_samples.append(AdjudicatedSourceSample(
+                        selection=selection, source_validity="unresolved",
+                        source_assessment="unresolved", attestation_status="unavailable",
+                    ))
+                    source_outcomes.append(SourceAuditOutcome(
+                        selection=selection, adjudication=None, evidence=(),
+                        issue="selected rejected source has no authenticated adjudication",
+                    ))
+                    continue
+                payload, evidence, verification_ref = self._verify_human(
+                    selection, attestation_ref, SourceAuditAdjudication,
+                    "m8-source-audit-adjudication",
+                )
+                if payload.candidate != selection.candidate or payload.source_evidence != source_evidence:
+                    raise AuditRejected("source adjudication candidate/evidence binding mismatch")
+                source_samples.append(AdjudicatedSourceSample(
+                    selection=selection, source_validity=payload.source_validity,
+                    source_assessment=payload.source_assessment,
+                    attestation_status="authenticated",
+                ))
+                source_outcomes.append(SourceAuditOutcome(
+                    selection=selection, adjudication=payload, evidence=(evidence,),
+                    issue="authenticated rejected-source adjudication",
+                ))
+                dependencies.extend((attestation_ref, verification_ref, payload.counterexample, candidate.provenance.inputs[0] if candidate.provenance.inputs else selection.candidate))
+                human_evidence.append(evidence)
+                if payload.source_assessment == "defect":
+                    source_defects.setdefault(selection.candidate, []).append((payload.counterexample, verification_ref))
 
-        rows = []
-        defects: dict[c.ArtifactRef, list[tuple[AuditAdjudication, c.ArtifactRef]]] = {}
-        output_evidence = []
-        for run_id in run_ids:
-            selection = selections[run_id]
-            rollout_ref, rollout, _, grade = self._rollout_and_grade(run_id)
-            if selection.verifier_decision != self._verifier_decision(grade.disposition):
-                raise AuditRejected("frozen audit stratum differs from the selected grade")
-            payload, record, verification_ref = self._authenticate(
-                selection, self.attestations[run_id], rollout, grade,
-            )
-            rows.append((selection, payload, record, rollout_ref))
-            output_evidence.extend(record.evidence)
-            mismatch = (
-                selection.verifier_decision == "accepted" and payload.human_decision == "invalid"
-            ) or (
-                selection.verifier_decision in {"rejected", "invalid"} and payload.human_decision == "valid"
-            )
-            if mismatch:
-                defects.setdefault(payload.verifier, []).append((payload, verification_ref))
-
-        quarantined = []
-        affected_runs = set()
-        affected_checkpoints = set()
-        for verifier, findings in defects.items():
-            evidence_refs = tuple(dict.fromkeys(
-                ref for payload, verification_ref in findings
-                for ref in (payload.counterexample, verification_ref)
-            ))
-            notice_id = "m8-audit-" + verifier.sha256[:24]
+        quarantined, quarantined_sources = [], []
+        affected_runs, affected_checkpoints = set(), set()
+        for root, findings, target in (
+            *((root, findings, quarantined) for root, findings in defects.items()),
+            *((root, findings, quarantined_sources) for root, findings in source_defects.items()),
+        ):
+            evidence_refs = tuple(dict.fromkeys(ref for finding in findings for ref in finding))
             self.registry.quarantine(
-                verifier, notice_id=notice_id,
-                reason="authenticated M8 human audit found a verifier decision defect",
+                root, notice_id="m8-audit-" + root.sha256[:24],
+                reason="authenticated M8 human audit found a decision defect",
                 evidence=evidence_refs,
             )
-            trace = self.registry.trace(verifier)
-            quarantined.append(verifier)
+            trace = self.registry.trace(root)
+            target.append(root)
             affected_runs.update(trace.runs)
             affected_checkpoints.update(trace.checkpoints)
-
-        statistics = summarize_audits(tuple(
-            AdjudicatedSample(selection=selection, human_decision=payload.human_decision)
-            for selection, payload, _, _ in rows
-        ))
-        actions = () if not defects else (
-            "regrade saved submissions with an unaffected verifier",
+        actions = () if not defects and not source_defects else (
+            "regrade saved submissions after checker defects with an unaffected verifier",
             "restart training from an unaffected checkpoint or disclose contamination after weight updates",
+            "retain and correct rejected-source screening without relabeling patch audit denominators",
         )
         report = AuditExecutionReport(
-            version="m8-audit-report-v1", population_frame=self.selection.population_frame,
-            records=tuple(record for _, _, record, _ in rows), statistics=statistics,
+            version="m8-audit-report-v2", population_frame=self.population_ref,
+            sampling_plan=self.plan_ref, selection_manifest=self.selection_ref,
+            patch_outcomes=tuple(patch_outcomes), source_outcomes=tuple(source_outcomes),
+            patch_statistics=summarize_audits(tuple(patch_samples)),
+            source_statistics=summarize_source_audits(tuple(source_samples)),
             quarantined_verifiers=tuple(sorted(quarantined, key=lambda ref: ref.sha256)),
+            quarantined_sources=tuple(sorted(quarantined_sources, key=lambda ref: ref.sha256)),
             affected_runs=tuple(sorted(affected_runs, key=lambda ref: ref.sha256)),
             affected_checkpoints=tuple(sorted(affected_checkpoints, key=lambda ref: ref.sha256)),
             required_action=actions,
         )
-        report_ref = self.store.put_bytes(
-            canonical_json(report.model_dump(mode="json")), "m8-audit-report", c.Visibility.PRIVATE,
+        complete = all(item.attestation_status == "authenticated" for item in (*patch_samples, *source_samples))
+        return report, tuple(dict.fromkeys(dependencies)), tuple(human_evidence), complete
+
+    def _spec(self):
+        return JobSpec(
+            operation="audit", inputs=(self.selection_ref,), configuration=self.configuration,
+            implementation=self.revision, invocation="m8-audit-v2", attempt_limit=1,
         )
-        evidence = c.EvidenceRecord(
-            producer="feature_rl.audits", command=("AuditService.audit", *run_ids),
-            recorded_at=datetime.now(timezone.utc), exit_status=0, artifacts=(report_ref,),
-            revision=self.revision, scope="human_review",
+
+    def audit(self, run_ids: tuple[str, ...]) -> c.OperationResult:
+        if type(run_ids) is not tuple or any(type(item) is not str for item in run_ids):
+            raise TypeError("audit run IDs must be a tuple")
+        expected = tuple(sorted(
+            item.run_id for item in self.selection.selections if item.unit == "patch"
+        ))
+        if tuple(sorted(run_ids)) != expected or len(run_ids) != len(set(run_ids)):
+            raise AuditRejected("audit must account for the complete frozen patch selection")
+        job = self.registry.enqueue(self._spec())
+        if job.state == "completed":
+            return job.result
+        if job.state != "queued":
+            raise AuditRejected("existing audit attempt requires controller recovery")
+        claim = self.registry.claim(
+            job.job_id, owner="feature_rl.audits.AuditService", claim_key=uuid.uuid4().hex,
         )
-        return c.OperationResult(
-            operation="audit", disposition=c.Disposition.SUCCESS,
-            artifacts=(report_ref,), evidence=(evidence, *output_evidence),
-            costs=(_unknown_audit_cost(),),
-            reason="authenticated human audit completed; report records any quarantine and required remediation",
-        )
+        try:
+            report, dependencies, human_evidence, complete = self._execute()
+            report_ref = self.store.put_bytes(
+                canonical_json(report.model_dump(mode="json")), "m8-audit-report", c.Visibility.PRIVATE,
+            )
+            self.registry.register(report_ref, dependencies=dependencies)
+            evidence = c.EvidenceRecord(
+                producer="feature_rl.audits", command=("AuditService.audit", *expected),
+                recorded_at=datetime.now(timezone.utc), exit_status=0, artifacts=(report_ref,),
+                revision=self.revision, scope="human_review" if human_evidence else "source_inspection",
+            )
+            result = c.OperationResult(
+                operation="audit",
+                disposition=c.Disposition.SUCCESS if complete else c.Disposition.PROVISIONAL,
+                artifacts=(report_ref,), evidence=(evidence, *human_evidence),
+                costs=(_unknown_audit_cost(),),
+                reason="complete frozen audit selection recorded; unavailable adjudications remain explicit",
+            )
+        except AuditRejected as exc:
+            payload = canonical_json({
+                "version": "m8-audit-failure-v1", "configuration": self.configuration.model_dump(mode="json"),
+                "reason": str(exc), "recorded_at": datetime.now(timezone.utc).isoformat(),
+            })
+            failure_ref = self.store.put_bytes(payload, "m8-audit-failure", c.Visibility.PRIVATE)
+            self.registry.register(failure_ref, dependencies=(self.configuration,))
+            evidence = c.EvidenceRecord(
+                producer="feature_rl.audits", command=("AuditService.audit", *expected),
+                recorded_at=datetime.now(timezone.utc), exit_status=1, artifacts=(failure_ref,),
+                revision=self.revision, scope="source_inspection",
+            )
+            result = c.OperationResult(
+                operation="audit", disposition=c.Disposition.INVALID,
+                artifacts=(failure_ref,), evidence=(evidence,), costs=(_unknown_audit_cost(),),
+                reason=str(exc),
+            )
+        observation = self.registry.reconcile(claim, CostObservation(
+            source="m8-audit", upstream_attempt_id=claim.attempt_id,
+            revision=1, receipts=(self.configuration, *result.artifacts),
+            costs=result.costs,
+        ))
+        return self.registry.complete(
+            claim, result, observations=(observation.observation_id,),
+        ).result

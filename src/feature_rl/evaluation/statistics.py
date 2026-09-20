@@ -132,52 +132,61 @@ def summarize_trials(
     limitations = [
         "statistics aggregate supplied observed receipts and do not establish task or policy admission",
         "all-assigned rates count invalid and unresolved assigned trials as unsuccessful",
+        "independently trained replicates are not represented; policy sampling seeds do not measure training variability",
     ]
-    if len(preregistration.seeds.seeds) < 2:
-        limitations.append("one policy seed; training-seed uncertainty is unavailable")
     metrics: list[c.MetricEstimate] = []
     counts: list[ArmCounts] = []
     protocols = sorted(item.arm for item in preregistration.arms)
+    metric_name = "pass_at_1" if preregistration.metric == "pass_at_1" else f"best_of_{preregistration.episodes_per_trial}"
+    grouped: dict[tuple[tuple[str, str, int], int, str], list[c.TrialResult]] = {}
+    for assignment in preregistration.trials:
+        grouped.setdefault((_key(assignment.task), assignment.policy_seed, assignment.arm), []).append(observed[assignment.trial_id])
+    units: dict[tuple[tuple[str, str, int], int, str], tuple[str, float, float | None]] = {}
+    for key, episodes in grouped.items():
+        if len(episodes) != preregistration.episodes_per_trial:
+            raise StatisticsError("metric unit does not contain the frozen episode count")
+        family = episodes[0].repository_family
+        all_value = float(any(item.resolved is True for item in episodes))
+        valid_value = all_value if all(item.resolved is not None for item in episodes) else None
+        units[key] = family, all_value, valid_value
     for arm_index, arm in enumerate(protocols):
-        arm_trials = [item for item in trials if item.arm == arm]
-        valid = [item for item in arm_trials if item.resolved is not None]
-        successes = [item for item in valid if item.resolved]
+        arm_units = [value for (*_, unit_arm), value in units.items() if unit_arm == arm]
+        valid = [item for item in arm_units if item[2] is not None]
+        successes = [item for item in valid if item[2]]
         counts.append(ArmCounts(
-            arm=arm, assigned=len(arm_trials), valid=len(valid), resolved=len(successes),
-            failed=len(valid) - len(successes), invalid=len(arm_trials) - len(valid),
+            arm=arm, assigned=len(arm_units), valid=len(valid), resolved=len(successes),
+            failed=len(valid) - len(successes), invalid=len(arm_units) - len(valid),
         ))
         all_groups: dict[str, list[float]] = {}
         valid_groups: dict[str, list[float]] = {}
-        for item in arm_trials:
-            all_groups.setdefault(item.repository_family, []).append(float(item.resolved is True))
-            if item.resolved is not None:
-                valid_groups.setdefault(item.repository_family, []).append(float(item.resolved))
+        for family, all_value, valid_value in arm_units:
+            all_groups.setdefault(family, []).append(all_value)
+            if valid_value is not None:
+                valid_groups.setdefault(family, []).append(valid_value)
         metrics.append(_estimate(
-            f"pass_at_1/{arm}/all_assigned", all_groups, family_weighted=False,
-            sample_size=len(arm_trials), bootstrap_seed=bootstrap_seed + arm_index * 2,
+            f"{metric_name}/{arm}/all_assigned", all_groups, family_weighted=False,
+            sample_size=len(arm_units), bootstrap_seed=bootstrap_seed + arm_index * 2,
             bootstrap_resamples=bootstrap_resamples, limitations=tuple(limitations),
         ))
         metrics.append(_estimate(
-            f"pass_at_1/{arm}/valid_only", valid_groups, family_weighted=False,
+            f"{metric_name}/{arm}/valid_only", valid_groups, family_weighted=False,
             sample_size=len(valid), bootstrap_seed=bootstrap_seed + arm_index * 2 + 1,
             bootstrap_resamples=bootstrap_resamples,
             limitations=tuple((*limitations, "invalid trials excluded from this denominator")),
         ))
 
-    by_cell: dict[tuple[tuple[str, str, int], int, int, str], c.TrialResult] = {}
-    for assignment in preregistration.trials:
-        by_cell[(_key(assignment.task), assignment.policy_seed, assignment.episode_index, assignment.arm)] = observed[assignment.trial_id]
     for comparison_index, (left, right) in enumerate(preregistration.comparisons):
         all_groups: dict[str, list[float]] = {}
         valid_groups: dict[str, list[float]] = {}
-        cells = sorted({(task, seed, episode) for task, seed, episode, _ in by_cell})
-        for task, seed, episode in cells:
-            left_trial = by_cell[(task, seed, episode, left)]
-            right_trial = by_cell[(task, seed, episode, right)]
-            family = left_trial.repository_family
-            all_groups.setdefault(family, []).append(float(right_trial.resolved is True) - float(left_trial.resolved is True))
-            if left_trial.resolved is not None and right_trial.resolved is not None:
-                valid_groups.setdefault(family, []).append(float(right_trial.resolved) - float(left_trial.resolved))
+        cells = sorted({(task, seed) for task, seed, _ in units})
+        for task, seed in cells:
+            left_family, left_all, left_valid = units[(task, seed, left)]
+            right_family, right_all, right_valid = units[(task, seed, right)]
+            if left_family != right_family:
+                raise StatisticsError("paired arms disagree on repository family")
+            all_groups.setdefault(left_family, []).append(right_all - left_all)
+            if left_valid is not None and right_valid is not None:
+                valid_groups.setdefault(left_family, []).append(right_valid - left_valid)
         for population, groups in (("all_assigned", all_groups), ("valid_only", valid_groups)):
             n = sum(map(len, groups.values()))
             population_limits = tuple(limitations) if population == "all_assigned" else tuple((*limitations, "pairs with either invalid trial excluded from this denominator"))

@@ -18,26 +18,28 @@ This checkpoint implements immutable study records, validation, offline receipt 
 
 ## Receipt statistics
 
-`summarize_trials(roster, preregistration, trials, bootstrap_seed=..., bootstrap_resamples=...)` accepts a complete tuple of actual `TrialResult` receipts. It rejects missing, duplicate, drifted-task, drifted-family, drifted-policy-seed, or drifted-case-seed rows. It returns:
+`summarize_trials(roster, preregistration, trials, bootstrap_seed=..., bootstrap_resamples=...)` accepts a complete tuple of actual `TrialResult` receipts. It rejects missing, duplicate, drifted-task, drifted-family, drifted-policy-seed, or drifted-case-seed rows. Pass@1 aggregates one episode per task/policy seed. Best-of-k aggregates the frozen k-episode set once per task/policy seed; a valid-only best-of-k unit requires all k assigned episodes to be valid. It returns:
 
 - assigned, valid, resolved, failed and invalid counts by arm;
 - pass@1 rates using every assigned trial, counting invalid/unresolved assignments as unsuccessful;
 - separate valid-only rates, with null estimates for empty denominators;
 - paired right-minus-left task-weighted and repository-family-weighted differences; and
-- deterministic repository-family clustered percentile intervals, with explicit limitations when fewer than two families or training seeds exist.
+- deterministic repository-family clustered percentile intervals, with explicit limitations when fewer than two families exist. Policy sampling seeds never remove the explicit limitation that independently trained replicates are absent.
 
 This function aggregates supplied receipts only. It neither executes policies nor establishes current task/policy admission.
 
 ## Human audit
 
-`AuditService(store, registry, human_verifier, selection_manifest, attestations, revision).audit(run_ids)` uses the actual controller `Registry`, M4 receipts and M5 `SSHHumanVerifier`.
+`AuditService(store, registry, human_verifier, selection_manifest, attestations, revision).audit(run_ids)` uses the actual controller `Registry`, M4 receipts, M5 `SSHHumanVerifier`, and M6 `SourceDisposition` records. It registers every opaque frame, plan, selection, attestation and configuration dependency before creating one durable Registry `audit` job with accounting.
 
 For each frozen selected run it requires a completed registry job whose operation is `run`, exactly one `RolloutRecord` with `rollout.run_id == job_id`, and exactly one M4 grade receipt bound to the same task, submission, disposition, reward and sole grader seed. Unknown, incomplete, ambiguous or drifted records reject.
 
-The canonical signed `AuditAdjudication` binds the full selected sample, run, task, verifier, submission, reproducible counterexample, verdict, adjudication text, reviewer and review time. Verification uses the M5 namespace `feature-rl-human-review-v1`, live pinned external enrollment, revocation list, enrolled Ed25519 key and pinned native binary digest. SSHSIG validity alone is not treated as human origin.
+`AuditPopulationFrame` contains actual patch runs and true rejected-source construct jobs. `AuditSamplingPlan` stratifies by unit, repository family, actual status and failure category. `derive_selection_manifest` deterministically ranks each frozen stratum from its explicit seed and derives `sample_size / population_size`; the service recomputes the complete selection, validates every population subject against Registry/M4/M6, and refuses a partial `run_ids` list. Missing selected attestations remain explicit unresolved outcomes.
 
-`summarize_audits` reports inverse-probability weighted `invalid_among_accepted`, `accepted_among_invalid`, and `rejected_among_valid` estimates. Targeted samples are excluded from population estimates. Empty or unresolved denominators return null estimates. The frozen manifest requires accepted, rejected and rejected-source strata.
+The canonical signed patch payload separately binds patch validity, environment validity and checker assessment to the selected sample, run, task, verifier, submission and reproducible counterexample. An infrastructure outcome cannot establish a checker defect. The separate source payload binds the selected M6 construct job, exact CandidateRecord, M6 disposition/source evidence and counterexample. Source findings never enter patch denominators and quarantine the actual source version rather than a fabricated verifier. Verification uses the M5 namespace `feature-rl-human-review-v1`, live pinned external enrollment, revocation list, enrolled Ed25519 key and pinned native binary digest. SSHSIG validity alone is not treated as human origin.
 
-An authenticated checker mismatch quarantines the verifier in the real registry, traces descendant rollouts/checkpoints, and records the required regrade plus unaffected-restart-or-contamination-disclosure action. Historical inspection does not grant current task or policy admission.
+`summarize_audits` reports inverse-probability weighted `invalid_among_accepted` (conditioned on verifier acceptance), `accepted_among_invalid` (conditioned on human-invalid patches), and `rejected_among_valid` (conditioned on human-valid patches). Empty or unresolved denominators return null estimates and unavailable/invalid-environment outcomes have separate accounting. `summarize_source_audits` reports the separately weighted valid-source rate among rejected-source units.
+
+Only an explicit authenticated checker-defect adjudication in a valid environment quarantines the verifier. The service traces descendant rollouts/checkpoints and records the required regrade plus unaffected-restart-or-contamination-disclosure action. Historical inspection does not grant current task or policy admission.
 
 No real human enrollment, signed adjudication, frozen task roster, learned policy checkpoint, external corpus payload, GPU run or experiment result exists in this checkpoint.
