@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from feature_rl.contracts import ArtifactRef, Disposition, Partition, PolicyConfig, RolloutRecord, TaskBundle
+from feature_rl.contracts import ArtifactRef, Disposition, Partition, PolicyConfig, RolloutRecord, TaskBundle, StopReason
 from feature_rl.grading.service import read_grade
 from feature_rl.environments.archive import SourceArchive
 from feature_rl.environments import SandboxPolicy
@@ -129,7 +129,12 @@ class TrainingDataGate:
                     or not record.seeds.same_cases_within_group or record.seeds.seeds != (plan.case_seed,)):
                 raise ValueError('Group task/policy/episode seed/private case seed mismatch')
             if record.reward is not None:
-                if not record.training_eligible or record.policy.identity.tokenizer_digest != tokenizer_digest:
+                # An authenticated pre-generation limit still earns its measured
+                # candidate outcome. It contributes to the valid group mean,
+                # without inventing a sampled action or optimization row.
+                empty_limit=(self.runner is not None and not record.steps and not contexts[n]
+                    and record.stopping_reason in (StopReason.TOKEN_LIMIT,StopReason.TIME_LIMIT))
+                if (not record.training_eligible and not empty_limit) or record.policy.identity.tokenizer_digest != tokenizer_digest:
                     raise ValueError('Measured episode is not an exact training trajectory')
             self._episode_grade(record, plan.case_seed)
         rewards = tuple(r.reward for r in checked)

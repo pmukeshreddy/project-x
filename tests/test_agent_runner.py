@@ -327,3 +327,27 @@ def test_next_command_timeout_is_capped_by_remaining_measured_cpu(tmp_path,monke
     assert f.actions[0][1].remaining_cpu_seconds==60.
     assert f.actions[1][1].remaining_cpu_seconds==.5
     assert r.stopping_reason==c.StopReason.TIME_LIMIT and len(f.backend.calls)==2
+
+
+def test_authentic_pre_generation_limit_counts_in_group_without_fake_tokens(tmp_path,monkeypatch):
+    from feature_rl.training import TrainingDataGate,BalancedSampler,TaskSlot
+    f=fixture(tmp_path,monkeypatch)
+    f.task=replace_artifact(f.store,f.task,partition=c.Partition.TRAIN)
+    sampler=BalancedSampler([TaskSlot(f.task.sha256,'diagnostic','diagnostic')],seed=19)
+    plan=sampler.next_group(f.policy.policy_version)
+    limits=f.limits.model_copy(update={'input_tokens':1})
+    records=tuple(record(f,f.runner.run(f.task,f.policy.model_copy(update={'seed':seed}),limits,
+        case_seed=plan.case_seed)) for seed in plan.episode_seeds)
+    assert not f.backend.calls and len(f.grades)==4
+    gate=TrainingDataGate(store=f.store,admit=f.runner.lifecycle.resolve_released,
+        grader_revision=f.runner.grader.revision,runner=f.runner)
+    kwargs=dict(contexts=((),)*4,expected_policy=f.policy,vocab_size=f.backend.vocab_size,max_seq_len=f.backend.max_seq_len)
+    prepared=gate.prepare_group(plan,records,**kwargs)
+    assert prepared.rewards==(0,0,0,0) and prepared.effective_size==4
+    assert prepared.optimization_turns()==[] and all(r.costs for r in prepared.records)
+    # Same claimed zero-step result cannot enter without the selected runner receipt.
+    unauthenticated=TrainingDataGate(store=f.store,admit=f.runner.lifecycle.resolve_released,
+        grader_revision=f.runner.grader.revision)
+    with pytest.raises(ValueError,match='exact training trajectory'):unauthenticated.prepare_group(plan,records,**kwargs)
+    altered=records[0].model_copy(update={'stopping_reason':c.StopReason.SUBMITTED})
+    with pytest.raises(ValueError):gate.prepare_group(plan,(altered,*records[1:]),**kwargs)

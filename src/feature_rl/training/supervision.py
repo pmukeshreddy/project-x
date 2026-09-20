@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from feature_rl import contracts as c
 from feature_rl.artifacts import canonical_json
 from feature_rl.agents import AgentRunner
-from feature_rl.agents.protocol import parse_action, execution_request
+from feature_rl.agents.protocol import HARNESS, parse_action, execution_request
 from feature_rl.environments import SourceArchive
 from .data import TrainingDataGate, tokenize_supervision
 from .torch_backend import CausalTurn
@@ -61,6 +61,9 @@ class DemonstrationImporter:
 
     def source(self,*,task,submission,grade,policy) -> SupervisedExample:
         """Import an explicitly supplied M4-verified source solution for the SFT arm."""
+        policy=c.PolicyConfig.model_validate_json(policy.model_dump_json())
+        if policy.system_prompt.visibility!=c.Visibility.PUBLIC or policy.harness_version!=HARNESS:
+            raise ValueError('Supervised source requires the runner public system prompt and fixed harness')
         runner=self.runner;admitted=self.gate.admit_task(task)
         runner.registry.assert_usable(task);runner.registry.assert_usable(grade)
         receipt=self.gate._grade(grade,task=task,submission=submission,reward=1)

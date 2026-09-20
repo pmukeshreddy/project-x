@@ -67,6 +67,10 @@ def test_importer_keeps_admission_and_actual_submission_grade_join(tmp_path,monk
     assert len(example.turns)==1 and example.turns[0].behavior is None and example.turns[0].advantage is None
     target=bytes(example.turns[0].targets).decode();assert 'sft_diagnostic.py' in target
     assert not f.backend.calls and not f.actions and not f.grades
+    private=f.store.put_bytes(b'PRIVATE TEST marker','system-prompt',c.Visibility.PRIVATE)
+    with pytest.raises(ValueError,match='public system prompt'):
+        importer.source(task=f.task,submission=submission,grade=grade,
+            policy=f.policy.model_copy(update={'system_prompt':private}))
     bad=f.store.put_bytes(b'different submission','m4-submission',c.Visibility.PRIVATE)
     with pytest.raises(ValueError,match='exact task/submission'):
         importer.source(task=f.task,submission=bad,grade=grade,policy=f.policy)
