@@ -12,6 +12,7 @@ from .models import (
     TrialAssignment,
 )
 from .statistics import ArmCounts, EvaluationStatistics, StatisticsError, summarize_trials
+from .service import EvaluationRecoveryRequired, EvaluationRejected, EvaluationService
 from .adaptation import (
     AdaptationBatch,
     AdaptationItem,
@@ -27,6 +28,7 @@ __all__ = [
     "AdaptationFunnel", "AdaptationStage", "ArmProtocol", "BudgetLimit",
     "EvaluationPreregistration", "FrozenRoster", "FrozenStudyError",
     "LineageLeakage", "LineageRelation", "SourceAssignment", "TrialAssignment",
+    "EvaluationRecoveryRequired", "EvaluationRejected", "EvaluationService",
     "ArmCounts", "EvaluationStatistics", "StatisticsError", "summarize_trials",
     "AdaptationBatch", "AdaptationItem", "ExternalAdaptationConfig",
     "ExternalCorpusAdapter", "ExternalCorpusFrame", "ExternalCorpusRow",
