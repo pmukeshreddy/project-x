@@ -32,7 +32,11 @@ Reviewed CLI `fc08386`: strict bounded JSON, real service composition, actual Do
 
 Reviewed `ebd151e` and `22ea078`: source demonstrations bind actual successful M4 source, exact public harness contexts and tokenizer prefixes; trajectory demonstrations authenticate selected runner records. A root diagnostic reproduced acceptance of a private source-SFT system prompt; `22ea078` now rejects it before rendering. Reused eight SFT/file checks and fifteen data/core checks. The same checkpoint correctly retains authenticated zero-step token/time-budget episodes in group rewards with zero optimization rows. Nontraining arbitrary records remain rejected.
 
-Native session `7e7bb1f` uses the actual pinned SkyRL trainer/dispatch/checkpoint hooks, protected local native directories, actual broadcast plus bounded worker probes and live activation checks. Root inspected the affected pinned constructor, update and checkpoint symbols. GPU execution is unverified. The owner is finishing concrete trainable-tensor/optimizer witnesses and the selected-job session factory; review identified a new post-startup publication failure that could strand a live session, now assigned to M7. Full TrainingService remains under implementation/review.
+Native session `7e7bb1f` uses the actual pinned SkyRL trainer/dispatch/checkpoint hooks, protected local native directories, actual broadcast plus bounded worker probes and live activation checks. Root inspected the affected pinned constructor, update, worker and checkpoint symbols. GPU execution is unverified.
+
+Native factory/witnesses `e41c98f` and fixes `9c9c328` now retain startup and successful shutdown across publication faults, authenticate cleanup independently of current quarantine, and put outputs under the selected job's namespace. Native updates witness actual trainable and optimizer contents; reload requires exact witnesses and inference consistency. Root ran the publication-fault and BF16 AdamW witness checks:2 passed in1.29s. A root diagnostic then reproduced quarantine preventing shutdown; after the fix its single regression passed in0.65s. Reuse the owner's broader61 focused training checks in14.41s. These changed factory boundaries are PASS.
+
+TrainingService `9c9c328` authenticates released TRN inputs before native startup, freezes actual calls/costs, persists sampler/supervised positions and policy state, gates updates on real signal, and publishes selected checkpoints only after changed tensors/nonzero gradients and reload checks. Ordinary same-claim recovery is CPU-tested. One confirmed gap remains: explicit `resume=...` from an interrupted job is incorrectly routed through the completed-success evaluation validator. M7 is adding a recovery-only path tied to the original confirmed update/claim while preserving unknown subsequent work. The selected-success evaluation helper remains strict. Ordinary native-run orchestration is the other remaining M7 service deliverable.
 
 ## M8 audit/statistics and external adaptation — PASS for changed slices
 
@@ -49,3 +53,13 @@ All three findings now have reviewed fixes. Audit `5a71dbb`, `389e039` and `35e8
 External adaptation `3217cb0`, `591f330` and `4fcd89a` validate the actual M1 source-inspection/request/history joins and frozen locked-test exclusions, invoke Factory construction and include source, parent and selected TaskBuilder child costs once. Root caught an intermediate Git-tree-ID/archive-hash mismatch; the fix uses distinct identities and a real local Git→M1→adapter diagnostic. Reused eight focused checks. These prove local adapter behavior, not successful acquisition or qualification of a real external corpus task.
 
 Root reproductions used temporary resolved paths and labeled diagnostics with no human attestations, model calls or Docker reruns. Actual EvaluationService is the remaining M8 implementation/review scope; unchanged statistics and upstream modules remain closed.
+
+## M8 evaluation service — remaining protocol joins
+
+Reviewed the new `6b4dc6b` service: selected claimed native startup, actual released task partition/family/lineage, selected M7 checkpoint request/config/weights, per-arm activation and live barrier, explicit case seeds, sole selected runner records, frozen execution before shutdown, cleanup recovery and all-assigned reporting. Four owner CPU checks passed in28.19s. Diagnostic native boundaries are substituted explicitly; no real study ran.
+
+Remaining confirmed interface finding: matching declarative optimizer/tools/budget/method labels do not yet bind C/D to matching actual training settings or actual external-versus-factory dataset origins. M8 is adding those joins against selected M7 requests and existing Factory/adapter evidence. This review does not reopen unchanged statistics, audits or adaptation.
+
+## M0 command transport — PASS
+
+Reviewed `60ff9a7`: optional strict nonnegative `RunRequest.case_seed` defaults to None, preserving ordinary runner behavior, and `feature-rl` points to the real `feature_rl.cli:main`. Reuse121 focused contract checks, actual module help and metadata resolution. No dependency installation was needed.
