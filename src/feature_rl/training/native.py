@@ -427,3 +427,6 @@ class NativeSession:
         self.barrier.begin(self.barrier.stamp,self.barrier.probe)
         import ray
         ray.shutdown()
+
+# Pinned FSDPStrategy.create_optimizer constructs torch.optim.AdamW directly.
+OPTIMIZER_FAMILY = 'adamw'

@@ -73,3 +73,23 @@ def execution_request(action, remaining_wall):
         argv=action.argv;stdin=action.stdin.encode();timeout=min(action.timeout_seconds,remaining_wall)
     return ExecutionRequest(command=c.CommandSpec(argv=argv,working_directory='/workspace/source',
         timeout_seconds=float(timeout)),stdin=stdin,save_source=True)
+
+
+ACTION_FORMAT = 'actions-v1'
+
+
+def protocol_payload():
+    """Canonical public declaration of the actual fixed tool/action implementation."""
+    import hashlib
+    return canonical_json({'version':'m7-tool-protocol-v1','harness':HARNESS,
+        'action_format':ACTION_FORMAT,'schema':_ACTION.json_schema(),'instructions':INSTRUCTIONS,
+        'file_tool_sha256':hashlib.sha256(_FILE_TOOL.encode()).hexdigest(),
+        'workspace':'/workspace/source','execution':'reviewed-m3-source-worker',
+        'action_bytes':512*1024,'feedback_bytes':65536})
+
+
+def validate_protocol(store,ref,*,action_format):
+    if action_format!=ACTION_FORMAT or ref.kind!='m7-tool-protocol' or ref.visibility!=c.Visibility.PUBLIC:
+        raise ValueError('Actual public runner tool/action protocol required')
+    if store.get_bytes(ref,max_envelope_bytes=131072,max_payload_bytes=65536)!=protocol_payload():
+        raise ValueError('Frozen tools differ from actual runner action schema/instructions')
