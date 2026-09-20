@@ -373,9 +373,9 @@ class QualificationService:
                 working_directory='/workspace',timeout_seconds=0.25),save_source=False))
             if interrupted.reason!='timeout' or not interrupted.cleanup_verified:
                 raise QualificationRejected('environment_failure','actual bounded interruption and cleanup required')
-            before=runtime.workspace(handle,select_runtime=False)[0]['generation']
+            before=runtime.workspace(handle,bind=False)[0]['generation']
             restored=runtime.reset(handle)
-            after=runtime.workspace(handle,select_runtime=False)[0]['generation']
+            after=runtime.workspace(handle,bind=False)[0]['generation']
             if restored!=initial or after<=before:
                 raise QualificationRejected('environment_failure','reset did not restore exact initial saved source and advance generation')
             reset_submission=self.grader.submissions.from_saved(checked.task.baseline,restored.artifact,checked.contract.allowed_changes)

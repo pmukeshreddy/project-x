@@ -75,13 +75,11 @@ def validate_grade(store,checked,submission,seed,result,grader,*,seen=None):
     if len(set(runtime_refs))!=len(runtime_refs):raise QualificationRejected('invalid_evidence','duplicate runtime evidence')
     if receipt.build_evidence is not None and receipt.build_evidence not in runtime_refs:raise QualificationRejected('invalid_evidence','build evidence is not in runtime ledger')
     if any(c.evidence is not None and c.evidence not in runtime_refs for c in receipt.cases):raise QualificationRejected('invalid_evidence','case execution evidence missing from runtime ledger')
-    source=None
+    source=None;dependency_resolution=None
     if receipt.source is not None:
         source=grader.submissions.resolve(submission,checked.task.baseline,checked.contract.allowed_changes)
         if read_bytes(store,receipt.source,grader.submissions.policy.max_archive_bytes,'source-archive',True)!=source.to_tar():
             raise QualificationRejected('invalid_evidence','grade reconstructed source differs from assigned submission')
-        if runtime_refs:
-            prepared,_=grader.runtime.source_environment(prepared,source,bind=False)
     elif runtime_refs:
         raise QualificationRejected('invalid_evidence','runtime evidence lacks its reconstructed source')
     for ref in runtime_refs:
@@ -90,12 +88,20 @@ def validate_grade(store,checked,submission,seed,result,grader,*,seen=None):
         value=decode_json(raw,32*1024*1024)
         owner=Ownership.model_validate_json(canonical_json(value.get('record')))
         binding=owner.binding
+        raw_resolution=value.get('extra',{}).get('dependency_resolution')
+        if raw_resolution is None:
+            raise QualificationRejected('invalid_evidence','runtime evidence omits candidate dependency resolution')
+        resolution_ref=ArtifactRef.model_validate_json(canonical_json(raw_resolution))
+        grader.runtime.read_candidate_dependencies(resolution_ref,prepared,source,checked.contract.allowed_changes)
+        if dependency_resolution is not None and dependency_resolution!=resolution_ref:
+            raise QualificationRejected('invalid_evidence','build and execution used different candidate dependencies')
+        dependency_resolution=resolution_ref
         runtime_values[ref]=(value,owner)
         if value.get('cleanup_verified') is not True or owner.phase!='removed':
             raise QualificationRejected('environment_failure','runtime cleanup or policy evidence unverified')
         expected_binding={'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,'revision':grader.runtime.revision,'role':'candidate',
             'allowed_changes':hashlib.sha256(canonical_json(checked.contract.allowed_changes.model_dump(mode='json'))).hexdigest(),
-            'phase':value.get('phase')}
+            'phase':value.get('phase'),'dependency_resolution':resolution_ref.sha256}
         if receipt.source is not None:
             expected_binding.update(source=receipt.source.sha256,source_input=receipt.source.sha256,
                 source_raw=hashlib.sha256(source.to_tar()).hexdigest(),tree=source.tree_sha256)
@@ -200,7 +206,10 @@ def reset_probe(source,rules,profile):
     """Choose the same inert diagnostic mutation during execution and validation."""
     from feature_rl.environments import SourceFile, SourceRejected
     from feature_rl.submission.source import change_path
-    manifests={profile.manifest_path,*profile.manifest_hashes}
+    from feature_rl.environments.inference import infer_repository
+    from feature_rl.environments import PolicyRejected
+    try:manifests=set(infer_repository(source)['manifest_paths'])
+    except PolicyRejected:manifests={profile.manifest_path}
     candidates=[]
     for path,entry in source.files.items():
         try:change_path(path,rules)
@@ -216,7 +225,7 @@ def reset_probe(source,rules,profile):
 
 def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
     """Rejoin timeout, dirty saved source, restored source and independent workspace."""
-    from feature_rl.environments import SourceRejected, PolicyRejected
+    from feature_rl.environments import SourceRejected, DependencyUnavailable
     from feature_rl.environments.models import SavedSource, SandboxPolicy
     from feature_rl.verifiers.loader import read_local
     from .models import ResetReceipt, ReferenceProjection
@@ -229,8 +238,7 @@ def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
     owner=Ownership.model_validate_json(canonical_json(value.get('record')))
     saved=SavedSource.model_validate_json(canonical_json(owner.saved_source))
     initial=grader.submissions.source(projection.projected_source)
-    initial_prepared,_=grader.runtime.source_environment(prepared,initial,bind=False)
-    policy=SandboxPolicy.model_validate_json(grader.runtime.read_bytes(initial_prepared.policy,65536))
+    policy=SandboxPolicy.model_validate_json(grader.runtime.read_bytes(prepared.policy,65536))
     path,entry=reset_probe(initial,checked.contract.allowed_changes,policy.profile)
     dirty=grader.submissions.source(saved.artifact)
     expected_files=dict(initial.files);expected_files[path]=entry
@@ -238,12 +246,21 @@ def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
             or dirty.tree_sha256!=saved.tree_sha256
             or hashlib.sha256(dirty.to_tar()).hexdigest()!=saved.raw_sha256):
         raise QualificationRejected('invalid_evidence','reset interruption did not observe the exact saved diagnostic mutation')
-    try:interrupted_prepared,_=grader.runtime.source_environment(prepared,dirty,bind=False)
-    except (SourceRejected,PolicyRejected):
-        # Development commands may inspect or repair intermediate manifests using
-        # the task's original frozen runtime; builds still require an exact match.
-        interrupted_prepared=prepared
-    expected={'recipe':interrupted_prepared.recipe.sha256,'policy':interrupted_prepared.policy.sha256,
+    raw_resolution=value.get('extra',{}).get('dependency_resolution')
+    if raw_resolution is None:
+        # A repair command may use baseline tools when the dirty declarations
+        # are incomplete; do not treat it as a successfully resolved build.
+        from feature_rl.environments.candidates import candidate_resolution
+        try:candidate_resolution(store,prepared,checked.recipe,policy,dirty,checked.contract.allowed_changes)
+        except (SourceRejected,DependencyUnavailable):pass
+        else:raise QualificationRejected('invalid_evidence','development fallback had resolvable declarations')
+        dependency_binding='baseline-tools'
+    else:
+        resolution_ref=ArtifactRef.model_validate_json(canonical_json(raw_resolution))
+        grader.runtime.read_candidate_dependencies(resolution_ref,prepared,dirty,checked.contract.allowed_changes)
+        dependency_binding=resolution_ref.sha256
+    expected={'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,
+        'dependency_resolution':dependency_binding,
         'revision':grader.runtime.revision,'role':'candidate','phase':'development','workspace_id':reset.workspace_id,
         'generation':str(reset.generation_before),'source_input':projection.projected_source.sha256,
         'source':saved.artifact.sha256,'source_raw':saved.raw_sha256,'tree':saved.tree_sha256,

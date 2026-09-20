@@ -59,7 +59,8 @@ def requires_python(spec):
   raise RuntimeError('unsupported Requires-Python: '+spec)
 expected={canonicalize_name(p['name']):p['version'] for p in settings['dependencies']}
 installed={}
-for dist in metadata.distributions(path=[str(root/'deps')]):
+dependency_root=sys.argv[2] if len(sys.argv)>2 else str(root/'deps')
+for dist in metadata.distributions(path=[dependency_root]):
  name=canonicalize_name(dist.metadata['Name'])
  if name in installed:raise RuntimeError('duplicate installed distribution: '+name)
  installed[name]=dist

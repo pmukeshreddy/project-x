@@ -111,18 +111,27 @@ closure in a source-free builder. It retains wheel hashes, package versions,
 resolution inputs and immutable image digests. Dynamic or contradictory declarations
 which cannot be resolved reproducibly fail closed.
 
+`runtime.dependency_catalog` optionally references a trusted immutable wheel catalog
+in the artifact store. Preparation combines that catalog with the automatically
+captured baseline closure and binds the result to the task recipe. This is a shared
+controller input; repository-specific manual dependency pins are not required. The
+public runtime manifest lists catalog wheel names, versions, filenames, hashes and
+artifact references.
+
 New construction requires `runtime.image_repository` (for example,
 `registry.example.com/team/runtimes`), registry push access through the dedicated
 Docker client config, and Buildx timestamp-rewrite support. Only preparation downloads
 dependencies or system packages. Repository hooks run in the qualified offline sandbox.
 `runtime.image_seconds` bounds each image operation (default 600 seconds).
 
-When the selected feature changes build/dependency requirements, construction freezes
-a separate compatible runtime variant. This supports incompatible baseline and feature
-dependency pins without installing both versions together. Workers select a frozen
-variant from the submitted source's runtime declarations; unrecognized requirements
-are rejected. Workers may omit `image_repository` and load the exact policy and images
-from the task recipe. Sandbox platform and limits must still match their configuration.
+The original task and environment recipe remain fixed for every candidate. Candidate
+builds parse the submitted declarations and choose a compatible closure from the
+frozen catalog without network access. Different catalog versions are installed in
+separate candidate workspaces. The task's Python interpreter, platform, system packages
+and sandbox limits stay fixed. A required package absent from the catalog produces
+an unavailable, unmeasured result; unsafe declarations produce a candidate rejection.
+Workers may omit `image_repository` and load the exact policy, image and catalog from
+the task recipe. Sandbox platform and limits must still match their configuration.
 See [M3 construction](interfaces-M3.md) for retained inputs and package constraints.
 
 Qualification configuration is `qualification` with the actual M5 `revision`

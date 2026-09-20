@@ -13,6 +13,8 @@ class PolicyRejected(EnvironmentError): pass
 class DockerUnavailable(EnvironmentError): pass
 class CleanupUnverified(EnvironmentError): pass
 class SourceUnavailable(EnvironmentError): pass
+class DependencyUnavailable(EnvironmentError):
+    """Trusted offline catalog cannot establish a reproducible candidate closure."""
 class CpuBudgetExceeded(EnvironmentError): pass
 class EvidencePublicationFailed(EnvironmentError):
     """Bounded pending publication; no execution rerun is needed to retry storage."""
@@ -112,6 +114,7 @@ class BuildResult(StrictModel):
     source: ArtifactRef
     recipe: ArtifactRef
     policy: ArtifactRef
+    dependency_resolution: ArtifactRef
     wheel: ArtifactRef
     wheel_filename: str
     wheel_sha256: Annotated[str,Field(pattern=r"^[0-9a-f]{64}$")]

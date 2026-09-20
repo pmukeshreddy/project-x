@@ -41,6 +41,7 @@ class RuntimeConfiguration(LocalPaths):
     revision: c.Revision
     grading_revision: c.Revision
     policy: SandboxPolicy
+    dependency_catalog: c.ArtifactRef | None = Field(default=None, exclude_if=lambda value: value is None)
     image_repository: ImageRepository | None = Field(default=None, exclude_if=lambda value: value is None)
     qualification_image: ImageDigest | None = Field(default=None, exclude_if=lambda value: value is None)
     image_seconds: Annotated[float, Field(gt=0, le=3600)] = Field(default=600.0, exclude_if=lambda value: value == 600.0)
@@ -141,7 +142,8 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
             engine.qualify_boundary(image=settings.qualification_image)
         elif settings.policy.profile is not None:
             raise ConfigurationRequired('an explicit profile requires its pinned image; automatic profiles are resolved per repository')
-        actual_runtime=EnvironmentRuntime(store=store,engine=engine,revision=settings.revision)
+        actual_runtime=EnvironmentRuntime(store=store,engine=engine,revision=settings.revision,
+            dependency_catalog=settings.dependency_catalog)
         grader=GradingService(store=store,runtime=actual_runtime,revision=settings.grading_revision,
             max_wall_seconds=settings.grade_wall_seconds)
     if qualification:

@@ -39,6 +39,9 @@ dependency closure, source layout and system package requirements, then freezes
 wheel hashes and image digests. Configure the Linux platform, sandbox limits and
 publishing registry; per-repository profiles and dependency pins are generated.
 Unresolved declarations or an incomplete reproducible closure reject preparation.
+Each task retains one runtime and an immutable dependency catalog containing the
+baseline closure plus any optional controller-supplied catalog. Candidates resolve
+their own safe build and dependency declarations offline against that catalog.
 See [runtime construction](docs/interfaces-M3.md).
 
 [`construct-feature --github`](docs/runbook.md) captures a merged PR, its discussion
@@ -46,8 +49,10 @@ and review metadata, and an optional linked issue. Existing captures can be sele
 with `--prepared`; private repositories support token authentication. The reconstructed
 contract explicitly selects required files and records their requirement/evidence links.
 Projection preserves selected source, stubs, assets, configuration, build and dependency
-changes. Unrelated files retain their baseline versions. Required runtime changes are
-resolved during construction; grading uses only the frozen baseline or feature runtime.
+changes. Unrelated files retain their baseline versions. Candidate dependencies can
+use any compatible catalog choice while the task's Python, platform and system
+packages stay fixed. Missing catalog packages leave the result unmeasured; unsafe
+declarations are candidate rejections.
 Experiment splits and authoring budgets remain explicit.
 GPU training,
 native GPU inference, new task generation and experimental results remain

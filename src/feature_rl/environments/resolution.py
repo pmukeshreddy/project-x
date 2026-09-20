@@ -30,6 +30,7 @@ from pip._vendor.packaging.requirements import Requirement
 from pip._vendor.packaging.specifiers import SpecifierSet
 from pip._vendor.packaging.utils import canonicalize_name, parse_wheel_filename
 from pip._vendor.packaging.tags import sys_tags
+from pip._vendor.packaging.markers import default_environment
 root=pathlib.Path('/opt/feature-rl-resolution');settings=json.loads((root/'input.json').read_text())
 if not SpecifierSet(settings['requires_python']).contains(platform.python_version()):
  raise RuntimeError('resolved interpreter violates repository requirements')
@@ -78,7 +79,7 @@ if system:
    packages.append(dict(name=name,version=version))
  if {p['name'] for p in packages}!=requested:raise RuntimeError('unresolved system packages')
 (root/'resolution.json').write_text(json.dumps(dict(interpreter_version=platform.python_version(),dependencies=pins,
- system_packages=packages),sort_keys=True,separators=(',',':')))
+ system_packages=packages,marker_environment=default_environment(),compatible_tags=[str(tag) for tag in sys_tags()]),sort_keys=True,separators=(',',':')))
 for path in sorted(root.rglob('*'),reverse=True):os.utime(path,(946684800,946684800),follow_symlinks=False)
 os.utime(root,(946684800,946684800))
 '''
@@ -246,12 +247,14 @@ def resolve_repository(runtime, source, *, extra_roots=()):
                               'repository-resolution-execution')
     evidence = runtime.publish({'inputs':inputs, 'base_image':base, 'resolved_image':image,
         'catalog':catalog_ref.model_dump(mode='json'), 'context':context_ref.model_dump(mode='json'),
+        'marker_environment':observed['marker_environment'],'compatible_tags':observed['compatible_tags'],
         'execution_sha256':execution.sha256, 'cleanup_verified':session.cleanup_verified},
         'repository-runtime-resolution', Visibility.AUTHORING)
     profile = RuntimeProfile(profile_id='repository-'+key[:32], project_name=metadata['project_name'],
         project_version=metadata['project_version'], interpreter_version=observed['interpreter_version'],
-        manifest_path=metadata['manifest_path'], manifest_sha256=hashes[metadata['manifest_path']],
-        manifest_hashes=hashes,metadata_sha256=metadata_digest(metadata),resolution=evidence,build_backend=metadata['build_backend'],
+        manifest_path=metadata['manifest_path'],metadata_sha256=metadata_digest(metadata),
+        marker_environment=observed['marker_environment'],compatible_tags=tuple(observed['compatible_tags']),
+        resolution=evidence,build_backend=metadata['build_backend'],
         build_requirements=tuple(metadata['build_requirements']), source_roots=roots,
         source_mappings=tuple(metadata['source_mappings']), import_modules=tuple(metadata['import_modules']),
         entry_points=tuple(metadata['entry_points']), supported_observables=('JSON return value','CLI exit code',

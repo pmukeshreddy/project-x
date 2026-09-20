@@ -9,7 +9,7 @@ from feature_rl.artifacts import ArtifactError, ArtifactSizeLimitError, canonica
 from feature_rl.contracts import (ArtifactRef, CostRecord, Disposition, EvidenceRecord,
     GradeRequest, OperationResult, Visibility, CommandSpec)
 from feature_rl.environments import (EnvironmentRuntime, PreparedEnvironment, ExecutionRequest,
-    BuildFailed, EnvironmentError, SourceRejected, EvidencePublicationFailed)
+    BuildFailed, EnvironmentError, SourceRejected, DependencyUnavailable, EvidencePublicationFailed)
 from feature_rl.submission import SubmissionService
 from feature_rl.verifiers import load_verifier, materialize_manifest, parse_observations
 from feature_rl.verifiers.language import compare, operand_value, check_value, decode_json
@@ -83,11 +83,11 @@ class GradingService:
         start=time.monotonic();cpu_start=time.process_time();worker_wall=0.0
         failed_call=None;runtime_publications=[]
         verifier_ref=None;manifest_ref=None;source_ref=None;build_evidence=None;runtime_evidence=[];costs=[]
-        checked=None;handle=None;results=[];cleanup=True;executed=False
+        checked=None;handle=None;results=[];cleanup=True
         disposition=Disposition.INVALID;reward=None;reason='grading did not complete'
         def timed(call,category):
-            nonlocal worker_wall,executed,failed_call
-            executed=True;t=time.monotonic()
+            nonlocal worker_wall,failed_call
+            t=time.monotonic()
             try:return call()
             except BaseException:
                 failed_call=(category,time.monotonic()-t)
@@ -103,7 +103,6 @@ class GradingService:
             manifest_ref=self.store.put_bytes(canonical_json(manifest.model_dump(mode='json')),'m4-case-manifest',Visibility.PRIVATE)
             try:
                 source=self.submissions.resolve(submission,checked.task.baseline,checked.contract.allowed_changes)
-                self.runtime.source_environment(prepared,source,bind=False)
             except (SourceRejected,ArtifactSizeLimitError) as exc:
                 disposition=Disposition.REJECTED;reward=0;reason='source submission rejected: '+str(exc)[:800]
             else:
@@ -162,6 +161,10 @@ class GradingService:
                             disposition=Disposition.REJECTED;reward=0;reason='observation protocol violation: '+str(exc)[:800]
                             results[index]=CaseResult(case_id=case.case_id,mandatory=case.mandatory,status='protocol_failure',passed=None,
                                 assertions=(),evidence=output.evidence,reason=reason)
+        except DependencyUnavailable as exc:
+            disposition=Disposition.INVALID;reward=None;reason='offline dependency resolution unavailable: '+str(exc)[:800]
+        except SourceRejected as exc:
+            disposition=Disposition.REJECTED;reward=0;reason='candidate declarations rejected: '+str(exc)[:800]
         except EvidencePublicationFailed as exc:
             # Preserve M3's exact bounded pending payload. A permanent archive
             # outage raises replayable publication recovery, never drops logs.
@@ -202,6 +205,6 @@ class GradingService:
             expected_case_ids=tuple(c.case_id for c in results),cases=tuple(results),build_evidence=build_evidence,
             runtime_evidence=tuple(runtime_evidence),cleanup_verified=cleanup,implementation_revision=self.revision,
             recorded_at=datetime.now(timezone.utc))
-        scope='real_integration' if executed else 'source_inspection'
+        scope='real_integration' if runtime_evidence else 'source_inspection'
         if runtime_publications:raise GradePublicationFailed(receipt,tuple(costs),scope,tuple(runtime_publications))
         return self._publish(receipt,tuple(costs),scope)

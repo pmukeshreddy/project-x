@@ -86,18 +86,13 @@ class PreparationSelection(c.StrictModel):
     costs: tuple[c.CostRecord,...]
 
 
-class FeatureRuntimeSelection(c.StrictModel):
-    environment: PreparedEnvironment
-    contract: c.ArtifactRef
-
-
 class FeatureStep(c.StrictModel):
     version: Literal['m6-feature-step-v1']='m6-feature-step-v1'
     claim: Claim
     request: c.ArtifactRef
     key: Name
     inputs: c.ArtifactRef
-    output: IntakeSelection | PreparationSelection | FeatureRuntimeSelection | c.OperationResult
+    output: IntakeSelection | PreparationSelection | c.OperationResult
     costs: tuple[c.CostRecord,...]
 
 

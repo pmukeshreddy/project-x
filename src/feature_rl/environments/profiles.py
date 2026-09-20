@@ -41,9 +41,9 @@ class RuntimeProfile(StrictModel):
     project_version: Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9.!+_-]*$')]
     interpreter_version: Annotated[str, Field(pattern=r'^3\.[0-9]+\.[0-9]+$')]
     manifest_path: str = 'pyproject.toml'
-    manifest_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')] | None = None
-    manifest_hashes: dict[str, str | None] = Field(default_factory=dict)
     metadata_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')] | None = None
+    marker_environment: dict[str, str] = Field(default_factory=dict)
+    compatible_tags: tuple[str, ...] = ()
     resolution: ArtifactRef | None = None
     build_backend: Annotated[str, Field(min_length=1, max_length=256)]
     build_requirements: Annotated[tuple[str, ...], Field(min_length=1, max_length=64)]
@@ -66,9 +66,6 @@ class RuntimeProfile(StrictModel):
             if safe_path(path) != path or any(part in {'.pytest_cache', '.venv'}
                                                for part in path.split('/')):
                 raise ValueError('profile contains a noncanonical or protected source path')
-        for path, digest in self.manifest_hashes.items():
-            if safe_path(path) != path or (digest is not None and not re.fullmatch(r'[0-9a-f]{64}', digest)):
-                raise ValueError('noncanonical build input fingerprint')
         for values in (self.source_roots, self.import_modules, self.entry_points,
                        tuple(p.name for p in self.dependencies), tuple(p.filename for p in self.dependencies),
                        tuple(p.name for p in self.system_packages),
@@ -132,15 +129,10 @@ class RuntimeProfile(StrictModel):
 
     def validate_source(self, source):
         from .models import PolicyRejected
-        if self.manifest_hashes:
-            for path, digest in self.manifest_hashes.items():
-                entry = source.files.get(path)
-                actual = None if entry is None else hashlib.sha256(entry.data).hexdigest()
-                if actual != digest:
-                    raise PolicyRejected('repository runtime input differs from frozen resolution: '+path)
+        if self.metadata_sha256 is not None:
             from .inference import infer_repository
             metadata=infer_repository(source)
-            if (self.metadata_sha256 is None or metadata_digest(metadata)!=self.metadata_sha256
+            if (metadata_digest(metadata)!=self.metadata_sha256
                     or metadata['project_name']!=self.project_name or metadata['project_version']!=self.project_version
                     or metadata['build_backend']!=self.build_backend
                     or tuple(metadata['build_requirements'])!=self.build_requirements
@@ -154,8 +146,6 @@ class RuntimeProfile(StrictModel):
             manifest = tomllib.loads(data.decode())
         except (KeyError, ValueError, UnicodeError) as exc:
             raise PolicyRejected('invalid repository build manifest') from exc
-        if self.manifest_sha256 is not None and hashlib.sha256(data).hexdigest() != self.manifest_sha256:
-            raise PolicyRejected('repository build manifest digest mismatch')
         build = manifest.get('build-system', {})
         if build != {'requires': list(self.build_requirements), 'build-backend': self.build_backend}:
             raise PolicyRejected('repository build-system identity differs from profile')
@@ -163,9 +153,6 @@ class RuntimeProfile(StrictModel):
         if (('name' in project and project['name'] != self.project_name)
                 or ('version' in project and project['version'] != self.project_version)):
             raise PolicyRejected('declared project identity differs from profile')
-        if self.manifest_sha256 is None and (project.get('name') != self.project_name or
-                                            project.get('version') != self.project_version):
-            raise PolicyRejected('repository project identity differs from profile; dynamic metadata requires a pinned manifest')
         if any(not any(name == m.source or name.startswith(m.source+'/') for name in source.files)
                for m in self.source_mappings):
             raise PolicyRejected('profile wheel source mapping is absent from the source')
@@ -222,8 +209,9 @@ def validate_recipe_profile(recipe, policy, store):
             raise PolicyRejected('automatically resolved profile lost its repository input evidence')
         resolution=json.loads(store.get_bytes(profile.resolution,max_envelope_bytes=2*1024*1024,max_payload_bytes=1024*1024))
         if (resolution.get('resolved_image')!=policy.image or resolution.get('cleanup_verified') is not True
-                or metadata_digest(resolution.get('inputs',{}).get('metadata',{}))!=profile.metadata_sha256
-                or resolution.get('inputs',{}).get('manifests')!=profile.manifest_hashes):
+                or resolution.get('marker_environment')!=profile.marker_environment
+                or resolution.get('compatible_tags')!=list(profile.compatible_tags)
+                or metadata_digest(resolution.get('inputs',{}).get('metadata',{}))!=profile.metadata_sha256):
             raise PolicyRejected('runtime resolution inputs differ from the pinned profile')
     validate_runtime_image(recipe, policy, store)
     setup = profile.setup
@@ -242,20 +230,6 @@ def validate_recipe_profile(recipe, policy, store):
             raise PolicyRejected('runtime resource policy drift')
     if recipe.limits.wall_seconds != policy.lifecycle_seconds:
         raise PolicyRejected('runtime wall policy drift')
-    if len(recipe.source_variants)>16 or len(set(recipe.source_variants))!=len(recipe.source_variants):
-        raise PolicyRejected('invalid source runtime variants')
-    for ref in recipe.source_variants:
-        from feature_rl.contracts import EnvironmentRecipe, Visibility
-        if ref.kind!='EnvironmentRecipe' or ref.visibility!=Visibility.AUTHORING or ref not in recipe.provenance.inputs:
-            raise PolicyRejected('source runtime variant lost provenance')
-        variant=store.get_artifact(ref,max_envelope_bytes=256*1024)
-        if not isinstance(variant,EnvironmentRecipe) or variant.source_variants or variant.baseline!=recipe.baseline:
-            raise PolicyRejected('runtime variants must share the original baseline and remain flat')
-        policies=[p for p in variant.provenance.inputs if p.kind=='sandbox-policy']
-        if len(policies)!=1:raise PolicyRejected('runtime variant lacks one policy')
-        from .models import SandboxPolicy
-        other=SandboxPolicy.model_validate_json(store.get_bytes(policies[0],max_envelope_bytes=131072,max_payload_bytes=65536))
-        if other.model_dump(exclude={'image','profile'})!=policy.model_dump(exclude={'image','profile'}):
-            raise PolicyRejected('runtime variant changed sandbox constraints')
-        validate_recipe_profile(variant,other,store)
+    from .candidates import validate_catalog
+    validate_catalog(recipe,policy,store)
     return profile
