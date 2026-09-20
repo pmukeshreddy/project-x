@@ -204,6 +204,7 @@ def test_service_registers_opaque_frame_plan_selection_and_configuration_depende
     run_ids = tuple(sorted(item.run_id for item in selection.selections if item.unit == "patch"))
     result = service.audit(run_ids)
     assert result.disposition == c.Disposition.PROVISIONAL
+    assert result.evidence[0].scope == "source_inspection"
     assert registry.enqueue(service._spec()).result == result
     from feature_rl.audits import AuditExecutionReport
     from feature_rl.verifiers.loader import read_local
@@ -379,3 +380,27 @@ def test_other_audit_configuration_cannot_recover_or_publish_selected_claim(tmp_
         other.retry_publication(caught.value)
     with pytest.raises(ValueError, match="different audit service"):
         other.recover(caught.value.claim)
+
+
+def test_rejected_audit_failure_publication_retries_selected_failure(tmp_path, monkeypatch):
+    from feature_rl.audits import AuditPublicationFailed, AuditRejected
+
+    service, run_ids = diagnostic_service(tmp_path)
+    monkeypatch.setattr(
+        service, "_execute",
+        lambda subjects=None: (_ for _ in ()).throw(AuditRejected("diagnostic invalid attestation")),
+    )
+    put = service.store.put_bytes
+
+    def fail_failure(payload, kind, *args, **kwargs):
+        if kind == "m8-audit-failure":
+            raise OSError("diagnostic failure-report outage")
+        return put(payload, kind, *args, **kwargs)
+
+    monkeypatch.setattr(service.store, "put_bytes", fail_failure)
+    with pytest.raises(AuditPublicationFailed) as caught:
+        service.audit(run_ids)
+    monkeypatch.setattr(service.store, "put_bytes", put)
+    result = service.retry_publication(caught.value)
+    assert result.disposition == c.Disposition.INVALID
+    assert result.reason == "diagnostic invalid attestation"

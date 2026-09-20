@@ -491,7 +491,7 @@ class AuditService:
                 for evidence in outcome.record.evidence
             ) + tuple(
                 evidence
-                for outcome in report.source_outcomes
+                for outcome in report.source_outcomes if outcome.adjudication is not None
                 for evidence in outcome.evidence
             )
             evidence = c.EvidenceRecord(
@@ -597,7 +597,7 @@ class AuditService:
                 "version": "m8-audit-failure-v1", "configuration": self.configuration.model_dump(mode="json"),
                 "reason": str(exc), "recorded_at": datetime.now(timezone.utc).isoformat(),
             })
-            dependencies = (self.configuration,)
+            dependencies = (self.configuration, self.selection_ref)
             kind = "m8-audit-failure"
         return self._publish(claim, payload=payload, dependencies=dependencies, kind=kind)
 
