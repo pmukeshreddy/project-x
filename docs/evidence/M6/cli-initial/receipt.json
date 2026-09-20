@@ -1,0 +1,40 @@
+{
+  "diagnostic_only": true,
+  "native_model_or_docker_execution": false,
+  "observed_head_after": "ebd151e845f0c793559a43c14a1f46f7513a74eb",
+  "recorded_at": "2026-09-20T00:34:46.613361+00:00",
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_factory_cli.py"
+  ],
+  "environment": {
+    "PYTHONPATH": "src"
+  },
+  "exit_code": 0,
+  "result": "10 passed",
+  "source_hashes_captured_after_test": {
+    "src/feature_rl/cli.py": "2942e9fa3c7207cf15becce6d6afe7f68821158ec5b406085448cc8e57a481ca",
+    "src/feature_rl/__main__.py": "b2c4535633b57caf3d0640a6e81c9ff50fd3236f1c4028acaec1f760d4799374",
+    "src/feature_rl/pipeline/configuration.py": "b0f024ff6bc9663c0553c4705f63991df459a01b8daa375c74fef7e903110e1f",
+    "tests/test_factory_cli.py": "d6ac411cf81e3988406669ab10f13cbd1b43e84cd61779311c1272c4bda3f2ac"
+  },
+  "red": "8 failed: missing feature_rl.cli",
+  "additional_check": {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "feature_rl",
+      "--help"
+    ],
+    "exit_code": 0
+  },
+  "limits": [
+    "No actual runtime composition or human trust execution in this check.",
+    "Lost source publication reply recovered through concrete Factory retained capability with original bytes/costs.",
+    "Source hashes captured after focused check; no whole shared-tree freeze is claimed."
+  ],
+  "pytest_seconds": 1.35
+}

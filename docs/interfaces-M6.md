@@ -225,3 +225,28 @@ predecessor with its existing Q. It resolves the report's actual producer/policy
 uses both reviewed Registry lifecycle transitions. Missing current human trust or
 other validity gates cannot create a released root. M5 and lifecycle retained
 publication/recovery capabilities keep their concrete upstream APIs.
+
+# Actual CLI composition checkpoint
+
+`feature_rl.cli.main(argv=None) -> int` is callable now through
+`python -m feature_rl`. `config-schema` prints the strict closed
+`feature_rl.pipeline.configuration.CLIConfiguration` JSON schema. The actual
+composition method is `compose(config, *, runtime=False, qualification=False) ->
+Application`, whose fields are `factory`, `runtime`, `grader`, `lifecycle` and
+`resolver`. No provider/backend/native-session callback is accepted.
+
+Required config: version `m6-cli-v1`, absolute `store_root`/`registry_root`, exact
+Factory `revision`; optional `builder_revision`, `RegistryLimits`, `runtime` and
+`qualification`. Runtime fields are absolute state/socket paths, exact runtime and
+grading revisions, actual bounded SandboxPolicy and grade wall limit. Qualification
+fields are exact revision, actual QualificationPolicy and optional read-only
+external enrollment path/digest. Runtime composition invokes actual M3 boundary
+qualification; source/complete-artifact construction does not open Docker.
+
+Implemented commands and request shapes are documented in `docs/runbook.md`:
+`screen-source`, `construct`, `qualify`, `accept`, `release`, `resolve`.
+M0 request models remain authoritative; `construct --inputs` supplies actual
+BuildInputs separately. `main` emits typed operation JSON and nonzero failures.
+Publication exceptions additionally emit an exact private ordinary-JSON recovery
+receipt to stderr before exit. It is not an executable object loader or another
+ledger. Native/authoring and remaining M7/M8 commands are subsequent actual joins.
