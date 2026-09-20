@@ -471,35 +471,41 @@ class AgentRunner:
 
     def validate_record(self,record):
         """Authenticate selected completed run and its controller outcome, including nulls."""
-        record=c.RolloutRecord.model_validate_json(record.model_dump_json())
-        job=self.registry.job(record.run_id)
-        if (job.spec.operation!='run' or job.spec.configuration!=self.configuration or job.state!='completed'
-                or job.result is None or len([x for x in job.result.artifacts if x.kind=='RolloutRecord'])!=1):
-            raise ValueError('rollout lacks its exact selected Registry run')
-        record_ref=next(x for x in job.result.artifacts if x.kind=='RolloutRecord')
-        if self.store.get_artifact(record_ref,max_envelope_bytes=8*1024*1024)!=record: raise ValueError('selected rollout differs')
-        refs=[x for x in job.result.artifacts if x.kind=='m7-frozen-run']
-        if len(refs)!=1: raise ValueError('unique frozen run required')
-        frozen=read_local(self.store,refs[0],FrozenRun,'m7-frozen-run',MAX_RECORD)
-        if frozen.record!=record or frozen.configuration!=self.configuration or frozen.claim.job_id!=job.job_id:
-            raise ValueError('frozen run identity differs')
-        request=read_local(self.store,frozen.request,RunInput,'m7-run-input',MAX_RECORD)
-        if (job.spec.inputs!=(record.task,frozen.request) or job.spec.implementation!=self.revision
-                or job.spec.invocation!=request.invocation
-                or (request.task,request.policy,request.limits,request.case_seed)!=(record.task,record.policy,record.limits,record.seeds.seeds[0])
-                or job.result.disposition!=record.disposition or len(job.result.artifacts)!=2):
-            raise ValueError('selected run request/configuration/result binding differs')
-        if not any(a.claim==frozen.claim and a.state=='completed' for a in self.registry.attempts(job.job_id)):
-            raise ValueError('frozen run lacks selected completed claim')
-        outcome=read_local(self.store,frozen.outcome,ControllerOutcome,'m7-controller-outcome',MAX_RECORD)
-        own=[e for e in record.grading_evidence if e.producer=='feature_rl.agents']
-        if (outcome.request!=frozen.request or outcome.revision!=self.revision or len(own)!=1
-                or own[0].command!=('AgentRunner.run',record.run_id,record.task.sha256,str(request.case_seed))
-                or own[0].artifacts!=(frozen.outcome,) or own[0].recorded_at!=outcome.recorded_at
-                or own[0].revision!=self.revision or own[0].scope!=self.scope):
-            raise ValueError('runner controller receipt/evidence differs')
-        if (outcome.run_id,outcome.task,outcome.policy,outcome.case_seed,outcome.reward,outcome.disposition,outcome.submission,outcome.stopping_reason)!=(
-            record.run_id,record.task,record.policy,record.seeds.seeds[0],record.reward,record.disposition,record.submission,record.stopping_reason):
-            raise ValueError('controller outcome differs from selected rollout')
-        for ref in (record_ref,refs[0],frozen.outcome,self.configuration): self.registry.assert_usable(ref)
-        return outcome
+        return validate_selected_record(self.store,self.registry,record,configuration=self.configuration,
+            revision=self.revision,scope=self.scope)
+
+
+def validate_selected_record(store,registry,record,*,configuration,revision,scope):
+    """Pure selected-run authentication; no backend construction or generation."""
+    record=c.RolloutRecord.model_validate_json(record.model_dump_json())
+    job=registry.job(record.run_id)
+    if (job.spec.operation!='run' or job.spec.configuration!=configuration or job.state!='completed'
+            or job.result is None or len([x for x in job.result.artifacts if x.kind=='RolloutRecord'])!=1):
+        raise ValueError('rollout lacks its exact selected Registry run')
+    record_ref=next(x for x in job.result.artifacts if x.kind=='RolloutRecord')
+    if store.get_artifact(record_ref,max_envelope_bytes=8*1024*1024)!=record: raise ValueError('selected rollout differs')
+    refs=[x for x in job.result.artifacts if x.kind=='m7-frozen-run']
+    if len(refs)!=1: raise ValueError('unique frozen run required')
+    frozen=read_local(store,refs[0],FrozenRun,'m7-frozen-run',MAX_RECORD)
+    if frozen.record!=record or frozen.configuration!=configuration or frozen.claim.job_id!=job.job_id:
+        raise ValueError('frozen run identity differs')
+    request=read_local(store,frozen.request,RunInput,'m7-run-input',MAX_RECORD)
+    if (job.spec.inputs!=(record.task,frozen.request) or job.spec.implementation!=revision
+            or job.spec.invocation!=request.invocation
+            or (request.task,request.policy,request.limits,request.case_seed)!=(record.task,record.policy,record.limits,record.seeds.seeds[0])
+            or job.result.disposition!=record.disposition or len(job.result.artifacts)!=2):
+        raise ValueError('selected run request/configuration/result binding differs')
+    if not any(a.claim==frozen.claim and a.state=='completed' for a in registry.attempts(job.job_id)):
+        raise ValueError('frozen run lacks selected completed claim')
+    outcome=read_local(store,frozen.outcome,ControllerOutcome,'m7-controller-outcome',MAX_RECORD)
+    own=[e for e in record.grading_evidence if e.producer=='feature_rl.agents']
+    if (outcome.request!=frozen.request or outcome.revision!=revision or len(own)!=1
+            or own[0].command!=('AgentRunner.run',record.run_id,record.task.sha256,str(request.case_seed))
+            or own[0].artifacts!=(frozen.outcome,) or own[0].recorded_at!=outcome.recorded_at
+            or own[0].revision!=revision or own[0].scope!=scope):
+        raise ValueError('runner controller receipt/evidence differs')
+    if (outcome.run_id,outcome.task,outcome.policy,outcome.case_seed,outcome.reward,outcome.disposition,outcome.submission,outcome.stopping_reason)!=(
+        record.run_id,record.task,record.policy,record.seeds.seeds[0],record.reward,record.disposition,record.submission,record.stopping_reason):
+        raise ValueError('controller outcome differs from selected rollout')
+    for ref in (record_ref,refs[0],frozen.outcome,configuration): registry.assert_usable(ref)
+    return outcome

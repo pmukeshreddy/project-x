@@ -19,7 +19,7 @@ def factory_fixture(tmp_path,monkeypatch):
         seeds=c.SeedPolicy(algorithm='diagnostic',seeds=(19,),same_cases_within_group=True),algorithm='sft',
         group_size=4,max_updates=1,learning_rate=.01,framework='skyrl',framework_version=PINNED_SKYRL,
         backend_version=PINNED_HARBOR,budget_usd=None)
-    return SimpleNamespace(config=config,service=SimpleNamespace(store=f.store,registry=f.registry,settings=settings(tmp_path),revision='f'*40))
+    return SimpleNamespace(fixture=f,config=config,service=SimpleNamespace(store=f.store,registry=f.registry,settings=settings(tmp_path),revision='f'*40))
 
 
 def test_native_factory_requires_selected_config_and_records_intent_before_constructor(tmp_path,monkeypatch):

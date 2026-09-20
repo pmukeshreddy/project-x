@@ -36,7 +36,7 @@ class NativeSessionFactory:
         self.settings=NativeSettings.model_validate_json(settings.model_dump_json())
         self.training_configuration=c.TrainingConfig.model_validate_json(configuration.model_dump_json())
         if len(revision) not in (40,64) or any(x not in '0123456789abcdef' for x in revision):raise ValueError('Exact native factory revision required')
-        self.revision=revision;self._sessions={};self._pending={};self._closing={};self._closed={}
+        self.revision=revision;self._sessions={};self._pending={};self._closing={};self._closed={};self._aborted={}
         payload={'settings':self.settings.model_dump(mode='json'),'training':self.training_configuration.model_dump(mode='json'),'revision':revision}
         self.configuration=store.put_bytes(canonical_json(payload),'m7-native-configuration',c.Visibility.PRIVATE)
         registry.register(self.configuration,dependencies=tuple(dict.fromkeys(references(configuration.model_dump(mode='json')))))
@@ -54,6 +54,8 @@ class NativeSessionFactory:
     def create(self,claim,*,startup_key:str) -> NativeHandle:
         category=self._claim(claim);key=(claim.attempt_id,startup_key)
         if key in self._sessions:return self._sessions[key]
+        if key in self._pending and self._pending[key].get('abort_started') is not None:
+            raise NativeStartupRecoveryRequired('Startup is being closed; recover cleanup only')
         if key in self._pending:return self._finish_startup(claim,startup_key,category)
         if any(x.observation.source=='m7-native-startup' and x.observation.upstream_attempt_id==startup_key
             for x in self.registry.accounting(claim.job_id).observations):
@@ -127,3 +129,37 @@ class NativeSessionFactory:
         del self._closing[identity]
         self._closed[identity]=(receipt,observed.observation_id)
         return self._closed[identity]
+
+    def close_startup(self,claim,*,startup_key,shutdown_key):
+        """Close a retained unpublished startup even after quarantine; never initialize."""
+        category=self._claim(claim,cleanup=True);key=(claim.attempt_id,startup_key)
+        if key in self._aborted:return self._aborted[key]
+        if key not in self._pending:raise NativeStartupRecoveryRequired('No retained unpublished startup to close')
+        pending=self._pending[key]
+        if 'abort_started' not in pending:
+            pending.update(abort_started=time.monotonic(),abort_completed=None,abort_receipt=None,abort_key=shutdown_key)
+        if pending['abort_key']!=shutdown_key:raise ValueError('Retry the exact retained startup cleanup key')
+        accounting_error=None
+        try:
+            self.registry.reconcile(claim,CostObservation(source='m7-native-shutdown',upstream_attempt_id=shutdown_key,
+                revision=1,receipts=(self.configuration,),costs=(cost(category,note='Retained unpublished startup cleanup dispatched; outcome/cost unknown'),)))
+        except RegistryError as exc:accounting_error=exc
+        if pending['abort_completed'] is None:
+            pending['session'].close();pending['abort_completed']=time.monotonic()
+        try:
+            if pending['abort_receipt'] is None:
+                pending['abort_receipt']=self.store.put_bytes(canonical_json({'version':'m7-native-startup-abort-v1',
+                    'claim':claim.model_dump(mode='json'),'configuration':self.configuration.model_dump(mode='json'),
+                    'startup_key':startup_key,'note':'Unpublished startup was closed; initialization outcome/cost remains unknown.'}),
+                    'm7-native-startup-abort',c.Visibility.PRIVATE)
+            receipt=pending['abort_receipt']
+            if accounting_error is not None:raise accounting_error
+            self.registry.register(receipt,dependencies=(self.configuration,))
+            observation=self.registry.reconcile(claim,CostObservation(source='m7-native-shutdown',upstream_attempt_id=shutdown_key,
+                revision=2,receipts=(self.configuration,receipt),costs=(cost(category,
+                    wall=pending['abort_completed']-pending['abort_started'],note='Actual retained unpublished startup shutdown wall; other resources unknown'),)))
+        except BaseException as exc:
+            exc.native_session_closed=True
+            raise
+        self._aborted[key]=(receipt,observation.observation_id);del self._pending[key]
+        return self._aborted[key]

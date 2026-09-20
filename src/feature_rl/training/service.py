@@ -102,17 +102,22 @@ class TrainingService:
             artifacts=(ref,),revision=self.revision,scope=self.scope)
 
     def _finish(self,disposition,reason):
+        checkpoint_ref=None if self.state['checkpoint'] is None else c.ArtifactRef.model_validate_json(canonical_json(self.state['checkpoint']))
+        current_checkpoint=checkpoint_ref is not None and self.request in self.store.get_artifact(checkpoint_ref).provenance.inputs
+        if disposition==c.Disposition.SUCCESS and not current_checkpoint:
+            disposition=c.Disposition.BLOCKED;reason='Recovery budget exhausted without a newly confirmed update/checkpoint for this selected job'
         self.state['phase']='finalizing';self.state['final_outcome']={'disposition':disposition.value,'reason':reason};self._write()
         if getattr(self,'_live',None) is not None:
             factory,handle=self._live
-            factory.close(handle,self.claim,shutdown_key='training-close-'+self.claim.attempt_id)
+            self._shutdown_key='training-close-'+self.claim.attempt_id
+            factory.close(handle,self.claim,shutdown_key=self._shutdown_key)
             self._live=None
         summary=self._put({'version':'m7-training-summary-v1','job_id':self.claim.job_id,'reason':reason,
             'progress':self.state,'unknown_costs_are_zero':False},'m7-training-summary',
             dependencies=(self.request,*tuple(c.ArtifactRef.model_validate_json(canonical_json(v)) for v in self.state['group_receipts']),
                 *(() if self.state['checkpoint'] is None else (c.ArtifactRef.model_validate_json(canonical_json(self.state['checkpoint'])),))))
         costs,observations=self._costs()
-        artifacts=(summary,) if self.state['checkpoint'] is None else (c.ArtifactRef.model_validate_json(canonical_json(self.state['checkpoint'])),summary)
+        artifacts=(checkpoint_ref,summary) if current_checkpoint else (summary,)
         result=c.OperationResult(operation='train',disposition=disposition,artifacts=artifacts,
             evidence=(self._evidence(summary,'TrainingService.train',success=disposition==c.Disposition.SUCCESS),),costs=costs,reason=reason)
         self.state['frozen_result']=result.model_dump(mode='json');self.state['frozen_observations']=observations
@@ -132,13 +137,26 @@ class TrainingService:
                 if getattr(self,'_live',None) is not None:
                     factory,handle=self._live
                     try:
-                        factory.close(handle,self._live_claim,shutdown_key='training-failure-close-'+self._live_claim.attempt_id)
+                        self._shutdown_key=getattr(self,'_shutdown_key',None) or 'training-failure-close-'+self._live_claim.attempt_id
+                        factory.close(handle,self._live_claim,shutdown_key=self._shutdown_key)
                         self._live=None
                     except BaseException as cleanup:
                         error.native_cleanup_error=cleanup
                         if getattr(cleanup,'native_session_closed',False):self._live=None
                 raise
             finally:fcntl.flock(lock,fcntl.LOCK_UN)
+
+    def close(self):
+        """Terminal command cleanup without current task admission or native startup."""
+        if getattr(self,'_live',None) is not None:
+            factory,handle=self._live
+            self._shutdown_key=getattr(self,'_shutdown_key',None) or 'training-terminal-close-'+self._live_claim.attempt_id
+            factory.close(handle,self._live_claim,shutdown_key=self._shutdown_key)
+            self._live=None
+        if getattr(self,'_opening',None) is not None:
+            claim,factory,key=self._opening
+            factory.close_startup(claim,startup_key=key,shutdown_key=claim.attempt_id+':native-abort')
+            self._opening=None
 
     def _train(self,configuration:c.TrainingConfig,*,invocation:str,resume:c.ArtifactRef|None=None,demonstrations=()):
         configuration=c.TrainingConfig.model_validate_json(configuration.model_dump_json())
@@ -193,7 +211,7 @@ class TrainingService:
             self.state={'version':'m7-training-progress-v1','request':self.request.model_dump(mode='json'),
                 'claim':self.claim.model_dump(mode='json'),'phase':'initializing','elapsed_wall':0.,'sampler':sampler.state_dict(),
                 'signal':{},'pending':None,'unclassified_group':None,'batch_receipts':[],'supervised_positions':[],
-                'groups':0,'updates':0,'optimizer_steps':0,'data_position':0,
+                'groups':0,'updates':0,'unknown_updates':0,'optimizer_steps':0,'data_position':0,
                 'group_receipts':[],'consumed':[],'checkpoint':None,'native':None,'nonzero_updates':0,
                 'policy':configuration.initial_policy.model_dump(mode='json')}
             if resume is not None:self._restore_progress(resume)
@@ -201,6 +219,8 @@ class TrainingService:
         self._observe('m7-training-controller',self.claim.attempt_id,1,(self.request,),
             (cost('training',note='Native/controller resource costs are unknown until each phase receipt'),
              cost('storage',note='Private native tensor/checkpoint and CAS costs remain unmeasured')))
+        if resume is not None and self.state['updates']+self.state.get('unknown_updates',0)>=configuration.max_updates:
+            return self._finish(c.Disposition.BLOCKED,'Recovery has no remaining declared update budget; no native restart or new checkpoint')
         if getattr(self,'_live',None) is None:
             if getattr(self,'_opening',None) is None:
                 count=len(self.registry.accounting(job.job_id).observations)
@@ -210,7 +230,7 @@ class TrainingService:
             _,native_factory,startup_key=self._opening
             handle=native_factory.create(self.claim,startup_key=startup_key)
             self._live=(native_factory,handle)
-            self._live_claim=self.claim;self._opening=None
+            self._live_claim=self.claim;self._opening=None;self._shutdown_key=None
         self.native=self._live[1].session
         if self.state['native'] is not None:
             native=self.state['native'];policy=c.PolicyConfig.model_validate_json(canonical_json(self.state['policy']))
@@ -228,7 +248,7 @@ class TrainingService:
                     if isinstance(demo,SourceDemonstration) else importer.trajectory(demo.rollout,policy=self.native.policy))
                 if example.task not in configuration.tasks:raise ValueError('Demonstration outside frozen training roster')
                 examples.append(example)
-        while self.state['updates']<configuration.max_updates:
+        while self.state['updates']+self.state.get('unknown_updates',0)<configuration.max_updates:
             if self._elapsed_base+time.monotonic()-self._started>=self.settings.max_wall_seconds:
                 return self._finish(c.Disposition.BLOCKED,'Declared controller wall budget exhausted between bounded phases')
             if self.state['groups']>=self.settings.max_groups and not (self.state['batch_receipts'] or self.state['supervised_positions'] or self.state['unclassified_group']):
@@ -267,7 +287,7 @@ class TrainingService:
             self._update(rows)
         if self.state['nonzero_updates']<1 or self.state['checkpoint'] is None:
             return self._finish(c.Disposition.BLOCKED,'No actual nonzero-gradient changed-weight update with verified native reload')
-        return self._finish(c.Disposition.SUCCESS,'Native supervised/GRPO updates, synchronized inference and exact checkpoint reload completed')
+        return self._finish(c.Disposition.SUCCESS,f"{self.state['updates']} confirmed native updates with synchronized inference/reload; {self.state.get('unknown_updates',0)} prior unknown dispatches consumed budget without asserted optimizer steps")
 
     def _collect(self,sampler):
         if self.state['unclassified_group'] is not None:
@@ -316,7 +336,7 @@ class TrainingService:
         for ref in self.state['consumed']:self.gate.admit_task(c.ArtifactRef.model_validate_json(canonical_json(ref)))
         before=self.native.policy.identity.weights
         self.state['phase']='updating';self._write()
-        index=self.state['updates'];key=self.claim.attempt_id+':update:'+str(index)
+        index=self.state['updates']+self.state.get('unknown_updates',0);key=self.claim.attempt_id+':update:'+str(index)
         intent=self._put({'version':'m7-update-intent-v1','request':self.request.model_dump(mode='json'),
             'index':index,'policy':self.native.policy.model_dump(mode='json'),
             'rows':[{'context':r.turn.context,'targets':r.turn.targets,'mask':r.turn.mask,
@@ -354,12 +374,14 @@ class TrainingService:
                 consumed_tasks=tuple(c.ArtifactRef.model_validate_json(canonical_json(v)) for v in self.state['consumed']),
                 optimizer_steps=self.state['optimizer_steps'],update_evidence=(evidence,),reload_evidence=(evidence,))
             ref=self.store.put_artifact(checkpoint);self.registry.register(ref)
+            self._observe('m7-native-update',key,3,(intent,receipt,progress,ref),(cost('training',wall=time.monotonic()-started,
+                note='Confirmed native update/reload and frozen controller checkpoint; resource costs remain unknown'),))
             self.state['checkpoint']=ref.model_dump(mode='json')
         self.state['phase']='collecting';self._write()
 
     def _restore_progress(self,ref):
-        from .checkpoints import validate_selected_checkpoint
-        checkpoint=validate_selected_checkpoint(self.store,self.registry,ref,configuration=self.config)
+        from .checkpoints import validate_recovery_checkpoint
+        checkpoint=validate_recovery_checkpoint(self.store,self.registry,ref,configuration=self.config)
         refs=[x for x in checkpoint.provenance.inputs if x.kind=='m7-checkpoint-progress']
         if len(refs)!=1:raise ValueError('Unique frozen sampler/signal/native progress required')
         value=decode_json(self.store.get_bytes(refs[0],max_envelope_bytes=8*1024*1024,max_payload_bytes=4*1024*1024),4*1024*1024)
@@ -369,5 +391,55 @@ class TrainingService:
         if (checkpoint.weights!=policy.identity.weights or checkpoint.policy_version!=policy.policy_version
             or checkpoint.optimizer_steps!=restored['optimizer_steps'] or checkpoint.data_position!=restored['data_position']
             or checkpoint.optimizer_state.model_dump(mode='json')!=restored['native']['checkpoint']):raise ValueError('Checkpoint/progress joins differ')
+        from feature_rl.registry import Claim
+        old_claim=Claim.model_validate_json(canonical_json(restored['claim']))
+        observations=tuple(self.registry.accounting(old_claim.job_id).observations)
+        startups=[o for o in observations if o.observation.source=='m7-native-startup']
+        shutdowns=[o for o in observations if o.observation.source=='m7-native-shutdown' and o.observation.revision==2]
+        closed=set()
+        for observation in shutdowns:
+            for receipt in observation.observation.receipts:
+                if receipt.kind=='m7-native-shutdown':
+                    closed.add(decode_json(self.store.get_bytes(receipt),4*1024*1024)['startup']['sha256'])
+        if not startups or any(o.observation.revision!=2 or not any(r.kind=='m7-native-startup' and r.sha256 in closed
+            for r in o.observation.receipts) for o in startups):
+            raise ValueError('Reconcile and confirm owned old native session shutdown before recovery')
+        old_journal=Path(self.settings.work_directory)/'controller'/(old_claim.job_id+'.json')
+        require_private_tree(old_journal.parent)
+        current=decode_json(old_journal.read_bytes(),4*1024*1024)
+        if current['phase']=='superseded' and current.get('recovery_claim')==self.claim.model_dump(mode='json'):
+            recovery_ref=c.ArtifactRef.model_validate_json(canonical_json(current['recovery']))
+            preserved=decode_json(self.store.get_bytes(recovery_ref),4*1024*1024)
+            current=preserved['journal']
+        original_request=decode_json(self.store.get_bytes(c.ArtifactRef.model_validate_json(canonical_json(current['request']))),4*1024*1024)
+        selected_request=decode_json(self.store.get_bytes(self.request),4*1024*1024)
+        for field in ('demonstrations','lifecycle','builder_revision','runtime_revision','grader_revision','revision','scope'):
+            if original_request[field]!=selected_request[field]:raise ValueError('Recovery changes frozen inputs or implementation')
+        if (current['claim']!=old_claim.model_dump(mode='json') or current['request']!=restored['request']
+            or current['checkpoint']!=ref.model_dump(mode='json') or current['updates']!=restored['updates']
+            or current['phase'] not in ('updating','collecting','ready')):
+            raise ValueError('Original owned journal does not bind this last confirmed recovery checkpoint')
+        later=[o for o in observations if o.observation.source=='m7-native-update'
+            and int(o.observation.upstream_attempt_id.rsplit(':',1)[1])>=restored['updates']+restored.get('unknown_updates',0)]
+        # Dispatched rows/episodes are not replayed, even if their native result is unknown.
+        for field in ('sampler','signal','data_position','groups','consumed','group_receipts','elapsed_wall'):
+            restored[field]=current[field]
+        restored.update(pending=None,unclassified_group=None,batch_receipts=[],supervised_positions=[],
+            unknown_updates=restored.get('unknown_updates',0)+len(later))
+        recovery=self._put({'version':'m7-recovery-v1','checkpoint':ref.model_dump(mode='json'),
+            'original_claim':old_claim.model_dump(mode='json'),'journal':current,
+            'observations':[o.model_dump(mode='json') for o in observations]},'m7-recovery',
+            (ref,*tuple(dict.fromkeys(r for o in observations for r in o.observation.receipts))))
+        self._observe('m7-recovery-ancestry',old_claim.job_id,1,(recovery,),
+            tuple(v for o in observations for v in o.observation.costs))
+        current.update(phase='superseded',recovery_claim=self.claim.model_dump(mode='json'),recovery=recovery.model_dump(mode='json'))
+        temporary=old_journal.with_suffix('.new')
+        descriptor=os.open(temporary,os.O_CREAT|os.O_WRONLY|os.O_TRUNC,0o600)
+        with os.fdopen(descriptor,'wb') as stream:stream.write(canonical_json(current));stream.flush();os.fsync(stream.fileno())
+        os.replace(temporary,old_journal)
+        descriptor=os.open(old_journal.parent,os.O_RDONLY)
+        try:os.fsync(descriptor)
+        finally:os.close(descriptor)
+        restored['recovery']=recovery.model_dump(mode='json')
         identity=(self.state['request'],self.state['claim'])
         self.state=restored;self.state.update(request=identity[0],claim=identity[1],checkpoint=ref.model_dump(mode='json'),phase='initializing')

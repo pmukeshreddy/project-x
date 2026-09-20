@@ -42,6 +42,7 @@ def service_fixture(tmp_path,monkeypatch):
             import json
             journals=list((Path(kwargs['settings'].work_directory).parents[1]/'controller').glob('*.json'))
             assert any(json.loads(path.read_text())['phase']=='initializing' for path in journals)
+            self.output=Path(kwargs['settings'].work_directory);self.output.mkdir(parents=True,exist_ok=True)
             calls.append('initialize');torch.manual_seed(4);self.updater=TorchUpdater(Model(),learning_rate=.01,kl_coefficient=0,max_seq_len=8192)
             self.policy=config.initial_policy;self.backend=f.backend;self.trainer=SimpleNamespace(global_step=0)
             self.last_probe={'scope':'unit_diagnostic','no_native_inference':True}
@@ -51,7 +52,7 @@ def service_fixture(tmp_path,monkeypatch):
             calls.append('update');receipt=self.updater.update([row.turn for row in rows],algorithm=algorithm)
             after=snapshot_state(self.updater.model,self.updater.optimizer,rank=0)
             self.trainer.global_step+=1
-            path=tmp_path/('export-'+str(self.trainer.global_step));path.mkdir()
+            path=self.output/('export-'+str(self.trainer.global_step));path.mkdir()
             torch.save(self.updater.model.state_dict(),path/'model.pt')
             ref=publish_directory(store=f.store,registry=f.registry,path=path)
             self.policy=self.policy.model_copy(update={'identity':self.policy.identity.model_copy(update={'weights':ref}),
@@ -59,7 +60,7 @@ def service_fixture(tmp_path,monkeypatch):
             return {'grad_norm':receipt.gradient_norm,'weights':ref.model_dump(mode='json'),'cpu_tensor_before':receipt.before,'cpu_tensor_after':receipt.after,
                 **compare_states([before],[after])}
         def save_reload(self):
-            calls.append('save-reload');path=tmp_path/('checkpoint-'+str(self.trainer.global_step))
+            calls.append('save-reload');path=self.output/('checkpoint-'+str(self.trainer.global_step))
             digest=self.updater.save_checkpoint(path,binding={'diagnostic':True},progress={'position':1},policy_version=self.policy.policy_version)
             self.updater.load_checkpoint(path,expected_digest=digest,binding={'diagnostic':True})
             ref=publish_directory(store=f.store,registry=f.registry,path=path)
@@ -166,3 +167,81 @@ def test_checkpointed_service_resume_restores_real_cpu_optimizer_and_next_positi
     checkpoint=f.fixture.store.get_artifact(result.artifacts[0])
     assert result.disposition==c.Disposition.SUCCESS and checkpoint.optimizer_steps==2 and checkpoint.data_position==2
     assert f.calls==['initialize','update','save-reload','close','initialize','resume','update','save-reload','close']
+
+
+def test_explicit_recovery_skips_unknown_update_and_restores_cpu_optimizer(tmp_path,monkeypatch):
+    from feature_rl.training.checkpoints import validate_selected_checkpoint
+    from feature_rl.artifacts import canonical_json
+    import json
+    f=service_fixture(tmp_path,monkeypatch);f.config=f.config.model_copy(update={'max_updates':3})
+    original=f.service._update
+    def interrupt(rows):
+        if f.service.state['updates']==1:
+            real=f.service.native.update
+            def lost(*args,**kwargs):
+                real(*args,**kwargs)
+                raise OSError('lost later update result')
+            f.service.native.update=lost
+        return original(rows)
+    monkeypatch.setattr(f.service,'_update',interrupt)
+    with pytest.raises(OSError,match='lost later'):f.service.train(f.config,invocation='old',demonstrations=(f.demo,))
+    old_claim=f.service.claim;old_accounting=f.fixture.registry.accounting(old_claim.job_id)
+    checkpoint=c.ArtifactRef.model_validate_json(canonical_json(f.service.state['checkpoint']))
+    old_export=Path(f.service.settings.work_directory)/'jobs'/old_claim.job_id/'export-2'/'model.pt'
+    old_bytes=old_export.read_bytes()
+    from feature_rl.training.checkpoints import validate_recovery_checkpoint
+    original_cp=f.fixture.store.get_artifact(checkpoint)
+    forged=f.fixture.store.put_artifact(original_cp.model_copy(update={'costs':(original_cp.costs[0].model_copy(update={'note':'diagnostic counterfeit cost'}),)}))
+    f.fixture.registry.register(forged)
+    with pytest.raises(ValueError,match='confirmed update observation'):
+        validate_recovery_checkpoint(f.fixture.store,f.fixture.registry,forged,configuration=f.config)
+    with pytest.raises(ValueError,match='sole selected'):validate_selected_checkpoint(f.fixture.store,f.fixture.registry,checkpoint)
+    monkeypatch.setattr(f.service,'_update',original)
+    result=f.service.train(f.config,invocation='explicit-recovery',resume=checkpoint,demonstrations=(f.demo,))
+    recovered=f.fixture.store.get_artifact(result.artifacts[0])
+    assert recovered.optimizer_steps==2 and recovered.data_position==3
+    assert f.service.state['unknown_updates']==1 and f.service.state['updates']==2
+    assert f.service.claim.job_id!=old_claim.job_id
+    assert old_export.read_bytes()==old_bytes
+    assert f.fixture.registry.accounting(old_claim.job_id)==old_accounting
+    assert f.calls.count('update')==3 and f.calls.count('resume')==1
+    assert result.disposition==c.Disposition.SUCCESS
+
+
+def test_terminal_training_cleanup_closes_unpublished_startup_after_quarantine(tmp_path,monkeypatch):
+    from feature_rl.artifacts import ArtifactError
+    f=service_fixture(tmp_path,monkeypatch);put=f.fixture.store.put_bytes;failed=[]
+    def outage(payload,kind,*args,**kwargs):
+        if kind=='m7-native-startup' and not failed:failed.append(True);raise ArtifactError('startup receipt outage')
+        return put(payload,kind,*args,**kwargs)
+    monkeypatch.setattr(f.fixture.store,'put_bytes',outage)
+    with pytest.raises(ArtifactError):f.service.train(f.config,invocation='terminal-cleanup',demonstrations=(f.demo,))
+    assert f.calls==['initialize']
+    f.fixture.registry.quarantine(f.config.tasks[0],notice_id='terminal',reason='diagnostic quarantine',
+        evidence=(f.service.request,))
+    f.service.close();f.service.close()
+    assert f.calls==['initialize','close']
+    rows=f.fixture.registry.accounting(f.service.claim.job_id).observations
+    assert any(o.observation.source=='m7-native-startup' and o.observation.revision==1 for o in rows)
+    assert any(o.observation.source=='m7-native-shutdown' and o.observation.revision==2 for o in rows)
+
+
+def test_explicit_recovery_exhausted_unknown_budget_is_blocked_without_old_checkpoint_selection(tmp_path,monkeypatch):
+    f=service_fixture(tmp_path,monkeypatch);f.config=f.config.model_copy(update={'max_updates':2})
+    original=f.service._update
+    def interrupted(rows):
+        if f.service.state['updates']==1:
+            real=f.service.native.update
+            def lost(*args,**kwargs):
+                real(*args,**kwargs);raise OSError('lost budget-ending update')
+            f.service.native.update=lost
+        return original(rows)
+    monkeypatch.setattr(f.service,'_update',interrupted)
+    with pytest.raises(OSError):f.service.train(f.config,invocation='budget-old',demonstrations=(f.demo,))
+    ref=c.ArtifactRef.model_validate_json(canonical_json(f.service.state['checkpoint']))
+    monkeypatch.setattr(f.service,'_update',original)
+    result=f.service.train(f.config,invocation='budget-recovery',resume=ref,demonstrations=(f.demo,))
+    assert result.disposition==c.Disposition.BLOCKED
+    assert not any(r.kind=='TrainingCheckpoint' for r in result.artifacts)
+    assert f.service.state['updates']==1 and f.service.state['unknown_updates']==1
+    assert f.calls.count('update')==2 and f.calls.count('initialize')==1 # No restart, replay or budget extension.

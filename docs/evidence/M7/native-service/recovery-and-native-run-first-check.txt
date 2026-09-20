@@ -1,0 +1,226 @@
+.....F....FFFFFF......................                                   [100%]
+=================================== FAILURES ===================================
+____ test_explicit_recovery_skips_unknown_update_and_restores_cpu_optimizer ____
+
+self = <feature_rl.artifacts.store.ArtifactStore object at 0x110bcda30>
+artifact = TrainingCheckpoint(kind='TrainingCheckpoint', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, provenance...VATE: 'private'>, encoding='bytes'),), revision='ffffffffffffffffffffffffffffffffffffffff', scope='unit_diagnostic'),))
+
+    def put_artifact(self, artifact: ArtifactModel) -> ArtifactRef:
+        if type(artifact) not in ARTIFACT_TYPES.values():
+            raise ArtifactIntegrityError('unregistered artifact model')
+        try:
+            # Revalidation catches unsafe model_construct/model_copy mutations.
+>           checked = type(artifact).model_validate(artifact)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           pydantic_core._pydantic_core.ValidationError: 1 validation error for TrainingCheckpoint
+E           costs
+E             Tuple should have at least 1 item after validation, not 0 [type=too_short, input_value=(), input_type=tuple]
+E               For further information visit https://errors.pydantic.dev/2.13/v/too_short
+
+src/feature_rl/artifacts/store.py:162: ValidationError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_explicit_recovery_skips_u0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a3ed650>
+
+    def test_explicit_recovery_skips_unknown_update_and_restores_cpu_optimizer(tmp_path,monkeypatch):
+        from feature_rl.training.checkpoints import validate_selected_checkpoint
+        from feature_rl.artifacts import canonical_json
+        import json
+        f=service_fixture(tmp_path,monkeypatch);f.config=f.config.model_copy(update={'max_updates':3})
+        original=f.service._update
+        def interrupt(rows):
+            if f.service.state['updates']==1:
+                real=f.service.native.update
+                def lost(*args,**kwargs):
+                    real(*args,**kwargs)
+                    raise OSError('lost later update result')
+                f.service.native.update=lost
+            return original(rows)
+        monkeypatch.setattr(f.service,'_update',interrupt)
+        with pytest.raises(OSError,match='lost later'):f.service.train(f.config,invocation='old',demonstrations=(f.demo,))
+        old_claim=f.service.claim;old_accounting=f.fixture.registry.accounting(old_claim.job_id)
+        checkpoint=c.ArtifactRef.model_validate_json(canonical_json(f.service.state['checkpoint']))
+        old_export=Path(f.service.settings.work_directory)/'jobs'/old_claim.job_id/'export-2'/'model.pt'
+        old_bytes=old_export.read_bytes()
+        from feature_rl.training.checkpoints import validate_recovery_checkpoint
+        original_cp=f.fixture.store.get_artifact(checkpoint)
+>       forged=f.fixture.store.put_artifact(original_cp.model_copy(update={'costs':()}))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_training_service.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.artifacts.store.ArtifactStore object at 0x110bcda30>
+artifact = TrainingCheckpoint(kind='TrainingCheckpoint', schema_version=1, visibility=<Visibility.PRIVATE: 'private'>, provenance...VATE: 'private'>, encoding='bytes'),), revision='ffffffffffffffffffffffffffffffffffffffff', scope='unit_diagnostic'),))
+
+    def put_artifact(self, artifact: ArtifactModel) -> ArtifactRef:
+        if type(artifact) not in ARTIFACT_TYPES.values():
+            raise ArtifactIntegrityError('unregistered artifact model')
+        try:
+            # Revalidation catches unsafe model_construct/model_copy mutations.
+            checked = type(artifact).model_validate(artifact)
+        except ValidationError as exc:
+>           raise ArtifactIntegrityError('invalid artifact model') from exc
+E           feature_rl.artifacts.store.ArtifactIntegrityError: invalid artifact model
+
+src/feature_rl/artifacts/store.py:164: ArtifactIntegrityError
+__________ test_native_run_claim_child_join_costs_shutdown_and_replay __________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_claim_child_jo0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e253cb0>
+
+    def test_native_run_claim_child_join_costs_shutdown_and_replay(tmp_path,monkeypatch):
+>       f=setup(tmp_path,monkeypatch)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_native_run_service.py:34: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_claim_child_jo0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e253cb0>
+
+    def setup(tmp_path,monkeypatch):
+        from test_training_factory import factory_fixture
+        from feature_rl.training.factory import NativeSessionFactory
+>       from feature_rl.agents.native_service import NativeRunService
+E         File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/agents/native_service.py", line 120
+E           self.lifecycle.resolve_released(task)
+E           ^^^^
+E       SyntaxError: expected 'except' or 'finally' block
+
+tests/test_native_run_service.py:12: SyntaxError
+______________ test_native_run_publication_retry_never_resamples _______________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_publication_re0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e5e2750>
+
+    def test_native_run_publication_retry_never_resamples(tmp_path,monkeypatch):
+        from feature_rl.artifacts import ArtifactError
+>       f=setup(tmp_path,monkeypatch);put=f.f.store.put_bytes;failed=[]
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_native_run_service.py:53: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_publication_re0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e5e2750>
+
+    def setup(tmp_path,monkeypatch):
+        from test_training_factory import factory_fixture
+        from feature_rl.training.factory import NativeSessionFactory
+>       from feature_rl.agents.native_service import NativeRunService
+E         File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/agents/native_service.py", line 120
+E           self.lifecycle.resolve_released(task)
+E           ^^^^
+E       SyntaxError: expected 'except' or 'finally' block
+
+tests/test_native_run_service.py:12: SyntaxError
+________ test_native_run_quarantine_still_closes_and_denies_publication ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_quarantine_sti0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110a96ed0>
+
+    def test_native_run_quarantine_still_closes_and_denies_publication(tmp_path,monkeypatch):
+>       f=setup(tmp_path,monkeypatch);grade=f.f.runner.grader.grade
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_native_run_service.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_quarantine_sti0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110a96ed0>
+
+    def setup(tmp_path,monkeypatch):
+        from test_training_factory import factory_fixture
+        from feature_rl.training.factory import NativeSessionFactory
+>       from feature_rl.agents.native_service import NativeRunService
+E         File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/agents/native_service.py", line 120
+E           self.lifecycle.resolve_released(task)
+E           ^^^^
+E       SyntaxError: expected 'except' or 'finally' block
+
+tests/test_native_run_service.py:12: SyntaxError
+_______ test_native_run_durable_parent_completion_retry_without_session ________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_durable_parent0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110a97290>
+
+    
+    
+>   def test_native_run_durable_parent_completion_retry_without_session(tmp_path,monkeypatch):
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_native_run_service.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_durable_parent0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110a97290>
+
+    def setup(tmp_path,monkeypatch):
+        from test_training_factory import factory_fixture
+        from feature_rl.training.factory import NativeSessionFactory
+>       from feature_rl.agents.native_service import NativeRunService
+E         File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/agents/native_service.py", line 120
+E           self.lifecycle.resolve_released(task)
+E           ^^^^
+E       SyntaxError: expected 'except' or 'finally' block
+
+tests/test_native_run_service.py:12: SyntaxError
+__ test_native_run_startup_receipt_outage_retains_cleanup_without_generation ___
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_native_run_startup_receip0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110bfcb50>
+
+    
+    
+>   def test_native_run_startup_receipt_outage_retains_cleanup_without_generation(tmp_path,monkeypatch):
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E     File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/agents/native_service.py", line 120
+E       self.lifecycle.resolve_released(task)
+E       ^^^^
+E   SyntaxError: expected 'except' or 'finally' block
+
+tests/test_native_run_service.py:90: SyntaxError
+_____________ test_pending_startup_can_be_closed_after_quarantine ______________
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_pending_startup_can_be_cl0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110bfd020>
+
+    
+    
+>   def test_pending_startup_can_be_closed_after_quarantine(tmp_path,monkeypatch):
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_native_run_service.py:104: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/private/var/folders/9z/37tfwz3j0v9dlsykj19f5c600000gn/T/pytest-of-mukeshreddypochamreddy/pytest-1423/test_pending_startup_can_be_cl0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110bfd020>
+
+    def setup(tmp_path,monkeypatch):
+        from test_training_factory import factory_fixture
+        from feature_rl.training.factory import NativeSessionFactory
+>       from feature_rl.agents.native_service import NativeRunService
+E         File "/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/agents/native_service.py", line 120
+E           self.lifecycle.resolve_released(task)
+E           ^^^^
+E       SyntaxError: expected 'except' or 'finally' block
+
+tests/test_native_run_service.py:12: SyntaxError
+=============================== warnings summary ===============================
+tests/test_training_service.py::test_real_cpu_sft_service_update_checkpoint_and_selected_job_replay
+  /Users/mukeshreddypochamreddy/Desktop/project x/.venv-training-cpu/lib/python3.13/site-packages/torch/_subclasses/functional_tensor.py:307: UserWarning: Failed to initialize NumPy: No module named 'numpy' (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:84.)
+    cpu = _conversion_method_template(device=torch.device("cpu"))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_training_service.py::test_explicit_recovery_skips_unknown_update_and_restores_cpu_optimizer
+FAILED tests/test_native_run_service.py::test_native_run_claim_child_join_costs_shutdown_and_replay
+FAILED tests/test_native_run_service.py::test_native_run_publication_retry_never_resamples
+FAILED tests/test_native_run_service.py::test_native_run_quarantine_still_closes_and_denies_publication
+FAILED tests/test_native_run_service.py::test_native_run_durable_parent_completion_retry_without_session
+FAILED tests/test_native_run_service.py::test_native_run_startup_receipt_outage_retains_cleanup_without_generation
+FAILED tests/test_native_run_service.py::test_pending_startup_can_be_closed_after_quarantine
+7 failed, 31 passed, 1 warning in 36.59s
