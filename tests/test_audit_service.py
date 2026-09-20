@@ -270,7 +270,8 @@ def test_audit_recovery_finishes_frozen_quarantine_effect_without_rerunning_audi
         calls.append(1)
         report, dependencies, human_evidence, complete = original(frozen_subjects)
         action = QuarantineAction(
-            root=quarantine_root, notice_id="m8-audit-" + quarantine_root.sha256[:24],
+            root=quarantine_root,
+            notice_id=service._notice_id(quarantine_root, (evidence,)),
             reason="authenticated M8 human audit found a decision defect",
             evidence=(evidence,),
         )
@@ -296,5 +297,85 @@ def test_audit_recovery_finishes_frozen_quarantine_effect_without_rerunning_audi
     result = service.recover(caught.value.claim)
     assert result.disposition == c.Disposition.PROVISIONAL
     assert len(calls) == 1
-    assert any(notice.notice_id == "m8-audit-" + quarantine_root.sha256[:24]
+    assert any(notice.notice_id == service._notice_id(quarantine_root, (evidence,))
                for notice in service.registry.trace(quarantine_root).notices)
+
+
+def test_later_audit_of_same_subject_records_distinct_frozen_finding(tmp_path, monkeypatch):
+    from feature_rl.audits import AuditService, QuarantineAction
+
+    first, run_ids = diagnostic_service(tmp_path)
+    second = AuditService(
+        store=first.store, registry=first.registry,
+        human_verifier=first.human_verifier,
+        selection_manifest=first.selection_ref, attestations={}, revision="b" * 40,
+    )
+    second._population_subjects = first._population_subjects
+    root = next(entry.candidate for entry in first.population.entries if entry.unit == "source")
+    evidence = tuple(
+        first.store.put_bytes(f"finding-{index}".encode(), "audit-diagnostic", c.Visibility.PRIVATE)
+        for index in (1, 2)
+    )
+    for ref in evidence:
+        first.registry.register(ref)
+
+    for service, finding in ((first, evidence[0]), (second, evidence[1])):
+        original = service._execute
+
+        def execute(subjects=None, *, _service=service, _finding=finding, _original=original):
+            report, dependencies, human_evidence, complete = _original(subjects)
+            action = QuarantineAction(
+                root=root, notice_id=_service._notice_id(root, (_finding,)),
+                reason="authenticated M8 human audit found a decision defect",
+                evidence=(_finding,),
+            )
+            return report.model_copy(update={
+                "quarantined_sources": (root,), "quarantine_actions": (action,),
+            }), (*dependencies, _finding), human_evidence, complete
+
+        monkeypatch.setattr(service, "_execute", execute)
+        assert service.audit(run_ids).disposition == c.Disposition.PROVISIONAL
+
+    notices = [notice for notice in first.registry.trace(root).notices if notice.active]
+    assert len(notices) == 2
+    assert len({notice.notice_id for notice in notices}) == 2
+
+
+def test_other_audit_configuration_cannot_recover_or_publish_selected_claim(tmp_path, monkeypatch):
+    from feature_rl.audits import AuditPublicationFailed, AuditService, DetachedAuditAttestation
+
+    service, run_ids = diagnostic_service(tmp_path)
+    put = service.store.put_bytes
+
+    def fail_report(payload, kind, *args, **kwargs):
+        if kind == "m8-audit-report":
+            raise OSError("diagnostic report outage")
+        return put(payload, kind, *args, **kwargs)
+
+    monkeypatch.setattr(service.store, "put_bytes", fail_report)
+    with pytest.raises(AuditPublicationFailed) as caught:
+        service.audit(run_ids)
+    monkeypatch.setattr(service.store, "put_bytes", put)
+
+    payload = service.store.put_bytes(b"different signed payload", "m8-patch-audit-adjudication", c.Visibility.PRIVATE)
+    signature = service.store.put_bytes(b"different signature", "m8-sshsig", c.Visibility.PRIVATE)
+    envelope = DetachedAuditAttestation(
+        version="m8-detached-audit-attestation-v1",
+        payload=payload, signature=signature, principal="different-reviewer",
+    )
+    envelope_ref = service.store.put_bytes(
+        canonical_json(envelope.model_dump(mode="json")),
+        "m8-detached-audit-attestation", c.Visibility.PRIVATE,
+    )
+    other = AuditService(
+        store=service.store, registry=service.registry,
+        human_verifier=service.human_verifier,
+        selection_manifest=service.selection_ref,
+        attestations={service.selection.selections[0].subject_id: envelope_ref},
+        revision=REVISION,
+    )
+    other._population_subjects = service._population_subjects
+    with pytest.raises(ValueError, match="different audit service"):
+        other.retry_publication(caught.value)
+    with pytest.raises(ValueError, match="different audit service"):
+        other.recover(caught.value.claim)

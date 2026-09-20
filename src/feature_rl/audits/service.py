@@ -243,6 +243,15 @@ class AuditService:
             )
         return subjects
 
+    def _notice_id(self, root, evidence):
+        finding = canonical_json({
+            "version": "m8-audit-finding-v1",
+            "configuration": self.configuration.model_dump(mode="json"),
+            "root": root.model_dump(mode="json"),
+            "evidence": [ref.model_dump(mode="json") for ref in evidence],
+        })
+        return "m8-audit-" + hashlib.sha256(finding).hexdigest()[:32]
+
     def _verify_human(self, selection, attestation_ref, model, kind):
         envelope = read_local(self.store, attestation_ref, DetachedAuditAttestation, "m8-detached-audit-attestation")
         raw = read_bytes(self.store, envelope.payload, 65536, kind, True)
@@ -393,7 +402,7 @@ class AuditService:
             affected_runs.update(trace.runs)
             affected_checkpoints.update(trace.checkpoints)
             quarantine_actions.append(QuarantineAction(
-                root=root, notice_id="m8-audit-" + root.sha256[:24],
+                root=root, notice_id=self._notice_id(root, evidence_refs),
                 reason="authenticated M8 human audit found a decision defect",
                 evidence=evidence_refs,
             ))
@@ -435,6 +444,24 @@ class AuditService:
             else:
                 roots.extend((entry.candidate, entry.source_disposition))
         return tuple(dict.fromkeys(roots))
+
+    def _scoped_configuration(self, subjects):
+        return self.registry.historical_audit_configuration(
+            self.configuration,
+            subjects=self._subject_roots(subjects),
+            protected=self.audit_protected,
+        )
+
+    def _validate_claim_configuration(self, claim):
+        job = self.registry.job(claim.job_id)
+        if not any(attempt.claim == claim for attempt in self.registry.attempts(job.job_id)):
+            raise ValueError("claim is not this audit service configuration")
+        subjects = self._population_subjects()
+        expected = self._scoped_configuration(subjects)
+        if job.spec != self._spec(expected):
+            raise ValueError("claim belongs to a different audit service configuration")
+        self.audit_configuration = expected
+        return job
 
     def _result(self, reference, payload):
         if reference.kind == "m8-audit-report":
@@ -552,11 +579,7 @@ class AuditService:
         if tuple(sorted(run_ids)) != expected or len(run_ids) != len(set(run_ids)):
             raise AuditRejected("audit must account for the complete frozen patch selection")
         subjects = self._population_subjects()
-        self.audit_configuration = self.registry.historical_audit_configuration(
-            self.configuration,
-            subjects=self._subject_roots(subjects),
-            protected=self.audit_protected,
-        )
+        self.audit_configuration = self._scoped_configuration(subjects)
         job = self.registry.enqueue(self._spec())
         if job.state == "completed":
             return job.result
@@ -580,11 +603,7 @@ class AuditService:
 
     def recover(self, claim: Claim) -> c.OperationResult:
         claim = Claim.model_validate(claim)
-        job = self.registry.job(claim.job_id)
-        if job.spec != self._spec(job.spec.configuration) or not any(
-            attempt.claim == claim for attempt in self.registry.attempts(job.job_id)
-        ):
-            raise ValueError("claim is not this audit service configuration")
+        job = self._validate_claim_configuration(claim)
         if job.state == "completed":
             return job.result
         observations = [item for item in self.registry.accounting(job.job_id).observations
@@ -610,6 +629,9 @@ class AuditService:
                 or hashlib.sha256(pending.payload).hexdigest() != pending.sha256
                 or pending.kind not in {"m8-audit-report", "m8-audit-failure"}):
             raise ValueError("invalid retained audit publication")
+        self._validate_claim_configuration(pending.claim)
+        if not {self.configuration, self.selection_ref}.issubset(pending.dependencies):
+            raise ValueError("retained audit publication belongs to a different audit service")
         return self._publish(
             pending.claim, payload=pending.payload,
             dependencies=pending.dependencies, kind=pending.kind,
