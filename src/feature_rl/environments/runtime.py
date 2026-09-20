@@ -21,7 +21,7 @@ from feature_rl.contracts import (ActorRole,AllowedChanges,ArtifactRef,CommandSp
 from .archive import SourceArchive,SourceFile,safe_path
 from .docker import DockerEngine,utc_now,observation_json,stream_process
 from .models import (BuildResult,EnvironmentError,ExecutionRequest,ExecutionResult,PolicyRejected,
-    PreparedEnvironment,SandboxPolicy,SavedSource,SourceRejected,WorkspaceHandle,SourceUnavailable,REPAIRED_IMAGE,IMAGE,CleanupUnverified,DockerUnavailable,EvidencePublicationFailed)
+    PreparedEnvironment,SandboxPolicy,SavedSource,SourceRejected,WorkspaceHandle,SourceUnavailable,REPAIRED_IMAGE,IMAGE,CleanupUnverified,DockerUnavailable,EvidencePublicationFailed,CpuBudgetExceeded)
 from .workers import STAGE_CODE
 import time
 
@@ -54,6 +54,7 @@ class StageFailure(EnvironmentError):
 
 
 def failure(exc):
+    if isinstance(exc,CpuBudgetExceeded):return 'cpu_limit','candidate'
     if isinstance(exc,StageFailure):return exc.reason,exc.category
     if isinstance(exc,SourceRejected):return 'source_rejected','candidate'
     if isinstance(exc,SourceUnavailable):return 'source_unavailable','unresolved'
@@ -166,11 +167,12 @@ class EnvironmentRuntime:
         if len(data)>self.policy.max_staging_bytes:raise PolicyRejected('aggregate stage archive cap')
         command=CommandSpec(argv=('python','-I','-c',STAGE_CODE,str(self.policy.max_staging_bytes)),working_directory='/workspace',timeout_seconds=20.0)
         r=session.execute(command,data,staging=True)
+        if r.reason=='cpu_limit':raise CpuBudgetExceeded('CPU budget exhausted during source/dependency staging')
         if r.reason!='exited' or r.exit_code!=0:raise EnvironmentError('source/dependency staging failed')
     def binding(self,prepared,saved,phase,value):
         return {'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,'source':saved.artifact.sha256,'source_raw':saved.raw_sha256,'tree':saved.tree_sha256,'phase':phase,'revision':self.revision,'workspace_id':value['workspace_id'],'generation':str(value['generation']),'role':value['role'],'source_input':value['source_input']['sha256'],'source_pair':value['source_pair']['sha256'] if value['source_pair'] else 'none','allowed_changes':hashlib.sha256(canonical_json(value['allowed_changes'])).hexdigest()}
     def evidence(self,session,phase,extra=None):
-        return self.publish({'phase':phase,'revision':self.revision,'lifecycle_wall_seconds':max(0.0,time.monotonic()-(session.deadline-session.policy.lifecycle_seconds)),'record':session.record.model_dump(mode='json'),'effective':session.effective,'commands':session.receipts,'cleanup_verified':session.cleanup_verified,'maximum_cpu_seconds':session.maximum_cpu_seconds,'maximum_memory_bytes':session.maximum_memory_bytes,'memory_oom_events':session.memory_oom_events,'container_state':session.container_state,'extra':extra},'environment-execution')
+        return self.publish({'phase':phase,'revision':self.revision,'lifecycle_wall_seconds':max(0.0,time.monotonic()-(session.deadline-session.policy.lifecycle_seconds)),'record':session.record.model_dump(mode='json'),'effective':session.effective,'commands':session.receipts,'cleanup_verified':session.cleanup_verified,'maximum_cpu_seconds':session.maximum_cpu_seconds,'effective_cpu_seconds':session.effective_cpu_seconds,'maximum_memory_bytes':session.maximum_memory_bytes,'memory_oom_events':session.memory_oom_events,'container_state':session.container_state,'extra':extra},'environment-execution')
     def wheel_bytes(self,data,source):
         if len(data)>self.policy.max_source_bytes:raise SourceRejected('built wheel size limit')
         try:
@@ -232,6 +234,8 @@ class EnvironmentRuntime:
     def _execute(self,handle,request,*,build,development):
         self.recover_owned()
         request=ExecutionRequest.model_validate(request)
+        if request.remaining_cpu_seconds is not None and request.remaining_cpu_seconds>self.policy.cpu_seconds:
+            raise PolicyRejected('request CPU cap exceeds admitted policy')
         value,prepared,recipe,saved,source=self.workspace(handle);wheel=None
         if not development:
             if build.source!=saved.artifact or build.recipe!=prepared.recipe or build.policy!=prepared.policy or build.source_tree_sha256!=source.tree_sha256:raise PolicyRejected('build/source/recipe/policy mismatch')
@@ -245,7 +249,7 @@ class EnvironmentRuntime:
                 raise PolicyRejected('successful build receipt binding mismatch')
         if len(request.stdin)>self.policy.stdin_bytes:raise PolicyRejected('command stdin cap')
         phase='development' if development else 'execute'
-        s=self.engine.session(binding=self.binding(prepared,saved,phase,value),saved_source=saved.model_dump(mode='json'))
+        s=self.engine.session(binding=self.binding(prepared,saved,phase,value),saved_source=saved.model_dump(mode='json'),cpu_seconds=request.remaining_cpu_seconds)
         start=time.monotonic();result=None;error=None;save_status='last_confirmed';next_saved=saved
         environment=DEV_ENV if development else ENV
         try:
@@ -253,6 +257,7 @@ class EnvironmentRuntime:
                 self.stage(s,source,recipe.dependencies,wheel=wheel)
                 for command in ((DEPS,) if development else (DEPS,INSTALL)):
                     r=s.execute(command,environment=environment)
+                    if r.reason=='cpu_limit':raise CpuBudgetExceeded('CPU budget exhausted during offline execution setup')
                     if r.reason!='exited' or r.exit_code!=0:raise StageFailure('offline execution setup failed','infrastructure_failure' if r.reason=='monitor_failure' else 'setup_failed','infrastructure')
                 result=s.execute(request.command,request.stdin,environment=environment)
                 if result.reason=='exited' and request.save_source:

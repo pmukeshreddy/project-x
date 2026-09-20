@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import http.client
 import json
+import math
 import os
 from pathlib import Path
 import selectors
@@ -22,7 +23,7 @@ from feature_rl.artifacts import ArtifactStore,canonical_json
 from feature_rl.contracts import ActorRole,CommandSpec
 from .archive import SourceArchive,SourceFile
 from .models import (CleanupUnverified,DockerUnavailable,EnvironmentError,Ownership,
-                     PolicyRejected,ProcessObservation,SandboxPolicy,SECCOMP_SHA256,SourceRejected,SourceUnavailable,IMAGE,REPAIRED_IMAGE)
+                     PolicyRejected,ProcessObservation,SandboxPolicy,SECCOMP_SHA256,SourceRejected,SourceUnavailable,IMAGE,REPAIRED_IMAGE,CpuBudgetExceeded)
 
 
 def utc_now():return datetime.now(timezone.utc).isoformat()
@@ -155,7 +156,7 @@ class DockerEngine:
         if info.get('OSType')!='linux' or info.get('Architecture') not in ('aarch64','arm64'):raise PolicyRejected('requires Linux arm64 Docker')
         self.info=info;self.qualified=False;self.qualification=None
 
-    def session(self,*,binding,saved_source):return DockerSession(self,binding,saved_source)
+    def session(self,*,binding,saved_source,cpu_seconds=None):return DockerSession(self,binding,saved_source,cpu_seconds=cpu_seconds)
 
     def http(self,method,path,*,deadline,cap):
         remaining=deadline-time.monotonic()
@@ -205,8 +206,15 @@ class DockerEngine:
         return result
 
 class DockerSession:
-    def __init__(self,engine,binding,saved_source,record=None):
+    def __init__(self,engine,binding,saved_source,record=None,cpu_seconds=None):
         self.engine=engine;self.policy=engine.policy;self.receipts=[];self.cleanup_verified=False;self.effective=None
+        if record is not None and 'effective_cpu_seconds' in record.binding:
+            cpu_seconds=float(record.binding['effective_cpu_seconds'])
+        cap=self.policy.cpu_seconds if cpu_seconds is None else cpu_seconds
+        if type(cap) not in (float,int) or not math.isfinite(cap) or cap<=0 or (record is None and cap>self.policy.cpu_seconds):
+            raise PolicyRejected('CPU cap must be positive, finite and no greater than admitted policy')
+        self.effective_cpu_seconds=float(cap)
+        binding={**binding,'effective_cpu_seconds':str(self.effective_cpu_seconds)}
         op=uuid.uuid4().hex
         self.record=record or Ownership(operation_id=op,owner_token=uuid.uuid4().hex,daemon_id=engine.daemon_id,
             container_name='feature-rl-m3-'+op,container_id=None,phase='intent',binding=binding,saved_source=saved_source,created_at=utc_now())
@@ -282,7 +290,7 @@ class DockerSession:
             if status!=200:return 'monitor_failure'
             stats=json.loads(data);cpu=stats['cpu_stats']['cpu_usage']['total_usage']/1e9;memory=stats['memory_stats'].get('usage',0)
             self.maximum_cpu_seconds=max(self.maximum_cpu_seconds,cpu);self.maximum_memory_bytes=max(self.maximum_memory_bytes,memory)
-            if cpu>=self.policy.cpu_seconds:return 'cpu_limit'
+            if cpu>=self.effective_cpu_seconds:return 'cpu_limit'
         except (OSError,ValueError,KeyError,TimeoutError,http.client.HTTPException):return 'monitor_failure'
         return None
     def memory_events(self):
@@ -307,8 +315,11 @@ class DockerSession:
         after=self.memory_events() if check_oom and r.reason=='exited' else None
         if before is not None and after is not None and after>before:
             self.memory_oom_events+=after-before;r=r.model_copy(update={'reason':'memory_limit'})
+        if r.reason=='exited':
+            verdict=self.monitor()
+            if verdict:r=r.model_copy(update={'reason':verdict})
         self.remaining_output=max(0,self.remaining_output-r.observed_bytes)
-        receipt=observation_json(r);receipt.update({'stdin_bytes':len(stdin),'stdin_sha256':hashlib.sha256(stdin).hexdigest(),'oom_events_before':before,'oom_events_after':after})
+        receipt=observation_json(r);receipt.update({'stdin_bytes':len(stdin),'stdin_sha256':hashlib.sha256(stdin).hexdigest(),'oom_events_before':before,'oom_events_after':after,'effective_cpu_seconds':self.effective_cpu_seconds})
         self.receipts.append(receipt);return r
     def export_source(self):
         from .workers import EXPORT_CODE
@@ -318,8 +329,12 @@ class DockerSession:
         # Use its own archive cap instead of the ordinary command output cap.
         args=self.engine.base+['exec','-i','--workdir','/',self.name,*command.argv]
         r=stream_process(args,b'',min(self.deadline,time.monotonic()+self.policy.control_seconds),self.policy.max_archive_bytes,self.monitor)
-        self.receipts.append(observation_json(r))
+        if r.reason=='exited':
+            verdict=self.monitor()
+            if verdict:r=r.model_copy(update={'reason':verdict})
+        receipt=observation_json(r);receipt['effective_cpu_seconds']=self.effective_cpu_seconds;self.receipts.append(receipt)
         self.receipts.append({'source_capture_started':started,'source_capture_finished':utc_now(),'semantics':'validated last-confirmed capture; not an atomic filesystem instant'})
+        if r.reason=='cpu_limit':raise CpuBudgetExceeded('CPU budget exhausted during source capture')
         if r.reason=='monitor_failure':raise DockerUnavailable('source capture monitor unavailable')
         if r.reason=='output_limit' or (r.reason=='exited' and r.exit_code==65):raise SourceRejected('bounded source capture rejected: '+r.stderr.decode(errors='replace')[:1200])
         if r.reason!='exited' or r.exit_code!=0:raise SourceUnavailable('source capture unavailable: '+r.reason)

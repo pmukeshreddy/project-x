@@ -1,0 +1,33 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+_____ test_recovery_preserves_original_cap_when_current_policy_is_stricter _____
+
+    def test_recovery_preserves_original_cap_when_current_policy_is_stricter():
+        from feature_rl.environments.docker import DockerSession
+        engine=engine_double();original=engine.session(binding={},saved_source={})
+        engine.policy=SandboxPolicy(cpu_seconds=1.0)
+>       recovery=DockerSession(engine,original.record.binding,{},record=original.record)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environment_cpu_budget.py:113: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <feature_rl.environments.docker.DockerSession object at 0x10ac1e210>
+engine = <feature_rl.environments.docker.DockerEngine object at 0x10ac441a0>
+binding = {'effective_cpu_seconds': '60.0'}, saved_source = {}
+record = Ownership(operation_id='f265e47069f14b9ba6901f3ad3dd60c2', owner_token='c3249c323a254379b6c75e2dc8a194bf', daemon_id='... binding={'effective_cpu_seconds': '60.0'}, saved_source={}, created_at='2026-09-20T00:11:10.268066+00:00', error=None)
+cpu_seconds = 60.0
+
+    def __init__(self,engine,binding,saved_source,record=None,cpu_seconds=None):
+        self.engine=engine;self.policy=engine.policy;self.receipts=[];self.cleanup_verified=False;self.effective=None
+        if record is not None and 'effective_cpu_seconds' in record.binding:
+            cpu_seconds=float(record.binding['effective_cpu_seconds'])
+        cap=self.policy.cpu_seconds if cpu_seconds is None else cpu_seconds
+        if type(cap) not in (float,int) or not math.isfinite(cap) or not 0<cap<=self.policy.cpu_seconds:
+>           raise PolicyRejected('CPU cap must be positive, finite and no greater than admitted policy')
+E           feature_rl.environments.models.PolicyRejected: CPU cap must be positive, finite and no greater than admitted policy
+
+src/feature_rl/environments/docker.py:215: PolicyRejected
+=========================== short test summary info ============================
+FAILED tests/test_environment_cpu_budget.py::test_recovery_preserves_original_cap_when_current_policy_is_stricter
+1 failed, 1 passed, 21 deselected in 0.12s

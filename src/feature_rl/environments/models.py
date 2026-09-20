@@ -14,6 +14,7 @@ class PolicyRejected(EnvironmentError): pass
 class DockerUnavailable(EnvironmentError): pass
 class CleanupUnverified(EnvironmentError): pass
 class SourceUnavailable(EnvironmentError): pass
+class CpuBudgetExceeded(EnvironmentError): pass
 class EvidencePublicationFailed(EnvironmentError):
     """Bounded pending publication; no execution rerun is needed to retry storage."""
     failure_category='infrastructure'
@@ -62,6 +63,7 @@ class ExecutionRequest(StrictModel):
     command: CommandSpec
     stdin: bytes = b''
     save_source: bool = True
+    remaining_cpu_seconds: Annotated[float,Field(gt=0)] | None = None
 
 class SavedSource(StrictModel):
     artifact: ArtifactRef

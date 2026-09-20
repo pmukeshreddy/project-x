@@ -1,0 +1,27 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=src",
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_environment_cpu_budget.py"
+  ],
+  "exit_status": 1,
+  "source_hashes": {
+    "src/feature_rl/environments/seccomp.json": "005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44",
+    "src/feature_rl/environments/models.py": "ab6cb150a252f3d5f57c335ed15dd26608d5cf827c7ec53a70721e81b5c699da",
+    "src/feature_rl/environments/__init__.py": "bf204b871a62df026c04882279f6b80cbe55177ce7366fc4b1d093e90a18b556",
+    "src/feature_rl/environments/docker.py": "25be92992a5214442ef1b95cf0f499d260460072df68b564decd2da024e7e7a6",
+    "src/feature_rl/environments/runtime.py": "4994c5801464cc0fb7b676f1ad2247d534720db253f45b99933aab2278443b68",
+    "src/feature_rl/environments/archive.py": "e18b59e2b036dcd5843e9f4b39e3f5d2a491f7564d1bad700cc0026c2225fd4a",
+    "src/feature_rl/environments/probes.py": "01b871bb0fbcce519c233d32e4087e1f5df8514dcada5d046443f7e070a0618e",
+    "src/feature_rl/environments/workers.py": "ad57c0cb19a8d234476716b84d759e1e8e5182f2260c42ceb08551e497dd0dce"
+  },
+  "test_sha256": "73af00fbd00d2071a304255b12b1f2380ef10a338982b7a51fce284e26c6e75a",
+  "log_sha256": "58010ea2cc816888e1a3eb8f29bd91ea9ef3cf5f8f4e83a3fac4e61069ebfb03",
+  "utc_started": "2026-09-20T00:08:55.811744+00:00",
+  "utc_finished": "2026-09-20T00:08:56.056942+00:00",
+  "timestamp_source": "log filesystem creation/final-write times"
+}

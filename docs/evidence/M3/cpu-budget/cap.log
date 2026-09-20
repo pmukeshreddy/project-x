@@ -1,0 +1,1 @@
+{"status": "passed", "reason": "cpu_limit", "effective_cpu_seconds": 0.05, "maximum_cpu_seconds": 0.138736, "wall_seconds": 2.446264416910708, "all_owned_removed": true}

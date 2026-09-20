@@ -1,0 +1,95 @@
+{
+  "created_at": "2026-09-20T00:15:30.576779+00:00",
+  "source_hashes": {
+    "src/feature_rl/environments/seccomp.json": "005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44",
+    "src/feature_rl/environments/models.py": "03918f9b86a75d587e74cef72774e09715aab2dd23c9e304b1912f506e8898a2",
+    "src/feature_rl/environments/__init__.py": "bf204b871a62df026c04882279f6b80cbe55177ce7366fc4b1d093e90a18b556",
+    "src/feature_rl/environments/docker.py": "0b8c8595ad945c0f1b3ae69f707e637a12431f770db395aebb6509e7e8629bda",
+    "src/feature_rl/environments/runtime.py": "2a0ad9eb50069171f5dde5c827819b65168202b71675d5aef3112c497ccb3ace",
+    "src/feature_rl/environments/archive.py": "e18b59e2b036dcd5843e9f4b39e3f5d2a491f7564d1bad700cc0026c2225fd4a",
+    "src/feature_rl/environments/probes.py": "01b871bb0fbcce519c233d32e4087e1f5df8514dcada5d046443f7e070a0618e",
+    "src/feature_rl/environments/workers.py": "ad57c0cb19a8d234476716b84d759e1e8e5182f2260c42ceb08551e497dd0dce"
+  },
+  "test_hashes": {
+    "tests/test_environment_cpu_budget.py": "5f3a8a3b1a44272fd5750ace9af04c0da8baae6d9246bfd2cad8f8eb2ce2f02d",
+    "tests/test_environments.py": "dcc3415617b36c54e562b170546fd186d6941366d61e639ee741d240e2eb570b"
+  },
+  "checks": [
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_environment_cpu_budget.py",
+        "tests/test_environments.py"
+      ],
+      "exit_status": 0,
+      "log": "docs/evidence/M3/cpu-budget/final-tests.log",
+      "log_sha256": "607288fc2e60467458780b747aa9dfd857ba7cdf2a158a98737e8d312431bb70",
+      "utc_started": "2026-09-20T00:14:00.484216+00:00",
+      "utc_finished": "2026-09-20T00:14:00.678218+00:00",
+      "timestamp_source": "log filesystem creation/final-write observations"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "docs/evidence/M3/cpu-budget/cap_diagnostic.py"
+      ],
+      "exit_status": 0,
+      "log": "docs/evidence/M3/cpu-budget/cap.log",
+      "log_sha256": "9bfd06f818d9a4f579aa028d412330971b0e61b245d27ad01b9a3ab723e56046",
+      "utc_started": "2026-09-20T00:12:12.602276+00:00",
+      "utc_finished": "2026-09-20T00:12:15.146411+00:00",
+      "timestamp_source": "log filesystem creation/final-write observations"
+    },
+    {
+      "command": [
+        "env",
+        "PYTHONPATH=src",
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_environment_cpu_budget.py",
+        "-k",
+        "storage or recovery_preserves"
+      ],
+      "exit_status": 1,
+      "log": "docs/evidence/M3/cpu-budget/red-recovery.log",
+      "log_sha256": "ce4bd7a71c9277e73ce756fe134315eb4613bec177935d9ab2887da09fcd50be",
+      "utc_started": "2026-09-20T00:11:09.999137+00:00",
+      "utc_finished": "2026-09-20T00:11:10.299049+00:00",
+      "timestamp_source": "log filesystem creation/final-write observations"
+    }
+  ],
+  "final_result": "........................................                                 [100%]\n40 passed in 0.09s",
+  "actual_diagnostic": {
+    "effective_cpu_seconds": 0.05,
+    "observed_cpu_seconds": 0.138736,
+    "observed_overrun_seconds": 0.088736,
+    "source_preserved": true,
+    "cleanup_verified": true,
+    "exact_container_id": "68dfd3f25ff5ae453898ddefec7a01d3cb504846c523f9911b49a7c8b8496a6a",
+    "receipt_payload_sha256": "1ee67040735b99135310950f2b9e94f1bc9209ba034e730100b9567722474bab"
+  },
+  "audit_repair": "First inline audit assumed every commands entry had argv and raised KeyError on image metadata. Corrected to recognize metadata entries; no product/receipt change or execution rerun.",
+  "evidence_files": {
+    "docs/evidence/M3/cpu-budget/cap-result.json": "396a4b328d315756af160e16f9c00a6488d99146ffcdac13cfd3934da97d8ce3",
+    "docs/evidence/M3/cpu-budget/audit.py": "f2353f5d607aeffac1f216789274c081dc9bc3e439cb5e3021b9ceae92ce8596",
+    "docs/evidence/M3/cpu-budget/cap_diagnostic.py": "236c7dcaea62f75e5f169d0042482c6f8b4fc5f2a1f66720de7867ef2710cdb5",
+    "docs/evidence/M3/cpu-budget/green-tests.log": "7c7f06c808a40e7d4ed19213dc4237e1a4c5035295bbebd4698b695c7679f5cc",
+    "docs/evidence/M3/cpu-budget/cap.log": "9bfd06f818d9a4f579aa028d412330971b0e61b245d27ad01b9a3ab723e56046",
+    "docs/evidence/M3/cpu-budget/red-receipt.json": "66f14aadb728cdf00c89fc61cc095edbda3abfccddc14e381da4967dc1abb4a3",
+    "docs/evidence/M3/cpu-budget/owned-containers.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/evidence/M3/cpu-budget/red-recovery.log": "ce4bd7a71c9277e73ce756fe134315eb4613bec177935d9ab2887da09fcd50be",
+    "docs/evidence/M3/cpu-budget/final-tests.log": "607288fc2e60467458780b747aa9dfd857ba7cdf2a158a98737e8d312431bb70",
+    "docs/evidence/M3/cpu-budget/green-tests-1.log": "13f03aee018513736cd10c1c492249e72485fc67f95800c6ad11fe358b2e0568",
+    "docs/evidence/M3/cpu-budget/red-tests.log": "58010ea2cc816888e1a3eb8f29bd91ea9ef3cf5f8f4e83a3fac4e61069ebfb03"
+  },
+  "limitations": "One real synthetic cap request plus qualification; focused CPU doubles cover phase classification. Sample/probe/cleanup overshoot is explicit. No exact kernel aggregate CPU, model/native/history/GPU execution or consumer wiring claim."
+}

@@ -1,0 +1,267 @@
+....FFFFFFFFFFFFFFFFF                                                    [100%]
+=================================== FAILURES ===================================
+______________ test_request_default_and_fractional_remaining_cpu _______________
+
+    def test_request_default_and_fractional_remaining_cpu():
+>       assert ExecutionRequest(command=COMMAND).remaining_cpu_seconds is None
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_environment_cpu_budget.py:19: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ExecutionRequest(command=CommandSpec(argv=('python', '-c', 'pass'), working_directory='/workspace', timeout_seconds=1.0), stdin=b'', save_source=True)
+item = 'remaining_cpu_seconds'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ExecutionRequest' object has no attribute 'remaining_cpu_seconds'
+
+.venv/lib/python3.13/site-packages/pydantic/main.py:1042: AttributeError
+__________ test_monitor_uses_request_cap_and_default_preserves_policy __________
+
+    def test_monitor_uses_request_cap_and_default_preserves_policy():
+        engine=engine_double()
+>       low=engine.session(binding={},saved_source={},cpu_seconds=.5)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DockerEngine.session() got an unexpected keyword argument 'cpu_seconds'
+
+tests/test_environment_cpu_budget.py:31: TypeError
+______________ test_session_cap_cannot_exceed_admitted_policy[0] _______________
+
+cap = 0
+
+    @pytest.mark.parametrize('cap',[0,-1,float('inf'),float('nan'),61.0,True])
+    def test_session_cap_cannot_exceed_admitted_policy(cap):
+>       with pytest.raises(PolicyRejected):engine_double().session(binding={},saved_source={},cpu_seconds=cap)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DockerEngine.session() got an unexpected keyword argument 'cpu_seconds'
+
+tests/test_environment_cpu_budget.py:39: TypeError
+______________ test_session_cap_cannot_exceed_admitted_policy[-1] ______________
+
+cap = -1
+
+    @pytest.mark.parametrize('cap',[0,-1,float('inf'),float('nan'),61.0,True])
+    def test_session_cap_cannot_exceed_admitted_policy(cap):
+>       with pytest.raises(PolicyRejected):engine_double().session(binding={},saved_source={},cpu_seconds=cap)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DockerEngine.session() got an unexpected keyword argument 'cpu_seconds'
+
+tests/test_environment_cpu_budget.py:39: TypeError
+_____________ test_session_cap_cannot_exceed_admitted_policy[inf] ______________
+
+cap = inf
+
+    @pytest.mark.parametrize('cap',[0,-1,float('inf'),float('nan'),61.0,True])
+    def test_session_cap_cannot_exceed_admitted_policy(cap):
+>       with pytest.raises(PolicyRejected):engine_double().session(binding={},saved_source={},cpu_seconds=cap)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DockerEngine.session() got an unexpected keyword argument 'cpu_seconds'
+
+tests/test_environment_cpu_budget.py:39: TypeError
+_____________ test_session_cap_cannot_exceed_admitted_policy[nan] ______________
+
+cap = nan
+
+    @pytest.mark.parametrize('cap',[0,-1,float('inf'),float('nan'),61.0,True])
+    def test_session_cap_cannot_exceed_admitted_policy(cap):
+>       with pytest.raises(PolicyRejected):engine_double().session(binding={},saved_source={},cpu_seconds=cap)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DockerEngine.session() got an unexpected keyword argument 'cpu_seconds'
+
+tests/test_environment_cpu_budget.py:39: TypeError
+_____________ test_session_cap_cannot_exceed_admitted_policy[61.0] _____________
+
+cap = 61.0
+
+    @pytest.mark.parametrize('cap',[0,-1,float('inf'),float('nan'),61.0,True])
+    def test_session_cap_cannot_exceed_admitted_policy(cap):
+>       with pytest.raises(PolicyRejected):engine_double().session(binding={},saved_source={},cpu_seconds=cap)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DockerEngine.session() got an unexpected keyword argument 'cpu_seconds'
+
+tests/test_environment_cpu_budget.py:39: TypeError
+_____________ test_session_cap_cannot_exceed_admitted_policy[True] _____________
+
+cap = True
+
+    @pytest.mark.parametrize('cap',[0,-1,float('inf'),float('nan'),61.0,True])
+    def test_session_cap_cannot_exceed_admitted_policy(cap):
+>       with pytest.raises(PolicyRejected):engine_double().session(binding={},saved_source={},cpu_seconds=cap)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       TypeError: DockerEngine.session() got an unexpected keyword argument 'cpu_seconds'
+
+tests/test_environment_cpu_budget.py:39: TypeError
+_ test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[stage] _
+
+phase = 'stage'
+
+    @pytest.mark.parametrize('phase',['stage','setup','command','export'])
+    def test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category(phase):
+        runtime,saved,observed=runtime_double(phase)
+>       result=runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=.1))
+                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=0.1, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:77: ValidationError
+_ test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[setup] _
+
+phase = 'setup'
+
+    @pytest.mark.parametrize('phase',['stage','setup','command','export'])
+    def test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category(phase):
+        runtime,saved,observed=runtime_double(phase)
+>       result=runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=.1))
+                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=0.1, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:77: ValidationError
+_ test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[command] _
+
+phase = 'command'
+
+    @pytest.mark.parametrize('phase',['stage','setup','command','export'])
+    def test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category(phase):
+        runtime,saved,observed=runtime_double(phase)
+>       result=runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=.1))
+                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=0.1, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:77: ValidationError
+_ test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[export] _
+
+phase = 'export'
+
+    @pytest.mark.parametrize('phase',['stage','setup','command','export'])
+    def test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category(phase):
+        runtime,saved,observed=runtime_double(phase)
+>       result=runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=.1))
+                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=0.1, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:77: ValidationError
+_ test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion[monitor-False] _
+
+phase = 'monitor', cleanup_failure = False
+
+    @pytest.mark.parametrize('phase,cleanup_failure',[('monitor',False),('setup',True),('export',True)])
+    def test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion(phase,cleanup_failure):
+        runtime,saved,observed=runtime_double(phase,cleanup_failure)
+>       result=runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=.1))
+                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=0.1, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:85: ValidationError
+_ test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion[setup-True] _
+
+phase = 'setup', cleanup_failure = True
+
+    @pytest.mark.parametrize('phase,cleanup_failure',[('monitor',False),('setup',True),('export',True)])
+    def test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion(phase,cleanup_failure):
+        runtime,saved,observed=runtime_double(phase,cleanup_failure)
+>       result=runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=.1))
+                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=0.1, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:85: ValidationError
+_ test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion[export-True] _
+
+phase = 'export', cleanup_failure = True
+
+    @pytest.mark.parametrize('phase,cleanup_failure',[('monitor',False),('setup',True),('export',True)])
+    def test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion(phase,cleanup_failure):
+        runtime,saved,observed=runtime_double(phase,cleanup_failure)
+>       result=runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=.1))
+                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=0.1, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:85: ValidationError
+_________ test_excessive_request_cap_rejected_before_session_creation __________
+
+    def test_excessive_request_cap_rejected_before_session_creation():
+        runtime,saved,observed=runtime_double('stage')
+>       with pytest.raises(PolicyRejected):runtime.execute_development(WorkspaceHandle(workspace_id='a'*32),ExecutionRequest(command=COMMAND,remaining_cpu_seconds=61.0))
+                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for ExecutionRequest
+E       remaining_cpu_seconds
+E         Extra inputs are not permitted [type=extra_forbidden, input_value=61.0, input_type=float]
+E           For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+
+tests/test_environment_cpu_budget.py:92: ValidationError
+____________ test_export_cpu_monitor_failure_has_distinct_exception ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109f08fc0>
+
+    def test_export_cpu_monitor_failure_has_distinct_exception(monkeypatch):
+        from feature_rl.environments.docker import DockerSession
+        import feature_rl.environments.docker as docker_module
+>       from feature_rl.environments import CpuBudgetExceeded
+E       ImportError: cannot import name 'CpuBudgetExceeded' from 'feature_rl.environments' (/Users/mukeshreddypochamreddy/Desktop/project x/src/feature_rl/environments/__init__.py)
+
+tests/test_environment_cpu_budget.py:99: ImportError
+=========================== short test summary info ============================
+FAILED tests/test_environment_cpu_budget.py::test_request_default_and_fractional_remaining_cpu
+FAILED tests/test_environment_cpu_budget.py::test_monitor_uses_request_cap_and_default_preserves_policy
+FAILED tests/test_environment_cpu_budget.py::test_session_cap_cannot_exceed_admitted_policy[0]
+FAILED tests/test_environment_cpu_budget.py::test_session_cap_cannot_exceed_admitted_policy[-1]
+FAILED tests/test_environment_cpu_budget.py::test_session_cap_cannot_exceed_admitted_policy[inf]
+FAILED tests/test_environment_cpu_budget.py::test_session_cap_cannot_exceed_admitted_policy[nan]
+FAILED tests/test_environment_cpu_budget.py::test_session_cap_cannot_exceed_admitted_policy[61.0]
+FAILED tests/test_environment_cpu_budget.py::test_session_cap_cannot_exceed_admitted_policy[True]
+FAILED tests/test_environment_cpu_budget.py::test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[stage]
+FAILED tests/test_environment_cpu_budget.py::test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[setup]
+FAILED tests/test_environment_cpu_budget.py::test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[command]
+FAILED tests/test_environment_cpu_budget.py::test_budget_exhaustion_preserves_last_confirmed_source_and_candidate_category[export]
+FAILED tests/test_environment_cpu_budget.py::test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion[monitor-False]
+FAILED tests/test_environment_cpu_budget.py::test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion[setup-True]
+FAILED tests/test_environment_cpu_budget.py::test_actual_infrastructure_fault_is_not_relabelled_cpu_exhaustion[export-True]
+FAILED tests/test_environment_cpu_budget.py::test_excessive_request_cap_rejected_before_session_creation
+FAILED tests/test_environment_cpu_budget.py::test_export_cpu_monitor_failure_has_distinct_exception
+17 failed, 4 passed in 0.11s
