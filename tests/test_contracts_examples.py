@@ -244,3 +244,25 @@ def test_provenance_v2_redirect_chain_rejects_omission_empty_or_wrong_origin(cha
     value=examples()['CandidateRecord']['sources'][0];value.pop('redirect_chain',None)
     if chain!='missing':value['redirect_chain']=chain
     with pytest.raises(ValidationError):c.SourceSnapshot.model_validate_json(json.dumps(value))
+
+
+@pytest.mark.parametrize('seed_fields',[{}, {'case_seed':None}, {'case_seed':0}, {'case_seed':17}])
+def test_run_request_case_seed_transport_roundtrip(seed_fields):
+    rollout=examples()['RolloutRecord']
+    value=dict(task_version=rollout['task'],policy=rollout['policy'],limits=rollout['limits'])|seed_fields
+    request=c.RunRequest.model_validate_json(json.dumps(value))
+    assert request.case_seed==seed_fields.get('case_seed')
+    assert request.policy.seed==13
+    assert request.model_dump(mode='json')==value|{'case_seed':seed_fields.get('case_seed')}
+    assert c.RunRequest.model_validate_json(request.model_dump_json())==request
+
+
+@pytest.mark.parametrize('seed',[-1,True,False,1.0,'1',[],{}])
+def test_run_request_rejects_invalid_case_seed_in_json_and_python(seed):
+    rollout=examples()['RolloutRecord']
+    value=dict(task_version=rollout['task'],policy=rollout['policy'],limits=rollout['limits'])
+    valid=c.RunRequest.model_validate_json(json.dumps(value))
+    with pytest.raises(ValidationError):
+        c.RunRequest.model_validate_json(json.dumps(value|{'case_seed':seed}))
+    with pytest.raises(ValidationError):
+        c.RunRequest.model_validate(valid.model_dump()|{'case_seed':seed})

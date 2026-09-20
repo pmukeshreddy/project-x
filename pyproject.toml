@@ -9,6 +9,9 @@ description = "Evidence-backed feature environment construction and learning"
 requires-python = ">=3.11"
 dependencies = ["pydantic==2.13.5"]
 
+[project.scripts]
+feature-rl = "feature_rl.cli:main"
+
 [dependency-groups]
 dev = ["pytest==9.1.1"]
 # Qualified local authoring wheel closure; opt in only on CPython 3.13 / macOS 26+ arm64.

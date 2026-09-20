@@ -856,6 +856,8 @@ class ReleaseRequest(TaskRequest):
 class RunRequest(TaskRequest):
     policy: PolicyConfig
     limits: ResourceLimits
+    # None delegates ordinary case selection to policy.seed in AgentRunner.run.
+    case_seed: NonnegativeInt | None = None
 
 
 class GradeRequest(TaskRequest):
