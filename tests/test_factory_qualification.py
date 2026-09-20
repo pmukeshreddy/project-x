@@ -88,3 +88,26 @@ def test_accept_uses_frozen_request_policy_and_actual_human_denial(tmp_path,monk
     attestation=factory.store.put_bytes(b'TEST ONLY not a human signature','m5-sshsig-attestation',c.Visibility.PRIVATE)
     from feature_rl.qualification import QualificationRejected
     with pytest.raises(QualificationRejected):factory.accept(request,attestation)
+
+
+def test_factory_recovery_reconstructs_selected_m5_policy_and_exact_revision(tmp_path,monkeypatch):
+    factory,built=configured(tmp_path,monkeypatch)
+    result=factory.qualify(built.artifacts[0])
+    job=next(factory.registry.job(j) for j in factory.registry.trace(built.artifacts[0]).jobs
+        if factory.registry.job(j).spec.invocation=='m5-qualify')
+    claim=factory.registry.attempts(job.job_id)[0].claim
+    assert factory.recover(claim)==result
+    with pytest.raises(ValueError,match='selected Registry claim'):
+        factory.recover(claim.model_copy(update={'token':'0'*64}))
+    factory.qualification.revision='f'*40
+    with pytest.raises(AdmissionRejected,match='implementation'):factory.recover(claim)
+
+
+def test_factory_lifecycle_recovery_retains_actual_provisional_outcome(tmp_path,monkeypatch):
+    factory,built=configured(tmp_path,monkeypatch)
+    report=factory.qualify(built.artifacts[0]).artifacts[0]
+    result=factory.release(built.artifacts[0],accepted_report=report)
+    assert result.disposition==c.Disposition.PROVISIONAL
+    job=next(factory.registry.job(j) for j in factory.registry.trace(report).jobs
+        if factory.registry.job(j).spec.invocation=='m6-transition-qualified')
+    assert factory.recover(factory.registry.attempts(job.job_id)[0].claim)==result

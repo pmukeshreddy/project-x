@@ -14,6 +14,8 @@ from .build import TaskBuilder
 from .factory import Factory
 from .lifecycle import TaskLifecycle
 from .resolver import ReleasedTaskResolver
+from .authoring_models import AuthoringSettings
+from feature_rl.training.native import NativeSettings
 
 
 class ConfigurationRequired(ValueError):
@@ -50,6 +52,23 @@ class QualificationSettings(c.StrictModel):
     human: HumanTrustConfiguration | None = None
 
 
+class NativeConfiguration(c.StrictModel):
+    revision: c.Revision
+    settings: NativeSettings
+    bootstrap: c.TrainingConfig | None = None
+
+
+class EvaluationSettings(c.StrictModel):
+    revision: c.Revision
+
+
+class AuditSettings(c.StrictModel):
+    revision: c.Revision
+    selection_manifest: c.ArtifactRef
+    attestations: Annotated[dict[c.Identifier,c.ArtifactRef],Field(max_length=4096)]
+    human: HumanTrustConfiguration
+
+
 class CLIConfiguration(LocalPaths):
     version: Literal['m6-cli-v1'] = 'm6-cli-v1'
     store_root: str
@@ -59,6 +78,10 @@ class CLIConfiguration(LocalPaths):
     registry_limits: RegistryLimits = Field(default_factory=RegistryLimits)
     runtime: RuntimeConfiguration | None = None
     qualification: QualificationSettings | None = None
+    authoring: AuthoringSettings | None = None
+    native: NativeConfiguration | None = None
+    evaluation: EvaluationSettings | None = None
+    audit: AuditSettings | None = None
 
 
 @dataclass(frozen=True)
@@ -69,8 +92,12 @@ class Application:
     lifecycle: TaskLifecycle | None
     resolver: ReleasedTaskResolver | None
 
+    def close(self):
+        self.factory.close()
 
-def compose(config: CLIConfiguration, *, runtime=False, qualification=False) -> Application:
+
+def compose(config: CLIConfiguration, *, runtime=False, qualification=False, authoring=False,
+            native_operation: Literal['run','train','evaluate'] | None=None, audit=False) -> Application:
     """Create real services, qualifying the M3 boundary only when requested.
 
     Source and complete-artifact construction require neither a daemon nor model.
@@ -79,6 +106,16 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False) -> 
     """
     if type(config) is not CLIConfiguration:
         raise TypeError('validated CLIConfiguration required')
+    if native_operation not in (None,'run','train','evaluate'):raise ValueError('unknown native operation')
+    if authoring and config.authoring is None:raise ConfigurationRequired('actual M2/M4 authoring settings and frozen batch budget are required')
+    if native_operation is not None:
+        if config.native is None:raise ConfigurationRequired('actual inert M7 native settings are required')
+        if native_operation in ('run','evaluate') and config.native.bootstrap is None:
+            raise ConfigurationRequired('run/evaluate requires the frozen native bootstrap TrainingConfig')
+        if native_operation=='evaluate' and config.evaluation is None:
+            raise ConfigurationRequired('actual M8 evaluation revision is required')
+        qualification=True
+    if audit and config.audit is None:raise ConfigurationRequired('actual frozen M8 audit selection and external human trust are required')
     if (runtime or qualification) and config.runtime is None:
         raise ConfigurationRequired('actual M3 runtime configuration is required')
     if qualification and config.qualification is None:
@@ -104,5 +141,29 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False) -> 
             revision=settings.revision,policy=settings.policy,attestation_verifier=human)
         lifecycle=TaskLifecycle(store=store,registry=registry,qualification=q,revision=config.revision)
         resolver=ReleasedTaskResolver(profiles=(lifecycle,),revision=config.revision)
-    factory=Factory(store=store,registry=registry,revision=config.revision,builder=builder,qualification=q)
+    factory=Factory(store=store,registry=registry,revision=config.revision,builder=builder,qualification=q,
+        authoring=config.authoring,grading=grader)
+    if native_operation is not None:
+        settings=config.native
+        shared=dict(store=store,registry=registry,lifecycle=resolver,builder=builder,runtime=actual_runtime,grader=grader)
+        if native_operation=='train':
+            from feature_rl.training.service import TrainingService
+            factory.training=TrainingService(**shared,settings=settings.settings,revision=settings.revision)
+        else:
+            from feature_rl.training.factory import NativeSessionFactory
+            inert=NativeSessionFactory(store=store,registry=registry,settings=settings.settings,
+                configuration=settings.bootstrap,revision=settings.revision)
+            if native_operation=='run':
+                from feature_rl.agents.native_service import NativeRunService
+                factory.native_run=NativeRunService(**shared,native_factory=inert,revision=settings.revision)
+            else:
+                from feature_rl.evaluation.service import EvaluationService
+                factory.evaluation=EvaluationService(**shared,factory=factory,native_factory=inert,revision=config.evaluation.revision)
+    if audit:
+        from feature_rl.audits.service import AuditService
+        settings=config.audit
+        human=SSHHumanVerifier(enrollment_path=settings.human.enrollment_path,
+            expected_enrollment_sha256=settings.human.enrollment_sha256)
+        factory.audit_service=AuditService(store=store,registry=registry,human_verifier=human,
+            selection_manifest=settings.selection_manifest,attestations=settings.attestations,revision=settings.revision)
     return Application(factory,actual_runtime,grader,lifecycle,resolver)

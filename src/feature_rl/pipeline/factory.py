@@ -75,7 +75,8 @@ def source_decision(candidate):
 
 
 class Factory:
-    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None, qualification=None, authoring=None):
+    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None, qualification=None,
+                 authoring=None, grading=None, native_run=None, training=None, evaluation=None, audit=None):
         if (not isinstance(store, ArtifactStore) or store.role != c.ActorRole.CONTROLLER
                 or not isinstance(registry, Registry) or registry.store is not store):
             raise TypeError('Factory requires the same actual controller store and Registry')
@@ -93,6 +94,11 @@ class Factory:
         self.qualification=qualification
         from .authoring_models import AuthoringSettings
         self.authoring=None if authoring is None else checked(AuthoringSettings,authoring)
+        from feature_rl.grading import GradingService
+        if grading is not None and (type(grading) is not GradingService or grading.store is not store):
+            raise TypeError('Factory grading must use the actual same-store M4 service')
+        self.grading=grading
+        self.native_run,self.training,self.evaluation,self.audit_service=native_run,training,evaluation,audit
         self.source_configuration = store.put_bytes(self._source_policy(revision),
             'm6-source-policy', c.Visibility.PRIVATE)
         registry.register(self.source_configuration)
@@ -109,6 +115,10 @@ class Factory:
         from .authoring_import import import_rejected
         return import_rejected(self,candidate,call,journal_refs)
 
+    def grade(self, task_version, submission, case_seed, *, invocation='grade') -> c.OperationResult:
+        from .grading import grade
+        return grade(self,task_version,submission,case_seed,invocation)
+
     def qualify(self, task_ref: c.ArtifactRef, *, policy=None) -> c.OperationResult:
         from .qualification import qualify
         return qualify(self,task_ref,policy)
@@ -120,6 +130,39 @@ class Factory:
     def release(self, task_ref: c.ArtifactRef, *, accepted_report: c.ArtifactRef | None=None) -> c.OperationResult:
         from .qualification import release
         return release(self,task_ref,accepted_report)
+
+    def _execution_service(self,name,expected):
+        value=getattr(self,name)
+        if type(value) is not expected or value.store is not self.store or value.registry is not self.registry:
+            raise ValueError('configure the actual same-store '+expected.__name__)
+        return value
+
+    def run(self,task_version,policy,limits,*,case_seed=None,invocation):
+        from feature_rl.agents.native_service import NativeRunService
+        return self._execution_service('native_run',NativeRunService).run(task_version,policy,limits,
+            case_seed=case_seed,invocation=invocation)
+
+    def train(self,configuration,*,invocation,resume=None,demonstrations=()):
+        from feature_rl.training.service import TrainingService
+        return self._execution_service('training',TrainingService).train(configuration,
+            invocation=invocation,resume=resume,demonstrations=demonstrations)
+
+    def evaluate(self,configuration):
+        from feature_rl.evaluation.service import EvaluationService
+        return self._execution_service('evaluation',EvaluationService).evaluate(configuration)
+
+    def audit(self,run_ids):
+        from feature_rl.audits.service import AuditService
+        return self._execution_service('audit_service',AuditService).audit(run_ids)
+
+    def close(self):
+        """Terminal cleanup of configured native services; never starts a session."""
+        errors=[]
+        for value in (self.native_run,self.training,self.evaluation):
+            if value is not None:
+                try:value.close()
+                except Exception as exc:errors.append(exc)
+        if errors:raise ExceptionGroup('Native terminal cleanup failed; retain every failure',errors)
 
     @staticmethod
     def _source_policy(revision):
@@ -260,6 +303,23 @@ class Factory:
     def recover(self, claim: Claim) -> c.OperationResult:
         claim = checked(Claim,claim)
         job = self.registry.job(claim.job_id)
+        if not any(item.claim==claim for item in self.registry.attempts(job.job_id)):
+            raise ValueError('recovery requires an actual selected Registry claim')
+        if job.spec.configuration.kind=='m7-native-run-configuration':
+            from feature_rl.agents.native_service import NativeRunService
+            return self._execution_service('native_run',NativeRunService).recover(claim)
+        if job.spec.operation=='evaluate':
+            from feature_rl.evaluation.service import EvaluationService
+            return self._execution_service('evaluation',EvaluationService).recover(claim)
+        if job.spec.operation=='audit':
+            from feature_rl.audits.service import AuditService
+            return self._execution_service('audit_service',AuditService).recover(claim)
+        if job.spec.invocation=='m5-qualify' or job.spec.invocation.startswith('m6-transition-'):
+            from .qualification import recover
+            return recover(self,claim)
+        if job.spec.operation=='grade' and job.spec.configuration.kind=='m6-grade-policy':
+            from .grading import recover
+            return recover(self,claim)
         if job.spec.invocation.startswith('m6-author:'):
             from .authoring import recover
             return recover(self,claim)
@@ -282,6 +342,10 @@ class Factory:
         from .authoring import AuthoringPending, retry
         if type(pending) is AuthoringPending:return retry(self,pending)
         if type(pending) is FactoryUpstreamPending:
+            from feature_rl.grading import GradePublicationFailed
+            if type(pending.upstream) is GradePublicationFailed:
+                from .grading import recover
+                return recover(self,pending.claim)
             from .construction import retry_build
             return retry_build(self,pending)
         if (type(pending) is not FactoryPublicationFailed or type(pending.payload) is not bytes
@@ -293,5 +357,11 @@ class Factory:
         if pending.kind=='m6-authoring-receipt':
             from .authoring import publish
             return publish(self,pending.payload,pending.claim)
+        if pending.kind=='m6-frozen-grade':
+            from .grading import publish
+            return publish(self,pending.payload,pending.claim)
+        if pending.kind=='m6-pending-grade-result':
+            from .grading import retry_result
+            return retry_result(self,pending.payload,pending.claim)
         if pending.kind!='m6-source-disposition': raise ValueError('unknown Factory publication kind')
         return self._publish_source(pending.payload,pending.claim)

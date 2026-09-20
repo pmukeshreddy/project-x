@@ -106,3 +106,20 @@ def release(factory,task_ref,report_ref):
     if task.state!=c.TaskState.QUALIFIED or task.qualification!=report:
         raise AdmissionRejected('release requires BUILT plus accepted Q or its exact QUALIFIED predecessor')
     return lifecycle.release(task_ref)
+
+
+def recover(factory,claim):
+    """Reconstruct only the exact actual M5/lifecycle policy selected by this job."""
+    from .resolver import QualificationConfiguration,LifecyclePolicy
+    job=factory.registry.job(claim.job_id)
+    if job.spec.invocation=='m5-qualify':
+        config=read_record(factory.store,job.spec.configuration,QualificationConfiguration,'m5-qualification-configuration')
+        q=configured_service(factory,read_record(factory.store,config.policy,QualificationPolicy,'m5-qualification-policy'))
+        if q.configuration!=job.spec.configuration or q.revision!=job.spec.implementation:
+            raise AdmissionRejected('recovery M5 service configuration or implementation changed')
+        return q.recover(claim)
+    config=read_record(factory.store,job.spec.configuration,LifecyclePolicy,'m6-lifecycle-policy')
+    q=configured_service(factory,read_record(factory.store,config.qualification_policy,QualificationPolicy,'m5-qualification-policy'))
+    lifecycle=TaskLifecycle(store=factory.store,registry=factory.registry,qualification=q,revision=factory.revision)
+    if lifecycle.configuration!=job.spec.configuration:raise AdmissionRejected('recovery lifecycle service configuration changed')
+    return lifecycle.recover(claim)

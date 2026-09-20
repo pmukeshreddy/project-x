@@ -231,9 +231,11 @@ publication/recovery capabilities keep their concrete upstream APIs.
 `feature_rl.cli.main(argv=None) -> int` is callable now through
 `python -m feature_rl`. `config-schema` prints the strict closed
 `feature_rl.pipeline.configuration.CLIConfiguration` JSON schema. The actual
-composition method is `compose(config, *, runtime=False, qualification=False) ->
-Application`, whose fields are `factory`, `runtime`, `grader`, `lifecycle` and
-`resolver`. No provider/backend/native-session callback is accepted.
+composition method is `compose(config, *, runtime=False, qualification=False,
+authoring=False, native_operation=None, audit=False) -> Application`, whose fields
+are `factory`, `runtime`, `grader`, `lifecycle` and `resolver`; `close()` performs
+terminal native cleanup. `native_operation` is exactly `run`, `train`, `evaluate`
+or None. No provider/backend/native-session callback is accepted.
 
 Required config: version `m6-cli-v1`, absolute `store_root`/`registry_root`, exact
 Factory `revision`; optional `builder_revision`, `RegistryLimits`, `runtime` and
@@ -244,12 +246,56 @@ external enrollment path/digest. Runtime composition invokes actual M3 boundary
 qualification; source/complete-artifact construction does not open Docker.
 
 Implemented commands and request shapes are documented in `docs/runbook.md`:
-`screen-source`, `construct`, `qualify`, `accept`, `release`, `resolve`.
+`screen-source`, `construct`, `author`, `import-authoring`, `qualify`, `accept`,
+`release`, `resolve`, `grade`, `run`, `train`, `evaluate`, `audit`, `recover`,
+`retry-publication`.
 M0 request models remain authoritative; `construct --inputs` supplies actual
 BuildInputs separately. `main` emits typed operation JSON and nonzero failures.
 Publication exceptions additionally emit an exact private ordinary-JSON recovery
 receipt to stderr before exit. It is not an executable object loader or another
-ledger. Native/authoring and remaining M7/M8 commands are subsequent actual joins.
+ledger. The closed Factory publication reader verifies only supported concrete
+Factory payload kinds; it never imports an artifact-selected class.
+
+Additional configuration models in `feature_rl.pipeline.configuration` are
+`NativeConfiguration(revision, settings: NativeSettings, bootstrap: TrainingConfig
+| None)`, `EvaluationSettings(revision)` and `AuditSettings(revision,
+selection_manifest, attestations, human)`. `CLIConfiguration.authoring` is actual
+`AuthoringSettings`. Native startup never occurs in composition: actual M7/M8
+services freeze configuration and select claims first. Run/evaluate require a
+bootstrap configuration; training consumes its request config. All native services
+share the actual resolver/builder/runtime/grader; M8 also receives the same Factory
+for inert origin revalidation. The CLI always calls cleanup in `finally` and keeps
+both original and cleanup errors, or a selected result plus a cleanup error.
+
+```python
+Factory(..., grading: GradingService | None=None,
+        native_run: NativeRunService | None=None, training: TrainingService | None=None,
+        evaluation: EvaluationService | None=None, audit: AuditService | None=None)
+factory.grade(task_version, submission, case_seed, *, invocation='grade') -> OperationResult
+factory.run(task_version, policy, limits, *, case_seed=None, invocation) -> OperationResult
+factory.train(configuration, *, invocation, resume=None, demonstrations=()) -> OperationResult
+factory.evaluate(configuration) -> OperationResult
+factory.audit(run_ids) -> OperationResult
+factory.close()  # cleanup only; reports every retained service failure
+```
+
+Run/train/evaluate/audit validate actual same-store service types and delegate to
+their sole M7/M8 owners. No second native ledger or reward producer is introduced.
+Factory recovery routes selected native-run, evaluation, audit, actual M5 policy
+and lifecycle jobs to their concrete services; source/build/authoring recovery is
+preserved. M5 recovery binds both its configuration and implementation revision.
+
+Grade jobs freeze `m6-grade-request` and a new `m6-grade-policy` declaring opaque
+comparison/input/source-delta dependencies explicitly. Existing immutable leaf
+declarations are preserved. M4 runs once after claim/unknown intent; exact M4 task,
+submission, seed, revision, evidence and result joins are required. Original costs
+are retained in `m6-grade-original`; Registry receives the normalized aggregate,
+including explicit unknown missing channels/storage. `m6-frozen-grade` selects
+the original result and costs. Failed original publication preserves a bounded
+`m6-pending-grade-result` capability; actual M4 pending receipts are retained in
+CAS where possible. `Factory.retry_publication` republishes those exact results
+without calling grade again. An unknown unfrozen outcome remains unreconciled.
+Completed grade readback is historical; normal downstream admission remains current.
 
 # Actual M2/M4 authoring and retained history
 
