@@ -75,7 +75,7 @@ def source_decision(candidate):
 
 
 class Factory:
-    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None):
+    def __init__(self, *, store: ArtifactStore, registry: Registry, revision: str, builder=None, qualification=None):
         if (not isinstance(store, ArtifactStore) or store.role != c.ActorRole.CONTROLLER
                 or not isinstance(registry, Registry) or registry.store is not store):
             raise TypeError('Factory requires the same actual controller store and Registry')
@@ -86,6 +86,11 @@ class Factory:
         self.builder = TaskBuilder(store=store,registry=registry,revision=revision) if builder is None else builder
         if (type(self.builder) is not TaskBuilder or self.builder.store is not store or self.builder.registry is not registry):
             raise TypeError('Factory requires the actual same-store TaskBuilder')
+        from feature_rl.qualification import QualificationService
+        if qualification is not None and (type(qualification) is not QualificationService
+                or qualification.store is not store or qualification.registry is not registry):
+            raise TypeError('Factory qualification must be the actual same-store M5 service')
+        self.qualification=qualification
         self.source_configuration = store.put_bytes(self._source_policy(revision),
             'm6-source-policy', c.Visibility.PRIVATE)
         registry.register(self.source_configuration)
@@ -93,6 +98,18 @@ class Factory:
     def construct(self, candidate: c.ArtifactRef, *, inputs: BuildInputs | None=None) -> c.OperationResult:
         from .construction import construct
         return construct(self,candidate,inputs)
+
+    def qualify(self, task_ref: c.ArtifactRef, *, policy=None) -> c.OperationResult:
+        from .qualification import qualify
+        return qualify(self,task_ref,policy)
+
+    def accept(self, review_request_ref: c.ArtifactRef, attestation_ref: c.ArtifactRef) -> c.OperationResult:
+        from .qualification import accept
+        return accept(self,review_request_ref,attestation_ref)
+
+    def release(self, task_ref: c.ArtifactRef, *, accepted_report: c.ArtifactRef | None=None) -> c.OperationResult:
+        from .qualification import release
+        return release(self,task_ref,accepted_report)
 
     @staticmethod
     def _source_policy(revision):

@@ -201,3 +201,27 @@ result = factory.construct(candidate_ref, inputs=build_inputs)
 The selected parent result contains the actual builder task and an evidenced M5 `RepairHistory`; currently this retains known M3 neutral repairs and remains incomplete until authentic generation-attempt history is imported. Parent costs represent incremental controller/publication work; source and builder costs remain in their own selected jobs. `m6-construction-result` binds the parent claim, request, selected child job/result, history, exact costs, disposition, reason and revision.
 
 `TaskBuilder.job_spec(inputs) -> JobSpec` freezes the builder's actual existing input/policy CAS identities without enqueueing or assembly. Factory uses this exact public method for deterministic child recovery. `Factory.recover(parent_claim)` reuses a completed/frozen child, preserves unknown builder attempts, and never fabricates execution results. `FactoryUpstreamPending` retains an actual `BuildPublicationFailed`; `Factory.retry_publication(pending)` delegates to the actual builder replay before completing the parent. Parent `FactoryPublicationFailed` retains its own exact result bytes. Historical completion readback is distinct from current consumer admission.
+
+# Factory qualification, acceptance and release
+
+```python
+Factory(*, store, registry, revision, builder=None, qualification=None)
+factory.qualify(task_ref, *, policy: QualificationPolicy | None = None) -> OperationResult
+factory.accept(review_request_ref, attestation_ref) -> OperationResult
+factory.release(task_ref, *, accepted_report=None) -> OperationResult
+```
+
+`qualification` is the actual same-store/Registry M5 `QualificationService`, supplying
+its actual grader, package validator, implementation revision and current external
+human verifier. Missing configuration rejects explicitly. Qualification selects the
+original BUILT root's actual completed Factory construction history, selected child
+result and parent revision. It binds those values into M5 policy; an inconsistent
+caller history rejects. Unconstructed roots retain missing history and remain
+subject to all actual M5 gates. Actual M5 dispositions are preserved.
+
+Acceptance resolves the review request's exact frozen M5 policy and delegates to
+actual M5 acceptance. Release accepts BUILT plus accepted Q, or the exact QUALIFIED
+predecessor with its existing Q. It resolves the report's actual producer/policy and
+uses both reviewed Registry lifecycle transitions. Missing current human trust or
+other validity gates cannot create a released root. M5 and lifecycle retained
+publication/recovery capabilities keep their concrete upstream APIs.
