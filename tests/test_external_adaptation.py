@@ -254,6 +254,8 @@ def test_external_adapter_rejects_unbound_relation_evidence_before_factory(tmp_p
 def test_external_adapter_passes_supplied_real_build_inputs_to_factory_construct(tmp_path):
     from feature_rl.evaluation import ExternalCorpusAdapter
     from feature_rl.pipeline import Factory
+    from feature_rl.pipeline.construction import ConstructionResult
+    from feature_rl.verifiers.loader import read_local
 
     store, registry, config_ref, _ = records(tmp_path, with_build_inputs=True)
     _, batch = ExternalCorpusAdapter(
@@ -265,6 +267,14 @@ def test_external_adapter_passes_supplied_real_build_inputs_to_factory_construct
     assert "BuildInputs are missing" not in item.reason
     assert any(registry.job(job_id).spec.invocation == "m6-construct"
                for job_id in registry.trace(item.candidate).jobs)
+    receipt_ref = next(ref for ref in item.construction_result
+                       if ref.kind == "m6-construction-result")
+    receipt = read_local(store, receipt_ref, ConstructionResult, "m6-construction-result")
+    child = registry.job(receipt.build_job)
+    assert child.state == "completed" and child.result == receipt.build_result
+    child_notes = {cost.note for cost in child.result.costs}
+    assert child_notes <= {cost.note for cost in batch.funnel.costs}
+    assert child_notes <= {cost.note for cost in item.costs}
 
 
 def test_external_adapter_rejects_build_inputs_for_another_source_pair(tmp_path):

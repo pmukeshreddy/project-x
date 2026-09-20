@@ -9,7 +9,7 @@ The adapter:
 - authenticates the shared M1 source-inspection log, its Git object-tree IDs, actual authoring request/B/license refs, reconstructed patch digest, family, lineage, local assignment, rights/use classification and private row fingerprints; Git object IDs remain distinct from the archive format's SHA-256 tree encoding;
 - validates the supplied locked-evaluation roster and rejects any external source sharing a repository family or request lineage with a `LOCKED_TEST` member;
 - keeps solution/test patches, native test names, H and environment hints private while emitting a positive PUBLIC/AUTHORING source allowlist;
-- invokes actual `Factory.screen_source`, then actual `Factory.construct` with the aligned supplied `BuildInputs` (or records M6's real missing-input BLOCKED result), preserving both selected results and costs in a four-stage funnel; and
+- invokes actual `Factory.screen_source`, then actual `Factory.construct` with the aligned supplied `BuildInputs` (or records M6's real missing-input BLOCKED result), and authenticates the selected `ConstructionResult.build_job/build_result` so source, Factory-controller and TaskBuilder child costs each remain in their original scope exactly once in the four-stage funnel; and
 - registers the opaque configuration, frame, mappings, row leaves, M6 receipts and private batch in the existing Registry.
 
 Focused command:

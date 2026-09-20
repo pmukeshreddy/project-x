@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl.pipeline import BuildInputs, Factory
-from feature_rl.qualification.evidence import collapse_costs
+from feature_rl.pipeline.construction import ConstructionResult
 from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_bytes, read_local
 
@@ -352,6 +352,32 @@ class ExternalCorpusAdapter:
             raise ValueError("external row differs from its pre-authoring family/dedup assignment")
         return candidate, pair
 
+    def _selected_build_costs(self, result: c.OperationResult) -> c.Costs:
+        receipts = tuple(
+            ref for ref in result.artifacts if ref.kind == "m6-construction-result"
+        )
+        if len(receipts) != 1:
+            raise ValueError("selected Factory construction result lacks one receipt")
+        receipt = read_local(
+            self.store, receipts[0], ConstructionResult, "m6-construction-result",
+        )
+        if (
+            receipt.disposition != result.disposition
+            or receipt.reason != result.reason
+            or receipt.costs != result.costs
+        ):
+            raise ValueError("Factory construction receipt differs from selected result")
+        if receipt.build_result is None:
+            if receipt.build_job is not None:
+                raise ValueError("Factory construction receipt has an unbound child job")
+            return ()
+        if receipt.build_job is None:
+            raise ValueError("Factory construction receipt lacks its child job")
+        child = self.registry.job(receipt.build_job)
+        if child.state != "completed" or child.result != receipt.build_result:
+            raise ValueError("Factory construction receipt lacks its selected completed child")
+        return receipt.build_result.costs
+
     def adapt(self) -> tuple[c.ArtifactRef, AdaptationBatch]:
         assignments = {item.row: item for item in self.frame.assignments}
         if set(assignments) != set(self.configuration.rows):
@@ -423,7 +449,9 @@ class ExternalCorpusAdapter:
             if source_result.disposition == c.Disposition.SUCCESS:
                 screening_accepted += 1
                 result = self.factory.construct(mapping.candidate, inputs=build_inputs)
+                build_costs = self._selected_build_costs(result)
                 incurred.extend(result.costs)
+                incurred.extend(build_costs)
                 if result.disposition == c.Disposition.SUCCESS:
                     construction_accepted += 1
                 elif result.disposition in {c.Disposition.REJECTED, c.Disposition.UNSUPPORTED}:
@@ -444,7 +472,9 @@ class ExternalCorpusAdapter:
                 construction_result=() if result is source_result else result.artifacts,
                 disposition=result.disposition,
                 reason=result.reason,
-                costs=(source_result.costs if result is source_result else collapse_costs((*source_result.costs, *result.costs))),
+                costs=(source_result.costs if result is source_result else (
+                    *source_result.costs, *result.costs, *build_costs,
+                )),
                 required_next_gates=next_gates,
             ))
         stages = (
