@@ -19,8 +19,8 @@ def test_reference_projection_retains_exact_h_and_accounts_for_excluded_paths(st
     assert projection.task==task_ref and projection.reference==task.reference_solution
     assert projection.baseline==task.baseline and projection.source_pair==task.source_pair
     assert [(p.path,p.action) for p in projection.paths]==[
-        ('docs/use.rst','excluded_documentation'),('src/click/__init__.py','included_implementation'),
-        ('tests/test_example.py','excluded_tests')]
+        ('docs/use.rst','excluded_unrelated'),('src/click/__init__.py','included_implementation'),
+        ('tests/test_example.py','excluded_unrelated')]
     service=SubmissionService(store=store,policy=runtime_policy())
     rebuilt=service.resolve(projection.submission,task.baseline,store.get_artifact(task.contract).allowed_changes)
     assert rebuilt.files['src/click/__init__.py'].data==b'# synthetic reference\n'
@@ -29,25 +29,26 @@ def test_reference_projection_retains_exact_h_and_accounts_for_excluded_paths(st
     assert store.get_artifact(task_ref).reference_solution==task.reference_solution
 
 
-@pytest.mark.parametrize('category',['unrelated','dependency_build'])
-def test_reference_projection_never_drops_unsupported_changed_paths(store,category):
-    from feature_rl.qualification import derive_reference, QualificationRejected
-    record=c.ChangedFile(path='src/click/__init__.py',category=category,rationale='Synthetic unsupported control')
-    task=task_fixture(store,changes={'src/click/__init__.py':SourceFile(b'# changed\n',False)},classifications=(record,))
-    with pytest.raises(QualificationRejected,match='unsupported_semantics'):derive_reference(store,task,runtime_policy())
+@pytest.mark.parametrize('category',['unrelated','dependency_build','documentation'])
+def test_contract_selected_feature_is_included_regardless_of_history_category(store,category):
+    from feature_rl.qualification import derive_reference
+    record=c.ChangedFile(path='src/click/__init__.py',category=category,rationale='Historical classification')
+    task=task_fixture(store,changes={'src/click/__init__.py':SourceFile(b'# changed\n',True)},classifications=(record,))
+    projection=derive_reference(store,task,runtime_policy())
+    assert projection.paths[0].action=='included_implementation'
+    assert projection.paths[0].after_executable is True
 
 
-@pytest.mark.parametrize('defect',['omitted','duplicate','extra','disguised_implementation','wrong_h','out_of_policy','executable'])
+@pytest.mark.parametrize('defect',['omitted','duplicate','extra','wrong_h','out_of_policy'])
 def test_reference_projection_rejects_mismatched_classification_or_submission_policy(store,defect):
     from feature_rl.qualification import derive_reference, QualificationRejected
-    changes={'src/click/__init__.py':SourceFile(b'# changed\n',defect=='executable')}
+    changes={'src/click/__init__.py':SourceFile(b'# changed\n',False)}
     task_ref=task_fixture(store,changes=changes);task=store.get_artifact(task_ref);pair=store.get_artifact(task.source_pair)
     files=list(pair.changed_files)
     if defect=='omitted':files=[c.ChangedFile(path='docs/use.rst',category='documentation',rationale='Incorrect fixture')]
     if defect=='duplicate':files=files*2
     if defect=='extra':files.append(c.ChangedFile(path='missing.py',category='implementation',rationale='Incorrect fixture'))
-    if defect=='disguised_implementation':files=[c.ChangedFile(path=files[0].path,category='documentation',rationale='Incorrect fixture')]
-    if defect in {'omitted','duplicate','extra','disguised_implementation'}:
+    if defect in {'omitted','duplicate','extra'}:
         pref=replace_artifact(store,task.source_pair,changed_files=[x.model_dump(mode='json') for x in files])
         task_ref=replace_artifact(store,task_ref,source_pair=pref)
     if defect=='wrong_h':task_ref=replace_artifact(store,task_ref,reference_solution=task.baseline.model_copy(update={'visibility':c.Visibility.PRIVATE}))

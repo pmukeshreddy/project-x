@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import base64
 import hashlib
 from feature_rl.artifacts import canonical_json
-from feature_rl.contracts import ArtifactRef, CostRecord, Disposition, EvidenceRecord, Visibility
+from feature_rl.contracts import ArtifactRef, CostRecord, EvidenceRecord, Visibility
 from feature_rl.environments.models import Ownership
 from feature_rl.grading import read_grade
 from feature_rl.grading.bootstrap import recipe_adapter_argv
@@ -214,32 +214,6 @@ def assert_reference_determinism(store,checked,receipt,signatures):
     signatures.setdefault(seed,signature)
 
 
-def require_semantic_execution(store,checked,receipt):
-    """A compared process crash is not proof of a runnable semantic omission.
-
-    The fixed adapter must report exact declared missing-symbol behavior as a
-    normal compared observation. M4's classification of nonzero process output
-    remains valid for grading and other control modes; this is an M5 coverage
-    requirement, not an infrastructure classification or a stderr heuristic.
-    """
-    comparisons=getattr(checked,'comparisons',())
-    if len(comparisons)!=len(receipt.cases):
-        raise QualificationRejected('invalid_evidence','complete case comparison ledger required for targeted semantics')
-    for actual,comparison in zip(receipt.cases,comparisons):
-        if comparison.mode!='process':continue  # Completed JSON comparisons already require exit zero in M4.
-        if store is None or actual.evidence is None:
-            raise QualificationRejected('invalid_evidence','actual process evidence required for targeted semantic coverage')
-        value=decode_json(read_bytes(store,actual.evidence,32*1024*1024,'environment-execution',True),32*1024*1024)
-        owner=Ownership.model_validate_json(canonical_json(value.get('record')))
-        command=list(recipe_adapter_argv(checked))
-        rows=[row for row in value.get('commands',[]) if row.get('argv',[])[-len(command):]==command]
-        if value.get('phase')!='execute' or value.get('cleanup_verified') is not True or owner.phase!='removed' or len(rows)!=1 or len(rows[0].get('argv',[]))<=len(command) or rows[0]['argv'][-len(command)-1]!=(owner.container_id or owner.container_name):
-            raise QualificationRejected('invalid_evidence','targeted semantics lack exact clean adapter execution evidence')
-        extra=value.get('extra',{})
-        if rows[0].get('reason')!='exited' or rows[0].get('exit_code')!=0 or extra.get('reason')!='completed' or extra.get('failure_category')!='none' or extra.get('error') is not None:
-            raise QualificationRejected('oracle_disagreement','process case '+actual.case_id+' did not establish normal adapter completion; exact intended absence must be an explicit compared observation')
-
-
 RESET_PROBE_BYTES=b'\n# M5 temporary reset probe\n'
 
 
@@ -267,56 +241,59 @@ def reset_probe(source,rules,profile):
 
 
 def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
-    """Rejoin timeout, dirty saved source, restored source and independent workspace."""
+    """Bind the saved mutation and restored gold to one clean reset workspace."""
     from feature_rl.environments.models import SavedSource, SandboxPolicy
     from feature_rl.verifiers.loader import read_local
     from .models import ResetReceipt, ReferenceProjection
     prepared=grader.select_task(checked)
     reset=read_local(store,reset_ref,ResetReceipt,'m5-reset')
     projection=read_local(store,projection_ref,ReferenceProjection,'m5-reference-projection',1024*1024)
-    if (reset.task,reset.projection,reset.initial_source,reset.reset_source)!=(checked.task_ref,projection_ref,projection.projected_source,projection.projected_source) or not reset.cleanup_verified or reset.generation_after<=reset.generation_before:
+    if ((reset.task,reset.projection,reset.initial_source,reset.reset_source)!=(checked.task_ref,projection_ref,projection.projected_source,projection.projected_source)
+            or not reset.cleanup_verified or reset.generation_after!=reset.generation_before+1):
         raise QualificationRejected('invalid_evidence','reset exact initial source/projection/generation mismatch')
-    value=decode_json(read_bytes(store,reset.interruption,32*1024*1024,'environment-execution',True),32*1024*1024)
+    value=decode_json(read_bytes(store,reset.mutation,32*1024*1024,'environment-execution',True),32*1024*1024)
     owner=Ownership.model_validate_json(canonical_json(value.get('record')))
-    saved=SavedSource.model_validate_json(canonical_json(owner.saved_source))
+    extra=value.get('extra',{})
     initial=grader.submissions.source(projection.projected_source)
     policy=SandboxPolicy.model_validate_json(grader.runtime.read_bytes(prepared.policy,65536))
     path,entry=reset_probe(initial,checked.contract.allowed_changes,policy.profile)
+    saved=SavedSource.model_validate_json(canonical_json(extra.get('saved_source')))
     dirty=grader.submissions.source(saved.artifact)
     expected_files=dict(initial.files);expected_files[path]=entry
     if (dirty.files!=expected_files or saved.artifact==projection.projected_source
-            or dirty.tree_sha256!=saved.tree_sha256
-            or hashlib.sha256(dirty.to_tar()).hexdigest()!=saved.raw_sha256):
-        raise QualificationRejected('invalid_evidence','reset interruption did not observe the exact saved diagnostic mutation')
-    raw_resolution=value.get('extra',{}).get('dependency_resolution')
+            or dirty.tree_sha256!=saved.tree_sha256 or hashlib.sha256(dirty.to_tar()).hexdigest()!=saved.raw_sha256):
+        raise QualificationRejected('invalid_evidence','reset did not save the exact diagnostic mutation')
+    initial_saved=SavedSource.model_validate_json(canonical_json(owner.saved_source))
+    if initial_saved.artifact!=projection.projected_source:
+        raise QualificationRejected('invalid_evidence','reset mutation did not start from exact gold')
+    raw_resolution=extra.get('dependency_resolution')
     if raw_resolution is None:
-        # The controller captured this resolution failure before starting the
-        # offline development sandbox. Evidence replay must never contact PyPI.
-        failure=value.get('extra',{}).get('dependency_failure')
+        failure=extra.get('dependency_failure')
         if (not isinstance(failure,dict) or failure.get('type') not in {'SourceRejected','DependencyUnavailable'}
-                or failure.get('source_tree_sha256')!=dirty.tree_sha256
-                or not isinstance(failure.get('reason'),str) or not failure['reason']):
-            raise QualificationRejected('invalid_evidence','development fallback lacks its controller dependency failure')
+                or failure.get('source_tree_sha256')!=initial.tree_sha256 or not failure.get('reason')):
+            raise QualificationRejected('invalid_evidence','development fallback lacks its dependency failure')
         dependency_binding='baseline-tools'
     else:
         resolution_ref=ArtifactRef.model_validate_json(canonical_json(raw_resolution))
-        grader.runtime.read_candidate_dependencies(resolution_ref,prepared,dirty,checked.contract.allowed_changes)
+        grader.runtime.read_candidate_dependencies(resolution_ref,prepared,initial,checked.contract.allowed_changes)
         dependency_binding=resolution_ref.sha256
-    expected={'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,
-        'dependency_resolution':dependency_binding,
+    expected={'recipe':prepared.recipe.sha256,'policy':prepared.policy.sha256,'dependency_resolution':dependency_binding,
         'revision':grader.runtime.revision,'role':'candidate','phase':'development','workspace_id':reset.workspace_id,
-        'generation':str(reset.generation_before),'source_input':projection.projected_source.sha256,
-        'source':saved.artifact.sha256,'source_raw':saved.raw_sha256,'tree':saved.tree_sha256,
+        'generation':str(reset.generation_before-1),'source_input':projection.projected_source.sha256,
+        'source':projection.projected_source.sha256,'source_raw':hashlib.sha256(initial.to_tar()).hexdigest(),'tree':initial.tree_sha256,
         'allowed_changes':hashlib.sha256(canonical_json(checked.contract.allowed_changes.model_dump(mode='json'))).hexdigest()}
-    extra=value.get('extra',{})
-    if value.get('phase')!='development' or value.get('revision')!=grader.runtime.revision or value.get('cleanup_verified') is not True or owner.phase!='removed' or owner.operation_id!=reset.interruption_operation or any(owner.binding.get(k)!=v for k,v in expected.items()) or extra.get('reason')!='timeout' or extra.get('failure_category')!='candidate' or extra.get('error') is not None or extra.get('saved_source')!=saved.model_dump(mode='json'):
-        raise QualificationRejected('invalid_evidence','reset interruption/runtime/source binding mismatch')
-    command=['/usr/local/bin/python','-I','-c','import time;time.sleep(5)']
+    if (value.get('phase')!='development' or value.get('revision')!=grader.runtime.revision or value.get('cleanup_verified') is not True
+            or owner.phase!='removed' or owner.operation_id!=reset.mutation_operation or any(owner.binding.get(k)!=v for k,v in expected.items())
+            or extra.get('reason')!='completed' or extra.get('failure_category')!='none' or extra.get('error') is not None or extra.get('save_status')!='saved'):
+        raise QualificationRejected('invalid_evidence','reset mutation/runtime/source binding mismatch')
+    command=['/usr/local/bin/python','-I','-c','import pathlib,sys\nwith pathlib.Path(sys.argv[1]).open("ab") as stream: stream.write(sys.stdin.buffer.read())','/workspace/source/'+path]
     rows=[r for r in value.get('commands',[]) if r.get('argv',[])[-len(command):]==command]
-    if len(rows)!=1 or rows[0].get('reason')!='timeout' or rows[0].get('stdin_bytes')!=0:
-        raise QualificationRejected('invalid_evidence','reset lacks actual fixed bounded timeout command')
+    if (len(rows)!=1 or len(rows[0].get('argv',[]))<=len(command) or rows[0]['argv'][-len(command)-1]!=(owner.container_id or owner.container_name)
+            or rows[0].get('reason')!='exited' or rows[0].get('exit_code')!=0
+            or rows[0].get('stdin_bytes')!=len(RESET_PROBE_BYTES) or rows[0].get('stdin_sha256')!=hashlib.sha256(RESET_PROBE_BYTES).hexdigest()):
+        raise QualificationRejected('invalid_evidence','reset lacks the exact saved mutation command')
     identities=(owner.operation_id,'workspace:'+reset.workspace_id)
     if any(identity in seen for identity in identities):
-        raise QualificationRejected('invalid_evidence','replayed reset interruption/workspace')
+        raise QualificationRejected('invalid_evidence','replayed reset mutation/workspace')
     seen.update(identities)
     return reset

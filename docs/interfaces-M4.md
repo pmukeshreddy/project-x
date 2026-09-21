@@ -63,175 +63,28 @@ Measured candidate build/import/crash/limit failures produce zero; M3's infrastr
 
 `GradePublicationFailed` retains the exact receipt, costs, evidence scope and any M3 pending publication objects. `grader.retry_publication(error)` replays only missing retained bytes and the receipt, never source execution or inference. A recovered runtime publication still leaves that interrupted grading result unmeasured; retry grading with the same stored submission and seed/manifest. M3 pending-publication propagation is implemented using its reviewed replay method; this checkpoint separately exercised M4 receipt-publication recovery diagnostically, not a native injected M3 storage failure.
 
-The original core handoff consumed already supplied real M0 values. The completed checker/control authoring APIs below now construct those values through reviewed M2 interfaces. Tests remain explicitly hand-authored diagnostic contracts, not a substitute model-authored feature contract or qualification result. See `docs/reports/M4.md` for evidence and remaining semantic/empirical gates.
+## Behavioral verifier generation
 
-## Checker and control authoring (code-completion handoff)
+`CheckerAuthoringService.generate` consumes the frozen contract, baseline evidence,
+controller-built ScenarioPlan and runtime recipe. Astra returns one
+`BehavioralSpecification`: ordered groups of cases with API action bodies,
+bounded input domains and expected observations. It receives no gold source.
 
-Checker and control authoring use the M2 `CodexGenerationProvider` and existing
-evidence API, including `control_authoring` and `alternative_authoring`.
-Focused tests use explicit test-only Codex subprocess responses through the real
-schema, archive, cost and finalizer paths. No model-authored environment or
-qualification is claimed by the Codex/Astra refactor.
+The controller assigns scenario, case and assertion IDs, oracle evidence,
+mandatory flags, observation types and resource bounds. It infers types from the
+expected values and uses exact typed equality. Expected values may be literals
+or realized input values with a string prefix/suffix. Generated action bodies
+only invoke APIs and return observations. The controller supplies hardened JSON
+transport and dispatch, then freezes private case inputs/comparisons and the
+VerifierBundle. It never executes generated source on the host.
 
-The default factory authors one `CheckerFragmentProposal` per frozen scenario.
-Each bounded response contains only API action bodies, input domains, observation
-types, and typed assertions. It contains at most four cases and 32 KiB. Each
-Python action body takes `inputs` and returns ordinary observations; the controller
-supplies JSON transport, dispatch, IDs, mandatory flags, versions, timeouts and
-exact oracle evidence from the frozen scenario. Expected values and input domains
-remain private controller artifacts, separate from the worker action bodies.
+`ControlAuthoringService` authors three wrong implementations: partial,
+happy-path-only and hardcoded. It adds one regression implementation when the
+contract has compatibility obligations. Each proposal supplies paths and exact
+text replacements. Existing files are edited while preserving their executable
+mode; missing files are created from a single empty anchor. The controller
+checks legal paths, anchors and source limits before publication.
 
-`build_fragment_request` takes `request_id`, `response_id`, `prompt_id`, `contract`,
-`contract_ref`, `plan`, `plan_ref`, `sources`, `limits`, and `scenario_id`.
-It binds the selected scenario explicitly, including when multiple scenarios
-share the same requirement IDs. `CheckerFragmentService` resolves the exact
-stored evidence, validates the complete selected scenario, and retains its
-`m4-checker-fragment` and `checker-fragment-authoring-journal` through the existing
-provider/archive/cost/recovery path. Action syntax is compiled for validation but
-never executed on the host. Worker execution remains in M3.
-
-`Factory.assemble_checker(candidate, inputs=checker_inputs, fragments=refs)`
-authenticates each fragment against its completed terminal Factory authoring job,
-rejects missing/extra/duplicate scenario coverage, and deterministically assembles
-the existing `CheckerProposal`. The unchanged `CheckerFinalizer` validates and
-publishes the real `VerifierBundle`. Assembly has its own durable operation and
-can be recovered without model calls. Construction history includes both the
-original authoring receipts and the assembly record; failed old calls and their
-costs are retained.
-
-The controller formats assembled Python source compactly before applying the
-unchanged 65,536-byte adapter limit. It requires the complete syntax tree to match
-before and after formatting and compiles the result without executing it. Every
-probe, literal, identifier and statement remains present; a genuinely oversized
-adapter still fails validation.
-
-The monolithic `CheckerProposal` format remains the internal assembly/finalizer
-format and the decoder for retained authoring receipts. Default environment
-creation does not request that large response from Astra. Controls and H are
-absent from checker generation contexts.
-
-`CheckerFinalizationInputs` requires exact `contract`, `scenario_plan`, `baseline`,
-`environment`, `output_limit_bytes`, `visibility`, `provenance`, `costs`, and optional
-`public_examples=()` and `controls=()`. Empty controls mean qualification coverage
-has not been supplied. Examples must be declared public contract checks. A recipe
-must bind exactly one actual M3 `sandbox-policy`. Unsupported seeds, resource
-caps, types, operands, oracle joins, family coverage or downgraded mandatory cases
-reject explicitly. Construction and grading call the same mechanical bundle
-validator. This validation does not establish meaningful behavioral coverage;
-M5 must challenge the frozen checker.
-
-`CheckerFinalizer(store=..., resolver=...).prepare(proposal, inputs, sources)`
-returns `PreparedChecker`; `.publish(store)` returns a real M0 VerifierBundle ref.
-It uses a temporary actual M0 CAS under the controller store to validate exact
-component identities before durable publication, then retains the bounded source,
-input and comparison bytes. It does not fabricate a TaskBundle or require H.
-
-Controls use a separate service and provider stage:
-
-```python
-request = build_control_request(
-    request_id=..., response_id=..., prompt_id=..., store=controller_store,
-    resolver=resolver, inputs=control_inputs, sources=grounded_sources,
-    limits=generation_limits,
-)
-control_service = ControlAuthoringService(
-    provider=provider, store=controller_store, resolver=resolver,
-    revision=git_revision, evidence_scope="real_integration",
-)
-control_result = control_service.generate(candidates, control_inputs, grounded_sources)
-# control_result.control: actual M0 ControlPatch, patch is an m4-submission
-# control_result.record_ref: m4-control-record; record.qualification == "unverified"
-```
-
-`ControlFinalizationInputs` fixes M0 `control_id`, `category`, `requirement_ids`,
-`expected_valid`, `expected_reason`, plus `baseline`, `contract`, `environment`,
-`provenance`, `costs`. Optional `scenario_plan` and reference material belong only
-to negative `control_authoring`. Reference material requires `source_pair`,
-`reference` and explicit `reference_excerpts`: bounded `ReferenceExcerpt(context_id,
-path, line_ranges)` values. The actual M0 SourcePair must bind exact B/H; excerpts
-are reconstructed from that private source archive under M3 source bounds. H is
-never relabeled as B. This branch was checked only with synthetic reference bytes.
-
-`alternative_positive` selects `ALTERNATIVE_AUTHORING`, requires
-`expected_valid=True` and no omission targets, and rejects reference/scenario
-inputs. Its actual prompt includes only B excerpts, the visible frozen contract
-and admitted public checks. Runtime discovery and request retrieval are validated
-internally but omitted from this prompt. `author_provenance.inputs` records
-exactly the consumed source refs, matching M5's admitted alternative input set.
-Expected validity is a controller-selected hypothesis, not a finding.
-
-`ControlProposal(files, deletions, rationale)` accepts exact edits to existing files
-(`SourceEdit(path, replacements=(TextReplacement(before, after), ...))`) or explicit
-new files (`SourceCreation(path, source, executable)`). Each anchor must occur exactly
-once, including overlapping occurrences. Edits preserve unseen source and existing
-executable modes; creation cannot overwrite a baseline file. The resulting bounded
-delta passes the existing SubmissionService policy. Path aliases, conflicting changes
-and unauthorized roots reject without executing source. The proposal cannot author verdicts, provenance,
-costs or independence evidence. `ControlFinalizer.prepare(...)` returns
-`PreparedControl`; `.publish(store)` publishes the private control record and its
-submission. `ControlFinalizer.import_submission(submission, inputs, sources,
-rationale=...)` supports explicitly supplied controls, including intentionally
-malformed archive attacks: the outer submission/B join is checked, while M5 must
-measure and diagnose the declared source/protocol/semantic failure. Such imports
-are not automatically model-origin or independent.
-
-After controls have been authored, `CheckerFinalizer.attach_controls(verifier_ref,
-control_record_refs, baseline=..., environment=...)` returns a `PreparedChecker`
-with a new VerifierBundle, preserving case/component refs and binding both the
-prior verifier and exact control records in provenance. It requires exact
-B/contract/environment joins and rejects duplicate control IDs. This path makes
-no generation or worker call. Controls can instead be supplied at initial checker
-finalization. M6 must collect the required categories/targeted omissions/attacks
-and pass separately grounded M5 `ControlDiagnosis` values; absent controls or
-independence remain missing gates.
-
-For future native alternative calls, the evidence seam is concrete:
-
-- `ControlAuthoringResult.record_ref` is the private `m4-control-record`, containing
-  exact B/contract/environment, M0 control, `author_contexts`,
-  `generation_provenance`, costs and explicit `qualification="unverified"`.
-- `result.generation.record` identifies the actual attempt/request/response and
-  timestamp. Its `archives` map retains `generation-attempt`, `request`, `retrieval`,
-  `schema`, `options`, `provenance`, `events`, `status`, `usage`, `cost`, `response`.
-  The service verifies this archive closure against the exact request, output
-  schema, accepted result, usage and cost on fresh and recovered outcomes.
-- `result.record.generation_provenance.evidence[-1]` records producer, command
-  `("generate", request_id)`, time, revision, explicit evidence scope and those
-  archive refs. Provider event/provenance archives preserve the Codex turn, configured Astra
-  model, reported usage, and CLI version. M6 should use distinct
-  request/response/prompt IDs for each actual alternative call, retain the complete
-  record, and bind these existing refs in M5 diagnosis/independence evidence.
-
-These artifacts establish what the selected provider recorded; they do not prove
-semantic validity, human review or independent origin by themselves. Test-double
-records are `unit_diagnostic`, with no native/model authorship claim. Future
-native calls require the configured Codex/Astra provider and separately assessed
-independence; M5 owns that assessment and human approval.
-
-Each service permits one initial candidate and at most two diagnosed repairs.
-Changing IDs alone is not a repair. Prior rejected journals must match exact stage,
-input binding and sequence. M6 owns global candidate/stage accounting across
-checker and control jobs; this local limit cannot replace that aggregate budget.
-Generation failure, rejected-output cost and successful generation receipts remain
-in their immutable journals. Successful artifact costs include the exact provider
-cost once; control record costs and component refs remain traceable instead of
-being silently folded repeatedly into the parent verifier.
-
-Recovery APIs preserve work rather than calling the model again:
-
-- M2 `GenerationProviderError.replay_result(store.put_bytes)` / `.replay_error(...)`
-  recover provider publication. Pass that outcome as `recovered_result` or
-  `recovered_error` with exactly one matching candidate; complete archives are
-  validated before consumption.
-- M2 `AuthoringJournalPublicationPending.replay(store)` publishes the retained
-  rejected journal; resume with a diagnosed changed candidate and returned refs.
-- M4 `AuthoringPreparationPending.replay()` retries inert preparation using the
-  retained authenticated generation response and original costs.
-- `CheckerPublicationPending.replay(store)` and
-  `ControlPublicationPending.replay(store)` publish exact retained component,
-  journal and final artifact bytes; they return their normal authoring result.
-  Repeated publication is idempotent and does not execute source or generation.
-
-Retain these private exception capabilities until publication succeeds. A lost
-process without a retained outcome requires upstream provider/Registry
-reconciliation, not an assumed free retry.
+Model calls retain strict schemas, private provider records, resource caps and
+at most three attempts per role. There are no checker fragments, assembly jobs,
+alternative positives, isolation targets or qualification repair histories.

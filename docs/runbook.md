@@ -146,8 +146,7 @@ See [M3 construction](interfaces-M3.md) for retained inputs and package constrai
 Qualification configuration is `qualification` with the actual M5 `revision`
 and optional `QualificationPolicy`. Passing all automated gates produces a
 successful QualificationReport directly; no SSH enrollment, signature or separate
-human acceptance step is required. Missing history, unresolved control diagnoses or execution
-evidence still blocks admission. Authenticated audits have their own human-trust
+human acceptance step is required. Failed or missing behavioral execution evidence blocks admission. Authenticated audits have their own human-trust
 configuration, outside task admission.
 
 ```sh
@@ -159,11 +158,11 @@ PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json resolve -
 Task request files are the actual M0 request shape
 `{"task_version": <complete TaskBundle ArtifactRef>}`. Ref files contain a full
 M0 `ArtifactRef`, including kind, encoding and visibility. Qualify optionally takes
-`--policy`; it cannot replace selected Factory history. For Factory-generated
-controls, omitted diagnosis entries are produced automatically from their selected
-authoring archives and actual qualification grades. Results are frozen in the
-qualification summary and rechecked at release; unsupported or inconclusive
-controls still block qualification. Pass the successful report
+`--policy` to set the seed and wall-time limit. The schedule is baseline, gold,
+three wrong implementations (plus regression when compatibility exists), and one
+clean-reset gold rerun at the same seed. Wrong implementations only need to receive
+less than full reward. Results and raw runtime evidence are frozen for this task;
+no repair history or control diagnoses are required. Pass the successful report
 from `qualify` directly to `release --accepted-report`. Release can also consume
 the exact QUALIFIED predecessor and its existing Q without `--accepted-report`.
 `resolve` performs current admission and prints the exact TaskBundle. It executes
@@ -186,7 +185,7 @@ PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json construct
 
 If publication fails, stderr retains the exact concrete private pending payload,
 claim, costs and timestamps as ordinary JSON, including base64 for bytes. It is an
-output receipt, not an executable object deserializer. The actual Factory/M5/M6
+output receipt, not an executable object deserializer. Existing Factory publication
 recovery methods validate retained capabilities; an unknown pre-freeze attempt
 requires reconciliation and must not be dispatched again. The Registry remains
 the authoritative attempt/cost ledger, and JSONL is its verified projection.
@@ -204,29 +203,18 @@ pipeline configuration. Old `backend`, model manifests, calibration evidence, CU
 and generation sampling seeds are rejected. Episode/scenario seed policies remain unchanged.
 See [the M2 interface](interfaces-M2.md) for limits, validation, and recovery.
 
-Use the supported order contract → scenario → controls/alternative → bounded
-checker fragments → controller assembly with those controls → construction.
-Each repeated semantic lane consumes the
-shared stage/candidate repair allowance; new request or control IDs do not create
-another allowance. The narrow, authenticated transport correction in
-[the M6 interface](interfaces-M6.md) retains all original attempts and costs while
-separating proven controller transport failures from semantic repairs. Complete
-history is limited to the frozen controller scope.
+The authoring order is contract → controller scenario slots → three or four
+wrong implementations → one behavioral checker specification → controller-built
+private checks → construction. Model calls have bounded resource reservations
+and at most three attempts per role. Qualification does not consume repair or
+construction history.
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json author --request candidate-request.json --call authoring-call.json
-PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json import-authoring --request candidate-request.json --call retained-call.json --journals retained-journals.json
 ```
 
-`import-authoring` reads an ordered array of actual rejected M2 journal ArtifactRefs;
-it never invokes a model. It preserves already-incurred costs even if current
-source admission is unresolved, and leaves external history incomplete. The real
-Click import is retained in `docs/evidence/M6/authoring/click-import.json`: source
-scope remains provisional, contract repairs are exhausted at 2/2, and known
-candidate repairs are 3/4. **No new task-generation calls are authorized in this
-integration phase.** These authoring commands are implemented launch interfaces,
-not instructions to rerun Click. Null monetary caps explicitly declare unpriced
-compute; USD remains unknown. Finite caps reject without an actual meter.
+Null monetary caps explicitly declare unpriced compute; USD remains unknown.
+Finite caps reject without an actual meter.
 
 Ordinary grading requires the runtime settings but no human release gate. A
 `GradeRequest` contains `task_version`, the exact source `submission` ArtifactRef,
@@ -292,10 +280,9 @@ PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json retry-pub
 ```
 
 `recover` accepts an exact Registry `Claim` and selects actual composition through
-`--service factory|grade|qualification|lifecycle|run|evaluate|audit`. Use the original
-service versions/settings. It cannot restart unknown grade/model work. Actual M5
-recovery may continue undispatched qualification gates while reusing completed
-subjobs and refusing unknown ones. Training recovery uses `train`: repeat identical
+`--service factory|workflow|grade|run|evaluate|audit`. Use the original
+service versions/settings. It cannot restart unknown grade/model work. Qualification
+has no continuation or recovery route; unknown execution remains fail-closed. Training recovery uses `train`: repeat identical
 inputs/invocation for ordinary resume; an unknown update requires the exact last
 confirmed checkpoint, retained original journal, same frozen settings/config/data,
 and an explicit new invocation. It consumes the original budget and skips unknown
@@ -304,7 +291,7 @@ assigned data; it does not create a new allowance.
 `retry-publication` accepts exactly one emitted `FactoryPublicationFailed` JSON
 record for its closed set of actual Factory payload kinds, verifies its digest and
 delegates to concrete publication validation. An early grade publication outage
-retains its actual M4 result in this capability. Other concrete M2/M3/M4/M5 pending
+retains its actual M4 result in this capability. Other concrete M2/M3/M4 pending
 capabilities remain available through their documented library retry APIs or
 selected durable recovery; the command does not deserialize arbitrary classes.
 

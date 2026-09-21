@@ -34,24 +34,22 @@ def test_forged_accepted_report_without_authenticated_origin_is_rejected(tmp_pat
 
 
 
-def test_verified_history_uses_actual_registry_candidate_trace_jobs(tmp_path):
-    from feature_rl.qualification import QualificationService, QualificationPolicy, RepairHistory
-    from feature_rl.qualification.evidence import put_record
-    from feature_rl.registry import JobSpec
-    from feature_rl.verifiers import load_verifier
-    q=service(tmp_path);task_ref=task_fixture(q.store);checked=load_verifier(q.store,task_ref)
-    pair=q.store.get_artifact(checked.task.source_pair)
-    history=RepairHistory(candidate=pair.candidate,complete=True,initial_evidence=pair.verification,
-        attempts=(),journal_refs=(pair.verification[0].artifacts[0],))
-    history_ref=put_record(q.store,history,'m5-repair-history')
-    q.registry.register(history_ref,dependencies=(pair.candidate,*history.journal_refs))
-    config=put_record(q.store,{'diagnostic_only':True},'unit-diagnostic')
-    job=q.registry.enqueue(JobSpec(operation='construct',inputs=(pair.candidate,),configuration=config,
-        implementation='d'*40,invocation='synthetic-history-only',attempt_limit=1))
-    claim=q.registry.claim(job.job_id,owner='synthetic-diagnostic',claim_key='synthetic-history')
-    result=c.OperationResult(operation='construct',disposition=c.Disposition.SUCCESS,artifacts=(history_ref,),
-        evidence=pair.verification,costs=checked.task.costs,reason='Synthetic history fixture, not real construction')
-    q._complete(claim,result)
-    policy=QualificationPolicy(repair_history=history_ref,repair_history_job=job.job_id,factory_revision='d'*40)
-    bound=QualificationService(store=q.store,registry=q.registry,grader=q.grader,builder=None,revision='c'*40,policy=policy)
-    assert bound._history(checked)==(0,None)
+def test_unknown_worker_attempt_is_never_redispatched(tmp_path):
+    from feature_rl.qualification import QualificationUnavailable
+    q=service(tmp_path);task=task_fixture(q.store)
+    job=q._job(task,'m5-qualify');q._claim(job)
+    with pytest.raises(QualificationUnavailable):q.qualify(task)
+    assert q.registry.job(job.job_id).state=='running'
+    assert q.registry.accounting(job.job_id).unobserved_attempts==q.registry.job(job.job_id).attempts
+    assert q.registry.job(job.job_id).spec.attempt_limit==1
+
+
+def test_qualification_completion_accounts_only_for_its_actual_results(tmp_path):
+    q=service(tmp_path);task=task_fixture(q.store)
+    result=q.qualify(task);job=q._job(task,'m5-qualify')
+    assert [ref.kind for ref in result.artifacts]==['QualificationReport','m5-qualification-summary']
+    assert job.spec.attempt_limit==1
+    accounting=q.registry.accounting(job.job_id)
+    assert not accounting.unobserved_attempts and len(accounting.observations)==1
+    observation=accounting.observations[0].observation
+    assert observation.revision==1 and observation.receipts==result.artifacts and observation.costs==result.costs

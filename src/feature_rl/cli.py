@@ -20,7 +20,7 @@ from feature_rl.qualification.evidence import unknown_cost
 from feature_rl.registry import Claim
 
 MAX_INPUT=1024*1024
-SERVICES=('factory','workflow','grade','qualification','lifecycle','run','evaluate','audit')
+SERVICES=('factory','workflow','grade','run','evaluate','audit')
 
 
 class RetainedClaim(c.StrictModel):
@@ -97,13 +97,11 @@ def parser():
         command=commands.add_parser(name,help=help_text)
         command.add_argument('--request',required=True,help='JSON M0 ConstructRequest or task request')
         if name=='construct':command.add_argument('--inputs',help='complete M6 BuildInputs JSON; no automatic generation')
-        if name=='qualify':command.add_argument('--policy',help='actual QualificationPolicy JSON; selected Factory history is enforced')
+        if name=='qualify':command.add_argument('--policy',help='actual compact QualificationPolicy JSON')
         if name=='release':command.add_argument('--accepted-report',help='JSON ArtifactRef of accepted Q when request is BUILT')
-    for name in ('author','import-authoring'):
-        command=commands.add_parser(name,help='actual selected M2/M4 call' if name=='author' else 'inert import of retained rejected M2 journals; no generation')
-        command.add_argument('--request',required=True,help='M0 ConstructRequest JSON')
-        command.add_argument('--call',required=True,help='actual M6 AuthoringCall JSON')
-        if name=='import-authoring':command.add_argument('--journals',required=True,help='ordered JSON array of actual retained GenerationJournal ArtifactRefs')
+    author=commands.add_parser('author',help='actual selected M2/M4 call')
+    author.add_argument('--request',required=True,help='M0 ConstructRequest JSON')
+    author.add_argument('--call',required=True,help='actual M6 AuthoringCall JSON')
     for name,model in (('grade','GradeRequest'),('run','RunRequest'),('train','TrainRequest'),('evaluate','EvaluateRequest')):
         command=commands.add_parser(name,help='delegate to the actual '+name+' service')
         command.add_argument('--request',required=True,help='M0 '+model+' JSON')
@@ -183,8 +181,8 @@ def _with_cleanup(app,action):
 
 def _composition(args):
     service=args.service if args.command in ('recover','retry-publication') else args.command
-    return {'runtime':service=='grade','qualification':service in ('qualify','release','resolve','qualification','lifecycle'),
-        'authoring':args.command in ('author','import-authoring'),
+    return {'runtime':service=='grade','qualification':service in ('qualify','release','resolve'),
+        'authoring':args.command=='author',
         'native_operation':service if service in ('run','train','evaluate') else None,'audit':service=='audit',
         'workflow':service in ('construct-feature','workflow')}
 
@@ -228,7 +226,7 @@ def main(argv=None):
     args=parser().parse_args(argv)
     if args.command=='config-schema':
         _emit(CLIConfiguration.model_json_schema(),None);return 0
-    operation={'prepare-github':'construct','screen-source':'construct','construct-feature':'construct','author':'construct','import-authoring':'construct',
+    operation={'prepare-github':'construct','screen-source':'construct','construct-feature':'construct','author':'construct',
         'resolve':'release','recover':'construct','retry-publication':'construct'}.get(args.command,args.command)
     try:
         if args.command=='prepare-github':
@@ -244,14 +242,13 @@ def main(argv=None):
             config=read_json(args.config,CLIConfiguration)
         # Acquisition may create a separate capture; service inputs are validated
         # before opening the Registry, Docker runtime or model services.
-        inputs=policy=report=call=resume=None;journals=()
+        inputs=policy=report=call=resume=None
         if args.command=='construct-feature':
             pass  # Source preparation has already produced the validated request.
-        elif args.command in ('screen-source','construct','author','import-authoring'):
+        elif args.command in ('screen-source','construct','author'):
             request=read_json(args.request,c.ConstructRequest)
             if args.command=='construct' and args.inputs:inputs=read_json(args.inputs,BuildInputs)
-            if args.command in ('author','import-authoring'):call=read_json(args.call,AuthoringCall)
-            if args.command=='import-authoring':journals=read_json(args.journals,TypeAdapter(tuple[c.ArtifactRef,...]))
+            if args.command=='author':call=read_json(args.call,AuthoringCall)
         elif args.command=='audit':
             request=() if args.source_only else read_json(args.request,c.AuditRequest).run_ids
         elif args.command=='recover':
@@ -277,7 +274,6 @@ def main(argv=None):
             if args.command=='construct-feature':return factory.construct_feature(request)
             if args.command=='construct':return factory.construct(request.candidate,inputs=inputs)
             if args.command=='author':return factory.author(request.candidate,call=call)
-            if args.command=='import-authoring':return factory.import_rejected_authoring(request.candidate,call=call,journal_refs=journals)
             if args.command=='qualify':return factory.qualify(request.task_version,policy=policy)
             if args.command=='release':return factory.release(request.task_version,accepted_report=report)
             if args.command=='resolve':return app.resolver.resolve_released(request.task_version)

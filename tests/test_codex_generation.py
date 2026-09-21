@@ -80,21 +80,13 @@ def test_unsafe_remote_integer_bounds_keep_exact_local_validation():
 def test_codex_schema_uses_runtime_and_contract_observable_enums():
     from feature_rl.generation.schema import codex_request_schema
     from feature_rl.requirements import RequirementContractProposal
-    from feature_rl.scenarios import ScenarioPlanProposal
     from test_authoring import contract_request
-    from test_authoring_policy import scenario_request
 
     contract = codex_request_schema(contract_request(), RequirementContractProposal)
     assert contract['$defs']['Requirement']['properties']['observable']['enum'] == [
         'CLI exit code', 'combined terminal output']
     assert contract['$defs']['Requirement']['properties']['requirement_id']['enum'] == list(
         contract_request().allowed_requirement_ids)
-    scenario = codex_request_schema(scenario_request(), ScenarioPlanProposal)
-    assert scenario['$defs']['Scenario']['properties']['observations']['items']['enum'] == [
-        'combined terminal output', 'CLI exit code']
-    assert scenario['$defs']['Scenario']['properties']['reset_needs']['maxItems'] == 0
-    assert all(variant['properties']['source']['properties']['kind']['enum'] != ['RequirementContract']
-        for variant in scenario['$defs']['EvidenceLink']['anyOf'])
 
 
 def test_evidence_transport_binds_exact_admitted_identity_and_locator():
@@ -280,13 +272,11 @@ def test_archive_recovery_preserves_validated_response_without_redispatch(
 def test_transport_schema_preserves_actual_proposal_constraints():
     from feature_rl.generation.schema import output_envelope_schema, codex_output_schema
     from feature_rl.requirements import RequirementContractProposal
-    from feature_rl.scenarios import ScenarioPlanProposal
     from feature_rl.verifiers import CheckerProposal, ControlProposal
     from jsonschema import Draft202012Validator
 
     for model in (
         RequirementContractProposal,
-        ScenarioPlanProposal,
         CheckerProposal,
         ControlProposal,
     ):

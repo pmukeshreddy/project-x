@@ -1,20 +1,17 @@
-"""Frozen inputs for concrete M2/M4 authoring and shared repair accounting."""
+"""Frozen inputs and resource budgets for concrete M2/M4 authoring."""
 from typing import Annotated, Literal
 from pydantic import Field, model_validator
 from feature_rl import contracts as c
 from feature_rl.generation import CodexConfig
 from feature_rl.requirements import (GenerationCandidate, GroundedSource,
     ContractFinalizationInputs, RetrievalPolicy)
-from feature_rl.scenarios import ScenarioFinalizationInputs
 from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs
-from feature_rl.verifiers.fragments import CheckerFragmentInputs
 from feature_rl.environments import PreparedEnvironment
 from feature_rl.registry import Claim
-from feature_rl.qualification.models import Attack
 
 
 class AuthoringBudgetExceeded(ValueError):
-    """Frozen resource/repair budget exhausted before another provider dispatch."""
+    """Frozen resource budget or local attempt limit exhausted before provider dispatch."""
 
 
 class AuthoringBudgetUnverified(ValueError):
@@ -51,7 +48,6 @@ class AuthoringSettings(c.StrictModel):
     m4_revision: c.Revision
     batch: AuthoringBatch
     evidence_scope: Literal['real_integration','unit_diagnostic']='real_integration'
-    semantic_repair_authorization: c.ArtifactRef | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ResolverInputs(c.StrictModel):
@@ -63,67 +59,21 @@ class ResolverInputs(c.StrictModel):
     request_provenance: Literal['historical_request','reconstructed_specification']='reconstructed_specification'
 
 
-class ControlSlot(c.StrictModel):
-    category: Literal['omission','plausible_wrong','hardcoded','regression','adversarial','alternative_positive']
-    requirement_ids: tuple[c.Identifier,...]
-    attack: Attack | None=None
-
-    @model_validator(mode='after')
-    def bounded_role(self):
-        if tuple(sorted(set(self.requirement_ids)))!=self.requirement_ids:
-            raise ValueError('slot requirement IDs must be distinct and sorted')
-        if (self.category=='adversarial')!=(self.attack is not None):
-            raise ValueError('only an adversarial slot has one named attack')
-        if self.category=='alternative_positive' and self.requirement_ids:
-            raise ValueError('alternative slot has no targeted omissions')
-        if self.category not in ('alternative_positive','adversarial') and not self.requirement_ids:
-            raise ValueError('semantic negative slot requires exact targets')
-        return self
-
-
-class ControlPlan(c.StrictModel):
-    version: Literal['m6-control-plan-v1']='m6-control-plan-v1'
-    contract: c.ArtifactRef
-    slots: Annotated[tuple[ControlSlot,...],Field(min_length=1,max_length=32)]
-
-    @model_validator(mode='after')
-    def unique_slots(self):
-        from feature_rl.artifacts import canonical_json
-        if len({canonical_json(s.model_dump(mode='json')) for s in self.slots})!=len(self.slots):
-            raise ValueError('duplicate control slot')
-        return self
-
-
 class AuthoringCall(c.StrictModel):
     version: Literal['m6-authoring-call-v1']='m6-authoring-call-v1'
     source_pair: c.ArtifactRef
     environment: PreparedEnvironment
     resolver: ResolverInputs
     generation: GenerationCandidate
-    inputs: ContractFinalizationInputs | ScenarioFinalizationInputs | CheckerFinalizationInputs | ControlFinalizationInputs | CheckerFragmentInputs
+    inputs: ContractFinalizationInputs | CheckerFinalizationInputs | ControlFinalizationInputs
     sources: Annotated[tuple[GroundedSource,...],Field(min_length=1,max_length=128)]
-    control_plan: ControlPlan | None=None
-    attack: Attack | None=None
 
     @model_validator(mode='after')
     def actual_stage(self):
-        allowed={ContractFinalizationInputs:'initial_authoring',ScenarioFinalizationInputs:'scenario_planning',
-            CheckerFinalizationInputs:'checker_generation',CheckerFragmentInputs:'checker_generation',ControlFinalizationInputs:
-                'alternative_authoring' if getattr(self.inputs,'category',None)=='alternative_positive' else 'control_authoring'}
+        allowed={ContractFinalizationInputs:'initial_authoring',
+            CheckerFinalizationInputs:'checker_generation',ControlFinalizationInputs:'control_authoring'}
         if allowed[type(self.inputs)]!=self.generation.request.stage.value:
             raise ValueError('actual M2 stage and finalization inputs differ')
-        if isinstance(self.inputs,ControlFinalizationInputs):
-            if self.control_plan is None or self.control_plan.contract!=self.inputs.contract:
-                raise ValueError('control call requires its exact frozen contract plan')
-            slot=ControlSlot(category=self.inputs.category,requirement_ids=tuple(sorted(self.inputs.requirement_ids)),attack=self.attack)
-            if slot not in self.control_plan.slots:raise ValueError('control is outside the frozen role plan')
-            if self.attack is not None:
-                from feature_rl.qualification.attacks import attack_expected_reason
-                expected=attack_expected_reason(self.attack,self.inputs.requirement_ids)
-                if self.inputs.expected_reason!=expected or expected not in self.generation.request.instruction:
-                    raise ValueError('adversarial call differs from the controller attack specification')
-        elif self.control_plan is not None or self.attack is not None:
-            raise ValueError('only control authoring consumes a control plan/attack')
         return self
 
 
@@ -134,8 +84,6 @@ class AuthoringFrontier(c.StrictModel):
     source_pair: c.ArtifactRef
     environment: PreparedEnvironment
     batch: c.ArtifactRef
-    scope: Literal['factory-controlled-after-source-disposition','retained-history-import']='factory-controlled-after-source-disposition'
-    external_history: Literal['not-asserted']='not-asserted'
     revision: c.Revision
 
 
@@ -145,11 +93,8 @@ class AuthoringRequest(c.StrictModel):
     frontier: c.ArtifactRef
     call: AuthoringCall
     previous: c.ArtifactRef | None
-    repair: bool
-    stage: Literal['authoring','scenarios','verifier']
+    stage: Literal['authoring','verifier']
     lane: c.Identifier
-    origin: Literal['factory_dispatch','retained_journal']='factory_dispatch'
-    imported_journals: tuple[c.ArtifactRef,...]=()
 
 
 class AuthoringReceipt(c.StrictModel):
@@ -160,8 +105,7 @@ class AuthoringReceipt(c.StrictModel):
     journal_refs: tuple[c.ArtifactRef,...]
     disposition: c.Disposition
     reason: Annotated[str,Field(min_length=1,max_length=4096)]
-    repair: bool
-    stage: Literal['authoring','scenarios','verifier']
+    stage: Literal['authoring','verifier']
     lane: c.Identifier
     costs: tuple[c.CostRecord,...]
     revision: c.Revision

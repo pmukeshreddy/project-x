@@ -1,11 +1,12 @@
-"""M5 controller-local contracts; opaque CAS bytes, no shared schema changes."""
+"""Controller-local records for the bounded qualification check."""
 from typing import Annotated, Literal
-from pydantic import Field, model_validator
-from feature_rl.contracts import ArtifactRef, Digest, StrictModel
+from pydantic import Field
+from feature_rl.contracts import ArtifactRef, Digest, StrictModel, UTCDateTime
+from feature_rl.verifiers.models import Name
 
 ReasonCode = Literal['accepted','provisional','ambiguous_requirement','unsupported_semantics',
-    'unrecoverable_history','environment_failure','oracle_disagreement','false_acceptance',
-    'false_rejection','flaky_task','budget_exhausted','unverified_human_review','invalid_evidence']
+    'environment_failure','oracle_disagreement','false_acceptance','false_rejection',
+    'flaky_task','budget_exhausted','invalid_evidence']
 
 class QualificationRejected(ValueError):
     def __init__(self, code: ReasonCode, detail: str):
@@ -31,63 +32,18 @@ class ReferenceProjection(StrictModel):
     submission: ArtifactRef
     paths: Annotated[tuple[ProjectionPath,...],Field(min_length=1,max_length=2000)]
 
-from feature_rl.contracts import CostRecord, EvidenceRecord, UTCDateTime, Revision
-from feature_rl.verifiers.models import Name, unique
-
-Refs = Annotated[tuple[ArtifactRef,...],Field(max_length=256)]
-Evidence = Annotated[tuple[EvidenceRecord,...],Field(min_length=1,max_length=64)]
-Costs = Annotated[tuple[CostRecord,...],Field(min_length=1,max_length=64)]
-Stage = Literal['source','environment','authoring','scenarios','verifier','qualification']
-Mode = Literal['positive','baseline_health','semantic_negative','source_rejection','protocol_failure','resource_failure']
-Attack = Literal['forged_verdict','observation_spoofing','evaluator_detection','hardcoded_inputs','skipped_execution',
-    'protocol_manipulation','excessive_output','dependency_shadowing','path_link','retained_state']
+Mode = Literal['positive','baseline_health','baseline_absence','negative']
 
 class GateOutcome(StrictModel):
     passed: bool
     code: ReasonCode
     detail: str
 
-class ControlDiagnosis(StrictModel):
-    control_id: Name
-    validity: Literal['valid','invalid','equivalent','unresolved']
-    mode: Mode
-    targets: tuple[Name,...]
-    attack: Attack | None
-    evidence: Evidence
-    independence_evidence: tuple[EvidenceRecord,...] = ()
-    note: Annotated[str,Field(min_length=1,max_length=4096)]
-
-class RepairAttempt(StrictModel):
-    stage: Stage
-    before: ArtifactRef
-    after: ArtifactRef
-    diagnosis: Annotated[str,Field(min_length=1,max_length=4096)]
-    change: Annotated[str,Field(min_length=1,max_length=4096)]
-    evidence: Evidence
-    costs: Costs
-
-class RepairHistory(StrictModel):
-    version: Literal['m5-repair-history-v1']='m5-repair-history-v1'
-    candidate: ArtifactRef
-    complete: bool
-    initial_evidence: Evidence
-    attempts: Annotated[tuple[RepairAttempt,...],Field(max_length=128)]
-    journal_refs: Annotated[Refs,Field(min_length=1)]
-
 class QualificationPolicy(StrictModel):
     version: Literal['m5-pilot-policy-v1']='m5-pilot-policy-v1'
     policy_id: Name='pilot-v1'
-    baseline_missing_requirements: tuple[Name,...]=()
-    controls: Annotated[tuple[ControlDiagnosis,...],Field(max_length=128)]=()
-    fresh_seeds: Annotated[tuple[Annotated[int,Field(ge=0,lt=2**63)],...],Field(min_length=3,max_length=10)]=(11,23,47)
-    reset_seeds: Annotated[tuple[Annotated[int,Field(ge=0,lt=2**63)],...],Field(min_length=3,max_length=10)]=(11,23,47)
-    max_grade_calls: Annotated[int,Field(ge=7,le=256)]=64
+    seed: Annotated[int,Field(ge=0,lt=2**63)]=11
     max_wall_seconds: Annotated[float,Field(gt=0,le=21600)]=3600.0
-    repair_history: ArtifactRef | None=None
-    repair_history_job: Annotated[str,Field(pattern=r'^[0-9a-f]{64}$')] | None=None
-    factory_revision: Revision | None=None
-    semantic_repair_authorization: ArtifactRef | None=Field(default=None,exclude_if=lambda value:value is None)
-
 
 class RunBinding(StrictModel):
     version: Literal['m5-run-binding-v1']='m5-run-binding-v1'
@@ -97,8 +53,7 @@ class RunBinding(StrictModel):
     submission: ArtifactRef
     seed: Annotated[int,Field(ge=0,lt=2**63)]
     grade: ArtifactRef
-    # Null freezes an automatic diagnostic run before its outcome is known.
-    mode: Mode | None
+    mode: Mode
     targets: tuple[Name,...]
     operation_ids: tuple[Name,...]
     grade_job: Digest
@@ -109,8 +64,8 @@ class ResetReceipt(StrictModel):
     task: ArtifactRef
     projection: ArtifactRef
     workspace_id: Annotated[str,Field(pattern=r'^[0-9a-f]{32}$')]
-    interruption: ArtifactRef
-    interruption_operation: Name
+    mutation: ArtifactRef
+    mutation_operation: Name
     initial_source: ArtifactRef
     reset_source: ArtifactRef
     generation_before: Annotated[int,Field(ge=0)]
@@ -123,53 +78,17 @@ class QualificationSummary(StrictModel):
     task: ArtifactRef
     policy: ArtifactRef
     projection: ArtifactRef | None
-    bindings: Annotated[tuple[ArtifactRef,...],Field(max_length=256)]
-    control_diagnoses: Annotated[tuple[ControlDiagnosis,...],Field(max_length=128)]=()
-    issues: Annotated[tuple[str,...],Field(max_length=1024)]
-    repair_count: Annotated[int,Field(ge=0,le=7)] | None
-    semantic_repair_authorization: ArtifactRef | None=Field(default=None,exclude_if=lambda value:value is None)
+    bindings: Annotated[tuple[ArtifactRef,...],Field(max_length=7)]
+    issues: Annotated[tuple[str,...],Field(max_length=32)]
     qualification_job: Digest
-    wall_seconds: Annotated[float,Field(ge=0)] | None=None
-
-    @model_validator(mode='after')
-    def explicit_additional_repairs(self):
-        if self.repair_count is not None and self.repair_count>4 and self.semantic_repair_authorization is None:
-            raise ValueError('repair count above four requires explicit semantic authorization')
-        return self
-
-
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class CompletionPending:
-    claim: object
-    result: object
-
-@dataclass(frozen=True)
-class GradePending:
-    parent_claim: object
-    grade_claim: object
-    pending: object
-    reset_ref: ArtifactRef | None
-    reset_costs: tuple
-
-@dataclass(frozen=True)
-class RunCompletionPending:
-    parent_claim: object
-    completion: object
-
-@dataclass(frozen=True)
-class FrozenPublication:
-    """Retained bytes/costs after work, before CAS or Registry publication."""
-    claim: object
-    payload: object
-    purpose: Literal['qualification']
+    wall_seconds: Annotated[float,Field(ge=0)]
 
 class QualificationPublicationFailed(Exception):
-    """Exact operation payload retained; no execution retry is authorized."""
-    def __init__(self, message, *, pending, claim=None):
-        super().__init__(message);self.pending=pending;self.claim=claim
+    """Publication was interrupted; the selected attempt must not execute again."""
+    def __init__(self, message, *, claim=None):
+        super().__init__(message);self.claim=claim
 
-class QualificationRecoveryRequired(Exception):
+class QualificationUnavailable(Exception):
+    """An unfinished attempt has an unknown outcome and cannot be redispatched."""
     def __init__(self, message, claim=None):
         super().__init__(message);self.claim=claim

@@ -25,70 +25,6 @@ from test_qualification_service import service
 from m5_fixtures import task_fixture
 
 
-def process_observations(tmp_path,*,exit_code,stderr=b'',mode='process'):
-    q=service(tmp_path);task_ref=task_fixture(q.store);task=q.store.get_artifact(task_ref)
-    origin=q.store.get_artifact(task.contract).requirements[0].evidence[0]
-    marker=put_record(q.store,{'synthetic':'process-comparison diagnostic; not worker evidence'},'unit-diagnostic')
-    adapter=b'# Synthetic fixed adapter identity; never executed in this test'
-    comparisons=[];cases=[]
-    for index,requirement in enumerate(('F1','C1')):
-        observations=[{'name':'stdout','type':'string'}] if mode=='process' else [{'name':'present','type':'boolean'}]
-        comparison=CaseComparison.model_validate_json(json.dumps({'version':'m4-comparison-v1',
-            'scenario_id':'s'+str(index),'requirement_ids':[requirement],'mode':mode,'observations':observations,
-            'assertions':[{'assertion_id':'value','requirement_ids':[requirement],'oracle_origin':origin.model_dump(mode='json'),
-                'actual':'stdout' if mode=='process' else 'present','operator':'equal',
-                'expected':{'kind':'literal','value':'expected' if mode=='process' else True}}], 'timeout_seconds':2.0}))
-        cref=put_record(q.store,comparison,'m4-case-comparison')
-        case=RealizedCase(case_id='c'+str(index),scenario_id='s'+str(index),requirement_ids=(requirement,),
-            inputs={},input_plan=marker,comparison=cref,mandatory=True)
-        code=exit_code if index==0 else 0
-        output=(b'' if index==0 else b'expected') if mode=='process' else canonical_json({'case_id':case.case_id,'observations':{'present':index!=0}})
-        stdin=canonical_json({'case_id':case.case_id,'inputs':{}})
-        owner=Ownership(operation_id=str(index+1)*32,owner_token='a'*32,daemon_id='synthetic',
-            container_name='synthetic-'+str(index),container_id='synthetic-id-'+str(index),phase='removed',
-            binding={},saved_source={},created_at='2026-09-19T00:00:00Z')
-        environment=q.store.get_artifact(task.environment).environment
-        row={'argv':['diagnostic-docker','exec',owner.container_id,*adapter_argv(adapter,((v.name,v.value) for v in environment))],
-            'exit_code':code,'reason':'exited','stdin_bytes':len(stdin),'stdin_sha256':hashlib.sha256(stdin).hexdigest(),
-            'stdout_b64':base64.b64encode(output).decode(),'stderr_b64':base64.b64encode(stderr if index==0 else b'').decode()}
-        value={'phase':'execute','record':owner.model_dump(mode='json'),'cleanup_verified':True,'commands':[row],
-            'extra':{'error':None,'failure_category':'candidate' if code else 'none','reason':'command_failed' if code else 'completed'}}
-        ref=put_record(q.store,value,'environment-execution')
-        actual=CaseResult(case_id=case.case_id,mandatory=True,status='completed',passed=index!=0,
-            assertions=(AssertionResult(assertion_id='value',requirement_ids=(requirement,),passed=index!=0),),
-            evidence=ref,reason='compared externally')
-        comparisons.append(comparison);cases.append(actual)
-        checked=SimpleNamespace(adapter=adapter,recipe=SimpleNamespace(environment=environment),verifier=SimpleNamespace(permissions=SimpleNamespace(output_limit_bytes=65536)))
-        _assert_case_observation(checked,actual,case,comparison,value,owner)  # M4's process observation remains valid.
-    checked.comparisons=tuple(comparisons)
-    checked.contract=SimpleNamespace(requirements=(SimpleNamespace(requirement_id='F1',mandatory=True),),
-        compatibility_obligations=(SimpleNamespace(requirement_id='C1',mandatory=True),))
-    receipt=SimpleNamespace(cases=tuple(cases),reward=0,cleanup_verified=True,build_evidence=marker,
-        disposition=c.Disposition.REJECTED,reason='required comparison failed')
-    return q,checked,receipt
-
-
-@pytest.mark.parametrize('stderr',[b'SyntaxError: invalid syntax\n',b'ModuleNotFoundError: No module named required_dependency\n'])
-def test_process_crash_is_not_semantic_omission_even_when_m4_completed_and_only_f1_failed(tmp_path,stderr):
-    q,checked,receipt=process_observations(tmp_path,exit_code=1,stderr=stderr)
-    assert not assess_outcome(checked,receipt,'semantic_negative',('F1',)).passed
-
-
-@pytest.mark.parametrize('exit_code,stderr,want',[(1,b'SyntaxError: invalid syntax\n',False),
-    (1,b'ModuleNotFoundError: No module named required_dependency\n',False),
-    (0,b'',True)])
-def test_targeted_process_semantics_are_bound_to_actual_normal_completion(tmp_path,exit_code,stderr,want):
-    q,checked,receipt=process_observations(tmp_path,exit_code=exit_code,stderr=stderr)
-    outcome=assess_outcome(checked,receipt,'semantic_negative',('F1',),store=q.store)
-    assert outcome.passed is want
-    if not want:assert outcome.code!='environment_failure'
-
-
-def test_exact_absent_new_public_symbol_can_be_an_explicit_successful_adapter_observation(tmp_path):
-    q,checked,receipt=process_observations(tmp_path,exit_code=0,mode='json')
-    assert assess_outcome(checked,receipt,'semantic_negative',('F1',),store=q.store).passed
-
-
 def source_run(tmp_path,visibility=c.Visibility.PRIVATE):
     q=service(tmp_path);task_ref=task_fixture(q.store);checked=load_verifier(q.store,task_ref)
     projection=derive_reference(q.store,task_ref,q.grader.runtime.policy)
@@ -129,3 +65,17 @@ def test_quarantined_source_delta_is_rejected_before_grade_job_enqueue(tmp_path,
     before=q.registry.trace(checked.task_ref).jobs
     with pytest.raises(QuarantinedError):q._run(checked,projection,submission,11,'fresh_0','positive',(),parent,False,set())
     assert q.registry.trace(checked.task_ref).jobs==before
+
+
+@pytest.mark.parametrize('defect',['malformed','wrong_baseline','wrong_delta_kind','wrong_manifest_kind'])
+def test_source_dependency_manifest_must_bind_the_exact_submission(tmp_path,defect):
+    q,checked,projection,submission,delta,parent=source_run(tmp_path)
+    value=read_local(q.store,submission,Submission,'m4-submission',65536)
+    kind='m4-submission'
+    if defect=='wrong_baseline':value=value.model_copy(update={'baseline':delta})
+    if defect=='wrong_delta_kind':value=value.model_copy(update={'changes':checked.task.baseline})
+    if defect=='wrong_manifest_kind':kind='unit-diagnostic'
+    body=b'not JSON' if defect=='malformed' else canonical_json(value.model_dump(mode='json'))
+    bad=q.store.put_bytes(body,kind,c.Visibility.PRIVATE)
+    with pytest.raises(QualificationRejected,match='submission'):
+        q._source_dependencies(checked,bad,register=True)

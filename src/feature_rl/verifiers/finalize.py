@@ -98,8 +98,7 @@ def submission_service(store, environment):
 
 
 def validate_control_submission(service, ref, baseline):
-    # Deliberately malformed archive controls must reach grading. Their outer
-    # manifest and exact B binding are still controller validated here.
+    # Control manifests and their exact baseline binding are controller facts.
     raw = read_bytes(service.store, ref, 65536, 'm4-submission', private=True)
     manifest = Submission.model_validate_json(canonical_json(decode_json(raw, 65536)))
     if manifest.baseline != baseline:
@@ -114,42 +113,6 @@ class CheckerFinalizer:
         if not isinstance(store, ArtifactStore) or store.role is not ActorRole.CONTROLLER:
             raise TypeError('checker finalizer requires a controller store')
         self.store, self.resolver = store, resolver
-
-    def attach_controls(self, verifier_ref, control_record_refs, *, baseline, environment):
-        """Return a new frozen checker version; no checker generation or worker call."""
-        from datetime import datetime, timezone
-        from .control_authoring import ControlRecord
-        from .loader import read_local
-        verifier = _artifact(self.store, verifier_ref, VerifierBundle)
-        contract, *_ = validate_verifier_bundle(self.store, verifier, contract_ref=verifier.contract,
-            environment=environment, baseline=baseline)
-        refs = tuple(ArtifactRef.model_validate(ref) for ref in control_record_refs)
-        if not refs or len(refs) > 128 or len(set(refs)) != len(refs):
-            raise ValueError('control attachment requires distinct bounded record refs')
-        records = tuple(read_local(self.store, ref, ControlRecord, 'm4-control-record',
-            cap=2*1024*1024) for ref in refs)
-        service = submission_service(self.store, environment)
-        controls = list(verifier.controls)
-        known = {r.requirement_id for r in contract.requirements + contract.compatibility_obligations}
-        for record in records:
-            if (record.baseline, record.contract, record.environment) != (baseline, verifier.contract, environment):
-                raise ValueError('control record/checker frozen join mismatch')
-            targets = record.control.requirement_ids
-            if len(set(targets)) != len(targets) or not set(targets) <= known:
-                raise ValueError('control targets unknown/duplicate requirements')
-            validate_control_submission(service, record.control.patch, baseline)
-            controls.append(record.control)
-        if len(controls)>128 or len({control.control_id for control in controls})!=len(controls):
-            raise ValueError('duplicate or excessive attached controls')
-        provenance = verifier.provenance.model_copy(update={
-            'producer':'feature_rl.verifiers.CheckerFinalizer.attach_controls',
-            'created_at':datetime.now(timezone.utc),
-            'inputs':verifier.provenance.inputs+(verifier_ref,)+refs})
-        updated = VerifierBundle.model_validate(verifier.model_copy(update={
-            'controls':tuple(controls), 'provenance':provenance}))
-        if len(canonical_json(updated.model_dump(mode='json'))) > 900000:
-            raise ValueError('verifier exceeds bounded typed artifact size')
-        return PreparedChecker((), updated)
 
     def prepare(self, proposal, inputs, sources) -> PreparedChecker:
         proposal = CheckerProposal.model_validate(proposal)

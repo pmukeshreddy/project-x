@@ -42,14 +42,6 @@ from feature_rl.requirements import (
     EvidenceResolutionError,
     build_contract_request,
 )
-from feature_rl.scenarios import (
-    ScenarioAuthoringService,
-    ScenarioFinalizationInputs,
-    ScenarioFinalizer,
-    ScenarioJoinError,
-    ScenarioPlanProposal,
-    build_scenario_request,
-)
 from feature_rl.generation import (
     GenerationCallRecord,
     GenerationLimits,
@@ -385,125 +377,16 @@ def test_contract_finalizer_rejects_ungrounded_or_unsupported_content(proposal, 
         ContractFinalizer().finalize(proposal(), contract_inputs(), sources())
 
 
-def scenario_proposal(**updates) -> ScenarioPlanProposal:
-    values = {
-        "scenarios": (
-            {
-                "scenario_id": "SCENARIO_SUGGESTION",
-                "requirement_ids": ("FEATURE_COMMAND_SUGGESTION",),
-                "preconditions": ("A group exposes a command with a close name.",),
-                "actions": ("Invoke the group with an unknown close command name.",),
-                "observations": ("combined terminal output",),
-                "expected_relation": "The output contains a close available command name.",
-                "input_domain": "Unknown names with exactly one admitted close match.",
-                "oracle_origin": {
-                    "source": REQUEST,
-                    "locator": "request:1-4",
-                    "quote": "close command suggestion",
-                    "provenance_label": "reconstructed_specification",
-                },
-                "reset_needs": (),
-            },
-            {
-                "scenario_id": "SCENARIO_COMPAT",
-                "requirement_ids": ("COMPAT_GROUP_DISPATCH",),
-                "preconditions": ("A group exposes an existing command.",),
-                "actions": ("Invoke the existing command.",),
-                "observations": ("CLI exit code",),
-                "expected_relation": "The existing command invocation remains successful.",
-                "input_domain": "An exact existing command name.",
-                "oracle_origin": {
-                    "source": BASELINE,
-                    "locator": "src/click/core.py:1-20",
-                    "quote": "public command dispatch entry point",
-                    "provenance_label": "existing_obligation",
-                },
-                "reset_needs": (),
-            },
-        )
-    }
-    return ScenarioPlanProposal.model_validate(values | updates)
 
 
-def scenario_inputs(contract_ref: ArtifactRef) -> ScenarioFinalizationInputs:
-    return ScenarioFinalizationInputs(
-        contract=contract_ref,
-        supported_observables=("combined terminal output", "CLI exit code"),
-        seed_policy=SeedPolicy(
-            algorithm="sha256-case-family-v1", seeds=(0, 1, 2), same_cases_within_group=True
-        ),
-        visibility=Visibility.PRIVATE,
-        provenance=provenance(REQUEST, BASELINE, contract_ref),
-        costs=(cost(),),
-    )
 
 
-def test_scenario_proposal_preserves_m0_constraints_without_controller_fields():
-    assert set(ScenarioPlanProposal.model_fields) == {"scenarios"}
-    with pytest.raises(ValidationError):
-        scenario_proposal(scenarios=())
 
 
-def test_scenario_finalizer_enforces_frozen_contract_ids_seed_and_grounding():
-    contract = finalized_contract()
-    contract_ref = ref("RequirementContract", "f")
-    plan = ScenarioFinalizer().finalize(
-        scenario_proposal(), contract, scenario_inputs(contract_ref), sources(),
-        expected_contract=contract_ref,
-    )
-    assert plan.contract == contract_ref
-    assert plan.mandatory_requirement_ids == (
-        "FEATURE_COMMAND_SUGGESTION",
-        "COMPAT_GROUP_DISPATCH",
-    )
-    assert plan.seed_policy.same_cases_within_group is True
 
 
-def test_scenario_finalizer_rejects_unknown_and_incomplete_requirement_coverage():
-    contract = finalized_contract()
-    contract_ref = ref("RequirementContract", "f")
-    proposals = (
-        scenario_proposal(
-            scenarios=(
-                scenario_proposal().scenarios[0].model_copy(
-                    update={"requirement_ids": ("UNKNOWN",)}
-                ),
-                scenario_proposal().scenarios[1],
-            )
-        ),
-        scenario_proposal(scenarios=(scenario_proposal().scenarios[0],)),
-    )
-    for proposal in proposals:
-        with pytest.raises(ScenarioJoinError):
-            ScenarioFinalizer().finalize(
-                proposal, contract, scenario_inputs(contract_ref), sources(),
-                expected_contract=contract_ref,
-            )
 
 
-def test_scenario_finalizer_rejects_nonidentical_contract_and_variable_case_policy():
-    contract = finalized_contract()
-    contract_ref = ref("RequirementContract", "f")
-    wrong_ref = ref("RequirementContract", "e")
-    with pytest.raises(ScenarioJoinError, match="contract"):
-        ScenarioFinalizer().finalize(
-            scenario_proposal(), contract, scenario_inputs(wrong_ref), sources(),
-            expected_contract=contract_ref,
-        )
-    inputs = scenario_inputs(contract_ref).model_copy(
-        update={
-            "seed_policy": SeedPolicy(
-                algorithm="sha256-case-family-v1",
-                seeds=(0,),
-                same_cases_within_group=False,
-            )
-        }
-    )
-    with pytest.raises(ScenarioJoinError, match="same cases"):
-        ScenarioFinalizer().finalize(
-            scenario_proposal(), contract, inputs, sources(),
-            expected_contract=contract_ref,
-        )
 
 
 def generation_limits() -> GenerationLimits:
@@ -560,7 +443,7 @@ def archived_provider_result(
     schema = (
         RequirementContractProposal
         if request.stage is GenerationStage.INITIAL_AUTHORING
-        else ScenarioPlanProposal
+        else type(content)
     )
     schema_payload = schema.model_json_schema()
     envelope = {
@@ -1043,242 +926,18 @@ def test_contract_publication_failure_replays_without_another_generation(tmp_pat
     assert len(provider.calls) == 1
 
 
-def test_scenario_request_and_service_resolve_exact_stored_contract(tmp_path):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    contract = finalized_contract()
-    contract_ref = store.put_artifact(contract)
-    built = build_scenario_request(
-        request_id="SCENARIO_REQ_1",
-        response_id="SCENARIO_RESP_1",
-        prompt_id="SCENARIO_PROMPT_1",
-        contract=contract,
-        contract_ref=contract_ref,
-        sources=sources(),
-        limits=generation_limits(),
-    )
-    assert built.stage is GenerationStage.SCENARIO_PLANNING
-    assert tuple(context.role for context in built.contexts)[-1] == "contract"
-    provider = FakeProvider((provider_result(scenario_proposal()),))
-    result = ScenarioAuthoringService(
-        provider=provider,
-        store=store,
-        resolver=FakeEvidenceResolver(sources()),
-        revision="2" * 40,
-        evidence_scope="unit_diagnostic",
-    ).generate(
-        (GenerationCandidate(request=built),),
-        scenario_inputs(contract_ref),
-        sources(),
-    )
-    assert result.plan.contract == contract_ref
-    assert store.get_artifact(result.plan_ref) == result.plan
 
 
-@pytest.mark.parametrize("mutation", ("request", "cost"))
-def test_recovered_scenario_result_must_match_archived_operation(tmp_path, mutation):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    contract = finalized_contract()
-    contract_ref = store.put_artifact(contract)
-    request = build_scenario_request(
-        request_id="SCENARIO_RECOVER_REQ", response_id="SCENARIO_RECOVER_RESP",
-        prompt_id="SCENARIO_RECOVER_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=sources(), limits=generation_limits(),
-    )
-    recovered = archived_provider_result(store, request, scenario_proposal())
-    if mutation == "request":
-        request = request.model_copy(update={"instruction": request.instruction + " changed"})
-    else:
-        recovered = recovered.model_copy(
-            update={
-                "cost": recovered.cost.model_copy(
-                    update={"wall_seconds": 0.0, "cpu_seconds": 0.0}
-                )
-            }
-        )
-    provider = FakeProvider(())
-    with pytest.raises(ValueError, match="recovered .* archive"):
-        ScenarioAuthoringService(
-            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
-            revision="2" * 40, evidence_scope="unit_diagnostic",
-        ).generate(
-            (GenerationCandidate(request=request),), scenario_inputs(contract_ref), sources(),
-            recovered_result=recovered,
-        )
-    assert provider.calls == []
 
 
-def test_scenario_accepts_exact_public_check_frozen_by_contract(tmp_path):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    public_source = GroundedSource(
-        context_id="PUBLIC_CHECK", role="public_check", source=PUBLIC_CHECK,
-        locator="artifact:whole", text="Public compatibility obligation.",
-        provenance_label="existing_obligation",
-    )
-    admitted = sources() + (public_source,)
-    base_inputs = contract_inputs()
-    contract = ContractFinalizer().finalize(
-        contract_proposal(),
-        base_inputs.model_copy(
-            update={
-                "public_checks": (PUBLIC_CHECK,),
-                "provenance": base_inputs.provenance.model_copy(
-                    update={"inputs": base_inputs.provenance.inputs + (PUBLIC_CHECK,)}
-                )
-            }
-        ),
-        admitted,
-    )
-    contract_ref = store.put_artifact(contract)
-    request = build_scenario_request(
-        request_id="SCENARIO_PUBLIC_REQ", response_id="SCENARIO_PUBLIC_RESP",
-        prompt_id="SCENARIO_PUBLIC_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=admitted, limits=generation_limits(),
-    )
-    provider = FakeProvider((provider_result(scenario_proposal()),))
-    result = ScenarioAuthoringService(
-        provider=provider, store=store, resolver=FakeEvidenceResolver(admitted),
-        revision="2" * 40, evidence_scope="unit_diagnostic",
-    ).generate(
-        (GenerationCandidate(request=request),), scenario_inputs(contract_ref), admitted,
-    )
-    assert result.plan.contract == contract_ref
 
 
-def test_recovered_failed_scenario_generation_journals_without_provider(tmp_path):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    contract = finalized_contract()
-    contract_ref = store.put_artifact(contract)
-    request = build_scenario_request(
-        request_id="SCENARIO_FAILED_REQ", response_id="SCENARIO_FAILED_RESP",
-        prompt_id="SCENARIO_FAILED_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=sources(), limits=generation_limits(),
-    )
-    recovered = archived_provider_error(store, request, scenario_proposal())
-    provider = FakeProvider(())
-    with pytest.raises(AuthoringExhausted) as caught:
-        ScenarioAuthoringService(
-            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
-            revision="2" * 40, evidence_scope="unit_diagnostic",
-        ).generate(
-            (GenerationCandidate(request=request),), scenario_inputs(contract_ref), sources(),
-            recovered_error=recovered,
-        )
-    assert len(caught.value.journal_refs) == 1
-    assert provider.calls == []
 
 
-def test_scenario_publication_failure_replays_without_another_generation(tmp_path, monkeypatch):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    contract = finalized_contract()
-    contract_ref = store.put_artifact(contract)
-    request = build_scenario_request(
-        request_id="SCENARIO_REPLAY_REQ",
-        response_id="SCENARIO_REPLAY_RESP",
-        prompt_id="SCENARIO_REPLAY_PROMPT",
-        contract=contract,
-        contract_ref=contract_ref,
-        sources=sources(),
-        limits=generation_limits(),
-    )
-    provider = FakeProvider((provider_result(scenario_proposal()),))
-    service = ScenarioAuthoringService(
-        provider=provider,
-        store=store,
-        resolver=FakeEvidenceResolver(sources()),
-        revision="2" * 40,
-        evidence_scope="unit_diagnostic",
-    )
-    original = store.put_artifact
-    monkeypatch.setattr(store, "put_artifact", lambda artifact: (_ for _ in ()).throw(OSError("disk")))
-    with pytest.raises(AuthoringPublicationPending) as caught:
-        service.generate(
-            (GenerationCandidate(request=request),), scenario_inputs(contract_ref), sources()
-        )
-    assert len(provider.calls) == 1
-    monkeypatch.setattr(store, "put_artifact", original)
-    artifact_ref, journal_refs = caught.value.replay(store)
-    assert store.get_artifact(artifact_ref) == caught.value.artifact
-    assert len(journal_refs) == 1
-    assert len(provider.calls) == 1
 
 
-@pytest.mark.parametrize("mutation", ("text", "ids"))
-def test_scenario_service_rejects_forged_contract_context_or_ids(tmp_path, mutation):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    contract = finalized_contract()
-    contract_ref = store.put_artifact(contract)
-    built = build_scenario_request(
-        request_id="SCENARIO_REQ_FORGED",
-        response_id="SCENARIO_RESP_FORGED",
-        prompt_id="SCENARIO_PROMPT_FORGED",
-        contract=contract,
-        contract_ref=contract_ref,
-        sources=sources(),
-        limits=generation_limits(),
-    )
-    if mutation == "text":
-        changed = built.model_copy(
-            update={
-                "contexts": (
-                    *built.contexts[:-1],
-                    built.contexts[-1].model_copy(update={"text": "{}"}),
-                )
-            }
-        )
-    else:
-        changed = built.model_copy(update={"allowed_requirement_ids": ("FEATURE_COMMAND_SUGGESTION",)})
-    service = ScenarioAuthoringService(
-        provider=FakeProvider((provider_result(scenario_proposal()),)),
-        store=store,
-        resolver=FakeEvidenceResolver(sources()),
-        revision="2" * 40,
-        evidence_scope="unit_diagnostic",
-    )
-    with pytest.raises(ValueError, match="exact frozen contract"):
-        service.generate(
-            (GenerationCandidate(request=changed),),
-            scenario_inputs(contract_ref),
-            sources(),
-        )
 
 
-def test_scenario_service_rejects_evidence_set_or_observables_outside_frozen_contract(tmp_path):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    contract = finalized_contract()
-    contract_ref = store.put_artifact(contract)
-    foreign = tuple(
-        source.model_copy(update={"source": ref("source-archive", "e")})
-        if source.source == BASELINE else source
-        for source in sources()
-    )
-    forged_request = build_scenario_request(
-        request_id="SCENARIO_FOREIGN_REQ", response_id="SCENARIO_FOREIGN_RESP",
-        prompt_id="SCENARIO_FOREIGN_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=foreign, limits=generation_limits(),
-    )
-    service = ScenarioAuthoringService(
-        provider=FakeProvider(()), store=store,
-        resolver=FakeEvidenceResolver(foreign), revision="2" * 40,
-        evidence_scope="unit_diagnostic",
-    )
-    with pytest.raises(ValueError, match="evidence set"):
-        service.generate(
-            (GenerationCandidate(request=forged_request),),
-            scenario_inputs(contract_ref), foreign,
-        )
-    valid_request = build_scenario_request(
-        request_id="SCENARIO_OBS_REQ", response_id="SCENARIO_OBS_RESP",
-        prompt_id="SCENARIO_OBS_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=sources(), limits=generation_limits(),
-    )
-    service.resolver = FakeEvidenceResolver(sources())
-    bad_inputs = scenario_inputs(contract_ref).model_copy(
-        update={"supported_observables": ("object identity",)}
-    )
-    with pytest.raises(ScenarioJoinError, match="observables"):
-        service.generate(
-            (GenerationCandidate(request=valid_request),), bad_inputs, sources()
-        )
 
 
 class FakeRuntime:

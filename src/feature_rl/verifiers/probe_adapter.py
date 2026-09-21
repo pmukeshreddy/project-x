@@ -1,9 +1,6 @@
 """Deterministic JSON observation transport; candidate source is only parsed here."""
 import ast
-from collections import Counter
-import io
 import textwrap
-import tokenize
 
 
 def validate_actions(source):
@@ -13,7 +10,7 @@ def validate_actions(source):
         tree = ast.parse('def _probe(inputs):\n' + textwrap.indent(source, '    '))
         # AST parsing alone accepts break/continue outside loops and duplicate
         # arguments. Compilation checks scope legality but never executes code.
-        compile(tree, '<checker-fragment-actions>', 'exec', dont_inherit=True)
+        compile(tree, '<behavioral-actions>', 'exec', dont_inherit=True)
     except (SyntaxError, ValueError, RecursionError) as exc:
         raise ValueError('invalid Python action body') from exc
     function = tree.body[0]
@@ -182,124 +179,10 @@ def build_probe_adapter(cases):
             blocks.append('    def ' + name + '(inputs):\n' + textwrap.indent(actions, '        ') + '\n')
         dispatch[case_id] = (functions[actions], tuple(input_names), dict(observations))
     body = _TRANSPORT + '\n'.join(blocks)
-    metadata = _dispatch_source(dispatch, body + _DISPATCH)
-    source = _compact_source(body + '\n' + textwrap.indent(metadata, '    ') + '\n' + _DISPATCH)
+    entries = [f'{key!r}: ({name}, {names!r}, {fields!r})'
+        for key, (name, names, fields) in dispatch.items()]
+    source = body + '\n    _m4_dispatch = {' + ', '.join(entries) + '}\n' + _DISPATCH
+    compile(source, '<behavioral-checker>', 'exec', dont_inherit=True)
     if len(source.encode('utf-8')) > 65536:
         raise ValueError(f'assembled worker adapter exceeds bounded source size ({len(source.encode("utf-8"))} > 65536 bytes)')
     return source
-
-
-def _dispatch_source(dispatch, source):
-    """Share repeated controller metadata, preserving every complete case ID.
-
-    Only immutable dispatch strings are pooled. Probe source is untouched and
-    never executed. Fresh local names cannot shadow any name in that source.
-    """
-    occupied = {token.string for token in tokenize.generate_tokens(io.StringIO(source).readline)
-                if token.type == tokenize.NAME}
-    occupied.update(name for name, _, _ in dispatch.values())
-    counts, keys = Counter(), {}
-    for key, (_, names, fields) in dispatch.items():
-        prefix, separator, suffix = key.rpartition('_')
-        parts = (prefix + separator, suffix) if separator else (key,)
-        keys[key] = parts
-        counts.update(parts)
-        counts.update(names)
-        counts.update(fields.keys())
-        counts.update(fields.values())
-    symbols, declarations, index = {}, [], 0
-    for value, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
-        while '_' + str(index) in occupied:
-            index += 1
-        symbol = '_' + str(index)
-        literal = repr(value)
-        if count * (len(literal) - len(symbol)) <= len(symbol) + len(literal) + 2:
-            continue
-        symbols[value] = symbol
-        declarations.append(symbol + '=' + literal)
-        occupied.add(symbol)
-        index += 1
-    def literal(value):
-        return symbols.get(value, repr(value))
-    entries = []
-    for key, (function, names, fields) in dispatch.items():
-        parts = keys[key]
-        identity = '+'.join(literal(part) for part in parts) if any(part in symbols for part in parts) else repr(key)
-        names_source = '(' + ','.join(literal(name) for name in names) + (',' if len(names) == 1 else '') + ')'
-        fields_source = '{' + ','.join(literal(name) + ':' + literal(kind) for name, kind in fields.items()) + '}'
-        entries.append(identity + ':(' + function + ',' + names_source + ',' + fields_source + ')')
-    return ';'.join((*declarations, '_m4_dispatch={' + ','.join(entries) + '}'))
-
-
-def _compact_source(source):
-    """Format generated code compactly; require its complete AST to stay identical.
-
-    Only statement separators, comments and whitespace change. Literal contents,
-    identifiers, scope and statement order remain intact; nothing executes here.
-    """
-    original = ast.parse(source)
-    source = ast.unparse(original)
-    tree = ast.parse(source)
-    raw = source.encode('utf-8')
-    offsets = [0]
-    for line in raw.splitlines(keepends=True):
-        offsets.append(offsets[-1] + len(line))
-    simple = (ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Return, ast.Delete,
-        ast.Pass, ast.Break, ast.Continue, ast.Expr, ast.Import, ast.ImportFrom, ast.Raise)
-    separators = []
-    for node in ast.walk(tree):
-        for _, sequence in ast.iter_fields(node):
-            if not isinstance(sequence, list):
-                continue
-            for left, right in zip(sequence, sequence[1:]):
-                if isinstance(left, simple) and isinstance(right, simple):
-                    separators.append((offsets[left.end_lineno-1] + left.end_col_offset,
-                        offsets[right.lineno-1] + right.col_offset))
-    for start, end in sorted(separators, reverse=True):
-        raw = raw[:start] + b';' + raw[end:]
-    depth, tokens = 0, []
-    for token in tokenize.generate_tokens(io.StringIO(raw.decode('utf-8')).readline):
-        kind, value = token.type, token.string
-        if kind in (tokenize.COMMENT, tokenize.NL):
-            continue
-        if kind == tokenize.INDENT:
-            depth += 1
-            value = ' ' * depth
-        elif kind == tokenize.DEDENT:
-            depth -= 1
-        tokens.append((kind, value))
-    source = tokenize.untokenize(tokens)
-    # untokenize adds padding after every name/number, including before ordinary
-    # delimiters. Retain lexical separators and the space in e.g. 1 .real.
-    lines, previous, cuts = source.splitlines(keepends=True), None, {}
-    for token in tokenize.generate_tokens(io.StringIO(source).readline):
-        if (previous is not None and previous.type in (tokenize.NAME, tokenize.NUMBER)
-                and token.type in (tokenize.OP, tokenize.NEWLINE)
-                and not (previous.type == tokenize.NUMBER and token.string == '.')
-                and previous.end[0] == token.start[0] and previous.end[1] < token.start[1]):
-            cuts.setdefault(token.start[0]-1, []).append((previous.end[1], token.start[1]))
-        previous = token
-    for row, ranges in cuts.items():
-        for start, end in reversed(ranges):
-            lines[row] = lines[row][:start] + lines[row][end:]
-    compact = ''.join(lines)
-    # A simple suite can occupy its header's line. Compound suites retain their
-    # indentation; the final AST check covers try/else/finally and literal text.
-    lines, joins = compact.splitlines(keepends=True), set()
-    for node in ast.walk(ast.parse(compact)):
-        for _, sequence in ast.iter_fields(node):
-            if (isinstance(sequence, list) and sequence
-                    and all(isinstance(item, simple) for item in sequence)):
-                first, last = sequence[0], sequence[-1]
-                if (first.lineno == last.end_lineno and first.lineno > 1
-                        and lines[first.lineno-2].rstrip().endswith(':')):
-                    joins.add(first.lineno-1)
-    for row in sorted(joins, reverse=True):
-        lines[row-1] = lines[row-1].rstrip() + lines[row].lstrip()
-        lines[row] = ''
-    compact = ''.join(lines)
-    parsed = ast.parse(compact)
-    if ast.dump(original) != ast.dump(parsed):
-        raise ValueError('adapter formatting changed its Python semantics')
-    compile(parsed, '<checker-adapter>', 'exec', dont_inherit=True)
-    return compact

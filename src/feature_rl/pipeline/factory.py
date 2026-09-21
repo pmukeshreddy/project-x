@@ -118,15 +118,6 @@ class Factory:
         from .authoring import author
         return author(self,candidate,call)
 
-    def assemble_checker(self, candidate: c.ArtifactRef, *, inputs, fragments) -> c.OperationResult:
-        """Compile authenticated scenario specifications without another model call."""
-        from .checker import assemble
-        return assemble(self,candidate,inputs,fragments)
-
-    def import_rejected_authoring(self, candidate: c.ArtifactRef, *, call, journal_refs) -> c.OperationResult:
-        from .authoring_import import import_rejected
-        return import_rejected(self,candidate,call,journal_refs)
-
     def grade(self, task_version, submission, case_seed, *, invocation='grade') -> c.OperationResult:
         from .grading import grade
         return grade(self,task_version,submission,case_seed,invocation)
@@ -326,17 +317,11 @@ class Factory:
         if job.spec.operation=='audit':
             from feature_rl.audits.service import AuditService
             return self._execution_service('audit_service',AuditService).recover(claim)
-        if job.spec.invocation=='m5-qualify' or job.spec.invocation.startswith('m6-transition-'):
-            from .qualification import recover
-            return recover(self,claim)
         if job.spec.operation=='grade' and job.spec.configuration.kind=='m6-grade-policy':
             from .grading import recover
             return recover(self,claim)
         if job.spec.invocation.startswith('m6-author:'):
             from .authoring import recover
-            return recover(self,claim)
-        if job.spec.invocation=='m6-assemble-checker':
-            from .checker import recover
             return recover(self,claim)
         if job.spec.invocation=='m6-construct':
             from .construction import recover

@@ -128,17 +128,6 @@ def codex_request_schema(request: GenerationRequest, schema: type[StrictModel]) 
         discovery = parse_discovery(contexts[0].source, contexts[0].text)
         definitions['Requirement']['properties']['observable']['enum'] = list(discovery.supported_observables)
         result['properties']['content']['properties']['entry_points']['items']['enum'] = list(discovery.entry_points)
-    if 'Scenario' in definitions:
-        from feature_rl.contracts import RequirementContract
-        contexts = [context for context in request.contexts if context.role == 'contract']
-        if len(contexts) != 1:
-            raise ValueError('scenario transport requires exact frozen contract')
-        contract = RequirementContract.model_validate_json(contexts[0].text)
-        observables = list(dict.fromkeys(requirement.observable for requirement in
-            contract.requirements + contract.compatibility_obligations))
-        properties = definitions['Scenario']['properties']
-        properties['observations']['items']['enum'] = observables
-        properties['reset_needs']['maxItems'] = 0
     return codex_output_schema(result)
 
 

@@ -27,9 +27,7 @@ GenerationIdentifier = Annotated[
 class GenerationStage(str, Enum):
     DISCOVERY = "discovery"
     INITIAL_AUTHORING = "initial_authoring"
-    SCENARIO_PLANNING = "scenario_planning"
     CONTROL_AUTHORING = "control_authoring"
-    ALTERNATIVE_AUTHORING = "alternative_authoring"
     CHECKER_GENERATION = "checker_generation"
 
 
@@ -107,35 +105,6 @@ class GenerationRequest(StrictModel):
                     raise ValueError("initial authoring cannot receive private or evaluation artifacts")
                 if item.source.kind in {"SourcePair", "reference", "reference-tree"}:
                     raise ValueError("reference implementation context is forbidden")
-        elif self.stage is GenerationStage.SCENARIO_PLANNING:
-            contracts = 0
-            for item in self.contexts:
-                if item.role == "contract":
-                    contracts += 1
-                    if (
-                        item.source.kind != "RequirementContract"
-                        or item.source.encoding != "json"
-                        or item.source.visibility is not Visibility.AUTHORING
-                    ):
-                        raise ValueError(
-                            "scenario planning requires an authoring RequirementContract artifact"
-                        )
-                    continue
-                if item.role not in {"request", "baseline", "public_check"}:
-                    raise ValueError("scenario planning context role is not allowlisted")
-                if item.source.visibility not in {Visibility.PUBLIC, Visibility.AUTHORING}:
-                    raise ValueError("scenario planning evidence must be public or authoring")
-                if item.source.kind in {
-                    "SourcePair",
-                    "reference",
-                    "reference-tree",
-                    "ScenarioPlan",
-                }:
-                    raise ValueError("scenario planning cannot receive reference or plan data")
-            if contracts != 1:
-                raise ValueError("scenario planning requires exactly one frozen contract")
-            if not self.allowed_requirement_ids:
-                raise ValueError("scenario planning requires fixed requirement IDs")
         elif self.stage is GenerationStage.CONTROL_AUTHORING:
             contracts = 0
             baselines = 0
@@ -174,64 +143,13 @@ class GenerationRequest(StrictModel):
                         and item.source.encoding == "json"
                         and item.source.visibility in {Visibility.PRIVATE, Visibility.EVALUATION}
                     )
-                elif item.role == "reference":
-                    valid = (
-                        item.source.kind == "source-archive"
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility in {Visibility.PRIVATE, Visibility.EVALUATION}
-                    )
                 else:
                     valid = False
                 if not valid:
                     raise ValueError("control authoring context kind, encoding, or visibility is invalid")
             if contracts != 1 or baselines < 1 or scenarios > 1:
                 raise ValueError("control authoring requires one frozen contract and baseline context")
-        elif self.stage is GenerationStage.ALTERNATIVE_AUTHORING:
-            contracts = 0
-            baselines = 0
-            for item in self.contexts:
-                if item.role == "contract":
-                    contracts += 1
-                    valid = (
-                        item.source.kind == "RequirementContract"
-                        and item.source.encoding == "json"
-                        and item.source.visibility is Visibility.AUTHORING
-                    )
-                elif item.role == "baseline":
-                    baselines += 1
-                    valid = (
-                        item.source.kind in {"source-archive", "runtime-discovery"}
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
-                    )
-                elif item.role == "request":
-                    valid = (
-                        item.source.kind == "authoring-request"
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
-                    )
-                elif item.role == "public_check":
-                    valid = (
-                        item.source.kind == "public-check"
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
-                    )
-                elif item.role == "solver_safe":
-                    valid = (
-                        item.source.kind == "solver-safe-context"
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility is Visibility.PUBLIC
-                    )
-                else:
-                    valid = False
-                if not valid:
-                    raise ValueError(
-                        "alternative authoring context kind, encoding, or visibility is invalid"
-                    )
-            if contracts != 1 or baselines < 1:
-                raise ValueError(
-                    "alternative authoring requires one visible frozen contract and baseline context"
-                )
+
         else:
             for item in self.contexts:
                 expected_kind = {"contract": "RequirementContract", "scenario": "ScenarioPlan"}.get(

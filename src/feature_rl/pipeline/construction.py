@@ -7,7 +7,6 @@ from typing import Literal
 
 from feature_rl import contracts as c
 from feature_rl.artifacts import ArtifactError, canonical_json
-from feature_rl.qualification import RepairAttempt, RepairHistory
 from feature_rl.qualification.evidence import unknown_cost
 from feature_rl.registry import JobSpec, Claim, CostObservation, RegistryError, UnknownIdentity
 from .models import BuildInputs, BuildPublicationFailed, BuildRecoveryRequired
@@ -24,16 +23,8 @@ class ConstructionRequest(c.StrictModel):
     builder_job: JobSpec | None
 
 
-class ConstructionRequestV2(ConstructionRequest):
-    version: Literal['m6-construction-request-v2']='m6-construction-request-v2'
-    history: c.ArtifactRef
-
-
 def read_construction_request(store,ref):
-    import json
-    raw=read_bytes(store,ref,MAX_DOCUMENT,kind='m6-construction-request')
-    cls=ConstructionRequestV2 if json.loads(raw).get('version')=='m6-construction-request-v2' else ConstructionRequest
-    return read_record(store,ref,cls,'m6-construction-request')
+    return read_record(store,ref,ConstructionRequest,'m6-construction-request')
 
 
 class ConstructionResult(c.StrictModel):
@@ -42,7 +33,6 @@ class ConstructionResult(c.StrictModel):
     request: c.ArtifactRef
     build_job: c.Digest | None
     build_result: c.OperationResult | None
-    history: c.ArtifactRef | None
     disposition: c.Disposition
     reason: str
     costs: tuple[c.CostRecord,...]
@@ -75,8 +65,7 @@ def put(factory,value,kind,*,dependencies=()):
 
 def configuration(factory):
     return put(factory,{'version':'m6-construction-policy-v1','revision':factory.revision,
-        'builder_revision':factory.builder.revision,'source_policy':document(factory.source_configuration),
-        'repair_budget':{'per_stage':2,'candidate':4}},'m6-construction-policy',dependencies=(factory.source_configuration,))
+        'builder_revision':factory.builder.revision,'source_policy':document(factory.source_configuration)},'m6-construction-policy',dependencies=(factory.source_configuration,))
 
 
 def spec(factory,request_ref,request):
@@ -108,11 +97,6 @@ def construct(factory,candidate,inputs):
         if inputs is not None:inputs=checked(BuildInputs,inputs)
         child=None if inputs is None else factory.builder.job_spec(inputs)
         request=ConstructionRequest(candidate=candidate,source=source_result.artifacts[0],inputs=inputs,builder_job=child)
-        if inputs is not None:
-            from .authoring_history import selected_history
-            history=selected_history(factory,request)
-            if history is not None:
-                request=ConstructionRequestV2(**request.model_dump(exclude={'version'}),history=history)
         request_ref=put(factory,request,'m6-construction-request',dependencies=references(document(request)))
         job=factory.registry.enqueue(spec(factory,request_ref,request))
         if job.state=='completed':return job.result
@@ -145,31 +129,9 @@ def validated_request(factory,claim):
     return job,ref,request
 
 
-def incomplete_history(factory,request):
-    """Retain evidenced neutral repairs; absent authoring closure never means zero."""
-    value=typed(factory.store,request.candidate,c.CandidateRecord)
-    recipe=typed(factory.store,request.inputs.environment.recipe,c.EnvironmentRecipe)
-    from feature_rl.environments import SandboxPolicy
-    from feature_rl.environments.profiles import validate_recipe_profile
-    policy=read_record(factory.store,request.inputs.environment.policy,SandboxPolicy,'sandbox-policy')
-    validate_recipe_profile(recipe,policy,factory.store)
-    attempts=[];journals=[request.source]
-    for repair in recipe.neutral_repairs:
-        before=put(factory,{'version':'m6-environment-before-v1','base_manifest':policy.image,
-            'repair':document(repair.patch)},'m6-environment-before',dependencies=(repair.patch,))
-        attempts.append(RepairAttempt(stage='environment',before=before,after=repair.patch,
-            diagnosis='Neutral environment repair declared by the frozen runtime profile',change=repair.description,
-            evidence=repair.neutrality_evidence,costs=(unknown_cost('construction',
-                'Per-candidate allocation of the retained neutral image repair is unknown; original recipe evidence/costs remain resolvable'),)))
-        journals.append(repair.patch)
-    history=RepairHistory(candidate=request.candidate,complete=False,initial_evidence=value.provenance.evidence,
-        attempts=tuple(attempts),journal_refs=tuple(journals))
-    return put(factory,history,'m5-repair-history',dependencies=references(document(history)))
-
-
 def execute(factory,claim,request_ref,request,*,recovery):
     factory.registry.assert_usable(request_ref)
-    started=time.monotonic();child_elapsed=0.0;result=None;history=None
+    started=time.monotonic();child_elapsed=0.0;result=None
     if request.inputs is None:
         disposition=c.Disposition.BLOCKED;reason='Complete authored BuildInputs are missing; no generated prerequisites or BUILT root were manufactured'
     elif typed(factory.store,request.inputs.source_pair,c.SourcePair).candidate!=request.candidate:
@@ -194,9 +156,8 @@ def execute(factory,claim,request_ref,request,*,recovery):
         disposition=result.disposition;reason=result.reason
         if disposition==c.Disposition.SUCCESS:
             factory.builder.solver_package(result.artifacts[0])
-            history=request.history if isinstance(request,ConstructionRequestV2) else incomplete_history(factory,request)
     receipt=ConstructionResult(claim=claim,request=request_ref,
-        build_job=None if result is None else identity(request.builder_job),build_result=result,history=history,
+        build_job=None if result is None else identity(request.builder_job),build_result=result,
         disposition=disposition,reason=reason,costs=costs(None if recovery else max(0.0,time.monotonic()-started-child_elapsed)),
         revision=factory.revision,recorded_at=datetime.now(timezone.utc))
     return publish(factory,canonical_json(document(receipt)),claim)
@@ -217,10 +178,7 @@ def validate_result(factory,payload,claim):
     elif receipt.build_job is not None or receipt.disposition==c.Disposition.SUCCESS:
         raise ValueError('construction success lacks selected builder result')
     if receipt.disposition==c.Disposition.SUCCESS:
-        history=request.history if isinstance(request,ConstructionRequestV2) else incomplete_history(factory,request)
-        if receipt.history!=history:raise ValueError('construction repair history changed')
         factory.builder.solver_package(receipt.build_result.artifacts[0])
-    elif receipt.history is not None:raise ValueError('failed construction cannot select successful build history')
     return job,receipt
 
 
@@ -235,7 +193,7 @@ def publish(factory,payload,claim):
     evidence=c.EvidenceRecord(producer='feature_rl.pipeline.Factory',command=('Factory.construct',receipt.request.sha256),
         recorded_at=receipt.recorded_at,exit_status=0 if receipt.disposition==c.Disposition.SUCCESS else 1,
         artifacts=(reference,),revision=factory.revision,scope='source_inspection')
-    outputs=(reference,) if receipt.disposition!=c.Disposition.SUCCESS else (receipt.build_result.artifacts[0],receipt.history,reference)
+    outputs=(reference,) if receipt.disposition!=c.Disposition.SUCCESS else (receipt.build_result.artifacts[0],reference)
     result=c.OperationResult(operation='construct',disposition=receipt.disposition,artifacts=outputs,
         evidence=(evidence,),costs=receipt.costs,reason=receipt.reason)
     snapshots=[x for x in factory.registry.accounting(claim.job_id).observations if x.attempt_id==claim.attempt_id]

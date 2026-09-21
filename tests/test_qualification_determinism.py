@@ -19,14 +19,15 @@ from m5_fixtures import task_fixture
 from test_qualification_service import service
 
 
-def observed_receipt(q, task, *, output=b'ok first', stderr=b'', exit_code=0, seed=11, operation='1', mode='process', duplicate=False):
+def observed_receipt(q, task, *, output=b'ok first', outputs=None, stderr=b'', exit_code=0, seed=11, operation='1', mode='process', duplicate=False):
     """Both differing values genuinely satisfy the retained contains comparison."""
     checked = load_verifier(q.store, task)
     manifest = materialize_manifest(checked, seed)
     refs = []; cases = []
     for index, (case, comparison) in enumerate(zip(manifest.cases, checked.comparisons)):
-        stdout = output if mode == 'process' else canonical_json({'case_id': case.case_id,
-            'observations': {'stdout': output.decode()}})
+        actual_output = output if outputs is None else outputs[index]
+        stdout = actual_output if mode == 'process' else canonical_json({'case_id': case.case_id,
+            'observations': {'stdout': actual_output.decode()}})
         stdin = canonical_json({'case_id': case.case_id, 'inputs': case.model_dump(mode='json')['inputs']})
         owner = Ownership(operation_id=operation*31+str(index), owner_token=operation*32,
             daemon_id='synthetic', container_name='synthetic-'+operation+str(index),
@@ -41,13 +42,14 @@ def observed_receipt(q, task, *, output=b'ok first', stderr=b'', exit_code=0, se
             'extra': {'error': None, 'failure_category': 'candidate' if exit_code else 'none',
                       'reason': 'command_failed' if exit_code else 'completed'}}
         ref = put_record(q.store, raw, 'environment-execution'); refs.append(ref)
-        passed = b'ok' in output
+        passed = b'ok' in actual_output
         actual = CaseResult(case_id=case.case_id, mandatory=case.mandatory, status='completed', passed=passed,
             assertions=(AssertionResult(assertion_id='contains', requirement_ids=('echo',), passed=passed),),
             evidence=ref, reason='Synthetic retained observation; no worker execution')
         if not duplicate:
             _assert_case_observation(checked, actual, case, comparison, raw, owner)
         cases.append(actual)
+    passed = all(case.passed for case in cases)
     marker = checked.task.provenance.evidence[0].artifacts[0]
     receipt = GradeReceipt(version='m4-grade-v1', task=task, submission=marker, verifier=checked.task.private_oracle,
         case_seed=seed, manifest=put_record(q.store, manifest, 'm4-case-manifest'), source=checked.task.baseline,
@@ -137,23 +139,37 @@ def test_observation_replay_requires_exact_current_bootstrap_and_profile_paths(t
         _assert_case_observation(checked, actual, manifest.cases[0], checked.comparisons[0], value, owner)
 
 
-@pytest.mark.parametrize('changed_run', ['fresh_1', 'reset_0'])
-def test_actual_qualification_orchestration_records_output_flake(tmp_path, monkeypatch, changed_run):
+@pytest.mark.parametrize('defect,stopped,code',[
+    ('reset_changed','reset_0','flaky_task'),
+    ('gold_fails','fresh_0','false_rejection'),
+    ('wrong_passes','control_partial','false_acceptance'),
+    ('none','reset_0',None),
+])
+def test_qualification_dispatches_each_check_once_and_stops_on_failure(tmp_path, monkeypatch,defect,stopped,code):
     from types import SimpleNamespace
     from feature_rl.qualification import QualificationPolicy
 
     q, task = fixture(tmp_path)
-    q.policy = QualificationPolicy(fresh_seeds=(11, 11, 11, 23, 47), reset_seeds=(11, 11, 11, 23, 47))
+    from dataclasses import replace
+    loaded=load_verifier(q.store,task)
+    from test_qualification_controls import wrong_sources
+    controls=wrong_sources(q,loaded)
+    selected=replace(loaded,verifier=loaded.verifier.model_copy(update={'controls':controls}))
+    monkeypatch.setattr('feature_rl.qualification.service.load_verifier',lambda store,ref:selected)
+    q.policy = QualificationPolicy(seed=11)
     q.builder = SimpleNamespace(solver_package=lambda task: None)
     monkeypatch.setattr(q.grader, 'select_task', lambda checked: None)
-    monkeypatch.setattr(q, '_history', lambda checked: (0, None))
     monkeypatch.setattr(q, '_publish_qualification', lambda claim, frozen: frozen)
     dispatched = []
 
     def retained_run(checked, projection, submission, seed, name, mode, targets, claim, reset, seen):
         dispatched.append(name)
-        _, receipt = observed_receipt(q, task, seed=seed,
-            output=b'missing' if name=='baseline_absence' else b'ok changed' if name==changed_run else b'ok first')
+        output=b'missing' if name=='baseline_absence' or name.startswith('control_') else b'ok first'
+        if defect=='reset_changed' and name=='reset_0':output=b'ok changed'
+        if defect=='gold_fails' and name=='fresh_0':output=b'missing'
+        if defect=='wrong_passes' and name=='control_partial':output=b'ok first'
+        outputs=(b'ok existing behavior',b'missing feature') if name=='baseline_absence' else None
+        _, receipt = observed_receipt(q, task, seed=seed,output=output,outputs=outputs)
         return receipt.manifest, SimpleNamespace(costs=()), receipt
 
     # Substitute only the worker/Registry run boundary. _execute still consumes
@@ -161,6 +177,8 @@ def test_actual_qualification_orchestration_records_output_flake(tmp_path, monke
     monkeypatch.setattr(q, '_run', retained_run)
     claim = q._claim(q._job(task, 'm5-qualify'))
     frozen = q._execute(task, claim)
-    assert any(issue.startswith('flaky_task: repeated reference seed 11') for issue in frozen['issues'])
-    assert frozen['assessments'][changed_run].passed  # The comparison itself passed.
-    assert dispatched[-1] == changed_run
+    assert bool(frozen['issues']) is (code is not None)
+    if code:assert frozen['issues'][0].startswith(code+':')
+    if defect=='reset_changed':assert frozen['assessments']['reset_0'].passed
+    full=['baseline_absence','fresh_0','control_partial','control_happy_path','control_hardcoded','reset_0']
+    assert dispatched==full[:full.index(stopped)+1]

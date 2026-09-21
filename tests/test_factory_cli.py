@@ -124,20 +124,8 @@ def test_lost_publication_reply_retains_exact_private_recovery_capability(tmp_pa
     assert factory.store.get_bytes(result.artifacts[0])==payload
 
 
-def test_actual_m5_frozen_capability_retains_datetimes_models_and_bytes():
-    from datetime import datetime,timezone
-    from feature_rl.qualification.models import QualificationPublicationFailed,FrozenPublication
-    now=datetime.now(timezone.utc)
-    # Exact concrete M5 capability type and frozen value shapes, no signature or gate.
-    error=QualificationPublicationFailed('TEST retained bytes',pending=FrozenPublication(None,
-        {'recorded_at':now,'verification':b'TEST ONLY'},'human_verification'))
-    value=api()._retained(error)['state']['pending']['state']['payload']
-    assert value['recorded_at']['datetime_iso8601']==now.isoformat()
-    assert value['verification']['bytes_base64']=='VEVTVCBPTkxZ'
-
-
 def test_complete_command_surface_has_real_request_and_recovery_options(capsys):
-    for name in ('author','import-authoring','grade','run','train','evaluate','audit','recover','retry-publication'):
+    for name in ('author','grade','run','train','evaluate','audit','recover','retry-publication'):
         with pytest.raises(SystemExit) as status:api().main([name,'--help'])
         assert status.value.code==0
         assert '--' in capsys.readouterr().out
@@ -295,7 +283,7 @@ def test_actual_native_composition_is_inert_and_shares_real_services(tmp_path,mo
     app.close()
 
 
-def test_authoring_and_inert_import_deliver_actual_closed_call_without_generation(tmp_path,capsys,monkeypatch):
+def test_authoring_delivers_actual_closed_call_without_generation(tmp_path,capsys,monkeypatch):
     from test_factory_authoring import setup as authoring_setup
     from feature_rl.pipeline.configuration import Application
     from feature_rl.qualification.evidence import unknown_cost
@@ -304,18 +292,24 @@ def test_authoring_and_inert_import_deliver_actual_closed_call_without_generatio
         'revision':factory.revision,'authoring':factory.authoring.model_dump(mode='json')})
     request=write(tmp_path/'candidate.json',{'candidate':candidate.model_dump(mode='json')})
     call_file=write(tmp_path/'call.json',call.model_dump(mode='json'))
-    journal=factory.store.put_bytes(b'TEST delivery-only journal','GenerationJournal',c.Visibility.PRIVATE)
-    journals=write(tmp_path/'journals.json',[journal.model_dump(mode='json')]);calls=[]
+    calls=[]
     monkeypatch.setattr(api(),'compose',lambda config,**kwargs:Application(factory,None,None,None,None))
     def author(selected,*,call):
         calls.append(('author',selected,call));return c.OperationResult(operation='construct',disposition=c.Disposition.BLOCKED,
             artifacts=(),evidence=(),costs=(unknown_cost('authoring','TEST delivery only; no provider call'),),reason='TEST delivery only')
-    def imported(selected,*,call,journal_refs):
-        calls.append(('import',journal_refs));return author(selected,call=call)
-    monkeypatch.setattr(factory,'author',author);monkeypatch.setattr(factory,'import_rejected_authoring',imported)
+    monkeypatch.setattr(factory,'author',author)
     assert api().main(['--config',config,'author','--request',request,'--call',call_file])==1
     assert calls[-1]==('author',candidate,call)
-    assert api().main(['--config',config,'import-authoring','--request',request,'--call',call_file,'--journals',journals])==1
-    assert calls[-2]==('import',(journal,)) and calls[-1]==('author',candidate,call)
     assert not runner.calls
     assert all(json.loads(line)['operation']=='construct' for line in capsys.readouterr().out.splitlines())
+
+
+@pytest.mark.parametrize('args', [
+    ['import-authoring','--help'],
+    ['recover','--service','qualification','--claim','claim.json'],
+    ['recover','--service','lifecycle','--claim','claim.json'],
+])
+def test_obsolete_authoring_import_and_qualification_recovery_are_not_commands(args,capsys):
+    with pytest.raises(SystemExit) as status:api().main(args)
+    assert status.value.code==2
+    assert 'invalid choice' in capsys.readouterr().err

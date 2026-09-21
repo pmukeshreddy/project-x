@@ -31,7 +31,7 @@ def derive_reference(store, task_ref, policy):
         changed=sorted(name for name in set(before.files)|set(after.files) if before.files.get(name)!=after.files.get(name))
         classified={entry.path:entry for entry in pair.changed_files}
         if len(classified)!=len(pair.changed_files) or set(classified)!=set(changed):
-            raise QualificationRejected('unrecoverable_history','changed-file classification must account for every actual B/H change exactly once')
+            raise QualificationRejected('invalid_evidence','changed-file classification must account for every actual B/H change exactly once')
         automatic={entry.path:entry.category for entry in classify_changed_files(tuple(changed)).changed_files}
         rules=validate_rules(contract.allowed_changes)
         policy.profile.validate_allowed_changes(rules)

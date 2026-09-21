@@ -244,7 +244,7 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
             task=built_ref, disposition=c.Disposition.PROVISIONAL,
             baseline_health=None, baseline_absence=None, reference_run=None,
             controls=(), fresh_runs=(), interrupted_reset_runs=(),
-            rejection_reasons=("labeled lifecycle diagnostic",), repair_attempts=0,
+            rejection_reasons=("labeled lifecycle diagnostic",),
             policy_version="diagnostic-" + label,
         )
         report_ref = context.store.put_artifact(report)

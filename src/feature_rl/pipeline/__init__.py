@@ -5,7 +5,7 @@ from .lifecycle import TaskLifecycle, AdmissionRejected, LifecycleRecoveryRequir
 from .resolver import ReleasedTaskResolver
 from .factory import Factory, FactoryRecoveryRequired, FactoryPublicationFailed, FactoryUpstreamPending, SourceDisposition, read_source_disposition
 from .authoring_models import (AuthoringCall,AuthoringSettings,AuthoringBatch,AuthoringCaps,
-    ResolverInputs,ControlPlan,ControlSlot,AuthoringBudgetExceeded,AuthoringBudgetUnverified)
+    ResolverInputs,AuthoringBudgetExceeded,AuthoringBudgetUnverified)
 from .workflow_models import FeatureWorkflowSettings, FeatureWorkflowRequest
 
 __all__ = ['BuildInputs', 'TaskBuilder', 'BuildRejected', 'BuildRecoveryRequired', 'BuildPublicationFailed',
@@ -14,5 +14,5 @@ __all__ = ['BuildInputs', 'TaskBuilder', 'BuildRejected', 'BuildRecoveryRequired
     'SourceDisposition', 'read_source_disposition']
 __all__.append('FactoryUpstreamPending')
 __all__ += ['AuthoringCall','AuthoringSettings','AuthoringBatch','AuthoringCaps','ResolverInputs',
-    'ControlPlan','ControlSlot','AuthoringBudgetExceeded','AuthoringBudgetUnverified']
+    'AuthoringBudgetExceeded','AuthoringBudgetUnverified']
 __all__ += ['FeatureWorkflowSettings','FeatureWorkflowRequest']

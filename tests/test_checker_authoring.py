@@ -76,6 +76,8 @@ def authoring_fixture(tmp_path, *, archive=None):
     from feature_rl.verifiers import CheckerAuthoringService
     from feature_rl.requirements import GenerationCandidate
     store, task, proposal, inputs, sources, resolver = checker_fixture(tmp_path)
+    from test_behavioral_spec import specification
+    proposal = specification(proposal)
     request = request_for(store, inputs, sources)
     provider, runner = configured_diagnostic_provider(store, request, proposal, archive=archive)
     service = CheckerAuthoringService(provider=provider, store=store, resolver=resolver, revision='a'*40, evidence_scope='unit_diagnostic')
@@ -178,7 +180,7 @@ def test_preparation_outage_retains_generated_response_without_dispatch(tmp_path
 def test_diagnosed_repair_binds_original_inputs_and_retains_rejected_cost(tmp_path):
     from feature_rl.requirements import AuthoringExhausted, GenerationCandidate
     store, proposal, inputs, sources, request, service, runner, candidate = authoring_fixture(tmp_path)
-    broken = proposal.model_copy(update={'cases': proposal.cases[:1]})
+    broken = proposal.model_copy(update={'scenarios': proposal.scenarios[:1]})
     service.provider, first = configured_diagnostic_provider(store, request, broken)
     with pytest.raises(AuthoringExhausted) as caught:
         service.generate((candidate,), inputs, sources)
@@ -201,7 +203,7 @@ def test_diagnosed_repair_binds_original_inputs_and_retains_rejected_cost(tmp_pa
 def test_rejected_journal_outage_preserves_cost_and_resumes_with_diagnosis(tmp_path, monkeypatch):
     from feature_rl.requirements import AuthoringJournalPublicationPending, GenerationCandidate
     store, proposal, inputs, sources, request, service, runner, candidate = authoring_fixture(tmp_path)
-    broken=proposal.model_copy(update={'cases':proposal.cases[:1]})
+    broken=proposal.model_copy(update={'scenarios':proposal.scenarios[:1]})
     service.provider, runner = configured_diagnostic_provider(store,request,broken)
     original=store.put_bytes
     def failure(data,kind,visibility):
@@ -226,7 +228,7 @@ def test_recovered_failed_provider_attempt_is_not_reexecuted(tmp_path):
     store, proposal, inputs, sources, request, service, runner, candidate = authoring_fixture(tmp_path)
     service.provider, runner=configured_diagnostic_provider(store,request,proposal,termination='wall_timeout')
     with pytest.raises(GenerationProviderError) as caught:
-        service.provider.generate(request,CheckerProposal)
+        service.provider.generate(request,__import__('feature_rl.verifiers.behavioral', fromlist=['behavioral_schema']).behavioral_schema(store.get_artifact(inputs.scenario_plan)))
     error=caught.value
     with pytest.raises(AuthoringExhausted) as exhausted:
         service.generate((candidate,),inputs,sources,recovered_error=error)

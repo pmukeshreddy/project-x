@@ -17,15 +17,13 @@ from feature_rl.requirements import (AuthoringEvidenceResolver, ContractFinaliza
     GroundedSource, GenerationCandidate, RetrievalPolicy)
 from feature_rl.requirements.retrieval import BaselineRetriever
 from feature_rl.requirements.service import build_contract_request
-from feature_rl.scenarios import ScenarioFinalizationInputs, build_scenario_request
-from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs
-from feature_rl.verifiers.fragments import CheckerFragmentInputs, build_fragment_request
+from feature_rl.scenarios import build_scenario_plan
+from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs, build_checker_request
 from feature_rl.verifiers.control_authoring import build_control_request, ControlRecord
-from feature_rl.qualification.attacks import attack_expected_reason
 from feature_rl.qualification.evidence import unknown_cost, collapse_costs
 from feature_rl.registry import Claim, CostObservation, JobSpec
 from .authoring_models import (AuthoringSettings, AuthoringBatch, AuthoringCall, ResolverInputs,
-    ControlPlan, ControlSlot, AuthoringRequest, AuthoringBudgetExceeded, AuthoringBudgetUnverified)
+    AuthoringRequest, AuthoringBudgetExceeded, AuthoringBudgetUnverified)
 from .authoring import read_authoring_receipt
 from .construction import put, references
 from .factory import Factory, FactoryPublicationFailed, FactoryRecoveryRequired
@@ -60,6 +58,17 @@ def validate_seed_policy(policy):
 def checker_output_limit(runtime_limit,episode_limit):
     from feature_rl.verifiers.authoring_models import MAX_CHECKER_OUTPUT_BYTES
     return min(runtime_limit,episode_limit,MAX_CHECKER_OUTPUT_BYTES)
+
+
+def wrong_implementations(has_compatibility):
+    cases = (
+        ('partial', 'Implement only part of the requested feature.'),
+        ('happy_path', 'Implement normal inputs but mishandle an important edge case.'),
+        ('hardcoded', 'Overfit disclosed examples while leaving general behavior wrong.'),
+    )
+    if has_compatibility:
+        cases += (('regression', 'Implement the feature while breaking existing compatibility behavior.'),)
+    return cases
 
 
 class FeatureWorkflow:
@@ -354,7 +363,7 @@ class FeatureWorkflow:
                 pending.recovery_error=recovery
                 raise pending
 
-    def _author(self,claim,request_ref,author,selected,prepared,resolver,sources,inputs,build_request,*,plan=None,attack=None):
+    def _author(self,claim,request_ref,author,selected,prepared,resolver,sources,inputs,build_request):
         previous=[];last=None
         for attempt in range(3):
             generated=build_request(attempt)
@@ -366,8 +375,7 @@ class FeatureWorkflow:
                     changed_input='Added the exact retained stage failure diagnostics to the request instruction')
             else:candidate=GenerationCandidate(request=generated)
             call=AuthoringCall(source_pair=selected.source_pair,environment=prepared.environment,resolver=resolver,
-                generation=candidate,inputs=inputs,sources=sources,control_plan=plan,attack=attack)
-            self._recover_predispatch_phase(claim,request_ref,author,selected.candidate,call)
+                generation=candidate,inputs=inputs,sources=sources)
             key='author-'+hashlib.sha256(canonical_json(document(call))).hexdigest()
             def execute():
                 try:
@@ -390,23 +398,6 @@ class FeatureWorkflow:
                 return last
             previous.append(str(journal.get('error') or last.reason)[:2048])
         return last
-
-    def _recover_predispatch_phase(self,claim,request_ref,author,candidate,call):
-        """Close the exact invalid controller phase before its corrected replacement."""
-        if not isinstance(call.inputs,ScenarioFinalizationInputs):return
-        from .authoring import jobs,predispatch_replacement,validate_predispatch_receipt
-        for job,old in jobs(author,candidate):
-            if not predispatch_replacement(author,old.call,call):continue
-            key='author-'+hashlib.sha256(canonical_json(document(old.call))).hexdigest()
-            current=self._observation(claim,key)
-            if current is None:continue
-            attempts=self.registry.attempts(job.job_id)
-            if len(attempts)!=1:raise ValueError('predispatch recovery requires one exact child attempt')
-            result=author.recover(attempts[0].claim)
-            receipt=read_authoring_receipt(self.store,result.artifacts[-1])
-            validate_predispatch_receipt(author,old,receipt)
-            self._step(claim,request_ref,key,{'candidate':document(candidate),'call':document(old.call)},
-                lambda:(result,overhead()),child=True)
 
     def _execute(self,claim,ref,request):
         job,_,_=self._validated(claim)
@@ -444,38 +435,24 @@ class FeatureWorkflow:
                 supported_observables=prepared.supported_observables,allowed_changes=allowed))
         if contract_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,contract_result)
         contract_ref=contract_result.artifacts[0];contract=typed(self.store,contract_ref,c.RequirementContract)
-        from feature_rl.scenarios.service import contract_observables
-        scenario_inputs=ScenarioFinalizationInputs(contract=contract_ref,supported_observables=contract_observables(contract),
-            seed_policy=request.seed_policy,visibility=c.Visibility.PRIVATE,
-            provenance=self._provenance(claim,sources,(contract_ref,)),costs=overhead())
-        scenario_result=self._author(claim,ref,author,selected,prepared,resolver,sources,scenario_inputs,
-            lambda index:build_scenario_request(**identifiers('scenario',index),contract=contract,contract_ref=contract_ref,sources=sources))
-        if scenario_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,scenario_result)
-        scenario_ref=scenario_result.artifacts[0];scenario=typed(self.store,scenario_ref,c.ScenarioPlan)
-        mandatory=tuple(sorted(r.requirement_id for r in contract.requirements+contract.compatibility_obligations if r.mandatory))
-        feature=tuple(sorted(r.requirement_id for r in contract.requirements if r.mandatory))
-        compatibility=tuple(sorted(r.requirement_id for r in contract.compatibility_obligations if r.mandatory))
-        slots=[ControlSlot(category='omission',requirement_ids=(name,)) for name in mandatory]
-        slots.extend(ControlSlot(category=category,requirement_ids=feature or mandatory) for category in ('plausible_wrong','hardcoded'))
-        if compatibility:slots.append(ControlSlot(category='regression',requirement_ids=compatibility))
-        slots.append(ControlSlot(category='alternative_positive',requirement_ids=()))
-        if len(slots)>self.settings.max_controls:raise ValueError('frozen workflow control count exceeds configured bound')
-        plan=ControlPlan(contract=contract_ref,slots=tuple(slots));controls=[]
+        scenario=build_scenario_plan(contract, contract_ref, request.seed_policy,
+            provenance=self._provenance(claim,sources,(contract_ref,)), costs=overhead())
+        scenario_ref=self.store.put_artifact(scenario)
+        self.registry.register(scenario_ref)
+        feature=tuple(r.requirement_id for r in contract.requirements if r.mandatory)
+        compatibility=tuple(r.requirement_id for r in contract.compatibility_obligations if r.mandatory)
+        controls=[]
         evidence_resolver=AuthoringEvidenceResolver(store=self.store,**resolver.model_dump())
-        for index,slot in enumerate(slots):
-            alternative=slot.category=='alternative_positive'
-            fixed=(selected.baseline,contract_ref,prepared.environment.recipe,*(() if alternative else (scenario_ref,)))
-            control_inputs=ControlFinalizationInputs(control_id='control-'+str(index+1),category=slot.category,
-                requirement_ids=slot.requirement_ids,expected_valid=alternative,
-                expected_reason=('Implement the complete disclosed feature and preserve ordinary behavior from B only; independence and correctness remain unverified'
-                    if alternative else attack_expected_reason(slot.attack,slot.requirement_ids) if slot.attack else
-                    'Keep the program runnable while exposing '+slot.category+' for '+','.join(slot.requirement_ids)),
-                baseline=selected.baseline,contract=contract_ref,environment=prepared.environment.recipe,
-                scenario_plan=None if alternative else scenario_ref,
+        for index,(category,reason) in enumerate(wrong_implementations(bool(compatibility)),1):
+            fixed=(selected.baseline,contract_ref,prepared.environment.recipe,scenario_ref)
+            control_inputs=ControlFinalizationInputs(control_id='wrong-'+str(index),category=category,
+                requirement_ids=compatibility if category=='regression' else feature,
+                expected_reason=reason,baseline=selected.baseline,contract=contract_ref,
+                environment=prepared.environment.recipe,scenario_plan=scenario_ref,
                 provenance=self._provenance(claim,sources,fixed),costs=overhead())
             result=self._author(claim,ref,author,selected,prepared,resolver,sources,control_inputs,
-                lambda attempt:build_control_request(**identifiers('control-'+str(index+1),attempt),store=self.store,
-                    resolver=evidence_resolver,inputs=control_inputs,sources=sources),plan=plan,attack=slot.attack)
+                lambda attempt:build_control_request(**identifiers('wrong-'+str(index),attempt),store=self.store,
+                    resolver=evidence_resolver,inputs=control_inputs,sources=sources))
             if result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,result)
             controls.append(read_record(self.store,result.artifacts[0],ControlRecord,'m4-control-record').control)
         checker_inputs=CheckerFinalizationInputs(contract=contract_ref,scenario_plan=scenario_ref,baseline=selected.baseline,
@@ -483,23 +460,10 @@ class FeatureWorkflow:
                 self.runtime.policy.output_bytes,contract.episode_limits.output_bytes),
             public_examples=request.public_checks,controls=tuple(controls),visibility=c.Visibility.PRIVATE,
             provenance=self._provenance(claim,sources,(contract_ref,scenario_ref,selected.baseline,prepared.environment.recipe)),costs=overhead())
-        fragments=[]
-        for family in scenario.scenarios:
-            fragment_key='checker-'+hashlib.sha256(family.scenario_id.encode()).hexdigest()
-            fragment_inputs=CheckerFragmentInputs(**checker_inputs.model_dump(include={
-                'contract','scenario_plan','baseline','environment','visibility','provenance','costs'}),
-                scenario_id=family.scenario_id)
-            checker_result=self._author(claim,ref,author,selected,prepared,resolver,sources,fragment_inputs,
-                lambda index:build_fragment_request(**identifiers(fragment_key,index),
-                    contract=contract,contract_ref=contract_ref,plan=scenario,plan_ref=scenario_ref,
-                    sources=sources,scenario_id=family.scenario_id))
-            if checker_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,checker_result)
-            fragments.append(checker_result.artifacts[0])
-        checker_result,_=self._step(claim,ref,'checker-assembly',
-            {'candidate':document(selected.candidate),'inputs':document(checker_inputs),
-                'fragments':[document(fragment) for fragment in fragments]},
-            lambda:(self._child(lambda:author.assemble_checker(selected.candidate,
-                inputs=checker_inputs,fragments=tuple(fragments))),overhead()),child=True)
+        checker_result=self._author(claim,ref,author,selected,prepared,resolver,sources,checker_inputs,
+            lambda index:build_checker_request(**identifiers('checker',index),contract=contract,
+                contract_ref=contract_ref,plan=scenario,plan_ref=scenario_ref,sources=sources))
+        if checker_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,checker_result)
         inputs=BuildInputs(source_pair=selected.source_pair,contract=contract_ref,scenario_plan=scenario_ref,
             verifier=checker_result.artifacts[0],environment=prepared.environment,
             baseline_files=tuple(sorted(baseline.files)),invocation=request.invocation)
@@ -517,7 +481,7 @@ class FeatureWorkflow:
             if row.attempt_id==claim.attempt_id for r in row.observation.receipts if r.kind=='m6-feature-step')
         outcome=FeatureOutcome(claim=claim,request=ref,selected=result,steps=tuple(dict.fromkeys(steps)),
             recorded_at=self._claimed_at(claim),limitations=(
-                'BUILT artifacts are not qualification, human approval, independence evidence or released tasks.',
+                'BUILT artifacts require baseline, gold, wrong-implementation and reset validation before release.',
                 'Negative controls use B and the frozen contract/scenarios; reference behavior is never supplied.',
                 'Monetary costs and unmeasured controller overhead remain unknown; child costs remain in their original Registry jobs.'))
         return self._publish_outcome(canonical_json(document(outcome)),claim)

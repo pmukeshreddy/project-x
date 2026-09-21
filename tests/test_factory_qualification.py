@@ -24,29 +24,12 @@ def configured(tmp_path,monkeypatch):
     return factory,built
 
 
-def test_actual_m5_receives_selected_history_and_retains_failure_classification(tmp_path,monkeypatch):
+def test_actual_m5_keeps_a_small_policy_and_reuses_the_selected_result(tmp_path,monkeypatch):
     factory,built=configured(tmp_path,monkeypatch)
     result=factory.qualify(built.artifacts[0])
-    assert result.disposition==c.Disposition.INFRASTRUCTURE
-    task=factory.store.get_artifact(built.artifacts[0])
-    jobs=[factory.registry.job(j) for j in factory.registry.trace(task.source_pair).jobs]
-    qjob=next(j for j in jobs if j.spec.invocation=='m5-qualify')
-    from feature_rl.pipeline.packaging import read_record
-    from feature_rl.pipeline.resolver import QualificationConfiguration
-    config=read_record(factory.store,qjob.spec.configuration,QualificationConfiguration,'m5-qualification-configuration')
-    policy=read_record(factory.store,config.policy,QualificationPolicy,'m5-qualification-policy')
-    assert policy.repair_history==built.artifacts[1]
-    selected=factory.registry.job(policy.repair_history_job)
-    assert selected.result==built and policy.factory_revision==selected.spec.implementation
+    assert result.disposition!=c.Disposition.SUCCESS
+    assert set(QualificationPolicy.model_fields)=={'version','policy_id','seed','max_wall_seconds'}
     assert factory.qualify(built.artifacts[0])==result
-
-
-def test_caller_cannot_replace_or_invent_complete_repair_history(tmp_path,monkeypatch):
-    factory,built=configured(tmp_path,monkeypatch)
-    wrong=factory.store.put_bytes(b'TEST ONLY nonexistent history','m5-repair-history',c.Visibility.PRIVATE)
-    with pytest.raises(AdmissionRejected):
-        factory.qualify(built.artifacts[0],policy=QualificationPolicy(repair_history=wrong,
-            repair_history_job='f'*64,factory_revision='f'*40))
 
 
 def test_provisional_report_cannot_release_through_actual_m5(tmp_path,monkeypatch):
@@ -70,28 +53,3 @@ def test_mechanical_release_uses_both_real_registry_transitions_under_test_gate(
     assert factory.release(built.artifacts[0],accepted_report=report)==result
     jobs=[factory.registry.job(j) for j in factory.registry.trace(report).jobs]
     assert {'m6-transition-qualified','m6-transition-released'}<={j.spec.invocation for j in jobs}
-
-
-
-
-def test_factory_recovery_reconstructs_selected_m5_policy_and_exact_revision(tmp_path,monkeypatch):
-    factory,built=configured(tmp_path,monkeypatch)
-    result=factory.qualify(built.artifacts[0])
-    job=next(factory.registry.job(j) for j in factory.registry.trace(built.artifacts[0]).jobs
-        if factory.registry.job(j).spec.invocation=='m5-qualify')
-    claim=factory.registry.attempts(job.job_id)[0].claim
-    assert factory.recover(claim)==result
-    with pytest.raises(ValueError,match='selected Registry claim'):
-        factory.recover(claim.model_copy(update={'token':'0'*64}))
-    factory.qualification.revision='f'*40
-    with pytest.raises(AdmissionRejected,match='implementation'):factory.recover(claim)
-
-
-def test_factory_lifecycle_recovery_retains_actual_provisional_outcome(tmp_path,monkeypatch):
-    factory,built=configured(tmp_path,monkeypatch)
-    report=factory.qualify(built.artifacts[0]).artifacts[0]
-    result=factory.release(built.artifacts[0],accepted_report=report)
-    assert result.disposition==c.Disposition.PROVISIONAL
-    job=next(factory.registry.job(j) for j in factory.registry.trace(report).jobs
-        if factory.registry.job(j).spec.invocation=='m6-transition-qualified')
-    assert factory.recover(factory.registry.attempts(job.job_id)[0].claim)==result

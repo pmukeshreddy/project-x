@@ -15,8 +15,7 @@ PYTHONPATH=src .venv/bin/python -m feature_rl config-schema
 ```
 
 The CLI exposes `construct`, `qualify`, `release`, `run`, `grade`, `audit`, `train`
-and `evaluate`, plus source screening, authoring, retained-history import,
-resolution and publication recovery. Commands use strict JSON inputs
+and `evaluate`, plus source screening, authoring, resolution and publication recovery. Commands use strict JSON inputs
 and the actual library services. See [the runbook](docs/runbook.md) for commands,
 configuration and recovery, and [the native launch contract](docs/reports/M7-native-launch.md)
 for pinned Linux/CUDA setup, training and checkpoint resume.
@@ -27,13 +26,11 @@ explicit failures; no model downloads, API-key path, or local provider fallback.
 Configure `codex` in the workflow/authoring settings; see
 [the authoring setup](docs/interfaces-M2.md). This refactor has not generated a real environment.
 
-The labeled Click fixture executed 13 real grades and 39 cases through M3–M6. It
-remains historical diagnostic evidence and does not replace the original exhausted
-feature-generation attempt or establish a newly qualified real task. See
-[the retained fixture report](docs/reports/M6-click-fixture.md).
+The environment factory uses compact behavioral specifications and controller-built
+hidden checks. Qualification runs baseline, historical gold, three or four plausible
+wrong implementations, and one clean-reset gold rerun. Passing tasks can then be
+frozen and released. See [qualification](docs/interfaces-M5.md).
 
-[Historical CPU/CLI verification](docs/evidence/integration/final/receipt.json) and
-[progress](docs/progress.md) distinguish earlier executed checks from the unexecuted cleanup.
 `construct-feature` derives each repository's Python version, build backend,
 dependency closure, source layout and system package requirements, then freezes
 wheel hashes and image digests. Configure the Linux platform, sandbox limits and

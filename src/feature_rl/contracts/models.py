@@ -517,10 +517,9 @@ class CaseDefinition(StrictModel):
 
 class ControlPatch(StrictModel):
     control_id: Identifier
-    category: Literal['noop','omission','plausible_wrong','hardcoded','regression','adversarial','alternative_positive']
+    category: Literal['partial','happy_path','hardcoded','regression']
     patch: ArtifactRef
     requirement_ids: tuple[Identifier, ...]
-    expected_valid: bool
     expected_reason: Text
     author_provenance: Provenance
 
@@ -627,19 +626,13 @@ class QualificationReport(ArtifactModel):
     fresh_runs: tuple[RunAssessment, ...]
     interrupted_reset_runs: tuple[RunAssessment, ...]
     rejection_reasons: tuple[Text, ...]
-    repair_attempts: NonnegativeInt
     policy_version: Text
-    semantic_repair_authorization: ArtifactRef | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode='after')
     def successful_report(self):
         require_ref(self.task,'TaskBundle')
-        if self.semantic_repair_authorization is not None:
-            require_ref(self.semantic_repair_authorization,'m6-semantic-repair-authorization')
-        if self.repair_attempts > (7 if self.semantic_repair_authorization is not None else 4):
-            raise ValueError('pilot repair budget exceeded')
         if self.disposition == Disposition.SUCCESS:
-            if any(x is None for x in (self.baseline_health,self.baseline_absence,self.reference_run)) or not self.controls or len(self.fresh_runs)<3 or len(self.interrupted_reset_runs)<3:
+            if any(x is None for x in (self.baseline_health,self.baseline_absence,self.reference_run)) or not self.controls or len(self.fresh_runs)!=1 or len(self.interrupted_reset_runs)!=1:
                 raise ValueError('successful qualification requires all gate records')
             gates = (self.baseline_health,self.baseline_absence,self.reference_run)+self.controls+self.fresh_runs+self.interrupted_reset_runs
             if any(g.disposition != Disposition.SUCCESS or g.passed is not True for g in gates):

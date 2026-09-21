@@ -1,4 +1,4 @@
-"""One real M2/M4 call per durable attempt, with a shared candidate repair budget."""
+"""One real M2/M4 call per durable attempt, with bounded resource reservations."""
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -12,21 +12,19 @@ from feature_rl.requirements import (AuthoringEvidenceResolver, ContractAuthorin
     ContractFinalizationInputs, RequirementContractProposal, AuthoringExhausted,
     AuthoringPublicationPending, AuthoringJournalPublicationPending)
 from feature_rl.requirements.service import semantic_request_sha256, validate_recovered_generation
-from feature_rl.scenarios import ScenarioAuthoringService, ScenarioFinalizationInputs, ScenarioPlanProposal
-from feature_rl.verifiers import (CheckerAuthoringService, CheckerFinalizationInputs, CheckerProposal,
+from feature_rl.verifiers import (CheckerAuthoringService, CheckerFinalizationInputs,
     ControlAuthoringService, ControlFinalizationInputs, ControlProposal)
 from feature_rl.verifiers.service import CheckerPublicationPending, AuthoringPreparationPending
 from feature_rl.verifiers.control_authoring import ControlPublicationPending
-from feature_rl.verifiers.fragments import (CheckerFragmentInputs, CheckerFragmentProposal,
-    CheckerFragmentRecord, CheckerFragmentService, FragmentPublicationPending)
+from feature_rl.verifiers.behavioral import behavioral_schema
 from feature_rl.qualification.evidence import unknown_cost, collapse_costs
 from feature_rl.registry import JobSpec, Claim, CostObservation
 from .authoring_models import (AuthoringSettings, AuthoringCall, AuthoringFrontier,
-    AuthoringRequest, AuthoringReceipt, ControlSlot, AuthoringBatch,AuthoringBudgetExceeded,AuthoringBudgetUnverified)
+    AuthoringRequest, AuthoringReceipt, AuthoringBatch,AuthoringBudgetExceeded,AuthoringBudgetUnverified)
 from .construction import put, references, identity
 from .packaging import checked, document, typed, read_record, read_bytes, MAX_DOCUMENT
 from .locking import candidate_lock
-from .factory import FactoryRecoveryRequired, FactoryPublicationFailed, FactoryUpstreamPending
+from .factory import FactoryRecoveryRequired, FactoryPublicationFailed
 
 
 class AuthoringPending(FactoryRecoveryRequired):
@@ -42,12 +40,9 @@ def read_authoring_receipt(store, ref):
 
 def stage_lane(call):
     if isinstance(call.inputs,ContractFinalizationInputs):return 'authoring','contract'
-    if isinstance(call.inputs,ScenarioFinalizationInputs):return 'scenarios','scenarios'
-    if isinstance(call.inputs,CheckerFragmentInputs):
-        return 'verifier','checker-scenario-'+hashlib.sha256(call.inputs.scenario_id.encode()).hexdigest()
     if isinstance(call.inputs,CheckerFinalizationInputs):return 'verifier','checker'
-    slot=ControlSlot(category=call.inputs.category,requirement_ids=tuple(sorted(call.inputs.requirement_ids)),attack=call.attack)
-    return 'verifier','control-'+hashlib.sha256(canonical_json(document(slot))).hexdigest()
+    role={'control_id':call.inputs.control_id,'category':call.inputs.category}
+    return 'verifier','control-'+hashlib.sha256(canonical_json(role)).hexdigest()
 
 
 def settings(factory):
@@ -55,23 +50,11 @@ def settings(factory):
     return checked(AuthoringSettings,factory.authoring)
 
 
-def policy_document(revision, configured, *, version=None):
-    version=version or ('m6-authoring-policy-v3' if configured.semantic_repair_authorization is not None else 'm6-authoring-policy-v2')
-    if version not in {'m6-authoring-policy-v1','m6-authoring-policy-v2','m6-authoring-policy-v3'}:
-        raise ValueError('unsupported historical authoring policy version')
-    if version!='m6-authoring-policy-v3' and configured.semantic_repair_authorization is not None:
-        raise ValueError('historical policy cannot retroactively grant semantic repairs')
-    value={'version':version,'revision':revision,
-        'settings':document(configured),'per_stage_repairs':2,'candidate_repairs':4,
-        'stage_map':{'initial_authoring':'authoring','scenario_planning':'scenarios',
-            'checker_generation':'verifier','control_authoring':'verifier','alternative_authoring':'verifier'}}
-    if version in {'m6-authoring-policy-v2','m6-authoring-policy-v3'}:
-        value['repair_accounting']={'version':'m6-semantic-repair-accounting-v1',
-            'transport_classification':'m6-unsafe-integer-transport-v1',
-            'physical_attempts':'retain all histories, costs, reservations and local journal limits'}
-    if version=='m6-authoring-policy-v3':
-        value['additional_semantic_repairs']='m6-semantic-repair-authorization-v1: exact prospective successors remain counted'
-    return value
+def policy_document(revision, configured):
+    return {'version':'m6-authoring-policy-v4','revision':revision,
+        'settings':document(configured),'attempts_per_role':3,
+        'stage_map':{'initial_authoring':'authoring',
+            'checker_generation':'verifier','control_authoring':'verifier'}}
 
 
 def historical_settings(factory,job):
@@ -79,7 +62,7 @@ def historical_settings(factory,job):
     raw=read_policy(factory.store,job.spec.configuration,MAX_DOCUMENT,'m6-authoring-policy',private=True)
     value=json.loads(raw)
     configured=AuthoringSettings.model_validate_json(canonical_json(value['settings']))
-    if raw!=canonical_json(policy_document(job.spec.implementation,configured,version=value.get('version'))):
+    if raw!=canonical_json(policy_document(job.spec.implementation,configured)):
         raise ValueError('historical authoring policy differs from its Factory execution')
     return configured
 
@@ -99,7 +82,7 @@ def batch_reference(factory,candidate):
 def check_budget(factory,candidate,call,batch_ref):
     """Reserve whole call ceilings before enqueue, across the immutable batch.
 
-    Reservations are never refunded by failures or imports. Actual larger known
+    Reservations are never refunded by failures. Actual larger known
     usage raises the charge. Unknown controller/storage/USD costs remain unknown;
     the current provider has no spend meter, so real finite-spend dispatch is
     unsupported. A null cap explicitly declares unpriced Codex subscription usage; it is
@@ -185,131 +168,20 @@ def validate_call(factory,candidate,call):
         contract=typed(factory.store,call.inputs.contract,c.RequirementContract)
         if call.resolver.request not in contract.provenance.inputs or pair.baseline not in contract.provenance.inputs:
             raise ValueError('frozen contract does not bind the exact authoring request/B')
-        if isinstance(call.inputs,ScenarioFinalizationInputs):
-            failure=predispatch_failure(factory,call)
-            if failure is not None:raise ValueError(failure)
-            from feature_rl.scenarios import build_scenario_request
-            generated=call.generation.request
-            expected=build_scenario_request(request_id=generated.request_id,response_id=generated.response_id,
-                prompt_id=generated.prompt_id,contract=contract,contract_ref=call.inputs.contract,sources=call.sources,
-                limits=generated.limits)
-            if generated.contexts!=expected.contexts or generated.allowed_requirement_ids!=expected.allowed_requirement_ids:
-                raise ValueError('scenario request contexts/IDs differ from exact frozen contract and evidence')
-    if isinstance(call.inputs,(CheckerFinalizationInputs,ControlFinalizationInputs,CheckerFragmentInputs)):
+    if isinstance(call.inputs,(CheckerFinalizationInputs,ControlFinalizationInputs)):
         if call.inputs.baseline!=pair.baseline or call.inputs.environment!=call.environment.recipe:
             raise ValueError('M4 inputs changed the selected B/environment')
-        if isinstance(call.inputs,ControlFinalizationInputs) and call.inputs.source_pair not in (None,call.source_pair):
-            raise ValueError('negative control changed the exact private SourcePair')
-    if call.control_plan is not None:
-        mandatory={r.requirement_id for r in contract.requirements+contract.compatibility_obligations if r.mandatory}
-        if any(not set(slot.requirement_ids)<=mandatory for slot in call.control_plan.slots):
-            raise ValueError('control plan targets unknown/nonmandatory requirements')
     return recipe
 
 
-def predispatch_failure(factory,call):
-    """Recognize only the deterministic scenario gate that precedes generation.
-
-    Missing provider receipts alone never establishes that a call was not made.
-    This exact frozen input cannot pass ScenarioAuthoringService's preflight.
-    """
-    if not isinstance(call.inputs,ScenarioFinalizationInputs):return None
-    from feature_rl.scenarios.service import contract_observables
-    contract=typed(factory.store,call.inputs.contract,c.RequirementContract)
-    if set(call.inputs.supported_observables)!=set(contract_observables(contract)):
-        return 'Controller predispatch validation failed: scenario observables differ from the frozen contract requirements'
-    return None
-
-
-def predispatch_replacement(factory,previous,current):
-    """Only correct the frozen observable binding; retain the exact model request."""
-    if predispatch_failure(factory,previous) is None:return False
-    if not isinstance(current.inputs,ScenarioFinalizationInputs):return False
-    from feature_rl.scenarios.service import contract_observables
-    contract=typed(factory.store,previous.inputs.contract,c.RequirementContract)
-    corrected=previous.model_copy(update={'inputs':previous.inputs.model_copy(update={
-        'supported_observables':contract_observables(contract)})})
-    return current==corrected
-
-
-def validate_predispatch_receipt(factory,request,receipt):
-    failure=predispatch_failure(factory,request.call)
-    if (failure is None or receipt.reason!=failure or request.origin!='factory_dispatch'
-            or receipt.outputs or receipt.journal_refs or receipt.disposition!=c.Disposition.INVALID):
-        raise ValueError('invalid controller predispatch failure receipt')
-    snapshot=observation(factory,receipt.claim,'m6-generation')
-    if (snapshot is None or receipt.request not in snapshot.receipts
-            or any(ref!=receipt.request and ref.kind!='m6-authoring-receipt' for ref in snapshot.receipts)):
-        raise FactoryRecoveryRequired('controller predispatch failure conflicts with provider dispatch evidence; reconcile exact archives',receipt.claim)
-
-
-def completed_receipt(factory,job,request):
-    """Authenticate the selected prior result before granting any repair exemption."""
-    from types import SimpleNamespace
-    if job.state!='completed' or job.result is None:
-        raise ValueError('controller replacement requires a completed predecessor')
-    ref=job.result.artifacts[-1]
-    receipt=read_authoring_receipt(factory.store,ref)
-    snapshot=observation(factory,receipt.claim,'m6-generation')
-    if (receipt.request!=job.spec.inputs[1] or receipt.claim.job_id!=job.job_id
-            or receipt.revision!=job.spec.implementation
-            or (request.stage,request.lane)!=stage_lane(request.call)
-            or (receipt.stage,receipt.lane,receipt.repair)!=(request.stage,request.lane,request.repair)
-            or job.result.artifacts!=(*receipt.outputs,ref) or job.result.disposition!=receipt.disposition
-            or snapshot is None or authoring_costs(factory,receipt.claim)!=receipt.costs
-            or tuple(r for r in snapshot.receipts if r.kind=='m6-authoring-receipt')!=(ref,)
-            or not any(attempt.claim==receipt.claim and attempt.state=='completed'
-                for attempt in factory.registry.attempts(job.job_id))):
-        raise ValueError('controller replacement lacks exact authenticated predecessor receipt')
-    factory.registry.assert_usable(ref)
-    historical=SimpleNamespace(store=factory.store,registry=factory.registry,
-        authoring=historical_settings(factory,job),revision=job.spec.implementation)
-    validate_receipt(historical,request,receipt)
-    return historical,receipt
-
-
-def is_controller_replacement(factory,job,previous,current):
-    if predispatch_replacement(factory,previous.call,current):
-        historical,receipt=completed_receipt(factory,job,previous)
-        validate_predispatch_receipt(historical,previous,receipt)
-        return True
-    old=previous.call
-    if (previous.origin!='factory_dispatch' or not isinstance(old.inputs,CheckerFragmentInputs)
-            or not isinstance(current.inputs,CheckerFragmentInputs)
-            or old.model_dump(exclude={'generation'})!=current.model_dump(exclude={'generation'})
-            or current.generation.diagnosis is None or current.generation.changed_input is None):
-        return False
-    before,after=old.generation.request,current.generation.request
-    ignored={'request_id','response_id','prompt_id','instruction'}
-    if (before.model_dump(exclude=ignored)!=after.model_dump(exclude=ignored)
-            or not after.instruction.startswith(before.instruction)
-            or not after.instruction[len(before.instruction):].strip()):
-        return False
-    from .repair_accounting import transport_failure_proof
-    return transport_failure_proof(factory,job,previous) is not None
-
-
-def validate_controller_replacement(factory,request):
-    """A noninitial repair=False is a proved controller correction, never a reset."""
-    if request.previous is None or request.repair:return
-    matches=[(job,old) for job,old in jobs(factory,request.candidate)
-        if job.spec.inputs[1]==request.previous]
-    if (request.origin!='factory_dispatch' or len(matches)!=1
-            or (matches[0][1].frontier,matches[0][1].stage,matches[0][1].lane)!=(request.frontier,request.stage,request.lane)
-            or not is_controller_replacement(factory,*matches[0],request.call)):
-        raise ValueError('nonrepair predecessor lacks an authenticated controller replacement')
-
-
-def frontier(factory,candidate,source,call,*,retained=False):
+def frontier(factory,candidate,source,call):
     model=AuthoringFrontier(candidate=candidate,source=source,source_pair=call.source_pair,
-        environment=call.environment,batch=batch_reference(factory,candidate),revision=factory.revision,
-        scope='retained-history-import' if retained else 'factory-controlled-after-source-disposition')
+        environment=call.environment,batch=batch_reference(factory,candidate),revision=factory.revision)
     found=[ref for ref in factory.registry.trace(candidate).artifacts if ref.kind=='m6-authoring-frontier'
         and read_record(factory.store,ref,AuthoringFrontier,'m6-authoring-frontier').candidate==candidate]
     if len(found)>1:raise ValueError('ambiguous candidate authoring frontier')
     if found:
         old=read_record(factory.store,found[0],AuthoringFrontier,'m6-authoring-frontier')
-        model=model.model_copy(update={'scope':old.scope})
         if old.model_copy(update={'revision':factory.revision})!=model:
             raise ValueError('candidate frontier source/environment cannot be replaced')
         return found[0]
@@ -324,22 +196,19 @@ def author(factory,candidate,call):
     with candidate_lock(factory.store,batch_ref), candidate_lock(factory.store,candidate):
         source=factory._screen_source(candidate)
         if source.disposition!=c.Disposition.SUCCESS:return source
-        recipe=validate_call(factory,candidate,call)
+        validate_call(factory,candidate,call)
         front=frontier(factory,candidate,source.artifacts[0],call)
-        stage,lane=stage_lane(call);previous=None;controller_replacement=False
+        stage,lane=stage_lane(call);previous=None
         existing=jobs(factory,candidate)
         # Stable call replay precedes new budget reservation; request IDs alone
         # still cannot turn a changed call into another initial attempt.
         for job,old in existing:
-            validate_controller_replacement(factory,old)
             if old.call==call and old.frontier==front:
                 if job.spec.implementation!=factory.revision:
                     if job.state=='completed':return job.result
                     raise FactoryRecoveryRequired('recover the original authoring revision',factory.registry.attempts(job.job_id)[-1].claim)
                 if job.state=='completed':return job.result
                 if job.attempts:raise FactoryRecoveryRequired('authoring attempt already exists',factory.registry.attempts(job.job_id)[-1].claim)
-                if old.origin!='factory_dispatch':
-                    raise ValueError('resume the retained journal importer; an import never dispatches a provider')
                 return dispatch(factory,job,old)
         if any(job.state!='completed' for job,_ in existing):
             raise ValueError('all earlier candidate authoring attempts require reconciliation before another dispatch')
@@ -349,45 +218,17 @@ def author(factory,candidate,call):
             terminal=[(job,old) for job,old in lanes if job.spec.inputs[1] not in predecessors]
             if len(terminal)!=1:raise ValueError('ambiguous authoring lane version chain')
             prior_job,prior=terminal[0];previous=prior_job.spec.inputs[1]
-            controller_replacement=is_controller_replacement(factory,prior_job,prior,call)
-            if not controller_replacement:
-                if call.generation.diagnosis is None:raise ValueError('every repeated authoring role requires a diagnosis and changed input')
-                if semantic_request_sha256(prior.call.generation.request)==semantic_request_sha256(call.generation.request):
-                    raise ValueError('repair must change meaningful request content, not only IDs')
+            if call.generation.diagnosis is None:raise ValueError('every repeated authoring role requires a diagnosis and changed input')
+            if semantic_request_sha256(prior.call.generation.request)==semantic_request_sha256(call.generation.request):
+                raise ValueError('retry must change meaningful request content, not only IDs')
         elif call.generation.diagnosis is not None:
-            raise ValueError('initial role cannot claim a repair without a retained predecessor')
-        if call.control_plan is not None:
-            plans=[old.call.control_plan for _,old in existing if old.call.control_plan is not None]
-            if any(plan.slots!=call.control_plan.slots for plan in plans):
-                raise ValueError('the candidate control role plan was already frozen')
-        repair=previous is not None and not controller_replacement
-        from .repair_accounting import classifications
-        proofs=classifications(factory,existing) if repair else {}
-        repairs=[old for job,old in existing if old.repair and job.spec.inputs[1] not in proofs]
-        authorization=settings(factory).semantic_repair_authorization
-        authorized=False
-        if authorization is not None:
-            from .semantic_repairs import authorized_requests,call_digest,validate_authorized_call
-            allowance,used=authorized_requests(factory,authorization,existing)
-            target=next((item for item in allowance.targets if item.previous_request==previous),None)
-            if (allowance.candidate!=candidate or not repair or target is None
-                    or target.replacement_call_sha256!=call_digest(call)):
-                raise AuthoringBudgetExceeded('semantic authorization requires its exact single-use successor request')
-            validate_authorized_call(allowance,call,previous,existing)
-            authorized=True
-            repairs=[old for job,old in existing if old.repair
-                and job.spec.inputs[1] not in proofs and job.spec.inputs[1] not in used]
-            if (any(sum(old.stage==name for old in repairs)>2 for name in {old.stage for old in repairs})
-                    or len(repairs)+len(recipe.neutral_repairs)>4):
-                raise AuthoringBudgetExceeded('semantic authorization cannot excuse an earlier exhausted repair budget')
-        if repair and not authorized and (sum(old.stage==stage for old in repairs)>=2 or len(repairs)+len(recipe.neutral_repairs)>=4):
-            raise AuthoringBudgetExceeded('budget_exhausted: shared repair budget exhausted: two per stage and four per candidate including environment repairs')
+            raise ValueError('initial role cannot claim a retry without a retained predecessor')
+        if len(lanes)>=3:
+            raise AuthoringBudgetExceeded('budget_exhausted: each authoring role permits at most three attempts')
         check_budget(factory,candidate,call,batch_ref)
         request=AuthoringRequest(candidate=candidate,frontier=front,call=call,previous=previous,
-            repair=repair,stage=stage,lane=lane)
-        if isinstance(call.inputs,ControlFinalizationInputs) and len(prior_journals(factory,request))>=3:
-            raise AuthoringBudgetExceeded('budget_exhausted: this control already incurred its three permitted attempts')
-        ref=put(factory,request,'m6-authoring-request',dependencies=(*references(document(request)),*proofs.values()))
+            stage=stage,lane=lane)
+        ref=put(factory,request,'m6-authoring-request',dependencies=references(document(request)))
         job=factory.registry.enqueue(spec(factory,ref,request))
         return dispatch(factory,job,request)
 
@@ -407,11 +248,7 @@ def observe(factory,claim,source,refs,costs):
 
 
 def authoring_costs(factory,claim):
-    generated=observation(factory,claim,'m6-generation')
-    isolation=observation(factory,claim,'m6-control-isolation')
-    # Preserve each attributable ledger entry. Stable source order keeps the
-    # frozen receipt independent of publication-induced snapshot-ID changes.
-    return generated.costs if isolation is None else (*generated.costs,*isolation.costs)
+    return observation(factory,claim,'m6-generation').costs
 
 
 def archive_writer(factory,claim,request_ref):
@@ -431,39 +268,23 @@ def archive_writer(factory,claim,request_ref):
     return archive
 
 
+def checker_schema(factory,call):
+    plan=typed(factory.store,call.inputs.scenario_plan,c.ScenarioPlan)
+    return behavioral_schema(plan)
+
+
 def service(factory,call,claim,request_ref):
     conf=settings(factory)
     provider=CodexGenerationProvider(config=conf.codex,archive=archive_writer(factory,claim,request_ref))
     resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump())
     if isinstance(call.inputs,ContractFinalizationInputs):cls,schema=ContractAuthoringService,RequirementContractProposal
-    elif isinstance(call.inputs,ScenarioFinalizationInputs):cls,schema=ScenarioAuthoringService,ScenarioPlanProposal
-    elif isinstance(call.inputs,CheckerFragmentInputs):cls,schema=CheckerFragmentService,CheckerFragmentProposal
-    elif isinstance(call.inputs,CheckerFinalizationInputs):cls,schema=CheckerAuthoringService,CheckerProposal
+    elif isinstance(call.inputs,CheckerFinalizationInputs):cls,schema=CheckerAuthoringService,checker_schema(factory,call)
     else:cls,schema=ControlAuthoringService,ControlProposal
-    revision=conf.m2_revision if cls in (ContractAuthoringService,ScenarioAuthoringService) else conf.m4_revision
-    extra={}
-    if isinstance(call.inputs,ControlFinalizationInputs) and call.inputs.isolation_task is not None:
-        from feature_rl.verifiers.control_isolation import ControlIsolationExecutor
-        def record_isolation(result):
-            # The selected Factory child owns these immutable declarations.
-            for artifact in result.artifacts:factory.registry.assert_usable(artifact)
-            recorded=put(factory,result,'m4-control-isolation-result',dependencies=result.artifacts)
-            prior=observation(factory,claim,'m6-control-isolation')
-            observe(factory,claim,'m6-control-isolation',(*result.artifacts,recorded),
-                (*(prior.costs if prior is not None else ()),*result.costs))
-        def retained_isolation():
-            prior=observation(factory,claim,'m6-control-isolation')
-            return () if prior is None else tuple(read_record(factory.store,ref,c.OperationResult,
-                'm4-control-isolation-result') for ref in prior.receipts if ref.kind=='m4-control-isolation-result')
-        extra['isolation']=ControlIsolationExecutor(factory=factory,
-            task=call.inputs.isolation_task,seeds=call.inputs.isolation_seeds,
-            invocation='m6-control-isolation:'+claim.job_id,
-            observe=record_isolation,retained=retained_isolation)
-    return cls(provider=provider,store=factory.store,resolver=resolver,revision=revision,evidence_scope=conf.evidence_scope,**extra),schema
+    revision=conf.m2_revision if cls is ContractAuthoringService else conf.m4_revision
+    return cls(provider=provider,store=factory.store,resolver=resolver,revision=revision,evidence_scope=conf.evidence_scope),schema
 
 
 def dispatch(factory,job,request):
-    validate_controller_replacement(factory,request)
     claim=factory.registry.claim(job.job_id,owner='feature_rl.pipeline.Factory',claim_key=uuid.uuid4().hex)
     ref=job.spec.inputs[1]
     try:
@@ -482,20 +303,7 @@ def prior_journals(factory,request):
             or receipt.lane!=request.lane or receipt.disposition!=matches[0].result.disposition
             or matches[0].result.artifacts!=(*receipt.outputs,matches[0].result.artifacts[-1])):
         raise ValueError('previous journal chain lacks the exact selected lane result')
-    if isinstance(request.call.inputs,ControlFinalizationInputs):
-        if receipt.disposition==c.Disposition.SUCCESS:
-            previous=read_record(factory.store,request.previous,AuthoringRequest,'m6-authoring-request')
-            if not obsolete_control_binding(document(previous.call.inputs),document(request.call.inputs)):
-                raise ValueError('an accepted control can be repaired only against an obsolete contract/scenario binding')
-        return receipt.journal_refs
     return receipt.journal_refs if receipt.disposition==c.Disposition.REJECTED else ()
-
-
-def obsolete_control_binding(previous,current):
-    ignored={'provenance','costs','contract','scenario_plan','isolation_task','isolation_seeds'}
-    return (isinstance(previous,dict) and isinstance(current,dict)
-        and {k:v for k,v in previous.items() if k not in ignored}=={k:v for k,v in current.items() if k not in ignored}
-        and any(previous.get(key)!=current.get(key) for key in ('contract','scenario_plan','isolation_task')))
 
 
 def execute(factory,claim,ref,request,*,recovered=None):
@@ -504,32 +312,30 @@ def execute(factory,claim,ref,request,*,recovered=None):
     prior=prior_journals(factory,request)
     candidate=request.call.generation
     if not prior:
-        # A repaired previously accepted artifact starts a new local finalizer
-        # chain; the outer frozen request retains its global diagnosis/budget.
+        # A changed previously accepted artifact starts a new local finalizer
+        # chain; the outer frozen request retains its diagnosis and resource reservation.
         candidate=candidate.model_copy(update={'diagnosis':None,'changed_input':None})
     try:
         result=actual.generate((candidate,),request.call.inputs,request.call.sources,prior_journal_refs=prior,
             recovered_result=recovered if isinstance(recovered,GenerationResult) else None,
             recovered_error=recovered if isinstance(recovered,GenerationProviderError) else None)
         validate_recovered_generation(factory.store,candidate.request,schema,result.generation)
-        outputs=tuple(getattr(result,name) for name in ('contract_ref','plan_ref','verifier_ref','record_ref') if hasattr(result,name))
+        outputs=tuple(getattr(result,name) for name in ('contract_ref','verifier_ref','record_ref') if hasattr(result,name))
         if len(outputs)!=1:raise ValueError('actual authoring result must select one concrete output')
-        journals=result.journal_refs;disposition=c.Disposition.SUCCESS;reason='Actual M2/M4 authored artifact selected; semantic qualification and independence are unverified'
+        journals=result.journal_refs;disposition=c.Disposition.SUCCESS;reason='Actual M2/M4 authored artifact selected; qualification remains pending'
     except AuthoringExhausted as exc:
         outputs=();journals=exc.journal_refs;disposition=c.Disposition.REJECTED;reason=str(exc)
     except (GenerationProviderError,AuthoringPublicationPending,AuthoringJournalPublicationPending,
-            CheckerPublicationPending,ControlPublicationPending,FragmentPublicationPending) as exc:
+            CheckerPublicationPending,ControlPublicationPending) as exc:
         raise AuthoringPending(claim,exc) from exc
     except AuthoringPreparationPending as exc:
-        if isinstance(exc.__cause__,FactoryRecoveryRequired):
-            raise AuthoringPending(claim,exc.__cause__) from exc
         raise FactoryRecoveryRequired('validated provider result is retained; recover inert finalization without provider execution',claim) from exc
     except Exception as exc:
         raise FactoryRecoveryRequired('authoring controller outcome unknown; inspect retained archives before any new call',claim) from exc
     # Provider wall is already in its own cumulative record. Controller overhead
     # is left unknown here because callbacks and finalization interleave with it.
     frozen=AuthoringReceipt(claim=claim,request=ref,outputs=outputs,journal_refs=journals,
-        disposition=disposition,reason=reason,repair=request.repair,stage=request.stage,lane=request.lane,
+        disposition=disposition,reason=reason,stage=request.stage,lane=request.lane,
         costs=authoring_costs(factory,claim),revision=factory.revision,recorded_at=datetime.now(timezone.utc))
     return publish(factory,canonical_json(document(frozen)),claim)
 
@@ -540,7 +346,7 @@ def register_output(factory,ref):
         for child in references(document(value)):
             if child.kind in ('m4-case-input','m4-case-comparison'):register_output(factory,child)
         factory.registry.register(ref)
-    elif ref.kind in ('m4-control-record','m4-checker-fragment','m4-submission','m4-case-input','m4-case-comparison'):
+    elif ref.kind in ('m4-control-record','m4-submission','m4-case-input','m4-case-comparison'):
         raw=read_bytes(factory.store,ref,MAX_DOCUMENT)
         deps=references(json.loads(raw))
         for child in deps:
@@ -559,7 +365,6 @@ def validated(factory,claim):
         invocation='m6-author:'+request.lane,attempt_limit=1)
     if job.spec!=expected or historical_settings(factory,job)!=settings(factory):
         raise ValueError('recover with the original authoring service configuration')
-    validate_controller_replacement(factory,request)
     return job,request
 
 
@@ -568,7 +373,7 @@ def publish(factory,payload,claim):
     receipt=AuthoringReceipt.model_validate_json(payload)
     job,request=validated(factory,claim)
     if (canonical_json(document(receipt))!=payload or receipt.claim!=claim or receipt.request!=job.spec.inputs[1]
-            or receipt.revision!=factory.revision or (receipt.repair,receipt.stage,receipt.lane)!=(request.repair,request.stage,request.lane)):
+            or receipt.revision!=factory.revision or (receipt.stage,receipt.lane)!=(request.stage,request.lane)):
         raise ValueError('authoring frozen receipt changed exact request/claim')
     if job.state=='completed':return job.result
     snapshot=observation(factory,claim,'m6-generation')
@@ -601,21 +406,14 @@ def publish(factory,payload,claim):
 
 def validate_receipt(factory,request,receipt):
     """Frozen replay binds the actual journal/archive selection and output lineage."""
-    validate_controller_replacement(factory,request)
-    if receipt.disposition==c.Disposition.INVALID:
-        validate_predispatch_receipt(factory,request,receipt)
-        return
     classes={ContractFinalizationInputs:(RequirementContractProposal,'contract-authoring-journal','RequirementContract','feature_rl.requirements.ContractAuthoringService'),
-        ScenarioFinalizationInputs:(ScenarioPlanProposal,'scenario-authoring-journal','ScenarioPlan','feature_rl.scenarios.ScenarioAuthoringService'),
-        CheckerFinalizationInputs:(CheckerProposal,'checker-authoring-journal','VerifierBundle','feature_rl.verifiers.CheckerAuthoringService'),
-        CheckerFragmentInputs:(CheckerFragmentProposal,'checker-fragment-authoring-journal','m4-checker-fragment','feature_rl.verifiers.CheckerFragmentService'),
+        CheckerFinalizationInputs:(None,'checker-authoring-journal','VerifierBundle','feature_rl.verifiers.CheckerAuthoringService'),
         ControlFinalizationInputs:(ControlProposal,'control-authoring-journal','m4-control-record','feature_rl.verifiers.ControlAuthoringService')}
     schema,journal_kind,output_kind,producer=classes[type(request.call.inputs)]
+    if schema is None:schema=checker_schema(factory,request.call)
     if not 1<=len(receipt.journal_refs)<=3:raise ValueError('actual bounded authoring journal chain required')
     if receipt.journal_refs[:-1]!=prior_journals(factory,request):
         raise ValueError('receipt prior journals differ from the selected previous lane chain')
-    if request.origin=='retained_journal' and receipt.journal_refs!=request.imported_journals:
-        raise ValueError('receipt changed its exact retained import journal chain')
     values=[]
     for index,ref in enumerate(receipt.journal_refs,1):
         raw=read_bytes(factory.store,ref,65536,kind=journal_kind)
@@ -623,10 +421,7 @@ def validate_receipt(factory,request,receipt):
         if canonical_json(value)!=raw or value.get('attempt_index')!=index or value.get('stage')!=request.call.generation.request.stage.value:
             raise ValueError('authoring journal changed canonical stage/index')
         if index<len(receipt.journal_refs) and value.get('status')!='rejected':
-            if (not isinstance(request.call.inputs,ControlFinalizationInputs)
-                    or value.get('status')!='accepted'
-                    or not obsolete_control_binding(value.get('binding'),document(request.call.inputs))):
-                raise ValueError('accepted prior journal requires an obsolete exact control contract/scenario binding')
+            raise ValueError('prior authoring journals must be rejected attempts')
         values.append(value)
     last=values[-1]
     semantic=semantic_request_sha256(request.call.generation.request)
@@ -645,38 +440,16 @@ def validate_receipt(factory,request,receipt):
     if len(receipt.outputs)!=1 or receipt.outputs[0].kind!=output_kind or not isinstance(outcome,GenerationResult):
         raise ValueError('successful authoring requires exact output kind and successful archived generation')
     output=receipt.outputs[0]
-    if output_kind=='m4-checker-fragment':
-        model=read_record(factory.store,output,CheckerFragmentRecord,output_kind);provenance=model.provenance
-        if (model.baseline,model.contract,model.scenario_plan,model.environment,model.scenario_id)!=(
-                request.call.inputs.baseline,request.call.inputs.contract,request.call.inputs.scenario_plan,
-                request.call.inputs.environment,request.call.inputs.scenario_id):
-            raise ValueError('checker fragment changed its exact frozen inputs')
-        if model.proposal!=CheckerFragmentProposal.model_validate(outcome.content):
-            raise ValueError('checker fragment changed its validated model output')
-    elif output_kind=='m4-control-record':
+    if output_kind=='m4-control-record':
         from feature_rl.verifiers.control_authoring import ControlRecord
         model=read_record(factory.store,output,ControlRecord,output_kind);provenance=model.generation_provenance
         if (model.baseline,model.contract,model.environment)!=(request.call.inputs.baseline,request.call.inputs.contract,request.call.inputs.environment):
             raise ValueError('control output changed exact B/contract/environment')
-        if request.call.inputs.isolation_task is not None:
-            from feature_rl.grading import read_grade
-            from feature_rl.verifiers import load_verifier
-            from feature_rl.verifiers.control_isolation import require_isolated_execution
-            checked=load_verifier(factory.store,request.call.inputs.isolation_task)
-            observed=observation(factory,receipt.claim,'m6-control-isolation')
-            refs=() if observed is None else observed.receipts
-            grades=[read_grade(factory.store,ref) for ref in refs if ref.kind=='m4-grade-receipt']
-            if tuple(grade.case_seed for grade in grades)!=request.call.inputs.isolation_seeds:
-                raise ValueError('accepted control lacks the complete isolation execution schedule')
-            for grade in grades:
-                if (grade.task,grade.submission,grade.verifier)!=(checked.task_ref,model.control.patch,checked.task.private_oracle):
-                    raise ValueError('control isolation evidence belongs to another candidate or verifier')
-                require_isolated_execution(factory.store,checked,grade,model.control.requirement_ids)
     else:
         model=factory.store.get_artifact(output,max_envelope_bytes=MAX_DOCUMENT);provenance=model.provenance
-        if isinstance(request.call.inputs,(ScenarioFinalizationInputs,CheckerFinalizationInputs)) and model.contract!=request.call.inputs.contract:
+        if isinstance(request.call.inputs,CheckerFinalizationInputs) and model.contract!=request.call.inputs.contract:
             raise ValueError('authored output changed its exact frozen contract')
-    revision=settings(factory).m2_revision if isinstance(request.call.inputs,(ContractFinalizationInputs,ScenarioFinalizationInputs)) else settings(factory).m4_revision
+    revision=settings(factory).m2_revision if isinstance(request.call.inputs,ContractFinalizationInputs) else settings(factory).m4_revision
     ev=provenance.evidence[-1]
     if (provenance.producer!=producer or provenance.producer_version!=revision
             or ev.producer!='feature_rl.generation.CodexGenerationProvider'
@@ -728,16 +501,6 @@ def recover(factory,claim):
         snapshot=observation(factory,claim,'m6-generation')
         refs=[] if snapshot is None else [r for r in snapshot.receipts if r.kind=='m6-authoring-receipt']
         if refs:return publish(factory,read_bytes(factory.store,refs[-1],MAX_DOCUMENT),claim)
-        if request.origin=='retained_journal':
-            from .authoring_import import finish_import
-            return finish_import(factory,claim,job,request)
-        failure=predispatch_failure(factory,request.call)
-        if failure is not None:
-            if snapshot is None:raise FactoryRecoveryRequired('authoring intent unconfirmed; inspect exact controller history',claim)
-            receipt=AuthoringReceipt(claim=claim,request=job.spec.inputs[1],outputs=(),journal_refs=(),
-                disposition=c.Disposition.INVALID,reason=failure,repair=request.repair,stage=request.stage,lane=request.lane,
-                costs=snapshot.costs,revision=factory.revision,recorded_at=datetime.now(timezone.utc))
-            return publish(factory,canonical_json(document(receipt)),claim)
         _,schema=service(factory,request.call,claim,job.spec.inputs[1])
         value=archived_outcome(factory,request,claim,schema)
         return execute(factory,claim,job.spec.inputs[1],request,recovered=value)
@@ -758,7 +521,7 @@ def retry(factory,pending):
         # archive is already selected and is not called again.
         if isinstance(upstream,AuthoringJournalPublicationPending):
             upstream.replay(factory.store)
-        elif isinstance(upstream,(AuthoringPublicationPending,CheckerPublicationPending,ControlPublicationPending,FragmentPublicationPending)):
+        elif isinstance(upstream,(AuthoringPublicationPending,CheckerPublicationPending,ControlPublicationPending)):
             output=upstream.replay(factory.store)
             if isinstance(upstream,AuthoringPublicationPending):outputs,journals=(output[0],),output[1]
             else:
@@ -766,30 +529,9 @@ def retry(factory,pending):
                 journals=output.journal_refs
             receipt=AuthoringReceipt(claim=pending.claim,request=job.spec.inputs[1],outputs=outputs,journal_refs=journals,
                 disposition=c.Disposition.SUCCESS,reason='Actual retained authoring publication selected without provider redispatch',
-                repair=request.repair,stage=request.stage,lane=request.lane,costs=authoring_costs(factory,pending.claim),
+                stage=request.stage,lane=request.lane,costs=authoring_costs(factory,pending.claim),
                 revision=factory.revision,recorded_at=datetime.now(timezone.utc))
             return publish(factory,canonical_json(document(receipt)),pending.claim)
-        elif isinstance(upstream,FactoryRecoveryRequired):
-            child=factory.registry.job(upstream.claim.job_id)
-            if (not isinstance(request.call.inputs,ControlFinalizationInputs)
-                    or request.call.inputs.isolation_task is None
-                    or child.spec.operation!='grade'
-                    or child.spec.invocation!='m6-control-isolation:'+pending.claim.job_id
-                    or child.spec.inputs[0]!=request.call.inputs.isolation_task):
-                raise ValueError('pending isolation child differs from the authoring operation')
-            try:
-                if isinstance(upstream,FactoryUpstreamPending):
-                    from feature_rl.grading import GradePublicationFailed
-                    from .grading import retain_pending
-                    if not isinstance(upstream.upstream,GradePublicationFailed):
-                        raise ValueError('unexpected isolation grade upstream capability')
-                    if child.state!='completed':
-                        retain_pending(factory,upstream.claim,child.spec.inputs[2],upstream.upstream)
-                    factory.recover(upstream.claim)
-                elif isinstance(upstream,FactoryPublicationFailed):factory.retry_publication(upstream)
-                else:factory.recover(upstream.claim)
-            except FactoryRecoveryRequired as error:
-                raise AuthoringPending(pending.claim,error) from error
         else:raise ValueError('unsupported actual authoring recovery capability')
         _,schema=service(factory,request.call,pending.claim,job.spec.inputs[1])
         return execute(factory,pending.claim,job.spec.inputs[1],request,

@@ -105,7 +105,7 @@ def test_checker_stage_accepts_only_explicit_contract_and_scenario_context():
         request(stage=GenerationStage.CHECKER_GENERATION, contexts=(context(role="baseline"),))
 
 
-def test_control_authoring_requires_frozen_contract_and_baseline_with_explicit_reference():
+def test_control_authoring_requires_frozen_contract_and_baseline_without_gold():
     contract = context(
         context_id="CONTRACT", role="contract", kind="RequirementContract"
     ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
@@ -122,18 +122,13 @@ def test_control_authoring_requires_frozen_contract_and_baseline_with_explicit_r
     )
     built = request(
         stage=GenerationStage.CONTROL_AUTHORING,
-        contexts=(contract, baseline, scenario, reference),
+        contexts=(contract, baseline, scenario),
     )
     assert tuple(item.role for item in built.contexts) == (
-        "contract", "baseline", "scenario", "reference"
+        "contract", "baseline", "scenario"
     )
-    second_reference = reference.model_copy(update={"context_id": "REFERENCE_2"})
-    assert request(
-        stage=GenerationStage.CONTROL_AUTHORING,
-        contexts=(contract, baseline, reference, second_reference),
-    ).contexts[-1] == second_reference
-
     invalid = (
+        (contract, baseline, reference),
         (baseline,),
         (contract,),
         (contract, contract.model_copy(update={"context_id": "CONTRACT_2"}), baseline),
@@ -153,61 +148,9 @@ def test_control_authoring_requires_frozen_contract_and_baseline_with_explicit_r
             request(stage=GenerationStage.CONTROL_AUTHORING, contexts=contexts)
 
 
-def test_alternative_authoring_accepts_only_visible_contract_and_solver_safe_context():
-    contract = context(
-        context_id="CONTRACT", role="contract", kind="RequirementContract"
-    ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
-    baseline = context(context_id="BASELINE", role="baseline", kind="source-archive")
-    admitted = (
-        contract,
-        baseline,
-        context(context_id="REQUEST", role="request", kind="authoring-request"),
-        context(
-            context_id="PUBLIC_CHECK", role="public_check", kind="public-check",
-            visibility=Visibility.PUBLIC,
-        ),
-        context(
-            context_id="SOLVER_SAFE", role="solver_safe", kind="solver-safe-context",
-            visibility=Visibility.PUBLIC,
-        ),
-    )
-    built = request(stage=GenerationStage.ALTERNATIVE_AUTHORING, contexts=admitted)
-    assert tuple(item.role for item in built.contexts) == (
-        "contract", "baseline", "request", "public_check", "solver_safe"
-    )
-
-    invalid = (
-        (baseline,),
-        (contract,),
-        (contract, contract.model_copy(update={"context_id": "CONTRACT_2"}), baseline),
-        (contract, baseline, context(
-            context_id="REFERENCE", role="reference", kind="source-archive",
-            visibility=Visibility.PRIVATE,
-        )),
-        (contract, baseline, context(
-            context_id="SCENARIO", role="scenario", kind="ScenarioPlan",
-            visibility=Visibility.EVALUATION,
-        ).model_copy(
-            update={"source": artifact("ScenarioPlan", Visibility.EVALUATION, encoding="json")}
-        )),
-        (contract, baseline.model_copy(
-            update={"source": artifact("source-archive", Visibility.PRIVATE)}
-        )),
-        (contract, baseline, context(
-            context_id="CHECKER", role="solver_safe", kind="checker-output",
-            visibility=Visibility.PUBLIC,
-        )),
-        (contract, baseline, context(
-            context_id="PRIVATE_SAFE", role="solver_safe", kind="solver-safe-context",
-            visibility=Visibility.PRIVATE,
-        )),
-    )
-    for contexts in invalid:
-        with pytest.raises(ValidationError):
-            request(stage=GenerationStage.ALTERNATIVE_AUTHORING, contexts=contexts)
 
 
-def test_reference_role_is_exclusive_to_control_authoring():
+def test_gold_is_excluded_from_all_authoring_stages():
     reference = context(
         context_id="REFERENCE", role="reference", kind="source-archive",
         visibility=Visibility.PRIVATE,
@@ -223,58 +166,13 @@ def test_reference_role_is_exclusive_to_control_authoring():
     )
     for stage, contexts in (
         (GenerationStage.INITIAL_AUTHORING, (reference,)),
-        (GenerationStage.SCENARIO_PLANNING, (contract, reference)),
+        (GenerationStage.CONTROL_AUTHORING, (contract, reference)),
         (GenerationStage.CHECKER_GENERATION, (contract, scenario, reference)),
     ):
         with pytest.raises(ValidationError):
             request(stage=stage, contexts=contexts)
 
 
-def test_scenario_planning_requires_one_authoring_contract_and_admitted_evidence():
-    """The first plan is grounded in one frozen contract without admitting H or a plan."""
-    contract = context(
-        context_id="CONTRACT_1",
-        role="contract",
-        kind="RequirementContract",
-        visibility=Visibility.AUTHORING,
-    ).model_copy(update={"source": artifact("RequirementContract").model_copy(update={"encoding": "json"})})
-    built = request(
-        stage=GenerationStage.SCENARIO_PLANNING,
-        contexts=(context(), context(context_id="B_1", role="baseline"), contract),
-    )
-    assert tuple(item.role for item in built.contexts) == ("request", "baseline", "contract")
-
-    invalid_context_sets = (
-        (context(),),
-        (contract, contract.model_copy(update={"context_id": "CONTRACT_2"})),
-        (
-            contract.model_copy(
-                update={"source": artifact("ScenarioPlan").model_copy(update={"encoding": "json"})}
-            ),
-        ),
-        (
-            contract.model_copy(
-                update={
-                    "source": artifact(
-                        "RequirementContract", Visibility.PRIVATE
-                    ).model_copy(update={"encoding": "json"})
-                }
-            ),
-        ),
-        (
-            contract,
-            context(
-                context_id="PLAN_1",
-                role="scenario",
-                kind="ScenarioPlan",
-                visibility=Visibility.PRIVATE,
-            ),
-        ),
-        (contract, context(context_id="H_1", role="baseline", kind="reference-tree")),
-    )
-    for contexts in invalid_context_sets:
-        with pytest.raises(ValidationError):
-            request(stage=GenerationStage.SCENARIO_PLANNING, contexts=contexts)
 
 
 def test_request_rejects_duplicate_ids_placeholders_and_relaxed_resource_policy():

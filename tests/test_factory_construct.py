@@ -3,8 +3,8 @@ import pytest
 
 from feature_rl import contracts as c
 from feature_rl.pipeline import Factory
-from feature_rl.qualification import RepairHistory, validate_repairs
 from feature_rl.pipeline.packaging import read_record
+from feature_rl.pipeline.construction import ConstructionResult
 from test_factory import fixture, mutate
 
 
@@ -17,19 +17,17 @@ def configured(tmp_path, monkeypatch):
     return factory,candidate,inputs
 
 
-def test_construction_selects_real_built_root_and_incomplete_actual_repair_history(tmp_path,monkeypatch):
+def test_construction_selects_real_built_root_and_receipt(tmp_path,monkeypatch):
     factory,candidate,inputs = configured(tmp_path,monkeypatch)
     result = factory.construct(candidate,inputs=inputs)
     assert result.disposition==c.Disposition.SUCCESS
     built = factory.store.get_artifact(result.artifacts[0])
     assert built.state==c.TaskState.BUILT and built.qualification is None
     assert built.source_pair==inputs.source_pair
-    history = read_record(factory.store,result.artifacts[1],RepairHistory,'m5-repair-history')
-    assert history.candidate==candidate and history.complete is False
-    assert len(history.attempts)==1 and history.attempts[0].stage=='environment'
-    recipe=factory.store.get_artifact(inputs.environment.recipe)
-    assert history.attempts[0].after==recipe.neutral_repairs[0].patch
-    assert validate_repairs(history,candidate,recipe.neutral_repairs) is None
+    assert tuple(ref.kind for ref in result.artifacts)==('TaskBundle','m6-construction-result')
+    receipt = read_record(factory.store,result.artifacts[1],ConstructionResult,'m6-construction-result')
+    assert receipt.build_result.artifacts[0]==result.artifacts[0]
+    assert 'history' not in ConstructionResult.model_fields
     before=factory.registry.events(limit=1000)
     assert factory.construct(candidate,inputs=inputs)==result
     assert factory.registry.events(limit=1000)==before

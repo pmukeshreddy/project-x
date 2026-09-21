@@ -187,195 +187,30 @@ The selected source job has `operation='construct'`, `inputs=(candidate_ref,)`, 
 Rejected-source audits require the exact completed job/result/claim and record, equality with the retained CandidateRecord, `source_status='rejected'`, and `disposition='candidate_rejection'`. That outcome derives only from actual rejected screening or an ineligible license. Unsupported/infrastructure/provisional/unresolved prerequisites are not semantic source rejections. This route creates no TaskBundle or RolloutRecord. Reading the record is historical, not current admission.
 
 `Factory.recover(claim)` recovers a durably frozen source outcome; an unknown pre-freeze attempt raises `FactoryRecoveryRequired`. `Factory.retry_publication(FactoryPublicationFailed)` retries retained exact bytes and costs without source execution. These capabilities stay private. Source aggregate costs are imported once per exact immutable candidate, including reuse from another Factory revision under the same source protocol. The original selected result/revision is preserved; downstream construction references it instead of adding those costs again.
-# Factory construction from complete artifacts
+# Factory construction and qualification
 
-```python
-factory = Factory(store=store, registry=registry, revision=factory_revision,
-                  builder=actual_task_builder)  # default: actual builder at factory_revision
-result = factory.construct(candidate_ref, inputs=build_inputs)
-# success artifacts: (BUILT_T0, m5_repair_history_ref, m6_construction_result_ref)
-```
+`Factory.construct(candidate, inputs=BuildInputs(...))` uses source admission and
+the existing TaskBuilder. Success returns `(built_task_ref, construction_receipt)`.
+There is no repair-history artifact or historical import path.
 
-`construct(candidate: ArtifactRef, *, inputs: BuildInputs | None = None) -> OperationResult` consumes the selected source prerequisite before actual TaskBuilder assembly. It returns that exact rejected/unresolved source result without entering the builder. Eligible source with missing inputs returns a selected `blocked_dependency` construct result; it manufactures no contract/scenario/verifier/root. Supplied inputs must bind the exact `SourcePair.candidate`. The Registry parent job has `operation='construct'`, `invocation='m6-construct'` and inputs `(candidate_ref, source_disposition_ref, construction_request_ref)`. Its opaque request/configuration/result refs explicitly declare consumed dependencies.
+`FeatureWorkflow.construct` retains feature intake, baseline/gold capture and
+runtime preparation. It authors the semantic requirement contract, assigns one
+scenario slot per requirement, authors three or four wrong source changes, and
+requests one compact behavioral specification. The controller compiles and freezes
+the hidden checker and passes complete BuildInputs to construction.
 
-The selected parent result contains the actual builder task and an evidenced M5 `RepairHistory`. Direct externally authored inputs retain known M3 neutral repairs and remain incomplete. The authoring join below can freeze the complete declared controller scope. Parent costs represent incremental controller/publication work; source and builder costs remain in their own selected jobs. `m6-construction-result` binds the parent claim, request, selected child job/result, history, exact costs, disposition, reason and revision.
+The automatic workflow returns BUILT artifacts. `Factory.qualify(task_ref)` runs
+the bounded [qualification schedule](interfaces-M5.md), and
+`Factory.release(task_ref, accepted_report=report)` freezes the released task only after
+that schedule passes. Current artifact validation and solver-package privacy
+checks remain mandatory. An accepted qualification applies only to its exact
+immutable BUILT payload.
 
-`TaskBuilder.job_spec(inputs) -> JobSpec` freezes the builder's actual existing input/policy CAS identities without enqueueing or assembly. Factory uses this exact public method for deterministic child recovery. `Factory.recover(parent_claim)` reuses a completed/frozen child, preserves unknown builder attempts, and never fabricates execution results. `FactoryUpstreamPending` retains an actual `BuildPublicationFailed`; `Factory.retry_publication(pending)` delegates to the actual builder replay before completing the parent. Parent `FactoryPublicationFailed` retains its own exact result bytes. Historical completion readback is distinct from current consumer admission.
+`Factory.author` accepts contract, checker or wrong-implementation authoring
+calls. It reserves model resources, permits at most three attempts per role and
+retains provider outcomes for storage-only replay. No scenario authoring,
+fragment assembly, retained-history import, semantic repair authorization or
+qualification continuation API remains. Source/build/model publication handling
+belongs to those existing services.
 
-# Factory qualification, acceptance and release
-
-```python
-Factory(*, store, registry, revision, builder=None, qualification=None)
-factory.qualify(task_ref, *, policy: QualificationPolicy | None = None) -> OperationResult
-factory.release(task_ref, *, accepted_report=None) -> OperationResult
-```
-
-`qualification` is the actual same-store/Registry M5 `QualificationService`, supplying
-its actual grader, package validator and implementation revision. Missing configuration rejects explicitly. Qualification selects the
-original BUILT root's actual completed Factory construction history, selected child
-result and parent revision. It binds those values into M5 policy; an inconsistent
-caller history rejects. Unconstructed roots retain missing history and remain
-subject to all actual M5 gates. Actual M5 dispositions are preserved.
-
-Passing automated qualification produces Q directly; there is no separate human
-acceptance step. Release accepts BUILT plus successful Q, or the exact QUALIFIED
-predecessor with its existing Q. It resolves the report's actual producer/policy and
-uses both Registry lifecycle transitions. Missing automated validity evidence
-cannot create a released root. M5 and lifecycle retained
-publication/recovery capabilities keep their concrete upstream APIs.
-
-# Actual CLI composition checkpoint
-
-`feature_rl.cli.main(argv=None) -> int` is callable now through
-`python -m feature_rl`. `config-schema` prints the strict closed
-`feature_rl.pipeline.configuration.CLIConfiguration` JSON schema. The actual
-composition method is `compose(config, *, runtime=False, qualification=False,
-authoring=False, native_operation=None, audit=False) -> Application`, whose fields
-are `factory`, `runtime`, `grader`, `lifecycle` and `resolver`; `close()` performs
-terminal native cleanup. `native_operation` is exactly `run`, `train`, `evaluate`
-or None. No provider/backend/native-session callback is accepted.
-
-Required config: version `m6-cli-v1`, absolute `store_root`/`registry_root`, exact
-Factory `revision`; optional `builder_revision`, `RegistryLimits`, `runtime` and
-`qualification`. Runtime fields are absolute state/socket paths, exact runtime and
-grading revisions, actual bounded SandboxPolicy and grade wall limit. Qualification
-fields are exact revision, actual QualificationPolicy and optional read-only
-external enrollment path/digest. Runtime composition invokes actual M3 boundary
-qualification; source/complete-artifact construction does not open Docker.
-
-Implemented commands and request shapes are documented in `docs/runbook.md`:
-`screen-source`, `construct`, `author`, `import-authoring`, `qualify`,
-`release`, `resolve`, `grade`, `run`, `train`, `evaluate`, `audit`, `recover`,
-`retry-publication`.
-M0 request models remain authoritative; `construct --inputs` supplies actual
-BuildInputs separately. `main` emits typed operation JSON and nonzero failures.
-Publication exceptions additionally emit an exact private ordinary-JSON recovery
-receipt to stderr before exit. It is not an executable object loader or another
-ledger. The closed Factory publication reader verifies only supported concrete
-Factory payload kinds; it never imports an artifact-selected class.
-
-Additional configuration models in `feature_rl.pipeline.configuration` are
-`NativeConfiguration(revision, settings: NativeSettings, bootstrap: TrainingConfig
-| None)`, `EvaluationSettings(revision)` and `AuditSettings(revision,
-selection_manifest, attestations, human)`. `CLIConfiguration.authoring` is actual
-`AuthoringSettings`. Native startup never occurs in composition: actual M7/M8
-services freeze configuration and select claims first. Run/evaluate require a
-bootstrap configuration; training consumes its request config. All native services
-share the actual resolver/builder/runtime/grader; M8 also receives the same Factory
-for inert origin revalidation. The CLI always calls cleanup in `finally` and keeps
-both original and cleanup errors, or a selected result plus a cleanup error.
-
-```python
-Factory(..., grading: GradingService | None=None,
-        native_run: NativeRunService | None=None, training: TrainingService | None=None,
-        evaluation: EvaluationService | None=None, audit: AuditService | None=None)
-factory.grade(task_version, submission, case_seed, *, invocation='grade') -> OperationResult
-factory.run(task_version, policy, limits, *, case_seed=None, invocation) -> OperationResult
-factory.train(configuration, *, invocation, resume=None, demonstrations=()) -> OperationResult
-factory.evaluate(configuration) -> OperationResult
-factory.audit(run_ids) -> OperationResult
-factory.close()  # cleanup only; reports every retained service failure
-```
-
-Run/train/evaluate/audit validate actual same-store service types and delegate to
-their sole M7/M8 owners. No second native ledger or reward producer is introduced.
-Factory recovery routes selected native-run, evaluation, audit, actual M5 policy
-and lifecycle jobs to their concrete services; source/build/authoring recovery is
-preserved. M5 recovery binds both its configuration and implementation revision.
-
-Grade jobs freeze `m6-grade-request` and a new `m6-grade-policy` declaring opaque
-comparison/input/source-delta dependencies explicitly. Existing immutable leaf
-declarations are preserved. M4 runs once after claim/unknown intent; exact M4 task,
-submission, seed, revision, evidence and result joins are required. Original costs
-are retained in `m6-grade-original`; Registry receives the normalized aggregate,
-including explicit unknown missing channels/storage. `m6-frozen-grade` selects
-the original result and costs. Failed original publication preserves a bounded
-`m6-pending-grade-result` capability; actual M4 pending receipts are retained in
-CAS where possible. `Factory.retry_publication` republishes those exact results
-without calling grade again. An unknown unfrozen outcome remains unreconciled.
-Completed grade readback is historical; normal downstream admission remains current.
-
-# Actual M2/M4 authoring and retained history
-
-```python
-from feature_rl.pipeline import (Factory, AuthoringSettings, AuthoringBatch,
-    AuthoringCaps, AuthoringCall, ResolverInputs, ControlPlan, ControlSlot)
-factory = Factory(store=store, registry=registry, revision=revision,
-                  builder=builder, authoring=settings)
-factory.author(candidate_ref, *, call: AuthoringCall) -> OperationResult
-factory.import_rejected_authoring(candidate_ref, *, call: AuthoringCall,
-                                 journal_refs: tuple[ArtifactRef, ...]) -> OperationResult
-```
-
-`AuthoringSettings` binds `codex: CodexConfig`, `m2_revision`, `m4_revision`,
-`evidence_scope` and an `AuthoringBatch`. Batch fields are exact `candidates`,
-`candidate_caps` and `batch_caps`. Both cap sets
-declare input/output tokens, wall/CPU seconds, provider command count, memory bytes
-and `spend_usd`. Null USD explicitly declares unpriced Codex subscription usage and leaves
-monetary comparison verification unavailable. A finite cap rejects without the
-actual missing currency meter. Cumulative full-call reservations are not refunded
-by failed attempts; larger known actual use is retained. Same-batch dispatch is
-serialized. Memory is a peak ceiling, not a sum of sequential allocations; the
-actual M2 monitor retains its documented sampling/termination limitations.
-Controller/storage overhead stays separately unknown rather than becoming zero.
-
-`AuthoringCall` contains exact SourcePair, PreparedEnvironment, ResolverInputs,
-actual M2 `GenerationCandidate`, `sources`, and one actual M2/M4 finalization input:
-`ContractFinalizationInputs`, `ScenarioFinalizationInputs`,
-`CheckerFragmentInputs`, `CheckerFinalizationInputs` or `ControlFinalizationInputs`.
-The workflow authors one bounded checker fragment per scenario and uses
-`Factory.assemble_checker` to assemble the complete validated verifier. The full
-checker proposal remains the deterministic assembly format and historical
-authoring format. Controls also supply
-the frozen `ControlPlan` and, for adversarial roles, its named `attack`. A control
-slot is category + sorted mandatory requirement IDs + attack; changing control IDs
-does not create another initial role. The candidate's first plan cannot change.
-
-The Registry jobs are `construct` / `m6-author:<lane>`, each with one possible
-provider dispatch. Provider archive callbacks reconcile an attributable unknown
-intent, then real original costs and exact archive refs. The returned artifacts
-are `(actual_authored_artifact, m6_authoring_receipt)` or just the receipt for a
-rejected call. `read_authoring_receipt` is available from `pipeline.authoring`.
-Completed results are historical readback, not current admission. Publication
-requires exact selected accounting, prior lane journals, provider archives,
-output provenance and current dependency usability. Recovery never infers again;
-`AuthoringPending` retains actual M2/M4 publication capability for
-`Factory.retry_publication`, and `Factory.recover(claim)` uses a retained provider
-status or frozen result. Missing status remains explicit unknown work.
-
-Repair mappings are contract → `authoring`, scenario → `scenarios`, and checker,
-control and alternative → shared `verifier`. Maximum two semantic repairs per
-stage and four per candidate include actual M3 neutral repairs. Every retry needs a recorded
-diagnosis and meaningful request change; IDs do not count as changes.
-
-Authoring policy V2 makes one transport-accounting correction explicit. An
-archived, completed `CodexUnavailable` attempt with no generated output and a
-terminal `max_output_tokens` error can receive an append-only
-`m6-transport-repair-classification` proof only when removing unsafe integer
-bounds alone makes its archived transport schema exactly match the corrected
-schema for that original request. All original repair flags, attempts, journals,
-costs and physical command limits remain intact. Both authoring admission and M5
-authenticate the same proof before excluding that attempt from semantic repair
-allowances. Malformed generated output remains a semantic repair. Historical V1
-policy bytes are authenticated as V1, not reinterpreted as V2.
-
-Supported complete order: contract → scenario → controls/alternative → final
-checker fragments → controller assembly with the actual `ControlRecord.control`
-values in its inputs → construct. The final checker ref must be the selected
-authenticated assembly output (or a retained direct author output). An unauthenticated later
-`attach_controls` derivation remains incomplete. Construction request V2 freezes
-history before building, including all initial and repaired calls and current
-terminal outputs; V1 bytes/readback are preserved. Complete means the explicitly
-frozen `factory-controlled-after-source-disposition` scope, not an assertion that
-no work happened outside the controller. A changed frozen history requires a new
-construction selection; it is never retrofitted into a completed request.
-
-Retained import is inert and supports complete rejected M2 contract/scenario
-chains. It validates original requests and archives, derives semantic identity
-from exact bytes when a legacy journal omitted that field, and preserves those
-legacy bytes. It never invokes a provider/finalizer or grants source admission.
-Each original provider attempt is charged once; overlapping source aggregate
-authoring costs or conflicting prior lane allocation require reconciliation.
-Imported/external history remains incomplete. Real Click's three failed calls are
-retained with source scope review still provisional and contract repair allowance
-exhausted; see `docs/evidence/M6/authoring/click-import.json`.
+See [the runbook](runbook.md) for CLI configuration and commands.

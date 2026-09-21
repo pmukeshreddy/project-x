@@ -9,8 +9,7 @@ manifests. Repository execution requires a pinned runtime profile, explicit plat
 and cached prebuilt image. Click-only runtime/discovery and MLX compatibility paths
 are removed, including the fallback that installed dependencies for every rollout.
 
-Task admission uses automated execution evidence, generated control diagnoses and
-verified construction history; signed human task acceptance has been removed.
+Task admission uses baseline, gold, wrong-implementation and clean-reset execution evidence; signed human task acceptance has been removed.
 Independent historical human audits remain separate from task admission. Mixed-file
 uncertainty is carried into permitted-source qualification rather than a manual gate.
 `construct-feature --github` captures a selected GitHub PR/issue directly; completed
@@ -58,11 +57,16 @@ Owners remain available only for confirmed integration failures. M7 independentl
 
 ## Implemented connections
 
-The CLI exposes `construct`, `qualify`, `release`, `run`, `grade`, `audit`, `train`, `evaluate`, plus `screen-source`, `author`, `import-authoring`, `accept`, `resolve`, `recover` and `retry-publication`. Strict JSON inputs invoke actual same-store services. [Runbook](runbook.md) contains commands and recovery; [native launch](reports/M7-native-launch.md) contains pinned Linux setup and SFT/GRPO/resume requirements. Module interfaces remain in `docs/interfaces-M2.md` through `docs/interfaces-M8.md`.
+The CLI exposes `construct`, `qualify`, `release`, `run`, `grade`, `audit`, `train`, `evaluate`, plus `screen-source`, `author`, `resolve`, `recover` and `retry-publication`. Strict JSON inputs invoke actual same-store services. [Runbook](runbook.md) contains commands and recovery; [native launch](reports/M7-native-launch.md) contains pinned Linux setup and SFT/GRPO/resume requirements. Module interfaces remain in `docs/interfaces-M2.md` through `docs/interfaces-M8.md`.
 
-M6 selects actual M2/M4 provider attempts, freezes candidate/batch resource reservations, enforces two repairs per stage/four per candidate, and recovers retained archives without redispatch. Construction V2 freezes exact history before TaskBuilder execution; V1 readback remains supported. The actual TEST contract→scenario→control→final checker sequence reaches complete controller history; imports/external artifacts remain incomplete. Selected source/build/grade costs retain original and incremental attribution. Known M4 results survive early publication failure in a bounded recovery capability.
+M6 now retains model resource reservations and bounded attempts per role, then
+constructs BUILT plus a receipt. Scenario identities and verifier structure are
+controller-owned; no fragment assembly or construction repair history remains.
 
-M5 requires real B/H/control/repeat/reset evidence, semantic omissions, nine attacks, an independent alternative, global repair history and current external human approval. Complete BUILT T0 is signed; later Tn payloads preserve T0 apart from state/qualification. ReleasedTaskResolver validates selected Tn→Q→T0 transitions using actual trusted service revisions and current revocation/quarantine, including candidate-specific policies. Grading BUILT tasks does not grant admission.
+M5 now runs baseline, gold, three or four wrong implementations once each, and one
+same-seed gold reset rerun. Full reward for a wrong implementation rejects the
+environment. Exact task/report binding, private gold and verifier data, current
+artifact validation and runtime isolation remain required for release.
 
 M7 owns one native parent run and one selected AgentRunner child; the RolloutRecord retains the child's Registry job ID. Actual M3 actions/source capture end in sole M4 grading, with bounded same-submission infrastructure retries. Training authenticates TRN inputs, real signal, token/context/mask/behavior data, tensor/optimizer changes and checkpoint reload. Explicit recovery authenticates the last confirmed checkpoint plus original claim/journal/shutdown, preserves costs and dispatched-data positions, and skips unknown work. An exhausted recovered budget returns BLOCKED before native restart and does not select the old checkpoint as a new success. Terminal close APIs retain pending startup/shutdown recovery.
 

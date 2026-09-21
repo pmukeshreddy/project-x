@@ -32,7 +32,6 @@ class FeatureWorkflowSettings(c.StrictModel):
     context_files: Annotated[int,Field(ge=1,le=32)]=8
     context_lines: Annotated[int,Field(ge=8,le=512)]=80
     context_bytes: Annotated[int,Field(ge=1024,le=524288)]=65536
-    max_controls: Annotated[int,Field(ge=1,le=32)]=32
     evidence_scope: Literal['real_integration','unit_diagnostic']='real_integration'
 
     @field_validator('cache_root','cache_manifest_path','git_directory')

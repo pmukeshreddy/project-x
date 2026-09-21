@@ -163,36 +163,31 @@ def bind_events(runner,request):
     runner.stdout=('\n'.join(json.dumps(event) for event in events)+'\n').encode()
 
 
-def test_two_verifier_repairs_are_shared_across_checker_and_control_roles(tmp_path,monkeypatch):
+def test_attempt_limit_is_per_role_and_new_controls_have_their_own_limit(tmp_path,monkeypatch):
     factory,candidate,call,runner=setup(tmp_path,monkeypatch)
     factory.author(candidate,call=call)
     for index in (1,2):
         changed=repaired(call,index);bind_events(runner,changed.generation.request)
         assert factory.author(candidate,call=changed).disposition==c.Disposition.SUCCESS
-    changed=repaired(call,3)
-    with pytest.raises(ValueError,match='budget'):factory.author(candidate,call=changed)
+    with pytest.raises(ValueError,match='three attempts'):
+        factory.author(candidate,call=repaired(call,3))
     assert len(runner.calls)==3
-    from feature_rl.pipeline.authoring_models import ControlPlan,ControlSlot
-    from feature_rl.verifiers import ControlFinalizationInputs,ControlProposal,SourceEdit,TextReplacement,build_control_request
+    from feature_rl.verifiers import ControlFinalizationInputs,ControlProposal,SourceChange,TextReplacement,build_control_request
     from feature_rl.requirements import AuthoringEvidenceResolver,GenerationCandidate
     from test_checker_authoring import configured_diagnostic_provider
-    inputs=ControlFinalizationInputs(control_id='FIRST_NAME',category='omission',requirement_ids=('echo',),
-        expected_valid=False,expected_reason='TEST ONLY unverified omission',baseline=call.inputs.baseline,
+    inputs=ControlFinalizationInputs(control_id='PARTIAL',category='partial',requirement_ids=('echo',),
+        expected_reason='TEST ONLY unverified partial implementation',baseline=call.inputs.baseline,
         contract=call.inputs.contract,environment=call.inputs.environment,provenance=call.inputs.provenance,costs=call.inputs.costs)
     resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump())
     request=build_control_request(request_id='CONTROL',response_id='CONTROL_RESPONSE',prompt_id='CONTROL_PROMPT',
         store=factory.store,resolver=resolver,inputs=inputs,sources=call.sources,limits=call.generation.request.limits)
-    proposal=ControlProposal(files=(SourceEdit(path='src/click/__init__.py',replacements=(TextReplacement(before='# diagnostic', after='# TEST control only\n'),)),),
+    proposal=ControlProposal(files=(SourceChange(path='src/click/__init__.py',replacements=(TextReplacement(before='# diagnostic', after='# TEST control only\n'),)),),
         deletions=(),rationale='TEST semantic validity unknown')
     _,prepared_runner=configured_diagnostic_provider(factory.store,request,proposal)
     runner.stdout=prepared_runner.stdout
-    control=call.model_copy(update={'inputs':inputs,'generation':GenerationCandidate(request=request),
-        'control_plan':ControlPlan(contract=inputs.contract,slots=(ControlSlot(category='omission',requirement_ids=('echo',)),))})
+    control=call.model_copy(update={'inputs':inputs,'generation':GenerationCandidate(request=request)})
     result=factory.author(candidate,call=control)
     assert result.disposition==c.Disposition.SUCCESS and result.artifacts[0].kind=='m4-control-record'
-    changed=repaired(control,4)
-    changed=changed.model_copy(update={'inputs':inputs.model_copy(update={'control_id':'NEW_NAME'})})
-    with pytest.raises(ValueError,match='budget'):factory.author(candidate,call=changed)
     assert len(runner.calls)==4
 
 
@@ -255,24 +250,6 @@ def contract_call(factory,base,runner):
     return base.model_copy(update={'inputs':inputs,'generation':GenerationCandidate(request=request)})
 
 
-def test_import_retained_rejected_journal_costs_without_another_provider_call(tmp_path,monkeypatch):
-    factory,candidate,base,runner=setup(tmp_path,monkeypatch)
-    call=contract_call(factory,base,runner);runner.exit_status=1
-    from feature_rl.requirements import ContractAuthoringService,AuthoringEvidenceResolver,AuthoringExhausted
-    from feature_rl.generation import CodexGenerationProvider
-    provider=CodexGenerationProvider(config=factory.authoring.codex,archive=factory.store.put_bytes)
-    resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump())
-    service=ContractAuthoringService(provider=provider,store=factory.store,resolver=resolver,revision='a'*40,evidence_scope='unit_diagnostic')
-    with pytest.raises(AuthoringExhausted) as prior:service.generate((call.generation,),call.inputs,call.sources)
-    assert len(runner.calls)==1
-    assert hasattr(factory,'import_rejected_authoring'),'retained M2 journal importer is missing'
-    journal=prior.value.journal_refs[0]
-    result=factory.import_rejected_authoring(candidate,call=call,journal_refs=(journal,))
-    assert result.disposition==c.Disposition.REJECTED and len(runner.calls)==1
-    assert factory.import_rejected_authoring(candidate,call=call,journal_refs=(journal,))==result
-    assert len(runner.calls)==1
-
-
 @pytest.mark.parametrize('field,value',[('input_tokens',1),('output_tokens',1),('wall_seconds',0.1),
     ('cpu_seconds',0.1),('memory_bytes',1),('spend_usd',1.0)])
 def test_frozen_candidate_caps_block_before_provider(tmp_path,monkeypatch,field,value):
@@ -301,150 +278,9 @@ def test_frozen_batch_command_cap_combines_distinct_candidates(tmp_path,monkeypa
     with pytest.raises(ValueError,match='frontier|budget'):factory.author(candidate,call=repaired(call,1))
 
 
-def test_retained_import_rejects_context_substitution(tmp_path,monkeypatch):
-    factory,candidate,base,runner=setup(tmp_path,monkeypatch)
-    call=contract_call(factory,base,runner);runner.exit_status=1
-    from feature_rl.requirements import ContractAuthoringService,AuthoringEvidenceResolver,AuthoringExhausted
-    from feature_rl.generation import CodexGenerationProvider
-    service=ContractAuthoringService(provider=CodexGenerationProvider(config=factory.authoring.codex,archive=factory.store.put_bytes),
-        store=factory.store,resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump()),revision='a'*40,evidence_scope='unit_diagnostic')
-    with pytest.raises(AuthoringExhausted) as prior:service.generate((call.generation,),call.inputs,call.sources)
-    changed=call.model_copy(update={'sources':(call.sources[0].model_copy(update={'context_id':'DIFFERENT_CONTEXT'}),*call.sources[1:])})
-    with pytest.raises(ValueError,match='context'):factory.import_rejected_authoring(candidate,call=changed,journal_refs=prior.value.journal_refs)
-    assert len(runner.calls)==1
-
-
-def scenario_call(factory,base,runner):
-    from feature_rl.scenarios import ScenarioFinalizationInputs,ScenarioPlanProposal,build_scenario_request
-    from feature_rl.requirements import GenerationCandidate
-    from test_checker_authoring import configured_diagnostic_provider
-    plan=factory.store.get_artifact(base.inputs.scenario_plan)
-    contract=factory.store.get_artifact(base.inputs.contract)
-    observables=tuple(dict.fromkeys(r.observable for r in contract.requirements+contract.compatibility_obligations))
-    inputs=ScenarioFinalizationInputs(contract=base.inputs.contract,supported_observables=observables,
-        seed_policy=plan.seed_policy,visibility=c.Visibility.PRIVATE,
-        provenance=plan.provenance.model_copy(update={'inputs':tuple(dict.fromkeys((*plan.provenance.inputs,base.inputs.contract)))}),costs=plan.costs)
-    request=build_scenario_request(request_id='SCENARIOS',response_id='SCENARIOS_RESPONSE',prompt_id='SCENARIOS_PROMPT',
-        contract=factory.store.get_artifact(inputs.contract),contract_ref=inputs.contract,sources=base.sources,
-        limits=base.generation.request.limits)
-    proposed=plan.model_dump(mode='json')['scenarios']
-    for scenario in proposed:scenario['observations']=list(observables)
-    proposal=ScenarioPlanProposal.model_validate_json(canonical_json({'scenarios':proposed}))
-    _,prepared=configured_diagnostic_provider(factory.store,request,proposal);runner.stdout=prepared.stdout
-    return base.model_copy(update={'inputs':inputs,'generation':GenerationCandidate(request=request)})
-
-
-def test_actual_scenario_service_uses_exact_frozen_contract(tmp_path,monkeypatch):
-    factory,candidate,base,runner=setup(tmp_path,monkeypatch)
-    call=scenario_call(factory,base,runner)
-    result=factory.author(candidate,call=call)
-    assert result.disposition==c.Disposition.SUCCESS and result.artifacts[0].kind=='ScenarioPlan'
-    assert factory.store.get_artifact(result.artifacts[0]).contract==call.inputs.contract
-    assert len(runner.calls)==1
-
-
-@pytest.mark.parametrize('fragmented',[False,True])
-def test_complete_history_uses_actual_terminal_contract_scenario_checker_outputs(tmp_path,monkeypatch,fragmented):
-    factory,candidate,base,runner=setup(tmp_path,monkeypatch)
-    checker_proposal=next(json.loads(event['item']['text'])['content'] for event in
-        (json.loads(line) for line in runner.stdout.splitlines()) if event['type']=='item.completed')
-    contract=factory.author(candidate,call=contract_call(factory,base,runner)).artifacts[0]
-    current=base.model_copy(update={'inputs':base.inputs.model_copy(update={'contract':contract})})
-    scenarios=factory.author(candidate,call=scenario_call(factory,current,runner)).artifacts[0]
-    from feature_rl.verifiers import build_checker_request,CheckerProposal,ControlFinalizationInputs,ControlProposal,SourceEdit,TextReplacement,build_control_request
-    from feature_rl.requirements import GenerationCandidate,AuthoringEvidenceResolver
-    from test_checker_authoring import configured_diagnostic_provider
-    from feature_rl.pipeline.authoring_models import ControlPlan,ControlSlot
-    control_inputs=ControlFinalizationInputs(control_id='TEST_OMISSION',category='omission',requirement_ids=('echo',),
-        expected_valid=False,expected_reason='TEST unverified missing implementation',baseline=base.inputs.baseline,
-        contract=contract,environment=base.inputs.environment,
-        provenance=base.inputs.provenance.model_copy(update={'inputs':(*base.inputs.provenance.inputs,contract)}),costs=base.inputs.costs)
-    control_request=build_control_request(request_id='HISTORY_CONTROL',response_id='HISTORY_CONTROL_RESPONSE',prompt_id='HISTORY_CONTROL_PROMPT',
-        store=factory.store,resolver=AuthoringEvidenceResolver(store=factory.store,**base.resolver.model_dump()),
-        inputs=control_inputs,sources=base.sources,limits=base.generation.request.limits)
-    control_proposal=ControlProposal(files=(SourceEdit(path='src/click/__init__.py',replacements=(TextReplacement(before='# diagnostic', after='# TEST omission control\n'),)),),
-        deletions=(),rationale='TEST only, not qualified semantic evidence')
-    _,prepared=configured_diagnostic_provider(factory.store,control_request,control_proposal);runner.stdout=prepared.stdout
-    control_call=base.model_copy(update={'inputs':control_inputs,'generation':GenerationCandidate(request=control_request),
-        'control_plan':ControlPlan(contract=contract,slots=(ControlSlot(category='omission',requirement_ids=('echo',)),))})
-    control_ref=factory.author(candidate,call=control_call).artifacts[0]
-    from feature_rl.pipeline.packaging import read_record
-    from feature_rl.verifiers.control_authoring import ControlRecord
-    control=read_record(factory.store,control_ref,ControlRecord,'m4-control-record')
-    inputs=current.inputs.model_copy(update={'scenario_plan':scenarios,
-        'controls':(control.control,),
-        'provenance':current.inputs.provenance.model_copy(update={'inputs':(*current.inputs.provenance.inputs,contract,scenarios)})})
-    request=build_checker_request(request_id='FINAL_CHECKER',response_id='FINAL_CHECKER_RESPONSE',prompt_id='FINAL_CHECKER_PROMPT',
-        contract=factory.store.get_artifact(contract),contract_ref=contract,plan=factory.store.get_artifact(scenarios),
-        plan_ref=scenarios,sources=base.sources,limits=base.generation.request.limits)
-    _,prepared=configured_diagnostic_provider(factory.store,request,CheckerProposal.model_validate_json(canonical_json(checker_proposal)))
-    runner.stdout=prepared.stdout
-    current=current.model_copy(update={'inputs':inputs,'generation':GenerationCandidate(request=request)})
-    if fragmented:
-        from test_factory_checker_fragments import fragment
-        fragments=tuple(fragment(factory,current,runner,scenario.scenario_id)
-            for scenario in factory.store.get_artifact(scenarios).scenarios)
-        verifier=factory.assemble_checker(candidate,inputs=inputs,fragments=fragments).artifacts[0]
-    else:
-        verifier=factory.author(candidate,call=current).artifacts[0]
-    from feature_rl.pipeline.models import BuildInputs
-    from feature_rl.pipeline.construction import ConstructionRequest
-    from feature_rl.pipeline.authoring_history import selected_history
-    from feature_rl.pipeline.packaging import read_record
-    from feature_rl.qualification import RepairHistory,validate_repairs
-    build=BuildInputs(source_pair=base.source_pair,contract=contract,scenario_plan=scenarios,verifier=verifier,
-        environment=base.environment,baseline_files=('src/click/__init__.py',),invocation='TEST_COMPLETE_HISTORY')
-    request=ConstructionRequest(candidate=candidate,source=factory.screen_source(candidate).artifacts[0],inputs=build,builder_job=None)
-    history=read_record(factory.store,selected_history(factory,request),RepairHistory,'m5-repair-history')
-    assert history.complete and validate_repairs(history,candidate,())==0
-    assert len(runner.calls)==(5 if fragmented else 4)
-    assert factory.store.get_artifact(verifier).controls==(control.control,)
-    from feature_rl.pipeline.authoring import jobs
-    assert control_ref in {ref for job,_ in jobs(factory,candidate)
-        for ref in job.result.artifacts}
-
-
-def test_four_candidate_repairs_and_frozen_incomplete_history_across_actual_stages(tmp_path,monkeypatch):
-    factory,candidate,checker,runner=setup(tmp_path,monkeypatch)
-    checker_events=runner.stdout
-    contract=contract_call(factory,checker,runner)
-    assert factory.author(candidate,call=contract).disposition==c.Disposition.SUCCESS
-    for index in (1,2):
-        changed=repaired(contract,index);bind_events(runner,changed.generation.request)
-        assert factory.author(candidate,call=changed).disposition==c.Disposition.SUCCESS
-    runner.stdout=checker_events
-    result=factory.author(candidate,call=checker)
-    for index in (1,2):
-        changed=repaired(checker,index);bind_events(runner,changed.generation.request)
-        result=factory.author(candidate,call=changed)
-    from feature_rl.pipeline.models import BuildInputs
-    from feature_rl.pipeline.construction import ConstructionRequest,read_construction_request
-    from feature_rl.pipeline.authoring_history import selected_history
-    from feature_rl.pipeline.packaging import read_record
-    from feature_rl.qualification import RepairHistory
-    inputs=BuildInputs(source_pair=checker.source_pair,contract=checker.inputs.contract,
-        scenario_plan=checker.inputs.scenario_plan,verifier=result.artifacts[0],environment=checker.environment,
-        baseline_files=('src/click/__init__.py',),invocation='TEST_HISTORY')
-    request=ConstructionRequest(candidate=candidate,source=factory.screen_source(candidate).artifacts[0],inputs=inputs,builder_job=None)
-    history_ref=selected_history(factory,request)
-    history=read_record(factory.store,history_ref,RepairHistory,'m5-repair-history')
-    assert not history.complete  # task contract/plan were externally authored diagnostics
-    assert [item.stage for item in history.attempts]==['authoring','authoring','verifier','verifier']
-    assert history.attempts[1].before==history.attempts[0].after
-    assert history.attempts[3].before==history.attempts[2].after
-    assert all(any(cost.input_tokens==41 for cost in item.costs) for item in history.attempts)
-    assert selected_history(factory,request)==history_ref
-    scenarios=scenario_call(factory,checker,runner)
-    assert factory.author(candidate,call=scenarios).disposition==c.Disposition.SUCCESS
-    with pytest.raises(ValueError,match='shared repair budget'):factory.author(candidate,call=repaired(scenarios,1))
-    assert len(runner.calls)==7
-    # V2 freezes this exact history before the actual builder decides whether
-    # these diagnostic environment inputs satisfy packaging policy.
-    constructed=factory.construct(candidate,inputs=inputs)
-    parent=next(factory.registry.job(j) for j in factory.registry.trace(candidate).jobs
-        if factory.registry.job(j).spec.invocation=='m6-construct')
-    frozen=read_construction_request(factory.store,parent.spec.inputs[2])
-    assert frozen.version=='m6-construction-request-v2'
-    selected=read_record(factory.store,frozen.history,RepairHistory,'m5-repair-history')
-    assert len(selected.attempts)==4 and not selected.complete
-    assert factory.construct(candidate,inputs=inputs)==constructed
+def test_authoring_contracts_have_no_removed_control_or_repair_configuration():
+    assert 'control_plan' not in AuthoringCall.model_fields
+    assert 'attack' not in AuthoringCall.model_fields
+    assert 'semantic_repair_authorization' not in AuthoringSettings.model_fields
+    assert not hasattr(Factory,'assemble_checker')
+    assert not hasattr(Factory,'import_rejected_authoring')

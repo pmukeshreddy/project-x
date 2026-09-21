@@ -80,7 +80,9 @@ def fixture(tmp_path, monkeypatch, *, archive=None, files=None):
     data['SourcePair'].update(baseline=baseline.model_dump(mode='json'), reference=reference.model_dump(mode='json'))
     data['RequirementContract'].update(provenance_label='reconstructed_specification',
         visible_request='DIAGNOSTIC ONLY packaging request', capability='DIAGNOSTIC frozen package',
-        public_checks=[public_check.model_dump(mode='json')])
+        public_checks=[public_check.model_dump(mode='json')],
+        feature_files=[dict(path='src/click/__init__.py',requirement_ids=['R1'],
+            rationale='DIAGNOSTIC implementation scope',evidence=data['RequirementContract']['requirements'][0]['evidence'])])
     data['RequirementContract']['allowed_changes'].update(source_roots=['src'], forbidden_paths=[])
     for kind in ('CandidateRecord', 'SourcePair', 'RequirementContract', 'ScenarioPlan', 'VerifierBundle'):
         if kind == 'VerifierBundle':
