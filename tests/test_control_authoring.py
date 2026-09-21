@@ -2,7 +2,6 @@
 import json
 import pytest
 from feature_rl import contracts as c
-from feature_rl.requirements import GenerationCandidate
 from feature_rl.verifiers import (ControlFinalizationInputs, ControlProposal, SourceChange,
     TextReplacement, ControlAuthoringService, ControlFinalizer, build_control_request)
 from test_checker_authoring import checker_fixture, configured_diagnostic_provider
@@ -27,7 +26,7 @@ def control_fixture(tmp_path):
 
 def test_wrong_implementation_publishes_private_source_with_real_model_cost(tmp_path):
     store, inputs, sources, _, proposal, request, runner, service = control_fixture(tmp_path)
-    result = service.generate((GenerationCandidate(request=request),), inputs, sources)
+    result = service.generate((request,), inputs, sources)
     assert len(runner.calls) == 1
     assert result.control.patch.visibility is c.Visibility.PRIVATE
     assert result.control.category == 'partial'

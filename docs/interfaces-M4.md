@@ -86,5 +86,6 @@ mode; missing files are created from a single empty anchor. The controller
 checks legal paths, anchors and source limits before publication.
 
 Model calls retain strict schemas, private provider records, resource caps and
-at most three attempts per role. There are no checker fragments, assembly jobs,
-alternative positives, isolation targets or qualification repair histories.
+at most three attempts per role. A validation failure may retry without diagnosis,
+changed-input tracking or a predecessor journal. There are no checker fragments,
+assembly jobs, alternative positives, isolation targets or qualification repair histories.

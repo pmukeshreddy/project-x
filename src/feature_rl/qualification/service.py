@@ -1,22 +1,17 @@
-"""Execute qualification through M4/M3 and freeze admission evidence.
-
-Registry job selection, not arbitrary stored report booleans, is the operation
-origin. This module never signs human evidence or constructs a solver package.
-"""
+"""Run baseline, gold, wrong solutions and reset once, then freeze the result."""
 from datetime import datetime, timezone
-import uuid
+import time
 from feature_rl import contracts as c
-from feature_rl.artifacts import ArtifactStore, ArtifactError, canonical_json
-from feature_rl.environments import ExecutionRequest, CommandSpec, EnvironmentError
-from feature_rl.grading import GradingService
-from feature_rl.registry import Registry, JobSpec, CostObservation
+from feature_rl.artifacts import ArtifactStore, ArtifactError
+from feature_rl.environments import ExecutionRequest, CommandSpec, EnvironmentError, SourceArchive
+from feature_rl.grading import GradingService, read_grade
+from feature_rl.registry import Registry
 from feature_rl.verifiers import load_verifier
-from feature_rl.verifiers.loader import read_local, read_bytes
-from .models import (QualificationRejected, QualificationPolicy, RunBinding, ResetReceipt,
-    ReferenceProjection, QualificationPublicationFailed, QualificationUnavailable)
+from feature_rl.verifiers.loader import read_local
+from .models import QualificationRejected, QualificationPolicy, ResetReceipt, ReferenceProjection
 from .projection import derive_reference
-from .controls import assess_outcome, validate_control_plan
-from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade, validate_reset, check_consumed, assert_reference_determinism
+from .controls import assess_outcome, validate_control_plan, validate_wrong_sources, disposition_for
+from .evidence import put_record, unknown_cost, collapse_costs, evidence, assert_reference_determinism
 
 
 class QualificationService:
@@ -32,162 +27,98 @@ class QualificationService:
         self.store=store;self.registry=registry;self.grader=grader;self.builder=builder;self.revision=revision
         self.policy=QualificationPolicy() if policy is None else QualificationPolicy.model_validate(policy)
         self.policy_ref=put_record(store,self.policy,'m5-qualification-policy')
-        self.configuration=put_record(store,{'version':'m5-configuration-v1','policy':self.policy_ref.model_dump(mode='json'),
-            'grading_revision':grader.revision,'runtime_revision':grader.runtime.revision,
-            'builder_revision':builder.revision if builder is not None else None},'m5-qualification-configuration')
         self.registry.register(self.policy_ref)
-        self.registry.register(self.configuration,dependencies=(self.policy_ref,))
 
-    def _job(self,task,invocation,*,configuration=None,inputs=None,operation='qualify'):
-        return self.registry.enqueue(JobSpec(operation=operation,inputs=inputs or (task,),configuration=configuration or self.configuration,
-            implementation=self.revision,invocation=invocation,attempt_limit=1))
-
-    def _claim(self,job):
-        if job.state=='running':raise QualificationUnavailable('qualification attempt already running; it cannot execute twice',self.registry.attempts(job.job_id)[-1].claim)
-        if job.state!='queued':raise QualificationUnavailable('qualification attempt is not queued')
-        return self.registry.claim(job.job_id,owner='feature_rl.qualification',claim_key=uuid.uuid4().hex)
-
-    def _complete(self,claim,result):
-        try:
-            normalized=result.model_copy(update={'costs':collapse_costs(result.costs)})
-            observation=self.registry.reconcile(claim,CostObservation(source='m5-operation',upstream_attempt_id=claim.attempt_id,
-                revision=1,receipts=normalized.artifacts,costs=normalized.costs))
-            return self.registry.complete(claim,normalized,observations=(observation.observation_id,)).result
-        except Exception as exc:
-            raise QualificationPublicationFailed('Qualification publication failed; do not repeat execution',claim=claim) from exc
+    def _runs(self,checked,projection):
+        missing,targets=validate_control_plan(checked)
+        if missing:raise QualificationRejected('provisional','; '.join(missing))
+        validate_wrong_sources(self,checked)
+        baseline=self.grader.submissions.create(checked.task.baseline,SourceArchive({}).to_tar(),(),checked.contract.allowed_changes)
+        seed=self.policy.seed
+        return (('baseline_absence',baseline,seed,'baseline_absence',targets,False),
+                ('fresh_0',projection.submission,seed,'positive',(),False),
+                *(('control_'+control.control_id,control.patch,seed,'negative',control.requirement_ids,False)
+                  for control in checked.verifier.controls),
+                ('reset_0',projection.submission,seed,'positive',(),True))
 
     def qualify(self,task_version):
         task_version=c.ArtifactRef.model_validate(task_version)
-        job=self._job(task_version,'m5-qualify')
+        self.registry.register(task_version)
         self.registry.assert_usable(task_version)
-        if job.state=='completed':return job.result
-        claim=self._claim(job)
-        return self._execute(task_version,claim)
-
-    def _execute(self,task_version,claim):
-        checked=None;projection_ref=None;bindings=[];assessments={};costs=[];issues=[]
-        started=datetime.now(timezone.utc);seen=set();signatures={}
+        projection_ref=None;assessments={};costs=[];issues=[]
+        started=time.monotonic();signatures={}
         try:
             checked=load_verifier(self.store,task_version)
             self.grader.select_task(checked)
             if checked.task.state!=c.TaskState.BUILT or checked.task.qualification is not None:
-                raise QualificationRejected('invalid_evidence','qualification requires exact unqualified BUILT task')
+                raise QualificationRejected('invalid_evidence','qualification requires an unqualified BUILT task')
             if any(a.disposition=='unresolved' for a in checked.contract.ambiguities):
                 raise QualificationRejected('ambiguous_requirement','unresolved contract ambiguity')
             if self.builder is None:raise QualificationRejected('provisional','actual final package validator is unavailable')
             self.builder.solver_package(task_version)
-            missing,_=validate_control_plan(checked)
-            if missing:raise QualificationRejected('provisional','; '.join(missing))
             projection=derive_reference(self.store,task_version,self.grader.submissions.policy)
             projection_ref=put_record(self.store,projection,'m5-reference-projection')
             self.registry.register(projection_ref,dependencies=(task_version,projection.submission,projection.projected_source))
-            from .admission import expected_runs
-            runs,_=expected_runs(self,checked,projection)
-            for name,submission,seed,mode,targets,reset in runs:
-                if (datetime.now(timezone.utc)-started).total_seconds()>=self.policy.max_wall_seconds:
+            for name,submission,seed,mode,targets,reset in self._runs(checked,projection):
+                if time.monotonic()-started>=self.policy.max_wall_seconds:
                     raise QualificationRejected('budget_exhausted','qualification wall budget reached')
-                binding,result,receipt=self._run(checked,projection_ref,submission,seed,name,mode,targets,claim,reset,seen)
-                bindings.append(binding);costs.extend(result.costs)
+                result,receipt=self._run(checked,projection_ref,submission,seed,reset)
+                costs.extend(result.costs)
                 outcome=assess_outcome(checked,receipt,mode,targets)
+                run_evidence=evidence(result.artifacts[0],self.revision,
+                    ('QualificationService.grade',name,task_version.sha256),scope='real_integration')
+                run_evidence=run_evidence.model_copy(update={'artifacts':result.artifacts})
                 assessments[name]=c.RunAssessment(name=name,subject=task_version,
                     disposition=c.Disposition.SUCCESS if outcome.passed else c.Disposition.REJECTED,
-                    passed=outcome.passed,requirement_ids=targets,reason=outcome.detail,
-                    evidence=(evidence(binding,self.revision,('QualificationService.execute',name,task_version.sha256),scope='real_integration'),))
+                    passed=outcome.passed,requirement_ids=targets,reason=outcome.detail,evidence=(run_evidence,))
                 if name=='baseline_absence':
                     healthy=assess_outcome(checked,receipt,'baseline_health',())
                     assessments['baseline_health']=c.RunAssessment(name='baseline_health',subject=task_version,
                         disposition=c.Disposition.SUCCESS if healthy.passed else c.Disposition.REJECTED,passed=healthy.passed,
                         requirement_ids=tuple(r.requirement_id for r in checked.contract.compatibility_obligations if r.mandatory),
-                        reason=healthy.detail,evidence=assessments[name].evidence)
+                        reason=healthy.detail,evidence=(run_evidence,))
                     if not healthy.passed:raise QualificationRejected(healthy.code,'baseline_health: '+healthy.detail)
                 if not outcome.passed:raise QualificationRejected(outcome.code,name+': '+outcome.detail)
                 if name in {'fresh_0','reset_0'}:assert_reference_determinism(self.store,checked,receipt,signatures)
         except QualificationRejected as exc:issues.append(exc.code+': '+exc.detail)
         except (ArtifactError,ValueError,EnvironmentError) as exc:issues.append('environment_failure: '+type(exc).__name__+': '+str(exc)[:1200])
-        frozen_time=datetime.now(timezone.utc)
-        elapsed=(frozen_time-started).total_seconds()
-        if elapsed<0 or elapsed>self.policy.max_wall_seconds:issues.append('budget_exhausted: qualification wall budget exceeded or clock moved backwards')
-        return self._publish_qualification(claim,{'task':task_version,'projection':projection_ref,'bindings':tuple(bindings),
-            'assessments':assessments,'costs':tuple(costs),'issues':tuple(sorted(set(issues))),
-            'recorded_at':frozen_time,'wall_seconds':max(0.0,elapsed)})
+        if time.monotonic()-started>self.policy.max_wall_seconds:
+            issues.append('budget_exhausted: qualification wall budget exceeded')
+        return self._publish_qualification({'task':task_version,'projection':projection_ref,
+            'assessments':assessments,'costs':tuple(costs),'issues':tuple(issues)})
 
-    def _publish_qualification(self,claim,frozen):
-        from .models import QualificationSummary
-        from .controls import disposition_for
-        task_version=frozen['task'];projection_ref=frozen['projection'];bindings=frozen['bindings']
-        assessments=frozen['assessments'];issues=frozen['issues'];frozen_time=frozen['recorded_at']
-        summary=put_record(self.store,QualificationSummary(task=task_version,policy=self.policy_ref,projection=projection_ref,
-            bindings=bindings,issues=issues,qualification_job=claim.job_id,wall_seconds=frozen['wall_seconds']),'m5-qualification-summary')
-        self.registry.register(summary,dependencies=(task_version,self.policy_ref,*bindings,*([projection_ref] if projection_ref else [])))
-        ev=evidence(summary,self.revision,('QualificationService.qualify',task_version.sha256),scope='real_integration' if bindings else 'source_inspection').model_copy(update={'recorded_at':frozen_time})
+    def _publish_qualification(self,frozen):
+        task=frozen['task'];projection=frozen['projection'];assessments=frozen['assessments'];issues=frozen['issues']
+        ev=evidence(projection or task,self.revision,('QualificationService.qualify',task.sha256),
+            scope='real_integration' if assessments else 'source_inspection')
         disposition=disposition_for(issues)
         report=c.QualificationReport(kind='QualificationReport',schema_version=1,visibility=c.Visibility.PRIVATE,
-            provenance=c.Provenance(producer='feature_rl.qualification',producer_version=self.revision,created_at=frozen_time,
-                inputs=(task_version,self.policy_ref,summary),evidence=(ev,)),costs=collapse_costs((*frozen['costs'],unknown_cost())),
-            task=task_version,disposition=disposition,baseline_health=assessments.get('baseline_health'),
-            baseline_absence=assessments.get('baseline_absence'),reference_run=assessments.get('fresh_0'),
-            controls=tuple(v for name,v in assessments.items() if name.startswith('control_')),
+            provenance=c.Provenance(producer='feature_rl.qualification',producer_version=self.revision,
+                created_at=ev.recorded_at,inputs=(task,self.policy_ref,*((projection,) if projection else ())),evidence=(ev,)),
+            costs=collapse_costs((*frozen['costs'],unknown_cost())),task=task,disposition=disposition,
+            baseline_health=assessments.get('baseline_health'),baseline_absence=assessments.get('baseline_absence'),
+            reference_run=assessments.get('fresh_0'),controls=tuple(v for name,v in assessments.items() if name.startswith('control_')),
             fresh_runs=tuple(v for name,v in assessments.items() if name.startswith('fresh_')),
             interrupted_reset_runs=tuple(v for name,v in assessments.items() if name.startswith('reset_')),
             rejection_reasons=issues,policy_version=self.policy.policy_id)
         report_ref=self.store.put_artifact(report)
-        result=c.OperationResult(operation='qualify',disposition=disposition,artifacts=(report_ref,summary),
+        self.registry.register(report_ref)
+        return c.OperationResult(operation='qualify',disposition=disposition,artifacts=(report_ref,),
             evidence=(ev,),costs=report.costs,reason='; '.join(issues) or 'Baseline, gold, wrong implementations and clean reset passed')
-        if disposition==c.Disposition.SUCCESS:
-            from .admission import validate_pending_admission
-            self.registry.register(report_ref)
-            validate_pending_admission(self,result,claim)
-        return self._complete(claim,result)
 
-    def _source_dependencies(self,checked,submission,*,register=False):
-        from feature_rl.submission.source import Submission
-        from feature_rl.verifiers.language import decode_json
-        try:
-            value=Submission.model_validate_json(canonical_json(decode_json(
-                read_bytes(self.store,submission,65536,'m4-submission'),65536)))
-        except ValueError as exc:
-            raise QualificationRejected('invalid_evidence','invalid qualification submission manifest') from exc
-        if (value.baseline!=checked.task.baseline or value.changes.kind!='m4-source-delta'
-                or value.changes.encoding!='bytes'):
-            raise QualificationRejected('invalid_evidence','qualification submission baseline or source delta mismatch')
-        refs=(checked.task.baseline,value.changes)
-        check_consumed(self.registry,refs,register=register)
-        return refs
-
-    def _run(self,checked,projection_ref,submission,seed,name,mode,targets,parent_claim,reset,seen):
-        source_refs=self._source_dependencies(checked,submission,register=True)
-        config=put_record(self.store,{'version':'m5-run-configuration-v2','configuration':self.configuration.model_dump(mode='json'),
-            'projection':projection_ref.model_dump(mode='json'),'submission':submission.model_dump(mode='json'),
-            'source_dependencies':[ref.model_dump(mode='json') for ref in source_refs],
-            'seed':seed,'name':name,'mode':mode,'targets':list(targets),'reset':reset},'m5-run-configuration')
-        self.registry.register(config,dependencies=tuple(dict.fromkeys((self.configuration,projection_ref,submission,*source_refs))))
-        self.registry.assert_usable(config)
-        job=self._job(checked.task_ref,'m5-run:'+parent_claim.job_id+':'+name,configuration=config,operation='grade')
-        if job.state=='completed':result=job.result
-        else:
-            claim=self._claim(job)
-            reset_ref=None;extra_costs=()
-            try:
-                if reset:reset_ref,extra_costs=self._reset(checked,projection_ref,submission)
-                result=self.grader.grade(checked.task_ref,submission,seed)
-            except QualificationRejected:
-                raise
-            except Exception as exc:
-                raise QualificationUnavailable('Grading/reset attempt is incomplete; execution cannot be repeated',claim) from exc
-            if reset_ref is not None:
-                result=c.OperationResult(operation='grade',disposition=result.disposition,artifacts=(*result.artifacts,reset_ref),
-                    evidence=result.evidence,costs=(*extra_costs,*result.costs),reason=result.reason)
-            result=self._complete(claim,result)
-        receipt,ids=validate_grade(self.store,checked,submission,seed,result,self.grader,seen=seen)
-        reset_refs=[ref for ref in result.artifacts if ref.kind=='m5-reset']
-        if reset and len(reset_refs)!=1:raise QualificationRejected('invalid_evidence','reset grade lacks exact reset receipt')
-        if reset:
-            validate_reset(self.store,checked,projection_ref,reset_refs[0],self.grader,seen=seen)
-        binding=RunBinding(name=name,task=checked.task_ref,projection=projection_ref,submission=submission,seed=seed,
-            grade=result.artifacts[0],mode=mode,targets=targets,operation_ids=ids,grade_job=job.job_id,reset=reset_refs[0] if reset_refs else None)
-        ref=put_record(self.store,binding,'m5-run-binding')
-        self.registry.register(ref,dependencies=tuple(dict.fromkeys((checked.task_ref,projection_ref,submission,*source_refs,config,*result.artifacts))))
-        return ref,result,receipt
+    def _run(self,checked,projection_ref,submission,seed,reset):
+        reset_ref=None;extra_costs=()
+        if reset:reset_ref,extra_costs=self._reset(checked,projection_ref,submission)
+        result=self.grader.grade(checked.task_ref,submission,seed)
+        if result.operation!='grade' or not result.artifacts:
+            raise QualificationRejected('invalid_evidence','grader returned no grade receipt')
+        receipt=read_grade(self.store,result.artifacts[0])
+        if (receipt.task,receipt.submission,receipt.case_seed,receipt.verifier,receipt.implementation_revision,receipt.disposition)!=(
+                checked.task_ref,submission,seed,checked.task.private_oracle,self.grader.revision,result.disposition):
+            raise QualificationRejected('invalid_evidence','grader returned a receipt for another task, solution or seed')
+        if reset_ref is not None:
+            result=result.model_copy(update={'artifacts':(*result.artifacts,reset_ref),'costs':(*extra_costs,*result.costs)})
+        return result,receipt
 
     def _reset(self,checked,projection_ref,submission):
         from .evidence import reset_probe, RESET_PROBE_BYTES
@@ -200,12 +131,15 @@ class QualificationService:
             _,_,_,initial,initial_source=runtime.workspace(handle)
             # A fixed controller diagnostic mutates only an allowed source file;
             # the original confirmed source must be restored before grading.
-            path,_=reset_probe(initial_source,checked.contract.allowed_changes,runtime.profile)
+            path,dirty_entry=reset_probe(initial_source,checked.contract.allowed_changes,runtime.profile)
             mutation=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(
                 argv=('/usr/local/bin/python','-I','-c','import pathlib,sys\nwith pathlib.Path(sys.argv[1]).open("ab") as stream: stream.write(sys.stdin.buffer.read())','/workspace/source/'+path),
                 working_directory='/workspace',timeout_seconds=2.0),stdin=RESET_PROBE_BYTES,save_source=True))
             if mutation.reason!='completed' or not mutation.cleanup_verified or mutation.saved_source.artifact==initial.artifact:
                 raise QualificationRejected('environment_failure','reset canary was not actually saved with verified cleanup')
+            dirty=self.grader.submissions.source(mutation.saved_source.artifact)
+            if dirty.files!=dict(initial_source.files)|{path:dirty_entry}:
+                raise QualificationRejected('environment_failure','reset canary changed unexpected source bytes')
             before=runtime.workspace(handle,bind=False)[0]['generation']
             restored=runtime.reset(handle)
             after=runtime.workspace(handle,bind=False)[0]['generation']

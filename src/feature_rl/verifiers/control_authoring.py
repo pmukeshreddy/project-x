@@ -225,7 +225,7 @@ class ControlAuthoringResult:
 class ControlPublicationPending(RuntimeError):
     prepared: PreparedControl
     generation: GenerationResult
-    prior_journal_refs: tuple[ArtifactRef, ...]
+    journal_refs: tuple[ArtifactRef, ...]
     journal_payload: bytes
     publication_error: str
 
@@ -233,16 +233,15 @@ class ControlPublicationPending(RuntimeError):
         journal = store.put_bytes(self.journal_payload, 'control-authoring-journal', Visibility.PRIVATE)
         ref = self.prepared.publish(store)
         return ControlAuthoringResult(self.prepared.record.control, self.prepared.record, ref,
-            self.generation, self.prior_journal_refs+(journal,))
+            self.generation, self.journal_refs+(journal,))
 
 
 class ControlAuthoringService(CheckerAuthoringService):
-    def generate(self, candidates, inputs, sources, *, prior_journal_refs=(), recovered_result=None, recovered_error=None):
+    def generate(self, requests, inputs, sources, *, recovered_result=None, recovered_error=None):
         inputs, sources, contract, _, _, contexts = resolve_control_inputs(self.store, self.resolver, inputs, sources)
-        return run_authoring(self, candidates, stage=GenerationStage.CONTROL_AUTHORING, schema=ControlProposal,
+        return run_authoring(self, requests, stage=GenerationStage.CONTROL_AUTHORING, schema=ControlProposal,
             contexts=contexts, ids=tuple(r.requirement_id for r in contract.requirements+contract.compatibility_obligations),
-            binding=inputs.model_dump(mode='json', exclude={'provenance', 'costs'}),
-            inputs=inputs, sources=sources, prior_journal_refs=prior_journal_refs,
+            inputs=inputs, sources=sources,
             recovered_result=recovered_result, recovered_error=recovered_error,
             prepare=lambda proposal, frozen: ControlFinalizer(store=self.store, resolver=self.resolver).prepare(proposal, frozen, sources),
             journal_kind='control-authoring-journal', pending_type=ControlPublicationPending)

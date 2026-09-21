@@ -31,7 +31,6 @@ from feature_rl.requirements import (
     ContractFinalizationInputs,
     ContractFinalizer,
     RuntimeDiscoveryService,
-    GenerationCandidate,
     GroundedSource,
     GroundingError,
     RequirementContractProposal,
@@ -601,7 +600,7 @@ def test_contract_request_contains_only_grounded_sources_and_excludes_license():
     assert '"supported_observables":["combined terminal output","CLI exit code"]' in built.instruction
 
 
-def test_contract_service_records_failed_candidate_then_freezes_grounded_repair(tmp_path):
+def test_contract_service_records_failed_attempt_then_freezes_grounded_retry(tmp_path):
     forged = contract_proposal(
         requirements=(
             contract_proposal().requirements[0].model_copy(
@@ -626,12 +625,8 @@ def test_contract_service_records_failed_candidate_then_freezes_grounded_repair(
     )
     result = service.generate(
         (
-            GenerationCandidate(request=contract_request()),
-            GenerationCandidate(
-                request=contract_request(2),
-                diagnosis="The first proposal quoted text absent from its locator.",
-                changed_input="Require verbatim quotes copied from admitted contexts.",
-            ),
+            contract_request(),
+            contract_request(2),
         ),
         contract_inputs(),
         sources(),
@@ -644,65 +639,24 @@ def test_contract_service_records_failed_candidate_then_freezes_grounded_repair(
     assert result.generation.record.attempt_id == "attempt-2"
 
 
-def test_contract_service_requires_diagnosed_changed_repairs_and_preserves_exhaustion(tmp_path):
-    with pytest.raises(ValidationError):
-        GenerationCandidate(request=contract_request(2), diagnosis="failure")
+def test_contract_service_retries_same_prompt_and_preserves_exhaustion(tmp_path):
     provider = FakeProvider((provider_result({"malformed": True}),))
     store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
     service = ContractAuthoringService(
-        provider=provider,
-        store=store,
-        resolver=FakeEvidenceResolver(sources()),
-        revision="2" * 40,
-        evidence_scope="unit_diagnostic",
+        provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
+        revision="2" * 40, evidence_scope="unit_diagnostic",
     )
     with pytest.raises(AuthoringExhausted) as caught:
-        service.generate((GenerationCandidate(request=contract_request()),), contract_inputs(), sources())
+        service.generate((contract_request(),), contract_inputs(), sources())
     assert len(caught.value.journal_refs) == 1
     assert "ValidationError" in store.get_bytes(caught.value.journal_refs[0]).decode()
+    retry = contract_request().model_copy(update={
+        "request_id": "REQ_2", "response_id": "RESP_2", "prompt_id": "PROMPT_2",
+    })
     service.provider = FakeProvider((provider_result(contract_proposal(), 2),))
-    repaired = service.generate(
-        (
-            GenerationCandidate(
-                request=contract_request(2),
-                diagnosis="The first output omitted every required proposal field.",
-                changed_input="Add an explicit checklist of the six required proposal fields.",
-            ),
-        ),
-        contract_inputs(),
-        sources(),
-        prior_journal_refs=caught.value.journal_refs,
-    )
-    assert len(repaired.journal_refs) == 2
-
-
-def test_contract_service_rejects_identity_only_repair(tmp_path):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    first = contract_request()
-    identity_only = first.model_copy(
-        update={
-            "request_id": "REQ_IDENTITY_ONLY",
-            "response_id": "RESP_IDENTITY_ONLY",
-            "prompt_id": "PROMPT_IDENTITY_ONLY",
-        }
-    )
-    service = ContractAuthoringService(
-        provider=FakeProvider(()), store=store,
-        resolver=FakeEvidenceResolver(sources()), revision="2" * 40,
-        evidence_scope="unit_diagnostic",
-    )
-    with pytest.raises(ValueError, match="meaningful request input"):
-        service.generate(
-            (
-                GenerationCandidate(request=first),
-                GenerationCandidate(
-                    request=identity_only,
-                    diagnosis="retry",
-                    changed_input="Only identities changed.",
-                ),
-            ),
-            contract_inputs(), sources(),
-        )
+    result = service.generate((retry,), contract_inputs(), sources())
+    assert result.contract_ref == store.put_artifact(result.contract)
+    assert len(result.journal_refs) == 1
 
 
 def test_successful_provider_publication_recovery_stops_and_resumes_without_model_call(tmp_path):
@@ -720,14 +674,14 @@ def test_successful_provider_publication_recovery_stops_and_resumes_without_mode
     archived_before = set(store.root.glob("*.json"))
     with pytest.raises(GenerationProviderError) as caught:
         service.generate(
-            (GenerationCandidate(request=contract_request()),), contract_inputs(), sources()
+            (contract_request(),), contract_inputs(), sources()
     )
     assert caught.value is pending
     assert set(store.root.glob("*.json")) == archived_before
     recovered_provider = FakeProvider(())
     service.provider = recovered_provider
     result = service.generate(
-        (GenerationCandidate(request=contract_request()),), contract_inputs(), sources(),
+        (contract_request(),), contract_inputs(), sources(),
         recovered_result=successful,
     )
     assert result.contract_ref == store.put_artifact(result.contract)
@@ -755,13 +709,13 @@ def test_recovered_contract_result_must_match_archived_operation(tmp_path, mutat
             provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
             revision="2" * 40, evidence_scope="unit_diagnostic",
         ).generate(
-            (GenerationCandidate(request=request),), contract_inputs(), sources(),
+            (request,), contract_inputs(), sources(),
             recovered_result=recovered,
         )
     assert provider.calls == []
 
 
-def test_failed_generation_publication_recovery_stops_before_repair(tmp_path):
+def test_failed_generation_publication_recovery_stops_before_retry(tmp_path):
     store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
     record = provider_result(contract_proposal()).record.model_copy(
         update={"success": False, "generation_succeeded": False, "publication_complete": False}
@@ -774,10 +728,8 @@ def test_failed_generation_publication_recovery_stops_before_repair(tmp_path):
             revision="2" * 40, evidence_scope="unit_diagnostic",
         ).generate(
             (
-                GenerationCandidate(request=contract_request()),
-                GenerationCandidate(
-                    request=contract_request(2), diagnosis="retry", changed_input="repair"
-                ),
+                contract_request(),
+                contract_request(2),
             ),
             contract_inputs(), sources(),
         )
@@ -804,7 +756,7 @@ def test_recovered_failed_generation_journals_without_another_model_call(tmp_pat
     monkeypatch.setattr(store, "put_bytes", fail_journal)
     with pytest.raises(AuthoringJournalPublicationPending) as caught:
         service.generate(
-            (GenerationCandidate(request=request),), contract_inputs(), sources(),
+            (request,), contract_inputs(), sources(),
             recovered_error=recovered,
         )
     assert provider.calls == []
@@ -844,7 +796,7 @@ def test_actual_registration_publication_replay_journals_without_execution(tmp_p
     request = contract_request()
     with pytest.raises(GenerationProviderError) as caught:
         service.generate(
-            (GenerationCandidate(request=request),), contract_inputs(), sources()
+            (request,), contract_inputs(), sources()
         )
     recovered = caught.value.replay_error(store.put_bytes)
     assert recovered.cost.note.startswith("Execution did not start")
@@ -852,7 +804,7 @@ def test_actual_registration_publication_replay_journals_without_execution(tmp_p
     service.provider = no_model
     with pytest.raises(AuthoringExhausted) as rejected:
         service.generate(
-            (GenerationCandidate(request=request),), contract_inputs(), sources(),
+            (request,), contract_inputs(), sources(),
             recovered_error=recovered,
         )
     assert len(rejected.value.journal_refs) == 1
@@ -872,7 +824,7 @@ def test_recovered_response_receipt_cap_includes_base64_expansion(tmp_path):
         provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
         revision="2" * 40, evidence_scope="unit_diagnostic",
     ).generate(
-        (GenerationCandidate(request=request),), contract_inputs(), sources(),
+        (request,), contract_inputs(), sources(),
         recovered_result=recovered,
     )
     assert result.contract_ref.kind == "RequirementContract"
@@ -894,7 +846,7 @@ def test_rejection_journal_publication_failure_is_replayable(tmp_path, monkeypat
     monkeypatch.setattr(store, "put_bytes", fail_journal)
     with pytest.raises(AuthoringJournalPublicationPending) as caught:
         service.generate(
-            (GenerationCandidate(request=contract_request()),), contract_inputs(), sources()
+            (contract_request(),), contract_inputs(), sources()
         )
     monkeypatch.setattr(store, "put_bytes", original)
     refs = caught.value.replay(store)
@@ -916,7 +868,7 @@ def test_contract_publication_failure_replays_without_another_generation(tmp_pat
     monkeypatch.setattr(store, "put_artifact", lambda artifact: (_ for _ in ()).throw(OSError("disk")))
     with pytest.raises(AuthoringPublicationPending) as caught:
         service.generate(
-            (GenerationCandidate(request=contract_request()),), contract_inputs(), sources()
+            (contract_request(),), contract_inputs(), sources()
         )
     assert len(provider.calls) == 1
     monkeypatch.setattr(store, "put_artifact", original)
@@ -1227,6 +1179,6 @@ def test_contract_service_rejects_request_contexts_that_differ_from_resolved_sou
     )
     with pytest.raises(ValueError, match="contexts"):
         service.generate(
-            (GenerationCandidate(request=forged),), contract_inputs(), sources()
+            (forged,), contract_inputs(), sources()
         )
     assert provider.calls == []

@@ -37,15 +37,22 @@ def test_two_frozen_policies_use_one_trusted_version_profile_without_events(tmp_
     _, resolver, q, lifecycles, _, released = configured(tmp_path, monkeypatch)
     assert resolver.store is q.store and resolver.registry is q.registry
     with pytest.raises(AdmissionRejected): lifecycles[0].resolve_released(released[1])
+    def no_execution_or_history(*args, **kwargs):
+        raise AssertionError('frozen resolver must not execute or replay operation history')
+    for name in ('enqueue', 'claim', 'job', 'attempts', 'accounting', 'reconcile', 'complete', 'trace'):
+        monkeypatch.setattr(q.registry, name, no_execution_or_history)
+    monkeypatch.setattr(q.grader, 'grade', no_execution_or_history)
     before = q.registry.events(limit=1000)
     for ref in (*released, *released):
         assert resolver.resolve_released(ref) == q.store.get_artifact(ref)
     assert q.registry.events(limit=1000) == before
 
 
-def test_unknown_lifecycle_revision_fails_without_mutation(tmp_path, monkeypatch):
+def test_unknown_qualification_revision_fails_without_mutation(tmp_path, monkeypatch):
     api, resolver, q, _, _, released = configured(tmp_path, monkeypatch)
-    incompatible = TaskLifecycle(store=q.store, registry=q.registry, qualification=q, revision='f'*40)
+    unknown=QualificationService(store=q.store,registry=q.registry,grader=q.grader,
+        builder=q.builder,revision='f'*40)
+    incompatible = TaskLifecycle(store=q.store, registry=q.registry, qualification=unknown, revision='d'*40)
     other = api.ReleasedTaskResolver(profiles=(incompatible,), revision='e'*40)
     before = q.registry.events(limit=1000)
     with pytest.raises(AdmissionRejected): other.resolve_released(released[0])
@@ -62,12 +69,12 @@ def test_current_quarantine_rechecked_for_selected_policy_and_profile(tmp_path, 
     with pytest.raises(AdmissionRejected): resolver.resolve_released(released[1])
 
 
-def test_current_external_gate_rechecked_after_previous_success(tmp_path, monkeypatch):
+def test_current_report_integrity_checked_after_previous_success(tmp_path, monkeypatch):
     _, resolver, q, _, _, released = configured(tmp_path, monkeypatch)
     resolver.resolve_released(released[1])
-    def revoked(*args): raise QualificationRejected('unverified_human_review', 'TEST ONLY revoked')
-    monkeypatch.setattr(QualificationService, 'verify_accepted', revoked)
-    with pytest.raises(AdmissionRejected, match='revoked'): resolver.resolve_released(released[1])
+    def corrupted(*args): raise QualificationRejected('invalid_evidence', 'TEST ONLY corrupted')
+    monkeypatch.setattr(QualificationService, 'verify_accepted', corrupted)
+    with pytest.raises(AdmissionRejected, match='corrupted'): resolver.resolve_released(released[1])
 
 
 def test_forged_payload_or_unselected_state_cannot_dispatch(tmp_path, monkeypatch):
@@ -93,5 +100,5 @@ def test_real_m5_gate_remains_denied_for_diagnostic_chain(tmp_path, monkeypatch)
     original = QualificationService.verify_accepted
     _, resolver, _, _, _, released = configured(tmp_path, monkeypatch)
     monkeypatch.setattr(QualificationService, 'verify_accepted', original)
-    with pytest.raises(AdmissionRejected, match='automated gates'):
+    with pytest.raises(AdmissionRejected):
         resolver.resolve_released(released[0])

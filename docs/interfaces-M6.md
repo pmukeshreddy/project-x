@@ -105,72 +105,36 @@ The separate labeled Click runtime fixture at `da26580` did execute 13 real grad
 and 39 cases through M3/M4/M5/M6. It remained provisional and has no admission.
 See `docs/reports/M6-click-fixture.md`; no repetition is needed for lifecycle code.
 
-## Actual lifecycle and released-task resolver
+## Frozen task lifecycle and resolution
 
 ```python
-from feature_rl.pipeline import (
-    TaskLifecycle, AdmissionRejected,
-    LifecycleRecoveryRequired, LifecyclePublicationFailed,
-)
+from feature_rl.pipeline import TaskLifecycle, ReleasedTaskResolver
 
-TaskLifecycle(*, store: ArtifactStore, registry: Registry,
-              qualification: QualificationService, revision: str)
-resolve_released(task_ref: ArtifactRef) -> TaskBundle
-qualify(built_task: ArtifactRef, accepted_report: ArtifactRef) -> OperationResult
-release(qualified_task: ArtifactRef) -> OperationResult
-recover(claim: Claim) -> OperationResult
-retry_publication(pending: LifecyclePublicationFailed) -> OperationResult
+lifecycle = TaskLifecycle(store=store, registry=registry,
+                          qualification=qualification, revision=git_revision)
+qualified = lifecycle.qualify(built_ref, accepted_report_ref)
+released = lifecycle.release(qualified.artifacts[0])
+resolver = ReleasedTaskResolver(profiles=(lifecycle,), revision=git_revision)
+task = resolver.resolve_released(released.artifacts[0])
 ```
 
-The constructor requires the same concrete controller store, Registry and M5
-QualificationService; an arbitrary callback or separate registry is rejected.
-Use the exact lifecycle implementation revision and M5 configuration that selected
-the transitions. Its opaque configuration explicitly declares the actual M5
-configuration and policy dependencies. No other index or transition ledger exists.
+The legal sequence is BUILT → QUALIFIED → RELEASED. Each transition reads the
+private accepted report, checks its task identity and saves a new immutable
+TaskBundle with only state and qualification changed. It returns the saved task
+reference directly. Solver bytes, source, verifier, environment and original
+provenance remain unchanged. Repeating publication produces the same content hash.
 
-`resolve_released` is the actual admission callable for M7/M8. It returns the exact
-stored TaskBundle only after resolving `Tn → Q → T0`, calling concrete
-`QualificationService.verify_accepted(Tn,Q)` for complete accepted origin, gates,
-current quarantine, and comparing the canonical
-Tn/T0 payloads with only `state` and `qualification` excluded. It reads the exact
-deterministically keyed completed M6 qualification and release jobs, their frozen
-receipts, selected attempts/results and target manifests. Caller-published state
-strings, orphan CAS outputs, metadata drift or a different predecessor/configuration
-cannot satisfy this chain. The resolver does not enqueue, claim, transition, grade
-or execute candidate source. New admission uses the selected automated report;
-Legacy signed task admissions are no longer supported.
+There are no transition jobs, accounting snapshots, receipt chains or lifecycle
+recovery wrappers. Failed publication can be retried from the same frozen inputs.
+A failed or provisional qualification never produces a released task.
 
-The only implemented legal sequence is `BUILT → QUALIFIED → RELEASED`. Calibration
-is a separate model-specific difficulty measurement and is not a release validity
-prerequisite. `TaskLifecycle.qualify(T0,Q)` records the transition **after** M5 has
-accepted Q; it does not generate or qualify evidence. A fully passing automated
-report is sufficient; incomplete qualification returns no target TaskBundle. Every other T0
-payload field, including original provenance/costs and all solver references, stays
-identical. New transition evidence/costs are in OperationResult, the opaque frozen
-receipt and Registry dependencies. The final solver bytes are never repackaged.
+`ReleasedTaskResolver` chooses a controller-supplied qualification implementation
+by the private report's producer revision and reads its frozen policy. It checks
+artifact integrity, current quarantine and unchanged task payload without calling
+the grader, reconstructing qualification results or replaying transition history.
+Its store, registry, configuration and revision properties remain available to
+existing consumers. The frozen solver package is still validated by TaskBuilder.
 
-An unknown-cost intent precedes validation. Frozen exact outcome bytes and partial
-validation wall costs precede manifest publication. Failed prerequisites receive
-selected typed failed results with costs. Before completing a frozen successful
-transition, current M5 admission is checked again. Publication loss preserves an
-exact private retry capability; recovery does not reassemble a task or reset its
-attempt identity. Pre-freeze unknown work requires explicit reconciliation and is
-not automatically repeated. A completed historical `recover` result is readback;
-current consumption still requires `resolve_released`. Keep claim/pending capabilities
-controller-private. Recovery/publication/current-trust overhead remains explicitly
-unmeasured rather than being counted as zero or rewriting frozen manifest costs.
-# Candidate-specific released-task consumer
-
-```python
-from feature_rl.pipeline import ReleasedTaskResolver
-
-resolver = ReleasedTaskResolver(profiles=(actual_task_lifecycle,), revision=git_revision)
-released = resolver.resolve_released(task_ref)  # exact stored TaskBundle
-```
-
-`profiles` is a tuple of one to 32 actual `TaskLifecycle` instances sharing the same controller store and Registry. Duplicate version profiles reject because their current trust could be ambiguous. Each profile supplies supported lifecycle/M5/grader/runtime/builder revisions. Candidate-specific qualification policies are resolved from the selected release configuration; they do not choose code, service versions or external trust. Multiple policies can share one profile. Unsupported or ambiguous selected chains raise `AdmissionRejected`.
-
-The resolver exposes `.store`, `.registry`, `.configuration` (private `m6-resolver-configuration` ref with explicit profile dependencies) and `.revision`, matching consumer identity needs. Every call enforces exact Tn→accepted Q→BUILT T0 equality, actual legal Registry transitions and current M5/quarantine/revocation. It dispatches no grade, source, model, transition or Registry job. Existing selected CAS/configuration bytes are reasserted idempotently. Audit historical reads grant no admission. A consumer's one `TaskBuilder` must still match the accepted Q.task construction revision when calling `builder.solver_package(Q.task)`.
 # Factory source admission
 
 ```python

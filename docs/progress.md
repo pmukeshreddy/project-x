@@ -1,5 +1,15 @@
 # Feature-RL progress
 
+## Environment harness follow-up — 2026-09-21
+
+Baseline qualification accepts a working historical runtime whose new-feature probes
+fail, provided applicable old compatibility remains intact. Qualification executes
+baseline, gold, wrong solutions and reset once, then freezes direct private result
+references. Admission and release check immutable task/report identity without
+replaying qualification or transition history. Authoring validation retries are
+bounded to three attempts with no semantic repair chain. Training is unchanged;
+no real environment generation is part of this work.
+
 ## Current cleanup — 2026-09-20
 
 The active architecture is feature environments → GRPO/RLVR → held-out evaluation,

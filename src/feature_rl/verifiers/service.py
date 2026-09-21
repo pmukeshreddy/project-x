@@ -1,5 +1,5 @@
-"""Actual configured-provider checker generation, bounded repair and exact replay."""
-from dataclasses import dataclass
+"""Configured-provider checker generation with bounded retries and exact publication replay."""
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 from typing import Literal
@@ -8,14 +8,12 @@ from feature_rl.contracts import ActorRole, ArtifactRef, EvidenceRecord, Provena
 from feature_rl.generation import AuthoringContext, GenerationRequest, GenerationStage, GenerationResult
 from feature_rl.generation.provider import GenerationProviderError
 from feature_rl.environments import SourceRejected
-from feature_rl.requirements import (GenerationCandidate, AuthoringExhausted,
+from feature_rl.requirements import (AuthoringExhausted,
     AuthoringJournalPublicationPending)
-from feature_rl.requirements.service import (contexts_from_sources, semantic_request_sha256,
+from feature_rl.requirements.service import (contexts_from_sources,
     validate_recovered_generation)
 from .behavioral import behavioral_schema, compile_behavioral
 from .finalize import CheckerFinalizer, PreparedChecker, resolve_checker_inputs
-from .loader import read_bytes
-from .language import decode_json
 
 
 def frozen_context(model, ref, role):
@@ -45,7 +43,6 @@ def build_checker_request(*, request_id, response_id, prompt_id, contract, contr
             'Use bounded input domains for variation and multiple cases for distinct behaviors, including edge cases. '
             'Return exact built-in JSON scalars or homogeneous lists; exclude unstable addresses, timestamps and ordering. '
             'Each case gets a fresh runtime. Compatibility cases must use APIs and input shapes supported by the baseline. '
-            'Include at least one mandatory case demonstrating working baseline behavior. '
             'New feature cases may fail on the baseline when an API does not exist; never hide unrelated failures. '
             'The controller supplies IDs, evidence links, mandatory flags, types, resource limits and JSON transport. '
             'Do not reconstruct a reference solution, mock required behavior, or compute an oracle in candidate code.'),
@@ -66,7 +63,7 @@ class CheckerAuthoringResult:
 class CheckerPublicationPending(RuntimeError):
     prepared: PreparedChecker
     generation: GenerationResult
-    prior_journal_refs: tuple[ArtifactRef, ...]
+    journal_refs: tuple[ArtifactRef, ...]
     journal_payload: bytes
     publication_error: str
 
@@ -74,23 +71,24 @@ class CheckerPublicationPending(RuntimeError):
         journal = store.put_bytes(self.journal_payload, 'checker-authoring-journal', Visibility.PRIVATE)
         ref = self.prepared.publish(store)
         return CheckerAuthoringResult(self.prepared.verifier, ref, self.generation,
-            self.prior_journal_refs + (journal,))
+            self.journal_refs + (journal,))
 
 
 @dataclass(frozen=True)
 class AuthoringPreparationPending(RuntimeError):
     """Storage/setup failed after generation; replay only the retained response."""
     service: object
-    candidate: object
+    request: GenerationRequest
     inputs: object
     sources: tuple
-    prior_journal_refs: tuple
+    journal_refs: tuple
     generation: GenerationResult
     preparation_error: str
 
     def replay(self):
-        return self.service.generate((self.candidate,), self.inputs, self.sources,
-            prior_journal_refs=self.prior_journal_refs, recovered_result=self.generation)
+        result = self.service.generate((self.request,), self.inputs, self.sources,
+            recovered_result=self.generation)
+        return replace(result, journal_refs=self.journal_refs + result.journal_refs)
 
 
 class CheckerAuthoringService:
@@ -105,15 +103,14 @@ class CheckerAuthoringService:
         self.provider, self.store, self.resolver = provider, store, resolver
         self.revision, self.evidence_scope = revision, evidence_scope
 
-    def generate(self, candidates, inputs, sources, *, prior_journal_refs=(),
+    def generate(self, requests, inputs, sources, *,
                  recovered_result=None, recovered_error=None):
         inputs, sources, contract, plan = resolve_checker_inputs(self.store, self.resolver, inputs, sources)
         contexts = checker_contexts(contract, inputs.contract, plan, inputs.scenario_plan, sources)
         ids = tuple(r.requirement_id for r in contract.requirements + contract.compatibility_obligations)
-        binding = inputs.model_dump(mode='json', exclude={'provenance', 'costs'})
-        return run_authoring(self, candidates, stage=GenerationStage.CHECKER_GENERATION,
-            schema=behavioral_schema(plan), contexts=contexts, ids=ids, binding=binding,
-            inputs=inputs, sources=sources, prior_journal_refs=prior_journal_refs,
+        return run_authoring(self, requests, stage=GenerationStage.CHECKER_GENERATION,
+            schema=behavioral_schema(plan), contexts=contexts, ids=ids,
+            inputs=inputs, sources=sources,
             recovered_result=recovered_result, recovered_error=recovered_error,
             prepare=lambda proposal, frozen: CheckerFinalizer(store=self.store, resolver=self.resolver).prepare(
                 compile_behavioral(proposal, contract, plan, timeout_seconds=min(30.0,
@@ -121,64 +118,42 @@ class CheckerAuthoringService:
                     contract.episode_limits.wall_seconds)), frozen, sources))
 
 
-def run_authoring(service, candidates, *, stage, schema, contexts, ids, binding, inputs,
-                  sources, prior_journal_refs, recovered_result, recovered_error, prepare,
+def run_authoring(service, requests, *, stage, schema, contexts, ids, inputs,
+                  sources, recovered_result, recovered_error, prepare,
                   journal_kind='checker-authoring-journal', pending_type=CheckerPublicationPending):
-    """M4-local shared lifecycle; caller supplies the exact authorized stage/context."""
-    candidates = tuple(GenerationCandidate.model_validate(c) for c in candidates)
-    prior = tuple(ArtifactRef.model_validate(ref) for ref in prior_journal_refs)
-    if not candidates or len(candidates)+len(prior)>3:
-        raise ValueError('authoring permits one initial attempt and at most two repairs')
-    hashes = []
-    for index, ref in enumerate(prior, 1):
-        entry = decode_json(read_bytes(service.store, ref, 65536, journal_kind, private=True), 65536)
-        previous = entry.get('binding')
-        compatible = isinstance(previous, dict) and previous == binding
-        status_ok = entry.get('status') == 'rejected'
-        if ref.visibility is not Visibility.PRIVATE or entry.get('attempt_index') != index or entry.get('stage') != stage.value or not status_ok or not compatible:
-            raise ValueError('prior journal is not a sequential rejected attempt for these frozen inputs')
-        digest = entry.get('semantic_request_sha256')
-        if not isinstance(digest, str) or len(digest)!=64:
-            raise ValueError('invalid prior semantic request hash')
-        hashes.append(digest)
-    if not prior and candidates[0].diagnosis is not None:
-        raise ValueError('initial candidate cannot be labeled as a repair')
+    """Validate bounded requests and retain each provider outcome for accounting."""
+    requests = tuple(GenerationRequest.model_validate(request) for request in requests)
+    if not 1 <= len(requests) <= 3:
+        raise ValueError('authoring permits one to three attempts')
     identities = set()
-    for offset, candidate in enumerate(candidates):
-        request = candidate.request
-        if (prior or offset) and candidate.diagnosis is None:
-            raise ValueError('repair requires a diagnosis and changed input')
+    for request in requests:
         if request.stage is not stage or request.contexts != contexts or request.allowed_requirement_ids != ids:
             raise ValueError('authoring request differs from exact frozen stage/context/requirements')
         identity = (request.request_id, request.response_id, request.prompt_id)
         if identity in identities:
             raise ValueError('duplicate candidate request identity')
         identities.add(identity)
-        digest = semantic_request_sha256(request)
-        if hashes and digest == hashes[-1]:
-            raise ValueError('repair must change meaningful request input')
-        hashes.append(digest)
     if recovered_result is not None and recovered_error is not None:
         raise ValueError('only one recovered provider outcome may be supplied')
     recovered = recovered_result if recovered_result is not None else recovered_error
     if recovered is not None:
-        if len(candidates)!=1 or (recovered_error is not None and not isinstance(recovered_error, GenerationProviderError)):
+        if len(requests)!=1 or (recovered_error is not None and not isinstance(recovered_error, GenerationProviderError)):
             raise ValueError('recovered generation requires one candidate and a provider outcome')
-        validate_recovered_generation(service.store, candidates[0].request, schema, recovered)
-    journals = list(prior)
-    for index, candidate in enumerate(candidates, len(prior)+1):
+        validate_recovered_generation(service.store, requests[0], schema, recovered)
+    journals = []
+    for request in requests:
         result = None
         error = None
         try:
             if recovered_error is not None:
                 raise recovered_error
-            result = GenerationResult.model_validate(recovered_result if recovered_result is not None else service.provider.generate(candidate.request, schema))
+            result = GenerationResult.model_validate(recovered_result if recovered_result is not None else service.provider.generate(request, schema))
             # Validate real archived request/schema/usage/cost/status on fresh results too.
-            validate_recovered_generation(service.store, candidate.request, schema, result)
+            validate_recovered_generation(service.store, request, schema, result)
             proposal = schema.model_validate(result.content)
             refs = tuple(result.record.archives.values())
             evidence = EvidenceRecord(producer='feature_rl.generation.CodexGenerationProvider',
-                command=('generate', candidate.request.request_id), recorded_at=result.record.recorded_at,
+                command=('generate', request.request_id), recorded_at=result.record.recorded_at,
                 exit_status=0, artifacts=refs, revision=service.revision, scope=service.evidence_scope)
             provenance = Provenance(producer='feature_rl.verifiers.'+type(service).__name__,
                 producer_version=service.revision, created_at=datetime.now(timezone.utc),
@@ -189,7 +164,7 @@ def run_authoring(service, candidates, *, stage, schema, contexts, ids, binding,
             except (ValueError, SourceRejected):
                 raise
             except Exception as preparation_error:
-                raise AuthoringPreparationPending(service, candidate, inputs, sources,
+                raise AuthoringPreparationPending(service, request, inputs, sources,
                     tuple(journals), result, f'{type(preparation_error).__name__}: {preparation_error}') from preparation_error
         except (GenerationProviderError, ValueError, SourceRejected) as caught:
             if isinstance(caught, GenerationProviderError) and (caught.record.generation_succeeded or caught.recovery is not None):
@@ -197,11 +172,9 @@ def run_authoring(service, candidates, *, stage, schema, contexts, ids, binding,
             error = caught
         record = result.record if result is not None else getattr(error, 'record', None)
         cost = result.cost if result is not None else getattr(error, 'cost', None)
-        payload = canonical_json(dict(attempt_index=index, stage=stage.value, binding=binding,
-            request_sha256=hashlib.sha256(canonical_json(candidate.request.model_dump(mode='json'))).hexdigest(),
-            semantic_request_sha256=semantic_request_sha256(candidate.request),
-            status='rejected' if error is not None else 'accepted', diagnosis=candidate.diagnosis,
-            changed_input=candidate.changed_input, error_type=type(error).__name__ if error is not None else None,
+        payload = canonical_json(dict(stage=stage.value,
+            request_sha256=hashlib.sha256(canonical_json(request.model_dump(mode='json'))).hexdigest(),
+            status='rejected' if error is not None else 'accepted', error_type=type(error).__name__ if error is not None else None,
             error=str(error) if error is not None else None,
             generation_record=record.model_dump(mode='json') if record is not None else None,
             cost=cost.model_dump(mode='json') if cost is not None else None))
@@ -209,7 +182,7 @@ def run_authoring(service, candidates, *, stage, schema, contexts, ids, binding,
             try:
                 journal = service.store.put_bytes(payload, journal_kind, Visibility.PRIVATE)
             except Exception as publication_error:
-                raise AuthoringJournalPublicationPending(prior_journal_refs=tuple(journals),
+                raise AuthoringJournalPublicationPending(journal_refs=tuple(journals),
                     journal_payload=payload, journal_kind=journal_kind, journal_visibility=Visibility.PRIVATE,
                     rejected_error=f'{type(error).__name__}: {error}',
                     publication_error=f'{type(publication_error).__name__}: {publication_error}') from publication_error

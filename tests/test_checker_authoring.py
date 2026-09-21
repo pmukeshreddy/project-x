@@ -74,14 +74,13 @@ def request_for(store, inputs, sources):
 
 def authoring_fixture(tmp_path, *, archive=None):
     from feature_rl.verifiers import CheckerAuthoringService
-    from feature_rl.requirements import GenerationCandidate
     store, task, proposal, inputs, sources, resolver = checker_fixture(tmp_path)
     from test_behavioral_spec import specification
     proposal = specification(proposal)
     request = request_for(store, inputs, sources)
     provider, runner = configured_diagnostic_provider(store, request, proposal, archive=archive)
     service = CheckerAuthoringService(provider=provider, store=store, resolver=resolver, revision='a'*40, evidence_scope='unit_diagnostic')
-    return store, proposal, inputs, sources, request, service, runner, GenerationCandidate(request=request)
+    return store, proposal, inputs, sources, request, service, runner, request
 
 
 def test_actual_provider_request_schema_cost_and_private_bundle(tmp_path):
@@ -156,7 +155,7 @@ def test_provider_archive_success_recovery_uses_exact_request_and_cost(tmp_path)
     recovered = caught.value.replay_result(store.put_bytes)
     result = service.generate((candidate,), inputs, sources, recovered_result=recovered)
     assert result.generation == recovered and len(runner.calls) == 1
-    wrong = candidate.model_copy(update={'request': request.model_copy(update={'seed': 1})})
+    wrong = candidate.model_copy(update={'seed': 1})
     with pytest.raises(ValueError):
         service.generate((wrong,), inputs, sources, recovered_result=recovered)
     assert len(runner.calls) == 1
@@ -177,31 +176,31 @@ def test_preparation_outage_retains_generated_response_without_dispatch(tmp_path
     assert len(runner.calls) == 1
 
 
-def test_diagnosed_repair_binds_original_inputs_and_retains_rejected_cost(tmp_path):
-    from feature_rl.requirements import AuthoringExhausted, GenerationCandidate
-    store, proposal, inputs, sources, request, service, runner, candidate = authoring_fixture(tmp_path)
+def test_validation_failure_retries_unchanged_prompt_with_bounded_attempts(tmp_path):
+    from codex_fixtures import events, response
+    store, proposal, inputs, sources, request, service, runner, _ = authoring_fixture(tmp_path)
+    retry = request.model_copy(update={'request_id': 'CHECKER_2', 'response_id': 'RESPONSE_2', 'prompt_id': 'PROMPT_2'})
     broken = proposal.model_copy(update={'scenarios': proposal.scenarios[:1]})
-    service.provider, first = configured_diagnostic_provider(store, request, broken)
-    with pytest.raises(AuthoringExhausted) as caught:
-        service.generate((candidate,), inputs, sources)
-    prior = caught.value.journal_refs
-    entry = json.loads(store.get_bytes(prior[0]))
-    assert entry['status']=='rejected' and entry['cost']['input_tokens']==41
-    unchanged = GenerationCandidate(request=request.model_copy(update={'request_id': 'REPAIR'}), diagnosis='missing family', changed_input='IDs only')
-    with pytest.raises(ValueError, match='meaningful'):
-        service.generate((unchanged,), inputs, sources, prior_journal_refs=prior)
-    request2 = request.model_copy(update={'request_id': 'REPAIR', 'instruction': request.instruction+' Include the omitted second scenario.'})
-    repair = GenerationCandidate(request=request2, diagnosis='missing second family', changed_input='explicit second scenario coverage')
-    service.provider, second = configured_diagnostic_provider(store, request2, proposal)
-    result = service.generate((repair,), inputs, sources, prior_journal_refs=prior)
-    assert len(first.calls)==len(second.calls)==1 and len(result.journal_refs)==2
-    other_inputs = inputs.model_copy(update={'environment': inputs.environment.model_copy(update={'sha256': '0'*64})})
-    with pytest.raises(ValueError):
-        service.generate((repair,), other_inputs, sources, prior_journal_refs=prior)
+    original_run = runner.run
+    responses = iter((events(response(request, broken.model_dump(mode='json'))),
+                      events(response(retry, proposal.model_dump(mode='json')))))
+    def run(**kwargs):
+        runner.stdout = next(responses)
+        return original_run(**kwargs)
+    runner.run = run
+    result = service.generate((request, retry), inputs, sources)
+    assert store.get_artifact(result.verifier_ref).contract == inputs.contract
+    entries = [json.loads(store.get_bytes(ref)) for ref in result.journal_refs]
+    assert [entry['status'] for entry in entries] == ['rejected', 'accepted']
+    assert [entry['cost']['input_tokens'] for entry in entries] == [41, 41]
+    assert len(runner.calls) == 2
+    with pytest.raises(ValueError, match='three attempts'):
+        service.generate((request, retry, request, retry), inputs, sources)
+    assert len(runner.calls) == 2
 
 
-def test_rejected_journal_outage_preserves_cost_and_resumes_with_diagnosis(tmp_path, monkeypatch):
-    from feature_rl.requirements import AuthoringJournalPublicationPending, GenerationCandidate
+def test_rejected_journal_outage_preserves_cost_without_another_generation(tmp_path, monkeypatch):
+    from feature_rl.requirements import AuthoringJournalPublicationPending
     store, proposal, inputs, sources, request, service, runner, candidate = authoring_fixture(tmp_path)
     broken=proposal.model_copy(update={'scenarios':proposal.scenarios[:1]})
     service.provider, runner = configured_diagnostic_provider(store,request,broken)
@@ -215,11 +214,6 @@ def test_rejected_journal_outage_preserves_cost_and_resumes_with_diagnosis(tmp_p
     monkeypatch.setattr(store,'put_bytes',original)
     refs=caught.value.replay(store)
     assert len(runner.calls)==1 and json.loads(store.get_bytes(refs[-1]))['cost']['input_tokens']==41
-    repair_request=request.model_copy(update={'request_id':'REPAIRED','instruction':request.instruction+' Include both scenarios.'})
-    service.provider, next_runner=configured_diagnostic_provider(store,repair_request,proposal)
-    repair=GenerationCandidate(request=repair_request,diagnosis='missing case family',changed_input='explicit family coverage instruction')
-    assert len(service.generate((repair,),inputs,sources,prior_journal_refs=refs).journal_refs)==2
-    assert len(next_runner.calls)==1
 
 
 def test_recovered_failed_provider_attempt_is_not_reexecuted(tmp_path):

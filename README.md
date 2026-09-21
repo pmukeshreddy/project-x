@@ -29,7 +29,9 @@ Configure `codex` in the workflow/authoring settings; see
 The environment factory uses compact behavioral specifications and controller-built
 hidden checks. Qualification runs baseline, historical gold, three or four plausible
 wrong implementations, and one clean-reset gold rerun. Passing tasks can then be
-frozen and released. See [qualification](docs/interfaces-M5.md).
+frozen and released without replaying qualification. Baseline checks require a
+healthy old runtime and preserved compatibility, while new-feature probes may fail.
+See [qualification](docs/interfaces-M5.md).
 
 `construct-feature` derives each repository's Python version, build backend,
 dependency closure, source layout and system package requirements, then freezes

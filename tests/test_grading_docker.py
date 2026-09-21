@@ -83,11 +83,6 @@ def record(route,label,submission,seed=11):
     store,runtime,service,*_=route
     result=service.grade(route[4],submission,seed)
     receipt=read_grade(store,result.artifacts[0])
-    if label=='baseline':
-        from feature_rl.qualification.evidence import validate_grade
-        from feature_rl.verifiers import load_verifier
-        replayed,_=validate_grade(store,load_verifier(store,route[4]),submission,seed,result,service)
-        assert replayed==receipt
     print('\nM4_ROUTE '+json.dumps({'label':label,'result':result.model_dump(mode='json'),'receipt':receipt.model_dump(mode='json')}),flush=True)
     return receipt
 

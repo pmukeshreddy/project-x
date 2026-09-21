@@ -1,7 +1,7 @@
 """Freeze complete BUILT roots; qualification/release require their own gates."""
 from .models import BuildInputs, BuildRejected, BuildRecoveryRequired, BuildPublicationFailed
 from .build import TaskBuilder
-from .lifecycle import TaskLifecycle, AdmissionRejected, LifecycleRecoveryRequired, LifecyclePublicationFailed
+from .lifecycle import TaskLifecycle, AdmissionRejected
 from .resolver import ReleasedTaskResolver
 from .factory import Factory, FactoryRecoveryRequired, FactoryPublicationFailed, FactoryUpstreamPending, SourceDisposition, read_source_disposition
 from .authoring_models import (AuthoringCall,AuthoringSettings,AuthoringBatch,AuthoringCaps,
@@ -9,7 +9,7 @@ from .authoring_models import (AuthoringCall,AuthoringSettings,AuthoringBatch,Au
 from .workflow_models import FeatureWorkflowSettings, FeatureWorkflowRequest
 
 __all__ = ['BuildInputs', 'TaskBuilder', 'BuildRejected', 'BuildRecoveryRequired', 'BuildPublicationFailed',
-    'TaskLifecycle', 'AdmissionRejected', 'LifecycleRecoveryRequired', 'LifecyclePublicationFailed',
+    'TaskLifecycle', 'AdmissionRejected',
     'ReleasedTaskResolver', 'Factory', 'FactoryRecoveryRequired', 'FactoryPublicationFailed',
     'SourceDisposition', 'read_source_disposition']
 __all__.append('FactoryUpstreamPending')

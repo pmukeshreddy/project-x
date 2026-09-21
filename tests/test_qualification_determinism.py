@@ -12,7 +12,7 @@ from feature_rl.environments.models import Ownership
 from feature_rl.grading import AssertionResult, CaseResult, GradeReceipt, read_grade
 from feature_rl.grading.bootstrap import recipe_adapter_argv
 from feature_rl.qualification import QualificationRejected
-from feature_rl.qualification.evidence import put_record, _assert_case_observation
+from feature_rl.qualification.evidence import put_record
 from feature_rl.verifiers import load_verifier, materialize_manifest
 from m4_fixtures import replace_artifact
 from m5_fixtures import task_fixture
@@ -46,8 +46,6 @@ def observed_receipt(q, task, *, output=b'ok first', outputs=None, stderr=b'', e
         actual = CaseResult(case_id=case.case_id, mandatory=case.mandatory, status='completed', passed=passed,
             assertions=(AssertionResult(assertion_id='contains', requirement_ids=('echo',), passed=passed),),
             evidence=ref, reason='Synthetic retained observation; no worker execution')
-        if not duplicate:
-            _assert_case_observation(checked, actual, case, comparison, raw, owner)
         cases.append(actual)
     passed = all(case.passed for case in cases)
     marker = checked.task.provenance.evidence[0].artifacts[0]
@@ -118,27 +116,6 @@ def test_determinism_requires_unique_retained_adapter_execution(tmp_path):
         assert_reference_determinism(q.store, checked, receipt, {})
 
 
-@pytest.mark.parametrize('tamper', ['legacy', 'startup_site', 'different_paths', 'missing_owner'])
-def test_observation_replay_requires_exact_current_bootstrap_and_profile_paths(tmp_path, tamper):
-    q, task = fixture(tmp_path)
-    checked, receipt = observed_receipt(q, task)
-    actual = receipt.cases[0]
-    value = json.loads(q.store.get_bytes(actual.evidence))
-    row = value['commands'][0]
-    if tamper == 'legacy':
-        row['argv'] = row['argv'][:3] + ['/usr/local/bin/python', '-c', checked.adapter.decode()]
-    elif tamper == 'startup_site':
-        row['argv'].remove('-S')
-    elif tamper == 'different_paths':
-        row['argv'][-1] = '[]'
-    else:
-        row['argv'] = list(recipe_adapter_argv(checked))
-    owner = Ownership.model_validate_json(canonical_json(value['record']))
-    manifest = materialize_manifest(checked, receipt.case_seed)
-    with pytest.raises(QualificationRejected, match='invalid_evidence'):
-        _assert_case_observation(checked, actual, manifest.cases[0], checked.comparisons[0], value, owner)
-
-
 @pytest.mark.parametrize('defect,stopped,code',[
     ('reset_changed','reset_0','flaky_task'),
     ('gold_fails','fresh_0','false_rejection'),
@@ -159,26 +136,50 @@ def test_qualification_dispatches_each_check_once_and_stops_on_failure(tmp_path,
     q.policy = QualificationPolicy(seed=11)
     q.builder = SimpleNamespace(solver_package=lambda task: None)
     monkeypatch.setattr(q.grader, 'select_task', lambda checked: None)
-    monkeypatch.setattr(q, '_publish_qualification', lambda claim, frozen: frozen)
+    publish=q._publish_qualification
+    monkeypatch.setattr(q, '_publish_qualification', lambda frozen: frozen)
     dispatched = []
 
-    def retained_run(checked, projection, submission, seed, name, mode, targets, claim, reset, seen):
+    schedule=['baseline_absence','fresh_0','control_partial','control_happy_path','control_hardcoded','reset_0']
+    def retained_run(checked, projection, submission, seed, reset):
+        name=schedule[len(dispatched)]
+        assert reset is (name=='reset_0')
         dispatched.append(name)
         output=b'missing' if name=='baseline_absence' or name.startswith('control_') else b'ok first'
         if defect=='reset_changed' and name=='reset_0':output=b'ok changed'
         if defect=='gold_fails' and name=='fresh_0':output=b'missing'
         if defect=='wrong_passes' and name=='control_partial':output=b'ok first'
-        outputs=(b'ok existing behavior',b'missing feature') if name=='baseline_absence' else None
-        _, receipt = observed_receipt(q, task, seed=seed,output=output,outputs=outputs)
-        return receipt.manifest, SimpleNamespace(costs=()), receipt
+        _, receipt = observed_receipt(q, task, seed=seed,output=output)
+        result=SimpleNamespace(costs=(),artifacts=(put_record(q.store,receipt,'m4-grade-receipt'),))
+        return result, receipt
 
-    # Substitute only the worker/Registry run boundary. _execute still consumes
+    # Substitute only the worker boundary. Qualification still consumes
     # typed retained receipts through the real observation and determinism code.
     monkeypatch.setattr(q, '_run', retained_run)
-    claim = q._claim(q._job(task, 'm5-qualify'))
-    frozen = q._execute(task, claim)
+    frozen = q.qualify(task)
     assert bool(frozen['issues']) is (code is not None)
     if code:assert frozen['issues'][0].startswith(code+':')
     if defect=='reset_changed':assert frozen['assessments']['reset_0'].passed
     full=['baseline_absence','fresh_0','control_partial','control_happy_path','control_hardcoded','reset_0']
     assert dispatched==full[:full.index(stopped)+1]
+
+    if code is None:
+        result=publish(frozen)
+        report_ref=result.artifacts[0]
+        report=q.store.get_artifact(report_ref)
+        assert result.disposition==c.Disposition.SUCCESS
+        assert len(report.controls)==3 and report.reference_run==report.fresh_runs[0]
+        assert all(ev.artifacts[0].kind=='m4-grade-receipt' for gate in
+            (report.baseline_absence,report.reference_run,*report.controls,*report.interrupted_reset_runs)
+            for ev in gate.evidence)
+        def no_replay(*args,**kwargs):
+            raise AssertionError('frozen admission must not reconstruct qualification')
+        monkeypatch.setattr(q.grader,'grade',no_replay)
+        monkeypatch.setattr('feature_rl.qualification.service.derive_reference',no_replay)
+        monkeypatch.setattr('feature_rl.qualification.service.assess_outcome',no_replay)
+        for method in ('enqueue','reconcile','accounting','trace'):
+            monkeypatch.setattr(q.registry,method,no_replay)
+        assert q.verify_accepted(task,report_ref)==report
+        visible=q.store.put_artifact(report.model_copy(update={'visibility':c.Visibility.EVALUATION}))
+        with pytest.raises(QualificationRejected,match='private'):
+            q.verify_accepted(task,visible)

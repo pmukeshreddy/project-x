@@ -27,14 +27,16 @@ def qualify(factory,task_ref,policy):
 
 
 def for_report(factory,report_ref):
+    if report_ref.visibility!=c.Visibility.PRIVATE:
+        raise AdmissionRejected('qualification report must retain private visibility')
     report=typed(factory.store,report_ref,c.QualificationReport)
     current=template(factory)
     if report.provenance.producer_version!=current.revision:
         raise AdmissionRejected('qualification report uses an unsupported M5 service revision')
     inputs=report.provenance.inputs
-    if report.provenance.producer=='feature_rl.qualification' and len(inputs)==3:
-        # M5 authenticates the selected execution package; incomplete reports
-        # still fail admission even though human approval is no longer required.
+    if report.provenance.producer=='feature_rl.qualification' and len(inputs) in (2,3):
+        if inputs[1].visibility!=c.Visibility.PRIVATE:
+            raise AdmissionRejected('qualification policy must retain private visibility')
         policy=read_record(factory.store,inputs[1],QualificationPolicy,'m5-qualification-policy')
         return configured_service(factory,policy)
     raise AdmissionRejected('qualification report lacks actual M5 origin')

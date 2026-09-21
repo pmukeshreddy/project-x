@@ -38,19 +38,22 @@ def test_wrong_implementation_may_fail_multiple_requirements():
     assert assess_outcome(checked(),receipt(failed=('feature','compat')),'negative',('feature',)).passed
 
 
-def test_baseline_without_compatibility_still_requires_working_mandatory_behavior():
+def test_baseline_without_compatibility_allows_new_feature_cases_to_fail():
     from feature_rl.qualification import assess_outcome
     state=checked();state.contract.compatibility_obligations=()
     observed=receipt(failed=('feature','compat'))
-    assert not assess_outcome(state,observed,'baseline_health',()).passed
+    assert assess_outcome(state,observed,'baseline_health',()).passed
 
 
-def test_baseline_can_prove_health_with_a_mandatory_case_without_a_compatibility_label():
+def test_baseline_can_lack_every_new_api_when_build_and_execution_are_healthy():
     from feature_rl.qualification import assess_outcome
     state=checked();state.contract.compatibility_obligations=()
+    state.comparisons=(SimpleNamespace(assertions=(SimpleNamespace(requirement_ids=('feature',)),)),)
     observed=receipt(feature_status='candidate_failure')
+    observed.cases=observed.cases[:1]
     assert assess_outcome(state,observed,'baseline_health',()).passed
-    observed.cases=(observed.cases[0],observed.cases[1].model_copy(update={'mandatory':False}))
+    assert assess_outcome(state,observed,'baseline_absence',('feature',)).passed
+    observed.build_evidence=None
     assert not assess_outcome(state,observed,'baseline_health',()).passed
 
 
@@ -85,14 +88,12 @@ def test_fixed_schedule_runs_each_wrong_once_and_repeats_gold_at_same_seed(tmp_p
     from test_qualification_service import service
     from m5_fixtures import task_fixture
     from feature_rl.verifiers import load_verifier
-    from feature_rl.qualification.admission import expected_runs
     from feature_rl.qualification import derive_reference
     q=service(tmp_path);task=task_fixture(q.store);loaded=load_verifier(q.store,task)
     controls=wrong_sources(q,loaded)
     state=SimpleNamespace(task=loaded.task,contract=loaded.contract,verifier=SimpleNamespace(controls=controls))
     projection=derive_reference(q.store,task,q.grader.submissions.policy)
-    runs,missing=expected_runs(q,state,projection)
-    assert not missing
+    runs=q._runs(state,projection)
     assert [run[0] for run in runs]==['baseline_absence','fresh_0','control_partial','control_happy_path','control_hardcoded','reset_0']
     assert all(run[2]==q.policy.seed for run in runs)
     assert runs[-1][1]==runs[1][1] and runs[-1][-1] is True
@@ -114,7 +115,6 @@ def test_wrong_implementations_must_change_baseline_and_have_distinct_sources(tm
     from feature_rl.verifiers import load_verifier
     from feature_rl.environments import SourceArchive
     from feature_rl.qualification import derive_reference, QualificationRejected
-    from feature_rl.qualification.admission import expected_runs
     q=service(tmp_path);task=task_fixture(q.store);loaded=load_verifier(q.store,task)
     controls=list(wrong_sources(q,loaded))
     if defect=='same_patch':controls[1].patch=controls[0].patch
@@ -128,4 +128,4 @@ def test_wrong_implementations_must_change_baseline_and_have_distinct_sources(tm
     state=SimpleNamespace(task=loaded.task,contract=loaded.contract,verifier=SimpleNamespace(controls=tuple(controls)))
     projection=derive_reference(q.store,task,q.grader.submissions.policy)
     with pytest.raises(QualificationRejected,match='distinct|baseline'):
-        expected_runs(q,state,projection)
+        q._runs(state,projection)

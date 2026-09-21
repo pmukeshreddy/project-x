@@ -93,7 +93,7 @@ def parser():
         ('construct','build from actual supplied BuildInputs; missing inputs remain a selected blocked outcome'),
         ('qualify','execute actual M5 gates on complete BUILT T0; requires configured M3/M5'),
         ('release','apply exact accepted qualification and both legal lifecycle transitions'),
-        ('resolve','verify current released-task admission through the actual selected chain')):
+        ('resolve','verify the frozen released task and its accepted qualification report')):
         command=commands.add_parser(name,help=help_text)
         command.add_argument('--request',required=True,help='JSON M0 ConstructRequest or task request')
         if name=='construct':command.add_argument('--inputs',help='complete M6 BuildInputs JSON; no automatic generation')

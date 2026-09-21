@@ -101,18 +101,24 @@ remain unknown, never zero by assumption.
 
 `RuntimeDiscoveryService.discover(prepared)` probes the configured repository profile through M3's installed-wheel path. Its author-visible `RuntimeDiscoveryObservation` binds the exact baseline, environment recipe, and private build/execution receipt hashes. `BaselineRetriever` reads only declared inert archive paths and inclusive line ranges; safe directory metadata is ignored while links and other non-regular members reject. `AuthoringEvidenceResolver` reconstructs every supplied request, baseline span, public check, and discovery context from the controller store before inference and rejects altered text, locators, roles, or references.
 
-`RequirementContractProposal` is derived from the actual M0 `RequirementContract` field metadata for the semantic fields. `build_contract_request(...)` accepts a bounded requirement-ID namespace without requiring the model to use every ID. `ContractAuthoringService.generate(...)` resolves the evidence, checks the request contexts, makes at most one initial attempt plus two diagnosed repairs, grounds every quote and locator, validates entry points and observations against discovery, binds the final visible request and provenance label to the resolved request, constructs the real M0 artifact, and stores it immutably.
+`RequirementContractProposal` contains the semantic fields of the requirement
+contract. `ContractAuthoringService.generate(...)` accepts one to three
+`GenerationRequest` values, grounds evidence and validates discovered capabilities,
+then publishes the immutable contract. Each validation failure may be followed by
+another bounded attempt with fresh request IDs. No diagnosis, changed-input proof,
+authorization, predecessor link or semantic history is required.
 
-Every attempt creates a journal with an exact request hash and a semantic request hash that excludes only request/response/prompt identities. A repair must change that semantic hash. `AuthoringExhausted` returns all verified rejected-journal refs. `AuthoringJournalPublicationPending.replay(store)` publishes a failed rejection journal before any later generation. Any provider error with pending `GenerationPublicationRecovery` propagates before journaling or another generation. `GenerationProviderError.replay_result(archive)` completes publication for a successful generation; `replay_error(archive)` completes publication for a failed generation while preserving its original response, usage observation, cost, status, and error attribution. The authoring services accept `recovered_result=` or `recovered_error=` only after bounded resolution of an authentic complete provider archive variant: the full post-execution set, registration `{attempt,status}`, or preflight `{attempt,preflight,cost,status}`. Full outcomes compare the exact request, schema, contexts, attempt/status, content where present, usage, response where present, and cost. Pre-execution outcomes compare request/schema hashes, identities, disposition, status, observed sizes, and every available cost without fabricating absent execution records. Artifact reads use per-kind caps derived from the request's existing stdin/output limits; response receipts include base64 expansion and fixed metadata, and the outer CAS cap includes its second base64 envelope. These receipt caps do not change native token, memory, wall, CPU, or raw-output limits. A fully archived failed result can then be journaled, and a journal write failure remains replayable, without another model call. `AuthoringPublicationPending.replay(store)` handles a later accepted-journal or final-artifact publication fault.
+Each call retains its exact request hash and provider outcome for resource accounting
+and storage recovery. `AuthoringExhausted` reports rejected attempt records.
+Publication recovery reuses the already-produced bytes; it does not generate a new
+answer. Provider archives remain bounded and checked against their request, schema,
+usage and cost. Resource reservations and the three-attempt limit still apply.
 
-## Scenario planning
+## Controller scenario slots
 
-`build_scenario_request(...)` creates the explicit `scenario_planning` stage from one exact authoring `RequirementContract`, the admitted request/B/discovery/public-check contexts, and the contract's actual requirement IDs. `ScenarioAuthoringService.generate(...)` dereferences the contract and requires its canonical context text, locator, ref, ordered ID sequence, exact admitted request/B/discovery/public-check reference set, request text/provenance, and requirement observation set. Public checks must be the exact refs frozen in `contract.public_checks`; unrelated public refs still reject. It applies the same three-attempt journaling, semantic-change, provider-recovery, and storage-replay rules as contract authoring.
-
-`ScenarioFinalizer` derives the mandatory set from every mandatory feature requirement plus every compatibility obligation, rejects unknown IDs or unsupported observations, grounds each oracle in the admitted evidence, requires structural requirement-ID coverage of the mandatory set, preserves `same_cases_within_group=true`, constructs the real M0 `ScenarioPlan`, and stores it with an exact contract join. Structural ID presence is not proof of semantic entailment or a behaviorally discriminating checker. The retained reproduction/controller default uses M4's implemented `SeedPolicy.algorithm="m4-sha256-v1"`; an explicitly supplied unsupported algorithm remains a downstream compatibility failure.
-
-The historical MLX Click run retained one successful M3 discovery and three provider calls. Two calls reached the fixed 120-second deadline. The final concise four-ID call completed in 84.458 seconds but returned a duplicate-key response that strict JSON rejected. No contract or scenario was frozen; this is an explicit construction failure rather than an API fallback or handwritten artifact.
-
+The controller builds one scenario slot per frozen requirement. Astra supplies the
+behavioral cases within those slots; see [verifier generation](interfaces-M4.md).
+There is no separate scenario-generation call or finalizer.
 
 ## Immutable archives and recovery
 
@@ -127,7 +133,7 @@ retain bounded attempt/cost/status records without archiving oversized context.
 cost. Publication failures retain `GenerationPublicationRecovery`; replay writes
 only the retained bytes and never invokes Codex again. Recovery revalidates the
 Codex events, original output schema and artifact lineage. Authentication failures
-stop the workflow without consuming further repair calls. Validation repairs keep
-the existing diagnosed two-per-stage/four-per-candidate budget and use only Astra.
+stop the workflow without consuming further attempts. Validation failures permit
+at most three attempts per role using Astra.
 Old local-worker archives/configuration are not a compatible authoring path;
 historical evidence under `docs/evidence` is retained solely as historical evidence.

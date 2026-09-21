@@ -14,7 +14,7 @@ from feature_rl.environments import EnvironmentRuntime
 from feature_rl.history import GitHistory
 from feature_rl.intake import CachedSourceCatalog, GitHubPullRequestIntake, PullRequestIntakeResult
 from feature_rl.requirements import (AuthoringEvidenceResolver, ContractFinalizationInputs,
-    GroundedSource, GenerationCandidate, RetrievalPolicy)
+    GroundedSource, RetrievalPolicy)
 from feature_rl.requirements.retrieval import BaselineRetriever
 from feature_rl.requirements.service import build_contract_request
 from feature_rl.scenarios import build_scenario_plan
@@ -364,18 +364,11 @@ class FeatureWorkflow:
                 raise pending
 
     def _author(self,claim,request_ref,author,selected,prepared,resolver,sources,inputs,build_request):
-        previous=[];last=None
+        last=None
         for attempt in range(3):
             generated=build_request(attempt)
-            if previous:
-                diagnosis='; '.join(previous)[-4096:]
-                generated=generated.model_copy(update={'instruction':generated.instruction+
-                    '\nCorrect the retained validation failures without inventing requirements or evidence: '+diagnosis})
-                candidate=GenerationCandidate(request=generated,diagnosis=diagnosis,
-                    changed_input='Added the exact retained stage failure diagnostics to the request instruction')
-            else:candidate=GenerationCandidate(request=generated)
             call=AuthoringCall(source_pair=selected.source_pair,environment=prepared.environment,resolver=resolver,
-                generation=candidate,inputs=inputs,sources=sources)
+                generation=generated,inputs=inputs,sources=sources)
             key='author-'+hashlib.sha256(canonical_json(document(call))).hexdigest()
             def execute():
                 try:
@@ -396,7 +389,6 @@ class FeatureWorkflow:
             journal=json.loads(read_bytes(self.store,receipt.journal_refs[-1],65536))
             if (journal.get('generation_record') or {}).get('error_code') == 'CodexUnavailable':
                 return last
-            previous.append(str(journal.get('error') or last.reason)[:2048])
         return last
 
     def _execute(self,claim,ref,request):

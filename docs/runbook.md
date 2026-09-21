@@ -162,7 +162,9 @@ M0 `ArtifactRef`, including kind, encoding and visibility. Qualify optionally ta
 three wrong implementations (plus regression when compatibility exists), and one
 clean-reset gold rerun at the same seed. Wrong implementations only need to receive
 less than full reward. Results and raw runtime evidence are frozen for this task;
-no repair history or control diagnoses are required. Pass the successful report
+no repair history, run bindings, reconciliation or post-qualification replay is required.
+Baseline new-feature cases may all fail when old build/execution and applicable
+compatibility behavior are healthy. Pass the successful report
 from `qualify` directly to `release --accepted-report`. Release can also consume
 the exact QUALIFIED predecessor and its existing Q without `--accepted-report`.
 `resolve` performs current admission and prints the exact TaskBundle. It executes
@@ -183,7 +185,8 @@ umask 077
 PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json construct --request candidate-request.json --inputs build-inputs.json > operation.json 2> recovery.jsonl
 ```
 
-If publication fails, stderr retains the exact concrete private pending payload,
+For source, construction and model operations, publication failure retains the
+exact concrete private pending payload on stderr,
 claim, costs and timestamps as ordinary JSON, including base64 for bytes. It is an
 output receipt, not an executable object deserializer. Existing Factory publication
 recovery methods validate retained capabilities; an unknown pre-freeze attempt
@@ -206,8 +209,9 @@ See [the M2 interface](interfaces-M2.md) for limits, validation, and recovery.
 The authoring order is contract → controller scenario slots → three or four
 wrong implementations → one behavioral checker specification → controller-built
 private checks → construction. Model calls have bounded resource reservations
-and at most three attempts per role. Qualification does not consume repair or
-construction history.
+and at most three attempts per role. Retries use fresh request IDs without
+diagnosis, changed-input metadata or predecessor links. Qualification stores direct
+result references and does not consume repair or construction history.
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json author --request candidate-request.json --call authoring-call.json

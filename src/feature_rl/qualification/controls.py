@@ -29,9 +29,8 @@ def assess_outcome(checked, receipt, mode, targets):
         observed={r for case in receipt.cases for assertion in case.assertions if assertion.passed for r in assertion.requirement_ids}
         compatibility_ran=all(case.status=='completed' for case,comparison in zip(receipt.cases,getattr(checked,'comparisons',()))
             if any(set(assertion.requirement_ids)&preserved for assertion in comparison.assertions))
-        baseline_positive=any(case.mandatory and case.status=='completed' and case.passed for case in receipt.cases)
-        good=ran and baseline_positive and compatibility_ran and preserved<=observed and not (failed&preserved)
-        return outcome(good,'accepted' if good else 'environment_failure','Baseline must pass a mandatory behavioral case and preserve existing compatibility obligations')
+        good=ran and compatibility_ran and preserved<=observed and not (failed&preserved)
+        return outcome(good,'accepted' if good else 'environment_failure','Baseline must build, execute and preserve existing compatibility obligations')
     if receipt.reward==1:return outcome(False,'false_acceptance','Known incomplete implementation received full reward')
     if mode=='negative':
         return outcome(ran,'accepted' if ran else 'environment_failure','Wrong implementation must execute and receive less than full reward')

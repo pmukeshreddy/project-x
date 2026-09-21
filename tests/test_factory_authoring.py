@@ -54,13 +54,19 @@ def test_actual_checker_result_costs_archives_and_idempotent_completion(tmp_path
     assert factory.author(candidate,call=call)==result and len(runner.calls)==1
 
 
-def test_new_request_ids_do_not_reset_repair_allowance_or_semantic_identity(tmp_path,monkeypatch):
+def test_rejected_generation_retries_same_prompt_without_history(tmp_path,monkeypatch):
     factory,candidate,call,runner=setup(tmp_path,monkeypatch)
-    factory.author(candidate,call=call)
-    request=call.generation.request.model_copy(update={'request_id':'OTHER','response_id':'OTHER_RESPONSE','prompt_id':'OTHER_PROMPT'})
-    changed=call.model_copy(update={'generation':call.generation.model_copy(update={'request':request})})
-    with pytest.raises(ValueError,match='diagnos|meaningful'):factory.author(candidate,call=changed)
-    assert len(runner.calls)==1
+    runner.exit_status=1
+    rejected=factory.author(candidate,call=call)
+    assert rejected.disposition==c.Disposition.REJECTED
+    runner.exit_status=0
+    changed=retry_call(call,1);bind_events(runner,changed.generation)
+    result=factory.author(candidate,call=changed)
+    assert result.disposition==c.Disposition.SUCCESS
+    from feature_rl.pipeline.authoring import read_authoring_receipt
+    receipt=read_authoring_receipt(factory.store,result.artifacts[-1])
+    assert len(receipt.journal_refs)==1
+    assert len(runner.calls)==2
 
 
 def test_provider_registration_crash_stays_unknown_without_redispatch(tmp_path,monkeypatch):
@@ -120,38 +126,10 @@ def test_retained_publication_cannot_replace_selected_cost_snapshot(tmp_path,mon
     assert len(runner.calls)==1
 
 
-def test_retained_publication_requires_selected_previous_journal_chain(tmp_path,monkeypatch):
-    factory,candidate,base,runner=setup(tmp_path,monkeypatch)
-    call=contract_call(factory,base,runner);runner.exit_status=1
-    initial=factory.author(candidate,call=call)
-    assert initial.disposition==c.Disposition.REJECTED
-    changed=repaired(call,1);bind_events(runner,changed.generation.request)
-    original=factory.store.put_bytes
-    def lost(data,kind,visibility):
-        if kind=='m6-authoring-receipt':raise OSError('TEST publication before selection')
-        return original(data,kind,visibility)
-    monkeypatch.setattr(factory.store,'put_bytes',lost)
-    from feature_rl.pipeline import FactoryPublicationFailed
-    with pytest.raises(FactoryPublicationFailed) as pending:factory.author(candidate,call=changed)
-    monkeypatch.setattr(factory.store,'put_bytes',original)
-    modified=json.loads(pending.value.payload)
-    prior_ref=c.ArtifactRef.model_validate_json(canonical_json(modified['journal_refs'][0]))
-    prior=json.loads(factory.store.get_bytes(prior_ref));prior['error']='TEST substituted unrelated prior outcome'
-    changed_ref=original(canonical_json(prior),prior_ref.kind,prior_ref.visibility)
-    modified['journal_refs'][0]=changed_ref.model_dump(mode='json')
-    forged=FactoryPublicationFailed('TEST altered previous journal',pending.value.claim,
-        canonical_json(modified),kind='m6-authoring-receipt')
-    with pytest.raises(ValueError,match='previous|chain'):factory.retry_publication(forged)
-    assert factory.retry_publication(pending.value).disposition==c.Disposition.REJECTED
-    assert len(runner.calls)==2
-
-
-def repaired(call,index):
-    request=call.generation.request.model_copy(update={'request_id':'REPAIR_'+str(index),
-        'response_id':'RESPONSE_'+str(index),'prompt_id':'PROMPT_'+str(index),
-        'instruction':call.generation.request.instruction+'\nTEST diagnosed revision '+str(index)})
-    return call.model_copy(update={'generation':call.generation.model_copy(update={'request':request,
-        'diagnosis':'TEST exact observed defect','changed_input':'TEST meaningful instruction revision '+str(index)})})
+def retry_call(call,index):
+    request=call.generation.model_copy(update={'request_id':'RETRY_'+str(index),
+        'response_id':'RESPONSE_'+str(index),'prompt_id':'PROMPT_'+str(index)})
+    return call.model_copy(update={'generation':request})
 
 
 def bind_events(runner,request):
@@ -167,25 +145,25 @@ def test_attempt_limit_is_per_role_and_new_controls_have_their_own_limit(tmp_pat
     factory,candidate,call,runner=setup(tmp_path,monkeypatch)
     factory.author(candidate,call=call)
     for index in (1,2):
-        changed=repaired(call,index);bind_events(runner,changed.generation.request)
+        changed=retry_call(call,index);bind_events(runner,changed.generation)
         assert factory.author(candidate,call=changed).disposition==c.Disposition.SUCCESS
     with pytest.raises(ValueError,match='three attempts'):
-        factory.author(candidate,call=repaired(call,3))
+        factory.author(candidate,call=retry_call(call,3))
     assert len(runner.calls)==3
     from feature_rl.verifiers import ControlFinalizationInputs,ControlProposal,SourceChange,TextReplacement,build_control_request
-    from feature_rl.requirements import AuthoringEvidenceResolver,GenerationCandidate
+    from feature_rl.requirements import AuthoringEvidenceResolver
     from test_checker_authoring import configured_diagnostic_provider
     inputs=ControlFinalizationInputs(control_id='PARTIAL',category='partial',requirement_ids=('echo',),
         expected_reason='TEST ONLY unverified partial implementation',baseline=call.inputs.baseline,
         contract=call.inputs.contract,environment=call.inputs.environment,provenance=call.inputs.provenance,costs=call.inputs.costs)
     resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump())
     request=build_control_request(request_id='CONTROL',response_id='CONTROL_RESPONSE',prompt_id='CONTROL_PROMPT',
-        store=factory.store,resolver=resolver,inputs=inputs,sources=call.sources,limits=call.generation.request.limits)
+        store=factory.store,resolver=resolver,inputs=inputs,sources=call.sources,limits=call.generation.limits)
     proposal=ControlProposal(files=(SourceChange(path='src/click/__init__.py',replacements=(TextReplacement(before='# diagnostic', after='# TEST control only\n'),)),),
         deletions=(),rationale='TEST semantic validity unknown')
     _,prepared_runner=configured_diagnostic_provider(factory.store,request,proposal)
     runner.stdout=prepared_runner.stdout
-    control=call.model_copy(update={'inputs':inputs,'generation':GenerationCandidate(request=request)})
+    control=call.model_copy(update={'inputs':inputs,'generation':request})
     result=factory.author(candidate,call=control)
     assert result.disposition==c.Disposition.SUCCESS and result.artifacts[0].kind=='m4-control-record'
     assert len(runner.calls)==4
@@ -224,32 +202,6 @@ def test_recovery_after_provider_status_reuses_archived_outcome_only(tmp_path,mo
     assert result.disposition==c.Disposition.SUCCESS and len(runner.calls)==1
 
 
-def contract_call(factory,base,runner):
-    from feature_rl.requirements import ContractFinalizationInputs,RequirementContractProposal,build_contract_request,GenerationCandidate
-    from test_checker_authoring import configured_diagnostic_provider
-    contract=factory.store.get_artifact(base.inputs.contract)
-    from feature_rl.requirements.runtime_discovery import RuntimeDiscoveryObservation
-    discovery=RuntimeDiscoveryObservation.model_validate_json(factory.store.get_bytes(base.resolver.runtime_discovery))
-    inputs=ContractFinalizationInputs(visible_request=contract.visible_request,
-        allowed_requirement_ids=tuple(r.requirement_id for r in contract.requirements+contract.compatibility_obligations),
-        entry_points=discovery.entry_points,supported_observables=discovery.supported_observables,
-        runtime_discovery=base.resolver.runtime_discovery,allowed_changes=contract.allowed_changes,
-        public_checks=contract.public_checks,episode_limits=contract.episode_limits,provenance_label=contract.provenance_label,
-        visibility=c.Visibility.AUTHORING,provenance=contract.provenance,costs=contract.costs)
-    request=build_contract_request(request_id='CONTRACT',response_id='CONTRACT_RESPONSE',prompt_id='CONTRACT_PROMPT',
-        sources=base.sources,allowed_requirement_ids=inputs.allowed_requirement_ids,entry_points=inputs.entry_points,
-        supported_observables=inputs.supported_observables,allowed_changes=inputs.allowed_changes,
-        limits=base.generation.request.limits)
-    proposed={name:contract.model_dump(mode='json')[name] for name in RequirementContractProposal.model_fields}
-    proposed['entry_points']=list(discovery.entry_points)
-    for requirement in proposed['requirements']+proposed['compatibility_obligations']:
-        requirement['observable']='combined terminal output'
-    proposal=RequirementContractProposal.model_validate_json(canonical_json(proposed))
-    _,prepared=configured_diagnostic_provider(factory.store,request,proposal)
-    runner.stdout=prepared.stdout
-    return base.model_copy(update={'inputs':inputs,'generation':GenerationCandidate(request=request)})
-
-
 @pytest.mark.parametrize('field,value',[('input_tokens',1),('output_tokens',1),('wall_seconds',0.1),
     ('cpu_seconds',0.1),('memory_bytes',1),('spend_usd',1.0)])
 def test_frozen_candidate_caps_block_before_provider(tmp_path,monkeypatch,field,value):
@@ -275,7 +227,7 @@ def test_frozen_batch_command_cap_combines_distinct_candidates(tmp_path,monkeypa
     # Replacing a frozen batch/revision cannot turn existing candidate use into zero.
     expanded=batch.model_copy(update={'batch_caps':batch.batch_caps.model_copy(update={'commands':2})})
     factory.authoring=factory.authoring.model_copy(update={'batch':expanded})
-    with pytest.raises(ValueError,match='frontier|budget'):factory.author(candidate,call=repaired(call,1))
+    with pytest.raises(ValueError,match='frontier|budget'):factory.author(candidate,call=retry_call(call,1))
 
 
 def test_authoring_contracts_have_no_removed_control_or_repair_configuration():

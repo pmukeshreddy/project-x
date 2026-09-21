@@ -36,11 +36,3 @@ def test_provisional_result_and_arbitrary_cas_are_never_accepted_origin(tmp_path
     q,task,report=package(tmp_path)
     for ref in (report.task,q.store.put_artifact(report)):
         with pytest.raises(QualificationRejected):q.verify_accepted(report.task,ref)
-
-def test_arbitrary_report_cannot_replace_the_current_selected_report(tmp_path):
-    from feature_rl.qualification.admission import _selected, _spec
-    q,task,report=package(tmp_path)
-    forged=q.store.put_artifact(report.model_copy(update={'rejection_reasons':('Synthetic replacement, never admitted',)}))
-    job=q._job(report.task,'m5-qualify')
-    with pytest.raises(QualificationRejected,match='selected'):
-        _selected(q,job.job_id,_spec(q,(report.task,),'m5-qualify'),forged)

@@ -15,7 +15,6 @@ from .service import (
     AuthoringPublicationPending,
     ContractAuthoringResult,
     ContractAuthoringService,
-    GenerationCandidate,
     build_contract_request,
 )
 from .retrieval import (
@@ -40,7 +39,6 @@ __all__ = [
     "ContractAuthoringService",
     "ContractFinalizationInputs",
     "ContractFinalizer",
-    "GenerationCandidate",
     "GroundedSource",
     "GroundingError",
     "EvidenceResolutionError",

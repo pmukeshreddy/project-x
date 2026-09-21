@@ -24,12 +24,13 @@ def configured(tmp_path,monkeypatch):
     return factory,built
 
 
-def test_actual_m5_keeps_a_small_policy_and_reuses_the_selected_result(tmp_path,monkeypatch):
+def test_actual_m5_keeps_a_small_policy_and_freezes_failed_qualification(tmp_path,monkeypatch):
     factory,built=configured(tmp_path,monkeypatch)
     result=factory.qualify(built.artifacts[0])
     assert result.disposition!=c.Disposition.SUCCESS
     assert set(QualificationPolicy.model_fields)=={'version','policy_id','seed','max_wall_seconds'}
-    assert factory.qualify(built.artifacts[0])==result
+    report=factory.store.get_artifact(result.artifacts[0])
+    assert report.task==built.artifacts[0] and report.disposition==result.disposition
 
 
 def test_provisional_report_cannot_release_through_actual_m5(tmp_path,monkeypatch):
@@ -40,16 +41,19 @@ def test_provisional_report_cannot_release_through_actual_m5(tmp_path,monkeypatc
     assert all(ref.kind!='TaskBundle' for ref in result.artifacts)
 
 
-def test_mechanical_release_uses_both_real_registry_transitions_under_test_gate(tmp_path,monkeypatch):
+def test_mechanical_release_preserves_payload_without_transition_jobs(tmp_path,monkeypatch):
     factory,built=configured(tmp_path,monkeypatch)
     report=factory.qualify(built.artifacts[0]).artifacts[0]
     def diagnostic_gate(q,task,selected):
         assert selected==report
         return q.store.get_artifact(report)  # original nonaccepted report; no human/accepted Q is fabricated
     monkeypatch.setattr(QualificationService,'verify_accepted',diagnostic_gate)
+    before=set(factory.registry.trace(report).jobs)
     result=factory.release(built.artifacts[0],accepted_report=report)
     assert result.disposition==c.Disposition.SUCCESS
     assert factory.store.get_artifact(result.artifacts[0]).state==c.TaskState.RELEASED
     assert factory.release(built.artifacts[0],accepted_report=report)==result
-    jobs=[factory.registry.job(j) for j in factory.registry.trace(report).jobs]
-    assert {'m6-transition-qualified','m6-transition-released'}<={j.spec.invocation for j in jobs}
+    assert set(factory.registry.trace(report).jobs)==before
+    original=factory.store.get_artifact(built.artifacts[0])
+    released=factory.store.get_artifact(result.artifacts[0])
+    assert released.model_dump(exclude={'state','qualification'})==original.model_dump(exclude={'state','qualification'})

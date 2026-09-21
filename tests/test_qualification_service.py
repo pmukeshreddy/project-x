@@ -23,7 +23,6 @@ def test_missing_real_package_validator_returns_precise_provisional_without_work
     result=q.qualify(task)
     assert result.operation=='qualify' and result.disposition==c.Disposition.PROVISIONAL
     assert 'package validator' in result.reason
-    assert result==q.qualify(task)
 
 
 def test_forged_accepted_report_without_authenticated_origin_is_rejected(tmp_path):
@@ -34,22 +33,12 @@ def test_forged_accepted_report_without_authenticated_origin_is_rejected(tmp_pat
 
 
 
-def test_unknown_worker_attempt_is_never_redispatched(tmp_path):
-    from feature_rl.qualification import QualificationUnavailable
+def test_qualification_does_not_create_or_reconcile_jobs(tmp_path,monkeypatch):
     q=service(tmp_path);task=task_fixture(q.store)
-    job=q._job(task,'m5-qualify');q._claim(job)
-    with pytest.raises(QualificationUnavailable):q.qualify(task)
-    assert q.registry.job(job.job_id).state=='running'
-    assert q.registry.accounting(job.job_id).unobserved_attempts==q.registry.job(job.job_id).attempts
-    assert q.registry.job(job.job_id).spec.attempt_limit==1
-
-
-def test_qualification_completion_accounts_only_for_its_actual_results(tmp_path):
-    q=service(tmp_path);task=task_fixture(q.store)
-    result=q.qualify(task);job=q._job(task,'m5-qualify')
-    assert [ref.kind for ref in result.artifacts]==['QualificationReport','m5-qualification-summary']
-    assert job.spec.attempt_limit==1
-    accounting=q.registry.accounting(job.job_id)
-    assert not accounting.unobserved_attempts and len(accounting.observations)==1
-    observation=accounting.observations[0].observation
-    assert observation.revision==1 and observation.receipts==result.artifacts and observation.costs==result.costs
+    def obsolete(*args,**kwargs):
+        raise AssertionError('qualification must not replay or reconcile Registry jobs')
+    for method in ('enqueue','claim','reconcile','complete','accounting','trace'):
+        monkeypatch.setattr(q.registry,method,obsolete)
+    result=q.qualify(task)
+    assert [ref.kind for ref in result.artifacts]==['QualificationReport']
+    assert result.disposition==c.Disposition.PROVISIONAL

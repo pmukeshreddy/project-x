@@ -2,8 +2,8 @@
 from typing import Annotated, Literal
 from pydantic import Field, model_validator
 from feature_rl import contracts as c
-from feature_rl.generation import CodexConfig
-from feature_rl.requirements import (GenerationCandidate, GroundedSource,
+from feature_rl.generation import CodexConfig, GenerationRequest
+from feature_rl.requirements import (GroundedSource,
     ContractFinalizationInputs, RetrievalPolicy)
 from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs
 from feature_rl.environments import PreparedEnvironment
@@ -64,7 +64,7 @@ class AuthoringCall(c.StrictModel):
     source_pair: c.ArtifactRef
     environment: PreparedEnvironment
     resolver: ResolverInputs
-    generation: GenerationCandidate
+    generation: GenerationRequest
     inputs: ContractFinalizationInputs | CheckerFinalizationInputs | ControlFinalizationInputs
     sources: Annotated[tuple[GroundedSource,...],Field(min_length=1,max_length=128)]
 
@@ -72,7 +72,7 @@ class AuthoringCall(c.StrictModel):
     def actual_stage(self):
         allowed={ContractFinalizationInputs:'initial_authoring',
             CheckerFinalizationInputs:'checker_generation',ControlFinalizationInputs:'control_authoring'}
-        if allowed[type(self.inputs)]!=self.generation.request.stage.value:
+        if allowed[type(self.inputs)]!=self.generation.stage.value:
             raise ValueError('actual M2 stage and finalization inputs differ')
         return self
 
@@ -92,7 +92,6 @@ class AuthoringRequest(c.StrictModel):
     candidate: c.ArtifactRef
     frontier: c.ArtifactRef
     call: AuthoringCall
-    previous: c.ArtifactRef | None
     stage: Literal['authoring','verifier']
     lane: c.Identifier
 

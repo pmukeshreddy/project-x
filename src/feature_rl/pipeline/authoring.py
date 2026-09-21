@@ -11,7 +11,7 @@ from feature_rl.generation.provider import GenerationProviderError
 from feature_rl.requirements import (AuthoringEvidenceResolver, ContractAuthoringService,
     ContractFinalizationInputs, RequirementContractProposal, AuthoringExhausted,
     AuthoringPublicationPending, AuthoringJournalPublicationPending)
-from feature_rl.requirements.service import semantic_request_sha256, validate_recovered_generation
+from feature_rl.requirements.service import validate_recovered_generation
 from feature_rl.verifiers import (CheckerAuthoringService, CheckerFinalizationInputs,
     ControlAuthoringService, ControlFinalizationInputs, ControlProposal)
 from feature_rl.verifiers.service import CheckerPublicationPending, AuthoringPreparationPending
@@ -98,7 +98,7 @@ def check_budget(factory,candidate,call,batch_ref):
     def reserved(entries):
         result=dict(input_tokens=0,output_tokens=0,wall_seconds=0.0,cpu_seconds=0.0,commands=0,memory_bytes=0)
         for job,request in entries:
-            limits=request.call.generation.request.limits
+            limits=request.call.generation.limits
             observed=[] if job is None else [cost for entry in factory.registry.accounting(job.job_id).observations
                 if entry.observation.source=='m6-generation' for cost in entry.observation.costs]
             for name in ('input_tokens','output_tokens','wall_seconds','cpu_seconds'):
@@ -160,7 +160,7 @@ def validate_call(factory,candidate,call):
     resolver.resolve(call.sources)
     if isinstance(call.inputs,ContractFinalizationInputs):
         from feature_rl.requirements.service import contexts_from_sources
-        if call.generation.request.contexts!=contexts_from_sources(call.sources):
+        if call.generation.contexts!=contexts_from_sources(call.sources):
             raise ValueError('contract request contexts differ from resolved evidence')
         if call.inputs.runtime_discovery!=call.resolver.runtime_discovery:
             raise ValueError('contract runtime discovery differs from actual resolver')
@@ -198,10 +198,9 @@ def author(factory,candidate,call):
         if source.disposition!=c.Disposition.SUCCESS:return source
         validate_call(factory,candidate,call)
         front=frontier(factory,candidate,source.artifacts[0],call)
-        stage,lane=stage_lane(call);previous=None
+        stage,lane=stage_lane(call)
         existing=jobs(factory,candidate)
-        # Stable call replay precedes new budget reservation; request IDs alone
-        # still cannot turn a changed call into another initial attempt.
+        # Replay a completed call before reserving resources for a new attempt.
         for job,old in existing:
             if old.call==call and old.frontier==front:
                 if job.spec.implementation!=factory.revision:
@@ -213,20 +212,10 @@ def author(factory,candidate,call):
         if any(job.state!='completed' for job,_ in existing):
             raise ValueError('all earlier candidate authoring attempts require reconciliation before another dispatch')
         lanes=[(job,old) for job,old in existing if old.lane==lane]
-        if lanes:
-            predecessors={old.previous for _,old in lanes}
-            terminal=[(job,old) for job,old in lanes if job.spec.inputs[1] not in predecessors]
-            if len(terminal)!=1:raise ValueError('ambiguous authoring lane version chain')
-            prior_job,prior=terminal[0];previous=prior_job.spec.inputs[1]
-            if call.generation.diagnosis is None:raise ValueError('every repeated authoring role requires a diagnosis and changed input')
-            if semantic_request_sha256(prior.call.generation.request)==semantic_request_sha256(call.generation.request):
-                raise ValueError('retry must change meaningful request content, not only IDs')
-        elif call.generation.diagnosis is not None:
-            raise ValueError('initial role cannot claim a retry without a retained predecessor')
         if len(lanes)>=3:
             raise AuthoringBudgetExceeded('budget_exhausted: each authoring role permits at most three attempts')
         check_budget(factory,candidate,call,batch_ref)
-        request=AuthoringRequest(candidate=candidate,frontier=front,call=call,previous=previous,
+        request=AuthoringRequest(candidate=candidate,frontier=front,call=call,
             stage=stage,lane=lane)
         ref=put(factory,request,'m6-authoring-request',dependencies=references(document(request)))
         job=factory.registry.enqueue(spec(factory,ref,request))
@@ -294,32 +283,15 @@ def dispatch(factory,job,request):
     return execute(factory,claim,ref,request)
 
 
-def prior_journals(factory,request):
-    if request.previous is None:return ()
-    matches=[job for job,old in jobs(factory,request.candidate) if job.spec.inputs[1]==request.previous]
-    if len(matches)!=1 or matches[0].state!='completed':raise ValueError('selected previous authoring result is missing')
-    receipt=read_authoring_receipt(factory.store,matches[0].result.artifacts[-1])
-    if (receipt.request!=request.previous or receipt.claim.job_id!=matches[0].job_id
-            or receipt.lane!=request.lane or receipt.disposition!=matches[0].result.disposition
-            or matches[0].result.artifacts!=(*receipt.outputs,matches[0].result.artifacts[-1])):
-        raise ValueError('previous journal chain lacks the exact selected lane result')
-    return receipt.journal_refs if receipt.disposition==c.Disposition.REJECTED else ()
-
-
 def execute(factory,claim,ref,request,*,recovered=None):
     factory.registry.assert_usable(ref)
     actual,schema=service(factory,request.call,claim,ref)
-    prior=prior_journals(factory,request)
     candidate=request.call.generation
-    if not prior:
-        # A changed previously accepted artifact starts a new local finalizer
-        # chain; the outer frozen request retains its diagnosis and resource reservation.
-        candidate=candidate.model_copy(update={'diagnosis':None,'changed_input':None})
     try:
-        result=actual.generate((candidate,),request.call.inputs,request.call.sources,prior_journal_refs=prior,
+        result=actual.generate((candidate,),request.call.inputs,request.call.sources,
             recovered_result=recovered if isinstance(recovered,GenerationResult) else None,
             recovered_error=recovered if isinstance(recovered,GenerationProviderError) else None)
-        validate_recovered_generation(factory.store,candidate.request,schema,result.generation)
+        validate_recovered_generation(factory.store,candidate,schema,result.generation)
         outputs=tuple(getattr(result,name) for name in ('contract_ref','verifier_ref','record_ref') if hasattr(result,name))
         if len(outputs)!=1:raise ValueError('actual authoring result must select one concrete output')
         journals=result.journal_refs;disposition=c.Disposition.SUCCESS;reason='Actual M2/M4 authored artifact selected; qualification remains pending'
@@ -411,22 +383,12 @@ def validate_receipt(factory,request,receipt):
         ControlFinalizationInputs:(ControlProposal,'control-authoring-journal','m4-control-record','feature_rl.verifiers.ControlAuthoringService')}
     schema,journal_kind,output_kind,producer=classes[type(request.call.inputs)]
     if schema is None:schema=checker_schema(factory,request.call)
-    if not 1<=len(receipt.journal_refs)<=3:raise ValueError('actual bounded authoring journal chain required')
-    if receipt.journal_refs[:-1]!=prior_journals(factory,request):
-        raise ValueError('receipt prior journals differ from the selected previous lane chain')
-    values=[]
-    for index,ref in enumerate(receipt.journal_refs,1):
-        raw=read_bytes(factory.store,ref,65536,kind=journal_kind)
-        value=json.loads(raw)
-        if canonical_json(value)!=raw or value.get('attempt_index')!=index or value.get('stage')!=request.call.generation.request.stage.value:
-            raise ValueError('authoring journal changed canonical stage/index')
-        if index<len(receipt.journal_refs) and value.get('status')!='rejected':
-            raise ValueError('prior authoring journals must be rejected attempts')
-        values.append(value)
-    last=values[-1]
-    semantic=semantic_request_sha256(request.call.generation.request)
-    if (last.get('request_sha256')!=identity(request.call.generation.request)
-            or last.get('semantic_request_sha256')!=semantic):
+    if len(receipt.journal_refs)!=1:raise ValueError('one authoring attempt journal required')
+    raw=read_bytes(factory.store,receipt.journal_refs[0],65536,kind=journal_kind)
+    last=json.loads(raw)
+    if canonical_json(last)!=raw or last.get('stage')!=request.call.generation.stage.value:
+        raise ValueError('authoring journal changed canonical stage')
+    if last.get('request_sha256')!=identity(request.call.generation):
         raise ValueError('authoring journal belongs to another exact request')
     expected='accepted' if receipt.disposition==c.Disposition.SUCCESS else 'rejected'
     if last.get('status')!=expected or receipt.disposition not in (c.Disposition.SUCCESS,c.Disposition.REJECTED):
@@ -453,7 +415,7 @@ def validate_receipt(factory,request,receipt):
     ev=provenance.evidence[-1]
     if (provenance.producer!=producer or provenance.producer_version!=revision
             or ev.producer!='feature_rl.generation.CodexGenerationProvider'
-            or ev.command!=('generate',request.call.generation.request.request_id)
+            or ev.command!=('generate',request.call.generation.request_id)
             or len(ev.artifacts)!=len(outcome.record.archives)
             or set(ev.artifacts)!=set(outcome.record.archives.values()) or ev.recorded_at!=outcome.record.recorded_at
             or ev.revision!=revision or ev.scope!=settings(factory).evidence_scope
@@ -470,7 +432,7 @@ def archived_outcome(factory,request,claim,schema):
         request_id=status['request_id'],response_id=status['response_id'],success=status['success'],
         generation_succeeded=status['generation_succeeded'],publication_complete=status['publication_complete'],
         error_code=status['error_type'],archives={**{k:c.ArtifactRef.model_validate_json(canonical_json(v)) for k,v in status['archive_refs'].items()},'status':ref})
-    return provider_outcome(factory.store,request.call.generation.request,record,schema)
+    return provider_outcome(factory.store,request.call.generation,record,schema)
 
 
 def provider_outcome(store,request,record,schema):

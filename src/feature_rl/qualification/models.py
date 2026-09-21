@@ -32,8 +32,6 @@ class ReferenceProjection(StrictModel):
     submission: ArtifactRef
     paths: Annotated[tuple[ProjectionPath,...],Field(min_length=1,max_length=2000)]
 
-Mode = Literal['positive','baseline_health','baseline_absence','negative']
-
 class GateOutcome(StrictModel):
     passed: bool
     code: ReasonCode
@@ -44,20 +42,6 @@ class QualificationPolicy(StrictModel):
     policy_id: Name='pilot-v1'
     seed: Annotated[int,Field(ge=0,lt=2**63)]=11
     max_wall_seconds: Annotated[float,Field(gt=0,le=21600)]=3600.0
-
-class RunBinding(StrictModel):
-    version: Literal['m5-run-binding-v1']='m5-run-binding-v1'
-    name: Name
-    task: ArtifactRef
-    projection: ArtifactRef
-    submission: ArtifactRef
-    seed: Annotated[int,Field(ge=0,lt=2**63)]
-    grade: ArtifactRef
-    mode: Mode
-    targets: tuple[Name,...]
-    operation_ids: tuple[Name,...]
-    grade_job: Digest
-    reset: ArtifactRef | None=None
 
 class ResetReceipt(StrictModel):
     version: Literal['m5-reset-v1']='m5-reset-v1'
@@ -72,23 +56,3 @@ class ResetReceipt(StrictModel):
     generation_after: Annotated[int,Field(ge=1)]
     cleanup_verified: bool
     recorded_at: UTCDateTime
-
-class QualificationSummary(StrictModel):
-    version: Literal['m5-qualification-summary-v1']='m5-qualification-summary-v1'
-    task: ArtifactRef
-    policy: ArtifactRef
-    projection: ArtifactRef | None
-    bindings: Annotated[tuple[ArtifactRef,...],Field(max_length=7)]
-    issues: Annotated[tuple[str,...],Field(max_length=32)]
-    qualification_job: Digest
-    wall_seconds: Annotated[float,Field(ge=0)]
-
-class QualificationPublicationFailed(Exception):
-    """Publication was interrupted; the selected attempt must not execute again."""
-    def __init__(self, message, *, claim=None):
-        super().__init__(message);self.claim=claim
-
-class QualificationUnavailable(Exception):
-    """An unfinished attempt has an unknown outcome and cannot be redispatched."""
-    def __init__(self, message, claim=None):
-        super().__init__(message);self.claim=claim
