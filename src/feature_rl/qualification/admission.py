@@ -6,9 +6,10 @@ from feature_rl.registry import JobSpec, RegistryError
 from feature_rl.verifiers import load_verifier
 from feature_rl.verifiers.loader import read_local
 from .controls import assess_outcome, validate_control_plan, control_origins, diagnose_control
-from .evidence import collapse_costs, unknown_cost, validate_grade, validate_reset
+from .evidence import collapse_costs, unknown_cost, validate_grade, validate_reset, assert_reference_determinism
 from .models import QualificationRejected, ReferenceProjection, RunBinding, QualificationSummary
 from .projection import derive_reference
+from .schedule import control_run_name, control_seeds
 
 
 def _compare_payload(left,right,excluded,detail):
@@ -52,8 +53,9 @@ def expected_runs(service,checked,projection,*,generated=()):
     for control in checked.verifier.controls:
         d=by_id.get(control.control_id)
         if d is not None and d.validity not in {'equivalent','unresolved'}:
-            mode,targets=(None,control.requirement_ids) if control.control_id in automatic else (d.mode,d.targets)
-            runs.append(('control_'+control.control_id,control.patch,service.policy.fresh_seeds[0],mode,targets,False))
+            for index,seed in enumerate(control_seeds(service.policy)):
+                mode,targets=(None,control.requirement_ids) if index==0 and control.control_id in automatic else (d.mode,d.targets)
+                runs.append((control_run_name(control.control_id,index),control.patch,seed,mode,targets,False))
     runs.extend(('reset_'+str(i),projection.submission,s,'positive',(),True) for i,s in enumerate(service.policy.reset_seeds))
     return tuple(runs),missing
 
@@ -85,6 +87,9 @@ def _qualification_context(service,report_ref,result,qualification_job):
         raise QualificationRejected('invalid_evidence','qualification package summary/policy/task mismatch')
     service.registry.assert_usable(summary_ref)
     summary=read_local(service.store,summary_ref,QualificationSummary,'m5-qualification-summary',4*1024*1024)
+    if (report.semantic_repair_authorization!=service.policy.semantic_repair_authorization
+            or summary.semantic_repair_authorization!=service.policy.semantic_repair_authorization):
+        raise QualificationRejected('invalid_evidence','qualification semantic authorization differs from its exact policy')
     if (summary.task,summary.policy,summary.qualification_job)!=(report.task,service.policy_ref,qualification_job) or summary.issues or summary.projection is None:
         raise QualificationRejected('invalid_evidence','qualification summary does not bind the complete frozen package')
     if summary.wall_seconds is None or summary.wall_seconds>service.policy.max_wall_seconds:
@@ -111,10 +116,11 @@ def _qualification_context(service,report_ref,result,qualification_job):
     gates=[report.baseline_absence,*report.fresh_runs,*report.controls,*report.interrupted_reset_runs]
     if len(gates)!=len(runs) or report.reference_run!=(report.fresh_runs[0] if report.fresh_runs else None):
         raise QualificationRejected('invalid_evidence','incomplete frozen reference/control/reset gate ledger')
-    seen=set();costs=[]
+    seen=set();costs=[];signatures={}
     generated={d.control_id:d for d in summary.control_diagnoses}
     origins=control_origins(service,checked) if generated else {}
     controls={control.control_id:control for control in checked.verifier.controls}
+    automatic_names={control_run_name(control_id,0):control_id for control_id in generated}
     for scheduled,binding_ref,gate in zip(runs,summary.bindings,gates):
         name,submission,seed,mode,targets,reset=scheduled
         service.registry.assert_usable(binding_ref)
@@ -137,12 +143,14 @@ def _qualification_context(service,report_ref,result,qualification_job):
         receipt,ids=validate_grade(service.store,checked,submission,seed,actual,service.grader,seen=seen)
         if binding.operation_ids!=ids:
             raise QualificationRejected('invalid_evidence','run operation identities differ from actual runtime')
+        if name.startswith(('fresh_','reset_')):
+            assert_reference_determinism(service.store,checked,receipt,signatures)
         if reset:
             if binding.reset not in actual.artifacts:
                 raise QualificationRejected('invalid_evidence','reset was not produced by this selected grade operation')
             validate_reset(service.store,checked,summary.projection,binding.reset,service.grader,seen=seen)
         if mode is None:
-            control_id=name.removeprefix('control_')
+            control_id=automatic_names[name]
             diagnosis,outcome=diagnose_control(service,checked,controls[control_id],receipt,binding_ref,origins)
             if diagnosis!=generated[control_id]:
                 raise QualificationRejected('invalid_evidence','automatic control diagnosis differs from retained execution/authorship')

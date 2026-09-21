@@ -7,7 +7,6 @@ does not qualify, accept or release a task and never manufactures an author outp
 import hashlib
 import json
 from pathlib import Path
-import re
 
 from feature_rl import contracts as c
 from feature_rl.artifacts import canonical_json
@@ -16,13 +15,13 @@ from feature_rl.history import GitHistory
 from feature_rl.intake import CachedSourceCatalog, GitHubPullRequestIntake, PullRequestIntakeResult
 from feature_rl.requirements import (AuthoringEvidenceResolver, ContractFinalizationInputs,
     GroundedSource, GenerationCandidate, RetrievalPolicy)
-from feature_rl.requirements.retrieval import BaselineRetriever, RetrievalRequest
+from feature_rl.requirements.retrieval import BaselineRetriever
 from feature_rl.requirements.service import build_contract_request
 from feature_rl.scenarios import ScenarioFinalizationInputs, build_scenario_request
 from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs
-from feature_rl.verifiers.service import build_checker_request
+from feature_rl.verifiers.fragments import CheckerFragmentInputs, build_fragment_request
 from feature_rl.verifiers.control_authoring import build_control_request, ControlRecord
-from feature_rl.qualification.controls import ATTACKS
+from feature_rl.qualification.attacks import attack_expected_reason
 from feature_rl.qualification.evidence import unknown_cost, collapse_costs
 from feature_rl.registry import Claim, CostObservation, JobSpec
 from .authoring_models import (AuthoringSettings, AuthoringBatch, AuthoringCall, ResolverInputs,
@@ -45,6 +44,22 @@ class FeatureRecoveryRequired(FactoryRecoveryRequired):
 
 def overhead():
     return (unknown_cost('construction','Automatic workflow controller overhead only; source, authoring and build costs stay in their original jobs'),)
+
+
+def phase_costs(previous, observed):
+    """Replace measured channels while retaining incurred, still unknown channels."""
+    categories = {cost.category for cost in observed}
+    return collapse_costs((*observed, *(cost for cost in previous if cost.category not in categories)))
+
+
+def validate_seed_policy(policy):
+    if policy.algorithm!='m4-sha256-v1' or not policy.same_cases_within_group:
+        raise ValueError('automatic checker construction requires seed algorithm m4-sha256-v1 with the same cases within each group')
+
+
+def checker_output_limit(runtime_limit,episode_limit):
+    from feature_rl.verifiers.authoring_models import MAX_CHECKER_OUTPUT_BYTES
+    return min(runtime_limit,episode_limit,MAX_CHECKER_OUTPUT_BYTES)
 
 
 class FeatureWorkflow:
@@ -79,6 +94,7 @@ class FeatureWorkflow:
 
     def construct(self,request:FeatureWorkflowRequest):
         request=checked(FeatureWorkflowRequest,request)
+        validate_seed_policy(request.seed_policy)
         ref=put(self.factory,request,'m6-feature-request',dependencies=references(document(request)))
         with candidate_lock(self.store,ref):
             job=self.registry.enqueue(self._spec(ref))
@@ -117,7 +133,8 @@ class FeatureWorkflow:
         old=self._observation(claim,key)
         return self.registry.reconcile(claim,CostObservation(source='m6-feature-'+key,
             upstream_attempt_id=claim.attempt_id,revision=1 if old is None else old.observation.revision+1,
-            receipts=tuple(dict.fromkeys((*(old.observation.receipts if old else ()),*refs))),costs=collapse_costs(costs)))
+            receipts=tuple(dict.fromkeys((*(old.observation.receipts if old else ()),*refs))),
+            costs=phase_costs(old.observation.costs if old else (),costs)))
 
     def _step(self,claim,request,key,inputs,execute,*,child=False):
         value={'version':'m6-feature-input-v1','request':document(request),'key':key,'inputs':inputs}
@@ -172,15 +189,17 @@ class FeatureWorkflow:
                     or candidate.provenance_label!=request.intake.provenance_label):
                 raise ValueError('intake selection differs from the requested repository/family/lineage')
         elif isinstance(output,PreparationSelection):
+            from feature_rl.environments import SandboxPolicy
             from feature_rl.environments.profiles import validate_recipe_profile
             selected=IntakeSelection.model_validate_json(canonical_json(inputs['inputs']))
             recipe=typed(self.store,output.environment.recipe,c.EnvironmentRecipe)
-            policy=read_record(self.store,output.environment.policy,type(self.runtime.policy),'sandbox-policy')
+            policy=read_record(self.store,output.environment.policy,SandboxPolicy,'sandbox-policy')
             if (step.key!='preparation' or recipe.baseline!=selected.baseline
                     or output.environment.policy not in recipe.provenance.inputs):
                 raise ValueError('preparation changed its selected baseline or runtime policy')
             validate_recipe_profile(recipe,policy,self.store)
-            self.runtime.bind_policy(policy)
+            if policy.model_dump(exclude={'image','profile'})!=self.runtime.base_policy.model_dump(exclude={'image','profile'}):
+                raise ValueError('preparation changed the frozen runtime constraints')
             raw=read_bytes(self.store,output.context.source,128*1024)
             from feature_rl.requirements.runtime_discovery import parse_discovery, discovery_locator
             observed=parse_discovery(output.context.source,raw)
@@ -235,7 +254,8 @@ class FeatureWorkflow:
             if len(selected)!=1 or read_bytes(self.store,selected[0],MAX_DOCUMENT)!=payload:
                 raise ValueError('workflow phase publication changed selected bytes')
             return step.output,selected[0]
-        if current.revision>1 and current.costs!=step.costs:raise ValueError('workflow phase changed selected costs')
+        if current.revision>1 and current.costs!=phase_costs(current.costs,step.costs):
+            raise ValueError('workflow phase changed selected costs')
         try:
             self._observe(claim,step.key,(step.inputs,),step.costs)
             ref=put(self.factory,step,'m6-feature-step',dependencies=references(document(step)))
@@ -257,8 +277,16 @@ class FeatureWorkflow:
         from feature_rl.requirements import RuntimeDiscoveryService
         candidate=typed(self.store,selected.candidate,c.CandidateRecord)
         pair=typed(self.store,selected.source_pair,c.SourcePair)
+        # Intake's full history proof is private. The authoring-visible recipe
+        # binds only the selected baseline and license; its private parent step
+        # retains the complete source-pair/history verification.
+        source_evidence=c.EvidenceRecord(producer='feature_rl.pipeline.FeatureWorkflow baseline selection',
+            command=('select verified baseline and license for runtime preparation',),
+            recorded_at=candidate.provenance.created_at,exit_status=0,
+            artifacts=(selected.baseline,selected.license_text),revision=self.settings.intake_revision,
+            scope='source_inspection')
         prepared=self.runtime.prepare_repository(selected.baseline,
-            source_evidence=candidate.provenance.evidence[0],extra_roots=tuple(entry.path for entry in pair.changed_files))
+            source_evidence=source_evidence,extra_roots=tuple(entry.path for entry in pair.changed_files))
         discovery=RuntimeDiscoveryService(runtime=self.runtime).discover(prepared)
         value=PreparationSelection(environment=prepared,context=discovery.context,
             entry_points=discovery.observation.entry_points,
@@ -267,32 +295,15 @@ class FeatureWorkflow:
         return value,(*discovery.costs,*overhead(),unknown_cost('storage','Runtime preparation publication overhead unmeasured'))
 
     def _sources(self,selected,prepared,request):
+        from .context import select_source_spans
         source=self.runtime.source(selected.baseline);profile=self.runtime.policy.profile
         profile.validate_source(source)
         text=read_bytes(self.store,selected.request,MAX_DOCUMENT,kind='authoring-request').decode()
-        terms=set(re.findall(r'[A-Za-z_]{3,}',text.lower()))-{'the','and','with','this','that','from','true','false','null'}
-        ranked=[]
-        for path,entry in source.files.items():
-            if not any(path==root or path.startswith(root.rstrip('/')+'/') for root in profile.source_roots):continue
-            try:lines=entry.data.decode().splitlines()
-            except UnicodeError:continue
-            if not lines:continue
-            scores=[len(terms.intersection(re.findall(r'[A-Za-z_]{3,}',line.lower()))) for line in lines]
-            center=max(range(len(lines)),key=lambda index:(scores[index],-index))
-            start=max(0,min(center-self.settings.context_lines//2,len(lines)-self.settings.context_lines))
-            end=min(len(lines),start+self.settings.context_lines)
-            ranked.append((-sum(scores[start:end]),path,start+1,end))
-        ranked.sort();spans=[];total=0
-        for _,path,start,end in ranked:
-            size=len(('\n'.join(source.files[path].data.decode().splitlines()[start-1:end])+'\n').encode())
-            if total+size>self.settings.context_bytes:continue
-            spans.append(RetrievalRequest(context_id='B_'+str(len(spans)+1),path=path,line_ranges=((start,end),)))
-            total+=size
-            if len(spans)>=self.settings.context_files:break
-        if not spans:raise ValueError('profile has no bounded author-visible source context')
+        spans=select_source_spans(source,profile.source_roots,text,max_files=self.settings.context_files,
+            max_lines=self.settings.context_lines,max_bytes=self.settings.context_bytes)
         policy=RetrievalPolicy(allowed_paths=tuple(span.path for span in spans),max_archive_bytes=self.runtime.policy.max_archive_bytes,
             max_files=self.runtime.policy.max_files,max_selected_bytes=self.settings.context_bytes,
-            max_spans=self.settings.context_files,max_expanded_bytes=self.runtime.policy.max_source_bytes)
+            max_spans=4*self.settings.context_files,max_expanded_bytes=self.runtime.policy.max_source_bytes)
         retrieved=BaselineRetriever(baseline=selected.baseline,
             archive=read_bytes(self.store,selected.baseline,policy.max_archive_bytes),policy=policy).retrieve(tuple(spans))
         sources=(GroundedSource(context_id='FEATURE_REQUEST',role='request',source=selected.request,
@@ -308,9 +319,9 @@ class FeatureWorkflow:
 
     def _author_factory(self,selected):
         conf=self.settings
-        settings=AuthoringSettings(backend=conf.backend,m2_revision=conf.m2_revision,m4_revision=conf.m4_revision,
+        settings=AuthoringSettings(codex=conf.codex,m2_revision=conf.m2_revision,m4_revision=conf.m4_revision,
             evidence_scope=conf.evidence_scope,batch=AuthoringBatch(candidates=(selected.candidate,),
-                candidate_caps=conf.authoring_caps,batch_caps=conf.authoring_caps,calibration_evidence=conf.calibration_evidence))
+                candidate_caps=conf.authoring_caps,batch_caps=conf.authoring_caps))
         return Factory(store=self.store,registry=self.registry,revision=self.factory.revision,
             builder=self.factory.builder,qualification=self.factory.qualification,authoring=settings)
 
@@ -356,6 +367,7 @@ class FeatureWorkflow:
             else:candidate=GenerationCandidate(request=generated)
             call=AuthoringCall(source_pair=selected.source_pair,environment=prepared.environment,resolver=resolver,
                 generation=candidate,inputs=inputs,sources=sources,control_plan=plan,attack=attack)
+            self._recover_predispatch_phase(claim,request_ref,author,selected.candidate,call)
             key='author-'+hashlib.sha256(canonical_json(document(call))).hexdigest()
             def execute():
                 try:
@@ -374,18 +386,42 @@ class FeatureWorkflow:
             if last.disposition!=c.Disposition.REJECTED or not last.artifacts:return last
             receipt=read_authoring_receipt(self.store,last.artifacts[-1])
             journal=json.loads(read_bytes(self.store,receipt.journal_refs[-1],65536))
+            if (journal.get('generation_record') or {}).get('error_code') == 'CodexUnavailable':
+                return last
             previous.append(str(journal.get('error') or last.reason)[:2048])
         return last
+
+    def _recover_predispatch_phase(self,claim,request_ref,author,candidate,call):
+        """Close the exact invalid controller phase before its corrected replacement."""
+        if not isinstance(call.inputs,ScenarioFinalizationInputs):return
+        from .authoring import jobs,predispatch_replacement,validate_predispatch_receipt
+        for job,old in jobs(author,candidate):
+            if not predispatch_replacement(author,old.call,call):continue
+            key='author-'+hashlib.sha256(canonical_json(document(old.call))).hexdigest()
+            current=self._observation(claim,key)
+            if current is None:continue
+            attempts=self.registry.attempts(job.job_id)
+            if len(attempts)!=1:raise ValueError('predispatch recovery requires one exact child attempt')
+            result=author.recover(attempts[0].claim)
+            receipt=read_authoring_receipt(self.store,result.artifacts[-1])
+            validate_predispatch_receipt(author,old,receipt)
+            self._step(claim,request_ref,key,{'candidate':document(candidate),'call':document(old.call)},
+                lambda:(result,overhead()),child=True)
 
     def _execute(self,claim,ref,request):
         job,_,_=self._validated(claim)
         if job.state=='completed':return job.result
+        validate_seed_policy(request.seed_policy)
         for value in (ref,self.configuration):self.registry.assert_usable(value)
         selected,_=self._step(claim,ref,'intake',document(request),lambda:self._source(request))
         source,_=self._step(claim,ref,'source',{'candidate':document(selected.candidate)},
             lambda:(self._child(lambda:self.factory.screen_source(selected.candidate)),overhead()),child=True)
         if source.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,source)
         prepared,_=self._step(claim,ref,'preparation',document(selected),lambda:self._prepare(selected))
+        # Runtime qualification belongs to continuation, never immutable phase
+        # validation or terminal publication replay.
+        from feature_rl.environments import SandboxPolicy
+        self.runtime.bind_policy(read_record(self.store,prepared.environment.policy,SandboxPolicy,'sandbox-policy'))
         sources,resolver,baseline=self._sources(selected,prepared,request)
         author=self._author_factory(selected)
         profile=self.runtime.policy.profile
@@ -401,14 +437,15 @@ class FeatureWorkflow:
         def identifiers(stage,index):
             prefix='feature-'+claim.job_id[:24]+'-'+stage+'-'+str(index)
             return dict(request_id=prefix,response_id=prefix+'-response',prompt_id=prefix+'-prompt',
-                limits=self.settings.generation_limits,seed=request.seed_policy.seeds[0]+index)
+                limits=self.settings.generation_limits)
         contract_result=self._author(claim,ref,author,selected,prepared,resolver,sources,contract_inputs,
             lambda index:build_contract_request(**identifiers('contract',index),sources=sources,
                 allowed_requirement_ids=request.allowed_requirement_ids,entry_points=prepared.entry_points,
                 supported_observables=prepared.supported_observables,allowed_changes=allowed))
         if contract_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,contract_result)
         contract_ref=contract_result.artifacts[0];contract=typed(self.store,contract_ref,c.RequirementContract)
-        scenario_inputs=ScenarioFinalizationInputs(contract=contract_ref,supported_observables=prepared.supported_observables,
+        from feature_rl.scenarios.service import contract_observables
+        scenario_inputs=ScenarioFinalizationInputs(contract=contract_ref,supported_observables=contract_observables(contract),
             seed_policy=request.seed_policy,visibility=c.Visibility.PRIVATE,
             provenance=self._provenance(claim,sources,(contract_ref,)),costs=overhead())
         scenario_result=self._author(claim,ref,author,selected,prepared,resolver,sources,scenario_inputs,
@@ -421,7 +458,6 @@ class FeatureWorkflow:
         slots=[ControlSlot(category='omission',requirement_ids=(name,)) for name in mandatory]
         slots.extend(ControlSlot(category=category,requirement_ids=feature or mandatory) for category in ('plausible_wrong','hardcoded'))
         if compatibility:slots.append(ControlSlot(category='regression',requirement_ids=compatibility))
-        slots.extend(ControlSlot(category='adversarial',requirement_ids=mandatory,attack=attack) for attack in sorted(ATTACKS))
         slots.append(ControlSlot(category='alternative_positive',requirement_ids=()))
         if len(slots)>self.settings.max_controls:raise ValueError('frozen workflow control count exceeds configured bound')
         plan=ControlPlan(contract=contract_ref,slots=tuple(slots));controls=[]
@@ -432,7 +468,8 @@ class FeatureWorkflow:
             control_inputs=ControlFinalizationInputs(control_id='control-'+str(index+1),category=slot.category,
                 requirement_ids=slot.requirement_ids,expected_valid=alternative,
                 expected_reason=('Implement the complete disclosed feature and preserve ordinary behavior from B only; independence and correctness remain unverified'
-                    if alternative else 'Keep the program runnable while exposing '+(slot.attack or slot.category)+' for '+','.join(slot.requirement_ids)),
+                    if alternative else attack_expected_reason(slot.attack,slot.requirement_ids) if slot.attack else
+                    'Keep the program runnable while exposing '+slot.category+' for '+','.join(slot.requirement_ids)),
                 baseline=selected.baseline,contract=contract_ref,environment=prepared.environment.recipe,
                 scenario_plan=None if alternative else scenario_ref,
                 provenance=self._provenance(claim,sources,fixed),costs=overhead())
@@ -442,13 +479,27 @@ class FeatureWorkflow:
             if result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,result)
             controls.append(read_record(self.store,result.artifacts[0],ControlRecord,'m4-control-record').control)
         checker_inputs=CheckerFinalizationInputs(contract=contract_ref,scenario_plan=scenario_ref,baseline=selected.baseline,
-            environment=prepared.environment.recipe,output_limit_bytes=self.runtime.policy.output_bytes,
+            environment=prepared.environment.recipe,output_limit_bytes=checker_output_limit(
+                self.runtime.policy.output_bytes,contract.episode_limits.output_bytes),
             public_examples=request.public_checks,controls=tuple(controls),visibility=c.Visibility.PRIVATE,
             provenance=self._provenance(claim,sources,(contract_ref,scenario_ref,selected.baseline,prepared.environment.recipe)),costs=overhead())
-        checker_result=self._author(claim,ref,author,selected,prepared,resolver,sources,checker_inputs,
-            lambda index:build_checker_request(**identifiers('checker',index),contract=contract,contract_ref=contract_ref,
-                plan=scenario,plan_ref=scenario_ref,sources=sources))
-        if checker_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,checker_result)
+        fragments=[]
+        for family in scenario.scenarios:
+            fragment_key='checker-'+hashlib.sha256(family.scenario_id.encode()).hexdigest()
+            fragment_inputs=CheckerFragmentInputs(**checker_inputs.model_dump(include={
+                'contract','scenario_plan','baseline','environment','visibility','provenance','costs'}),
+                scenario_id=family.scenario_id)
+            checker_result=self._author(claim,ref,author,selected,prepared,resolver,sources,fragment_inputs,
+                lambda index:build_fragment_request(**identifiers(fragment_key,index),
+                    contract=contract,contract_ref=contract_ref,plan=scenario,plan_ref=scenario_ref,
+                    sources=sources,scenario_id=family.scenario_id))
+            if checker_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,checker_result)
+            fragments.append(checker_result.artifacts[0])
+        checker_result,_=self._step(claim,ref,'checker-assembly',
+            {'candidate':document(selected.candidate),'inputs':document(checker_inputs),
+                'fragments':[document(fragment) for fragment in fragments]},
+            lambda:(self._child(lambda:author.assemble_checker(selected.candidate,
+                inputs=checker_inputs,fragments=tuple(fragments))),overhead()),child=True)
         inputs=BuildInputs(source_pair=selected.source_pair,contract=contract_ref,scenario_plan=scenario_ref,
             verifier=checker_result.artifacts[0],environment=prepared.environment,
             baseline_files=tuple(sorted(baseline.files)),invocation=request.invocation)
@@ -503,7 +554,7 @@ class FeatureWorkflow:
                 artifacts=(output,),revision=self.factory.revision,scope='source_inspection')
             result=c.OperationResult(operation='construct',disposition=outcome.selected.disposition,
                 artifacts=(*outcome.selected.artifacts,output),evidence=(*outcome.selected.evidence,evidence),
-                costs=collapse_costs(tuple(cost for row in rows for cost in row.observation.costs)),reason=outcome.selected.reason)
+                costs=tuple(cost for row in rows for cost in row.observation.costs),reason=outcome.selected.reason)
             return self.registry.complete(claim,result,observations=tuple(row.observation_id for row in rows)).result
         except Exception as exc:
             raise FactoryPublicationFailed('retain exact automatic construction result',claim,payload,kind='m6-feature-outcome') from exc

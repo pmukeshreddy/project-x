@@ -24,6 +24,7 @@ from feature_rl.contracts import (
 from feature_rl.generation import (
     AuthoringContext,
     GenerationRequest,
+    GenerationAttemptMetadata,
     GenerationResult,
     GenerationStage,
 )
@@ -51,8 +52,8 @@ class GenerationCandidate(StrictModel):
 
 
 class AuthoringExhausted(RuntimeError):
-    def __init__(self, stage: GenerationStage, journal_refs: tuple[ArtifactRef, ...]):
-        super().__init__(f"{stage.value} exhausted its declared candidate attempts")
+    def __init__(self, stage: GenerationStage, journal_refs: tuple[ArtifactRef, ...], reason: str):
+        super().__init__(f"{stage.value} authoring failed: {reason}")
         self.stage = stage
         self.journal_refs = journal_refs
 
@@ -68,30 +69,22 @@ _GENERATION_ARCHIVES = {
     name: f"generation-{name}"
     for name in (
         "attempt", "request", "response", "retrieval", "schema", "options",
-        "provenance", "usage", "cost", "events", "status", "preflight",
+        "provenance", "usage", "cost", "events", "status",
     )
 }
-_FULL_GENERATION_ARCHIVES = frozenset(_GENERATION_ARCHIVES) - {"preflight"}
-_REGISTRATION_ARCHIVES = frozenset({"attempt", "status"})
-_PREFLIGHT_ARCHIVES = frozenset({"attempt", "preflight", "cost", "status"})
+_FULL_GENERATION_ARCHIVES = frozenset(_GENERATION_ARCHIVES)
+_PREEXECUTION_ARCHIVES = frozenset({"attempt", "cost", "status"})
 
 
-def _strict_json(data: bytes):
-    def pairs(items):
-        value = {}
-        for key, item in items:
-            if key in value:
-                raise ValueError(f"duplicate JSON key: {key}")
-            value[key] = item
-        return value
-
-    return json.loads(data, object_pairs_hook=pairs)
+from feature_rl.generation.schema import _json_no_duplicates as _strict_json, _parse_envelope
+from feature_rl.generation.events import parse_events
 
 
-def _archive_read_caps(name: str, request: GenerationRequest) -> tuple[int, int]:
+def archive_read_caps(name: str, request: GenerationRequest) -> tuple[int, int]:
     if name == "response":
-        # stdout+stderr are jointly bounded by output_bytes, then base64 encoded in JSON.
-        payload = 4 * ((request.limits.output_bytes + 2) // 3) + 64 * 1024
+        # Captured streams, final text, exact transport schema and process
+        # monitoring observations are retained within their original bounds.
+        payload = 3 * request.limits.output_bytes + request.limits.stdin_bytes + 64 * 1024
     elif name == "events":
         payload = request.limits.output_bytes
     elif name in {"request", "schema", "retrieval"}:
@@ -113,7 +106,7 @@ def validate_recovered_generation(
     record = recovered.record
     archive_names = frozenset(record.archives)
     if archive_names not in {
-        _FULL_GENERATION_ARCHIVES, _REGISTRATION_ARCHIVES, _PREFLIGHT_ARCHIVES
+        _FULL_GENERATION_ARCHIVES, _PREEXECUTION_ARCHIVES
     }:
         raise ValueError("recovered generation archive set is not a complete provider variant")
     visibility = (
@@ -132,7 +125,7 @@ def validate_recovered_generation(
             or ref.schema_version != 1
         ):
             raise ValueError(f"recovered {name} archive reference is invalid")
-        payload_cap, envelope_cap = _archive_read_caps(name, request)
+        payload_cap, envelope_cap = archive_read_caps(name, request)
         raw[name] = store.get_bytes(
             ref, max_envelope_bytes=envelope_cap, max_payload_bytes=payload_cap
         )
@@ -140,7 +133,7 @@ def validate_recovered_generation(
     request_payload = request.model_dump(mode="json")
     schema_payload = output_schema.model_json_schema()
     try:
-        attempt = _strict_json(raw["attempt"])
+        attempt = GenerationAttemptMetadata.model_validate_json(raw["attempt"]).model_dump(mode="json")
         status = _strict_json(raw["status"])
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
         raise ValueError("recovered generation archive JSON is invalid") from error
@@ -184,71 +177,28 @@ def validate_recovered_generation(
         raise ValueError("recovered status archive differs from the provider record")
     recovered_cost = getattr(recovered, "cost", None)
 
-    if archive_names == _REGISTRATION_ARCHIVES:
+    if archive_names == _PREEXECUTION_ARCHIVES:
         expected_cost = {
             "category": "authoring", "wall_seconds": None, "cpu_seconds": None,
             "gpu_seconds": None, "input_tokens": None, "output_tokens": None,
             "human_minutes": None, "usd": None, "measurement": "unknown",
             "note": (
-                "Execution did not start because attempt registration failed; "
-                "costs are unknown."
+                "Execution did not start; execution and monetary costs are unknown."
             ),
         }
         if not isinstance(recovered, GenerationProviderError) or (
             record.success
             or record.generation_succeeded
             or not record.publication_complete
-            or record.error_code != "ArchivePublicationError"
+            or record.error_code not in {"ArchivePublicationError", "GenerationInputLimitError"}
             or recovered.response is not None
             or recovered.usage_observation is not None
             or recovered_cost is None
             or recovered_cost.model_dump(mode="json") != expected_cost
+            or _strict_json(raw["cost"]) != expected_cost
             or status.get("error") != str(recovered)
         ):
-            raise ValueError("recovered registration archive disposition is invalid")
-        return
-
-    if archive_names == _PREFLIGHT_ARCHIVES:
-        try:
-            preflight = _strict_json(raw["preflight"])
-            cost = _strict_json(raw["cost"])
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
-            raise ValueError("recovered preflight archive JSON is invalid") from error
-        observed = preflight.get("observed_bytes")
-        oversized = preflight.get("oversized_components")
-        if not isinstance(recovered, GenerationProviderError) or (
-            record.success
-            or record.generation_succeeded
-            or not record.publication_complete
-            or record.error_code != "GenerationInputLimitError"
-            or recovered.usage_observation is not None
-            or recovered_cost is None
-            or cost != recovered_cost.model_dump(mode="json")
-            or recovered.response != preflight
-            or preflight.get("attempt_id") != record.attempt_id
-            or not recorded_at_matches(preflight.get("recorded_at"))
-            or preflight.get("request_id") != request.request_id
-            or preflight.get("response_id") != request.response_id
-            or preflight.get("prompt_id") != request.prompt_id
-            or preflight.get("request_sha256") != attempt.get("request_sha256")
-            or preflight.get("output_schema_sha256") != attempt.get("output_schema_sha256")
-            or preflight.get("stdin_cap_bytes") != request.limits.stdin_bytes
-            or preflight.get("execution_started") is not False
-            or preflight.get("cause") != str(recovered)
-            or not isinstance(observed, dict)
-            or observed.get("request_json") != len(canonical_json(request_payload))
-            or observed.get("output_schema_json") != len(canonical_json(schema_payload))
-            or not isinstance(oversized, list)
-            or not oversized
-            or any(
-                name not in {"request_json", "output_schema_json", "templated_prompt_utf8"}
-                or type(observed.get(name)) is not int
-                or observed[name] <= request.limits.stdin_bytes
-                for name in oversized
-            )
-            or status.get("error") != str(recovered)
-        ):
-            raise ValueError("recovered preflight archive disposition is invalid")
+            raise ValueError("recovered preexecution archive disposition is invalid")
         return
 
     try:
@@ -277,28 +227,13 @@ def validate_recovered_generation(
             raise ValueError("recovered generation result status is not successful")
         if not usage.get("accepted_response_usage") or usage.get("accepted") != recovered.usage.model_dump(mode="json"):
             raise ValueError("recovered usage archive differs from the provider result")
-        completed = []
-        try:
-            for line in raw["events"].decode("utf-8").splitlines():
-                event = _strict_json(line.encode())
-                if isinstance(event, dict) and event.get("event") == "completed":
-                    completed.append(event)
-            envelope = _strict_json(completed[0]["output_text"].encode())
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, KeyError, IndexError, AttributeError) as error:
-            raise ValueError("recovered content archive is invalid") from error
-        expected_content = output_schema.model_validate(recovered.content).model_dump(mode="json")
-        if (
-            len(completed) != 1
-            or envelope.get("response_id") != request.response_id
-            or envelope.get("source_ids") != [context.context_id for context in request.contexts]
-            or len(envelope.get("requirement_ids", ()))
-            != len(set(envelope.get("requirement_ids", ())))
-            or not set(envelope.get("requirement_ids", ())).issubset(
-                request.allowed_requirement_ids
-            )
-            or envelope.get("content") != expected_content
-        ):
-            raise ValueError("recovered content archive differs from the provider result")
+        output_text, reported_usage = parse_events(raw["events"])
+        archived_content = _parse_envelope(output_text, request, output_schema)
+        response = _strict_json(raw["response"])
+        if (reported_usage != recovered.usage or archived_content != recovered.content
+                or response.get("output_text") != output_text):
+            raise ValueError("recovered content/usage archive differs from the provider result")
+
     else:
         if record.success or record.generation_succeeded or not record.publication_complete:
             raise ValueError("recovered provider error status is invalid")
@@ -383,7 +318,6 @@ def build_contract_request(
     supported_observables: tuple[str, ...],
     allowed_changes: AllowedChanges,
     limits,
-    seed: int,
 ) -> GenerationRequest:
     admitted = tuple(GroundedSource.model_validate(source) for source in sources)
     controller_constraints = canonical_json(
@@ -405,7 +339,19 @@ def build_contract_request(
         ),
         instruction=(
             "Choose only the needed IDs from the declared bounded namespace, use each chosen ID "
-            "once, and do not pad the proposal with unused IDs. Copy evidence quotes verbatim from "
+            "once, and do not pad the proposal with unused IDs. Prefer a minimal cohesive set of "
+            "independently falsifiable obligations over many overlapping obligations. Give each "
+            "obligation an explicit API and input scope and assign each behavioral guarantee to "
+            "one owning ID. Broad preservation clauses must describe only residual behavior not "
+            "already owned by other IDs; do not restate their formatting, value, type, or visibility "
+            "guarantees. Assign a cross-API relation to one ID without duplicating the properties "
+            "it relates. Every compatibility obligation must be measurable on baseline B through "
+            "existing interfaces without the new feature; new-interface behavior belongs in feature "
+            "requirements. Before emitting, consider a runnable mutation that violates each ID while "
+            "preserving every other mandatory ID. If isolation is impossible, factor the scopes or "
+            "merge inseparable obligations. Do not drop requested behavior, weaken guarantees, or "
+            "invent exclusions to obtain isolation. This reasoning is not evidence of qualification. "
+            "Copy evidence quotes verbatim from "
             "their exact locator. "
             "Select feature_files explicitly from the supplied request's changed-file history. "
             "Include only files genuinely needed for the selected requirements, citing their "
@@ -422,7 +368,6 @@ def build_contract_request(
         contexts=contexts_from_sources(admitted),
         allowed_requirement_ids=allowed_requirement_ids,
         limits=limits,
-        seed=seed,
     )
 
 
@@ -598,6 +543,7 @@ class ContractAuthoringService:
                 self.store, candidates[0].request, RequirementContractProposal, recovered_error
             )
         journal_refs = list(prior_journal_refs)
+        last_error = None
         for index, candidate in enumerate(candidates, len(prior_journal_refs) + 1):
             result = None
             try:
@@ -613,7 +559,7 @@ class ContractAuthoringService:
                 if not result.record.success or not result.record.publication_complete or not artifacts:
                     raise GroundingError("accepted generation requires complete archived receipts")
                 generation_evidence = EvidenceRecord(
-                    producer="feature_rl.generation.LocalGenerationProvider",
+                    producer="feature_rl.generation.CodexGenerationProvider",
                     command=("generate", candidate.request.request_id),
                     recorded_at=result.record.recorded_at,
                     exit_status=0,
@@ -656,6 +602,9 @@ class ContractAuthoringService:
                         ),
                     ) from publication_error
                 journal_refs.append(journal)
+                last_error = error
+                if isinstance(error, GenerationProviderError) and error.record.error_code == "CodexUnavailable":
+                    break
                 continue
             journal_payload = self._journal_payload(
                 candidate, index, status="accepted", error=None, result=result
@@ -682,4 +631,4 @@ class ContractAuthoringService:
                 generation=result,
                 journal_refs=tuple(journal_refs),
             )
-        raise AuthoringExhausted(GenerationStage.INITIAL_AUTHORING, tuple(journal_refs))
+        raise AuthoringExhausted(GenerationStage.INITIAL_AUTHORING, tuple(journal_refs), str(last_error))

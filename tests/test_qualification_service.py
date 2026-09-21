@@ -13,7 +13,7 @@ def service(tmp_path):
     from feature_rl.qualification import QualificationService
     store=ArtifactStore(tmp_path/'store',c.ActorRole.CONTROLLER)
     registry=Registry(tmp_path/'registry',store)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.revision='a'*40
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.base_policy=runtime.policy;runtime.revision='a'*40
     grader=GradingService(store=store,runtime=runtime,revision='b'*40)
     return QualificationService(store=store,registry=registry,grader=grader,builder=None,revision='c'*40)
 

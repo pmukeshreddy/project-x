@@ -36,7 +36,23 @@ def route():
         assert hashlib.sha256(data).hexdigest()==wheel['sha256']
         ref=store.put_bytes(data,'dependency-wheel',c.Visibility.AUTHORING)
         pins.append(c.DependencyPin(name=wheel['name'],version=wheel['version'],artifact=ref,sha256=wheel['sha256']))
-    engine=DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=state/'runtime',socket_path=Path(setup['socket_path']),policy=runtime_policy())
+    plugin_directory=os.environ.get('FEATURE_RL_TEST_BUILDX_PLUGIN_DIRECTORY')
+    engine=DockerEngine(image_repository=os.environ.get('FEATURE_RL_TEST_IMAGE_REPOSITORY'),state_root=state/'runtime',socket_path=Path(setup['socket_path']),policy=runtime_policy(),
+        buildx_plugin_directory=Path(plugin_directory) if plugin_directory else None)
+    # Candidate resolution needs actual pinned-worker markers and wheel tags;
+    # controller platform values or fabricated fixture tags are not evidence.
+    with engine.session(binding={'diagnostic':'M4 pinned worker target'},saved_source={}) as target_session:
+        target=target_session.execute(c.CommandSpec(argv=('/usr/local/bin/python','-I','-c',
+            'import json;from pip._vendor.packaging.markers import default_environment;'
+            'from pip._vendor.packaging.tags import sys_tags;'
+            'print(json.dumps({"markers":default_environment(),"tags":[str(t) for t in sys_tags()]}))'),
+            working_directory='/workspace',timeout_seconds=5.0))
+        assert target.exit_code==0 and target.reason=='exited'
+    assert target_session.cleanup_verified
+    target_data=json.loads(target.stdout)
+    assert target_data['markers']['python_full_version']==engine.policy.profile.interpreter_version
+    engine.policy=engine.policy.model_copy(update={'profile':engine.policy.profile.model_copy(update={
+        'marker_environment':target_data['markers'],'compatible_tags':tuple(target_data['tags'])})})
     engine.qualify_boundary()
     revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     runtime=EnvironmentRuntime(store=store,engine=engine,revision=revision)
@@ -67,6 +83,11 @@ def record(route,label,submission,seed=11):
     store,runtime,service,*_=route
     result=service.grade(route[4],submission,seed)
     receipt=read_grade(store,result.artifacts[0])
+    if label=='baseline':
+        from feature_rl.qualification.evidence import validate_grade
+        from feature_rl.verifiers import load_verifier
+        replayed,_=validate_grade(store,load_verifier(store,route[4]),submission,seed,result,service)
+        assert replayed==receipt
     print('\nM4_ROUTE '+json.dumps({'label':label,'result':result.model_dump(mode='json'),'receipt':receipt.model_dump(mode='json')}),flush=True)
     return receipt
 

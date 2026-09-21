@@ -42,6 +42,7 @@ class RuntimeConfiguration(LocalPaths):
     grading_revision: c.Revision
     policy: SandboxPolicy
     image_repository: ImageRepository | None = Field(default=None, exclude_if=lambda value: value is None)
+    buildx_plugin_directory: str | None = None
     qualification_image: ImageDigest | None = Field(default=None, exclude_if=lambda value: value is None)
     image_seconds: Annotated[float, Field(gt=0, le=3600)] = Field(default=600.0, exclude_if=lambda value: value == 600.0)
     grade_wall_seconds: Annotated[float, Field(gt=0, le=3600)] = 600.0
@@ -136,7 +137,8 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
     if runtime or qualification:
         settings=config.runtime
         engine=DockerEngine(state_root=Path(settings.state_root),socket_path=Path(settings.socket_path),
-            policy=settings.policy,image_repository=settings.image_repository,image_seconds=settings.image_seconds)
+            policy=settings.policy,image_repository=settings.image_repository,image_seconds=settings.image_seconds,
+            buildx_plugin_directory=None if settings.buildx_plugin_directory is None else Path(settings.buildx_plugin_directory))
         if settings.policy.image is not None:
             engine.qualify_boundary(image=settings.qualification_image)
         elif settings.policy.profile is not None:

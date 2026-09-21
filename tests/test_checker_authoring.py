@@ -1,6 +1,4 @@
 """CPU diagnostic proposals/events only; no model, H, or feature qualification."""
-from m4_fixtures import runtime_policy
-from datetime import datetime, timezone
 import json
 import pytest
 from feature_rl.artifacts import ArtifactStore, canonical_json
@@ -14,10 +12,6 @@ from test_authoring import bound_discovery_text
 def checker_fixture(tmp_path):
     store = ArtifactStore(tmp_path / 'objects', c.ActorRole.CONTROLLER)
     task = store.get_artifact(diagnostic(store))
-    from feature_rl.environments import SandboxPolicy
-    policy_ref = store.put_bytes(canonical_json(runtime_policy().model_dump(mode='json')), 'sandbox-policy', c.Visibility.AUTHORING)
-    recipe = store.get_artifact(task.environment)
-    task = task.model_copy(update={'environment': replace_artifact(store, task.environment, visibility='authoring', provenance=recipe.provenance.model_copy(update={'inputs': recipe.provenance.inputs+(policy_ref,)}))})
     old = store.get_artifact(task.contract)
     request = store.put_bytes(b'DIAGNOSTIC ONLY', 'authoring-request', c.Visibility.AUTHORING)
     discovery_text = bound_discovery_text(baseline=task.baseline, recipe=task.environment)
@@ -30,7 +24,12 @@ def checker_fixture(tmp_path):
     provenance = old.provenance.model_copy(update={'inputs': (request, task.baseline, discovery)})
     origin = c.EvidenceLink(source=request, locator='authoring-request:whole', quote='DIAGNOSTIC ONLY', provenance_label='reconstructed_specification')
     requirement = old.requirements[0].model_copy(update={'evidence': (origin,)})
-    contract_ref = replace_artifact(store, task.contract, visibility='authoring', provenance=provenance, requirements=[requirement.model_dump(mode='json')])
+    baseline_origin = c.EvidenceLink(source=task.baseline, locator=sources[1].locator,
+        quote='# diagnostic', provenance_label='existing_obligation')
+    feature_files = [item.model_copy(update={'evidence': (baseline_origin,)}).model_dump(mode='json')
+                     for item in old.feature_files]
+    contract_ref = replace_artifact(store, task.contract, visibility='authoring', provenance=provenance,
+        requirements=[requirement.model_dump(mode='json')], feature_files=feature_files)
     old_verifier = store.get_artifact(task.private_oracle)
     old_plan = store.get_artifact(old_verifier.scenario_plan)
     plan_ref = replace_artifact(store, old_verifier.scenario_plan, contract=contract_ref, provenance=provenance.model_copy(update={'inputs': provenance.inputs+(contract_ref,)}), scenarios=[s.model_copy(update={'oracle_origin': origin}).model_dump(mode='json') for s in old_plan.scenarios])
@@ -60,23 +59,17 @@ def test_finalizer_freezes_real_m0_and_loads_without_execution(tmp_path):
 
 
 def configured_diagnostic_provider(store, request, proposal, *, archive=None, termination='process_exit'):
-    """Real provider parser/archive/cost pipeline with TEST process/backend doubles."""
-    from test_generation import FakeBackend, FakeRunner, worker_events
-    from feature_rl.generation import LocalGenerationProvider
-    events = [json.loads(line) for line in worker_events().splitlines()]
-    for event in events:
-        event.update(request_id=request.request_id, response_id=request.response_id, prompt_id=request.prompt_id)
-        if event['event'] == 'identity_validated': event['seed'] = request.seed
-        if event['event'] == 'completed':
-            event['output_text'] = json.dumps({'response_id': request.response_id, 'source_ids': [ctx.context_id for ctx in request.contexts], 'requirement_ids': list(request.allowed_requirement_ids), 'content': proposal.model_dump(mode='json')})
-    runner = FakeRunner(stdout=('\n'.join(json.dumps(e) for e in events)+'\n').encode(), termination=termination)
-    return LocalGenerationProvider(backend=FakeBackend(), archive=archive or store.put_bytes, runner=runner), runner
+    """Real provider parser/archive/cost pipeline with an explicit Codex transport double."""
+    from codex_fixtures import config, CodexRunner, events, response
+    from feature_rl.generation import CodexGenerationProvider
+    runner = CodexRunner(events(response(request, proposal.model_dump(mode='json'))), termination=termination)
+    return CodexGenerationProvider(config=config(store.root), archive=archive or store.put_bytes, runner=runner), runner
 
 
 def request_for(store, inputs, sources):
     from test_generation import limits
     from feature_rl.verifiers import build_checker_request
-    return build_checker_request(request_id='CHECKER_1', response_id='RESPONSE_1', prompt_id='PROMPT_1', contract=store.get_artifact(inputs.contract), contract_ref=inputs.contract, plan=store.get_artifact(inputs.scenario_plan), plan_ref=inputs.scenario_plan, sources=sources, limits=limits(), seed=0)
+    return build_checker_request(request_id='CHECKER_1', response_id='RESPONSE_1', prompt_id='PROMPT_1', contract=store.get_artifact(inputs.contract), contract_ref=inputs.contract, plan=store.get_artifact(inputs.scenario_plan), plan_ref=inputs.scenario_plan, sources=sources, limits=limits())
 
 
 def authoring_fixture(tmp_path, *, archive=None):
@@ -105,7 +98,6 @@ def test_actual_provider_request_schema_cost_and_private_bundle(tmp_path):
 
 @pytest.mark.parametrize('defect', ['missing_family', 'unknown_requirement', 'wrong_oracle', 'downgraded', 'operand_type', 'worker_verdict'])
 def test_generated_defects_rejected_before_final_publication(tmp_path, defect):
-    from pydantic import ValidationError
     store, task, proposal, inputs, sources, resolver = checker_fixture(tmp_path)
     value = proposal.model_dump(mode='json')
     if defect == 'missing_family': value['cases'].pop()

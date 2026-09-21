@@ -6,7 +6,7 @@ from .authoring_models import CheckerProposal, CheckerFinalizationInputs, CasePr
 from .finalize import CheckerFinalizer, PreparedChecker
 from .service import (CheckerAuthoringService, CheckerAuthoringResult,
     CheckerPublicationPending, build_checker_request)
-from .control_authoring import (ControlProposal, SourceEdit, ReferenceExcerpt,
+from .control_authoring import (ControlProposal, SourceEdit, SourceCreation, TextReplacement, ReferenceExcerpt,
     ControlFinalizationInputs, ControlFinalizer, PreparedControl, ControlRecord,
     ControlAuthoringService, ControlAuthoringResult, ControlPublicationPending,
     build_control_request)

@@ -12,7 +12,6 @@ from feature_rl.contracts import (
     CostRecord,
     Digest,
     Identifier,
-    Revision,
     StrictModel,
     Text,
     UTCDateTime,
@@ -49,24 +48,22 @@ class AuthoringContext(StrictModel):
 
 
 class GenerationLimits(StrictModel):
-    wall_seconds: Annotated[float, Field(gt=0, le=120)]
+    wall_seconds: Annotated[float, Field(gt=0, le=3600)]
     cpu_seconds: Annotated[int, Field(gt=0, le=120)]
     stdin_bytes: Annotated[int, Field(gt=0, le=1_048_576)]
     output_bytes: Annotated[int, Field(gt=0, le=1_048_576)]
-    file_size_bytes: Annotated[int, Field(gt=0, le=1_048_576)]
     input_tokens: Annotated[int, Field(gt=0, le=262_144)]
     output_tokens: Annotated[int, Field(gt=0, le=262_144)]
     physical_footprint_kill_bytes: Annotated[int, Field(gt=0)]
     physical_footprint_poll_seconds: Annotated[float, Field(gt=0, le=1)]
-    cuda_memory_bytes: Annotated[int, Field(gt=0)] | None = None
     declared_memory_ceiling_bytes: Annotated[int, Field(gt=0)]
 
     @model_validator(mode="after")
     def token_envelope(self):
         if self.input_tokens + self.output_tokens > 262_144:
-            raise ValueError("input and emitted output must fit the model context envelope")
-        if self.declared_memory_ceiling_bytes <= self.physical_footprint_kill_bytes + (self.cuda_memory_bytes or 0):
-            raise ValueError("declared memory ceiling must leave a guard band above process and CUDA limits")
+            raise ValueError("input and emitted output must fit the authoring context envelope")
+        if self.declared_memory_ceiling_bytes <= self.physical_footprint_kill_bytes:
+            raise ValueError("declared memory ceiling must leave a guard band above Codex process limit")
         return self
 
 
@@ -84,7 +81,6 @@ class GenerationRequest(StrictModel):
     contexts: Annotated[tuple[AuthoringContext, ...], Field(min_length=1)]
     allowed_requirement_ids: tuple[Identifier, ...]
     limits: GenerationLimits
-    seed: Annotated[int, Field(ge=0)]
 
     @model_validator(mode="after")
     def stage_boundary(self):
@@ -261,26 +257,21 @@ class GenerationRequest(StrictModel):
 
 
 class GenerationUsage(StrictModel):
+    """Counts reported by Codex, not invented local token IDs or log probabilities."""
     input_tokens: Annotated[int, Field(ge=0)]
-    input_token_ids: tuple[Annotated[int, Field(ge=0)], ...]
+    cached_input_tokens: Annotated[int, Field(ge=0)]
     output_tokens: Annotated[int, Field(ge=0)]
-    token_ids: tuple[Annotated[int, Field(ge=0)], ...]
-    selected_model_logprobs: tuple[
-        Annotated[float, Field(le=0, allow_inf_nan=False)], ...
-    ]
-    sampling_policy: Literal["greedy_argmax"]
-    behavior_logprobs: Literal[None] = None
-    finish_reason: Literal["stop"]
-    truncated: Literal[False]
+    cache_write_input_tokens: Annotated[int, Field(ge=0)] | None = Field(default=None, exclude_if=lambda value: value is None)
+    reasoning_output_tokens: Annotated[int, Field(ge=0)] | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
-    def token_alignment(self):
-        if self.input_tokens != len(self.input_token_ids):
-            raise ValueError("actual input token IDs must align with input count")
-        if self.output_tokens != len(self.token_ids) or len(self.token_ids) != len(
-            self.selected_model_logprobs
-        ):
-            raise ValueError("token IDs and selected model logprobs must align with output count")
+    def cached_subset(self):
+        if self.cached_input_tokens > self.input_tokens:
+            raise ValueError("cached input tokens exceed total input tokens")
+        if self.cache_write_input_tokens is not None and self.cache_write_input_tokens > self.input_tokens:
+            raise ValueError("cache write tokens exceed total input tokens")
+        if self.reasoning_output_tokens is not None and self.reasoning_output_tokens > self.output_tokens:
+            raise ValueError("reasoning tokens exceed total output tokens")
         return self
 
 
@@ -299,22 +290,15 @@ class GenerationCallRecord(StrictModel):
 class GenerationAttemptMetadata(StrictModel):
     attempt_id: Identifier
     recorded_at: UTCDateTime
-    producer: Literal["feature_rl.generation.LocalGenerationProvider"]
-    protocol_version: Literal[3, 4]
+    producer: Literal["feature_rl.generation.CodexGenerationProvider"]
+    protocol_version: Literal["codex-exec-v1"]
     request_id: GenerationIdentifier
     response_id: GenerationIdentifier
     prompt_id: GenerationIdentifier
     request_sha256: Digest
     output_schema_sha256: Digest
-    source_sha256: dict[str, Digest]
-    configured_model_id: Text
-    configured_model_revision: Revision
-    model_config_sha256: Digest | None = None
-    model_manifest_sha256: Digest
-    dependency_manifest_sha256: Digest
-    dependency_versions: dict[str, str] = Field(default_factory=dict)
-    device: str | None = None
-    dtype: str | None = None
+    configured_model_id: Literal["gpt-6-astra"]
+    reasoning_effort: Literal["low", "medium", "high", "xhigh", "max"]
 
 
 class GenerationResult(StrictModel):

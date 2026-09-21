@@ -63,7 +63,7 @@ for path in sorted(wheelhouse.iterdir()):
  allowed=settings.get('dependency_hashes',{}).get(name)
  if allowed and digest not in allowed:raise RuntimeError('dependency disagrees with repository lock hash: '+name)
  with zipfile.ZipFile(path) as wheel:
-  metadata=[n for n in wheel.namelist() if n.endswith('.dist-info/METADATA')]
+  metadata=[n for n in wheel.namelist() if n.count('/')==1 and n.endswith('.dist-info/METADATA')]
   if len(metadata)!=1:raise RuntimeError('ambiguous wheel metadata')
   identity=email.parser.BytesParser().parsebytes(wheel.read(metadata[0]))
  if canonicalize_name(identity['Name'])!=name or identity['Version']!=str(version):raise RuntimeError('wheel identity mismatch')
@@ -184,14 +184,14 @@ def resolve_repository(runtime, source, *, extra_roots=()):
                  'resolve.py': SourceFile(RESOLVE_CODE.encode(), False)}
         files['Dockerfile'] = SourceFile((f'FROM --platform={engine.policy.platform} {base}\n'
             'USER 0:0\nENV SOURCE_DATE_EPOCH=946684800 PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0 DEBIAN_FRONTEND=noninteractive\n'
-            f'COPY input.json resolve.py {ROOT}/\nRUN ["python","-I","{ROOT}/resolve.py"]\n'
+            f'COPY input.json resolve.py {ROOT}/\nRUN ["/usr/local/bin/python","-I","{ROOT}/resolve.py"]\n'
             'USER 65534:65534\nWORKDIR /workspace\n').encode(), False)
         context = SourceArchive(files).to_tar()
         with engine.state.lock():
             engine._require_clean_owned_state()
             built_result=engine.image_command(['buildx','build','--builder','default','--platform',engine.policy.platform,
                 '--provenance=false','--build-arg','SOURCE_DATE_EPOCH=946684800',
-                '--output','type=docker,rewrite-timestamp=true','--tag',tag,'-'],stdin=context,checked=False)
+                '--output','type=docker','--tag',tag,'-'],stdin=context,checked=False)
             if built_result.reason!='exited' or built_result.exit_code!=0:
                 diagnosis=(built_result.stdout+built_result.stderr).decode(errors='replace')[-4000:]
                 if built_result.reason=='exited' and any(message in diagnosis.lower() for message in (
@@ -219,7 +219,7 @@ def resolve_repository(runtime, source, *, extra_roots=()):
     engine.qualify_boundary(image=image)
     session = engine.session(binding={'purpose':'repository-resolution','resolution':key}, saved_source={}, image=image)
     with session:
-        result = session.execute(CommandSpec(argv=('python','-I','-c',CAPTURE_CODE,
+        result = session.execute(CommandSpec(argv=('/usr/local/bin/python','-I','-c',CAPTURE_CODE,
             str(bootstrap.max_staging_bytes)), working_directory='/workspace', timeout_seconds=30),
             output_limit=bootstrap.max_staging_bytes,artifact_capture=True)
         if result.reason != 'exited' or result.exit_code != 0:

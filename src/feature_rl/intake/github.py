@@ -29,6 +29,7 @@ from feature_rl.history import GitHistory, classify_changed_files
 from feature_rl.splits import PartitionManifest
 
 from .sources import CachedSourceCatalog, SourceArchiver
+from .request_document import render_authoring_request
 
 
 _REVISION = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
@@ -585,10 +586,10 @@ class GitHubPullRequestIntake:
             "current_api_base_matches_graph": (
                 pr_data["base"]["sha"] == reconstruction.baseline_commit
             ),
-            "ci_config_baseline_object": self.history.path_object(
+            "ci_config_baseline_object": self.history.optional_path_object(
                 reconstruction.baseline_commit, ".github"
             ),
-            "ci_config_reference_object": self.history.path_object(
+            "ci_config_reference_object": self.history.optional_path_object(
                 reconstruction.reference_commit, ".github"
             ),
             "partition_assignments": [
@@ -726,7 +727,7 @@ class GitHubPullRequestIntake:
         source_pair_ref = self.store.put_artifact(source_pair)
 
         request_ref = self.store.put_bytes(
-            _canonical(request_payload), "authoring-request", Visibility.AUTHORING
+            render_authoring_request(request_payload), "authoring-request", Visibility.AUTHORING
         )
         return PullRequestIntakeResult(
             candidate=candidate_ref,

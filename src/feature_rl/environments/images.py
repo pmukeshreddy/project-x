@@ -21,7 +21,7 @@ ImageRepository = Annotated[str, Field(pattern=r'^[a-z0-9][a-z0-9.-]*(?::[0-9]+)
 EPOCH = 946684800  # Fixed, ZIP-compatible 2000-01-01; never the build clock.
 LABEL = 'feature-rl.runtime-context'
 ROOT = '/opt/feature-rl'
-LINK_DEPS = CommandSpec(argv=('python', '-I', '-c',
+LINK_DEPS = CommandSpec(argv=('/usr/local/bin/python', '-I', '-c',
     "import os;os.symlink('/opt/feature-rl/deps','/workspace/deps')"),
     working_directory='/workspace', timeout_seconds=5.0)
 
@@ -33,7 +33,7 @@ class HostRequirements(StrictModel):
 
 
 class RuntimeImage(StrictModel):
-    version: Literal['python-runtime-image-v1'] = 'python-runtime-image-v1'
+    version: Literal['python-runtime-image-v1', 'command-runtime-image-v1'] = 'python-runtime-image-v1'
     image_digest: ImageDigest
     base_image: ImageDigest
     context_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')]
@@ -89,7 +89,7 @@ if len(sys.argv)>1:
  if name!=canonicalize_name(settings['project_name']) or str(wheel_version)!=settings['project_version']:
   raise RuntimeError('project wheel filename identity mismatch')
  with zipfile.ZipFile(paths[0]) as wheel:
-  names=[name for name in wheel.namelist() if name.endswith('.dist-info/METADATA')]
+  names=[name for name in wheel.namelist() if name.count('/')==1 and name.endswith('.dist-info/METADATA')]
   if len(names)!=1:raise RuntimeError('ambiguous project wheel metadata')
   project=email.parser.BytesParser().parsebytes(wheel.read(names[0]))
  if canonicalize_name(project['Name'])!=canonicalize_name(settings['project_name']) or project['Version']!=settings['project_version']:
@@ -116,6 +116,10 @@ print('runtime dependency closure verified')
 
 def image_context(store, pins, policy):
     """Canonical, source-free recipe; the tar hash is also the cache key."""
+    from .command_profiles import CommandRuntimeProfile
+    if isinstance(policy.profile, CommandRuntimeProfile):
+        from .command_runtime import command_image_context
+        return command_image_context(store, pins, policy)
     profile = policy.profile
     files = {'supply/'+name: entry for name, entry in dependency_files(store, pins, policy).items()}
     files['profile.json'] = SourceFile(canonical_json(profile.model_dump(mode='json',
@@ -126,8 +130,8 @@ USER 0:0
 ENV SOURCE_DATE_EPOCH={EPOCH} PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0 LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC
 COPY supply/ {ROOT}/supply/
 COPY profile.json check.py {ROOT}/
-RUN ["python", "-B", "-I", "-m", "pip", "--isolated", "--disable-pip-version-check", "--no-cache-dir", "install", "--no-index", "--no-deps", "--require-hashes", "--ignore-installed", "--no-compile", "--find-links", "{ROOT}/supply", "--target", "{ROOT}/deps", "-r", "{ROOT}/supply/requirements.txt"]
-RUN ["python", "-B", "-I", "{ROOT}/check.py"]
+RUN ["/usr/local/bin/python", "-B", "-I", "-m", "pip", "--isolated", "--disable-pip-version-check", "--no-cache-dir", "install", "--no-index", "--no-deps", "--require-hashes", "--ignore-installed", "--no-compile", "--find-links", "{ROOT}/supply", "--target", "{ROOT}/deps", "-r", "{ROOT}/supply/requirements.txt"]
+RUN ["/usr/local/bin/python", "-B", "-I", "{ROOT}/check.py"]
 USER 65534:65534
 WORKDIR /workspace
 '''
@@ -195,27 +199,18 @@ def prepare_runtime_image(runtime, pins):
                 raise PolicyRejected('runtime image cache identity mismatch')
             info = engine.ensure_image(record.image_digest)
         else:
-            # Tags discover shared construction-cache entries only. No rollout
-            # ever receives a tag, nor falls back from a recorded digest to one.
-            pulled = engine.image_command(['pull', '--platform', policy.platform, tag], checked=False)
-            if pulled.reason == 'exited' and pulled.exit_code == 0:
-                info = engine.inspect_image(tag)
-            else:
-                message = (pulled.stdout+pulled.stderr).decode(errors='replace').lower()
-                if pulled.reason != 'exited' or not any(value in message for value in ('manifest unknown', 'manifest_unknown')):
-                    raise PolicyRejected('cannot resolve runtime image cache: '+message[-1500:])
-                engine.ensure_image(policy.image)
-                engine.image_command(['buildx', 'build', '--builder', 'default', '--platform', policy.platform,
-                    '--network', 'none', '--provenance=false', '--build-arg', f'SOURCE_DATE_EPOCH={EPOCH}',
-                    '--output', 'type=docker,rewrite-timestamp=true', '--label', LABEL+'='+key,
-                    '--tag', tag, '-'], stdin=payload)
-                info = engine.inspect_image(tag)
-                check_image(info, key, policy)
-                built_id = info['Id']
-                engine.image_command(['push', tag])
-                info = engine.inspect_image(tag)
-                if info['Id'] != built_id:
-                    raise PolicyRejected('runtime image changed while publishing')
+            engine.ensure_image(policy.image)
+            engine.image_command(['buildx', 'build', '--builder', 'default', '--platform', policy.platform,
+                '--network', 'none', '--provenance=false', '--build-arg', f'SOURCE_DATE_EPOCH={EPOCH}',
+                '--output', 'type=docker', '--label', LABEL+'='+key,
+                '--tag', tag, '-'], stdin=payload)
+            info = engine.inspect_image(tag)
+            check_image(info, key, policy)
+            built_id = info['Id']
+            engine.image_command(['push', tag])
+            info = engine.inspect_image(tag)
+            if info['Id'] != built_id:
+                raise PolicyRejected('runtime image changed while publishing')
             check_image(info, key, policy)
             digests = [value for value in (info.get('RepoDigests') or ())
                        if value.startswith(engine.image_repository+'@sha256:')]
@@ -224,7 +219,9 @@ def prepare_runtime_image(runtime, pins):
             pinned = engine.ensure_image(digests[0])
             if pinned['Id'] != info['Id']:
                 raise PolicyRejected('published manifest differs from constructed runtime image')
-            record = RuntimeImage(image_digest=digests[0], base_image=policy.image,
+            from .command_profiles import CommandRuntimeProfile
+            record = RuntimeImage(version='command-runtime-image-v1' if isinstance(policy.profile, CommandRuntimeProfile) else 'python-runtime-image-v1',
+                image_digest=digests[0], base_image=policy.image,
                 context_sha256=key, context=context, host_requirements=HostRequirements(platform=policy.platform))
             engine.state.write(name, record.model_dump(mode='json'))
         check_image(info, key, policy)
@@ -242,6 +239,10 @@ def check_image(info, key, policy):
 
 def validate_baseline(runtime, image, baseline, source):
     """Reject unbuildable repositories and incomplete dependency closures early."""
+    from .command_profiles import CommandRuntimeProfile
+    if isinstance(runtime.profile, CommandRuntimeProfile):
+        from .command_runtime import validate_command_baseline
+        return validate_command_baseline(runtime, image, baseline, source)
     session = runtime.engine.session(binding={'purpose': 'runtime-image-construction',
         'context': image.context_sha256, 'tree': source.tree_sha256}, saved_source={}, image=image.image_digest)
     error = None
@@ -249,7 +250,7 @@ def validate_baseline(runtime, image, baseline, source):
         with session:
             runtime.stage(session, source)
             commands = (*runtime.profile.setup[:2], CommandSpec(
-                argv=('python', '-I', '-c', CHECK_CODE, '/workspace/built'),
+                argv=('/usr/local/bin/python', '-I', '-c', CHECK_CODE, '/workspace/built'),
                 working_directory='/workspace', timeout_seconds=30.0))
             for command in commands:
                 settings = canonical_json(runtime.profile.model_dump(mode='json', exclude={'neutral_repairs'})) if command == commands[-1] else b''

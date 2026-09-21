@@ -10,7 +10,7 @@ from .models import (
     AccountingReport, ArtifactRecord, AttemptLimit, AttemptRecord, Backpressure,
     Claim, ClaimConflict, CostObservation, JobRecord, JobSpec, ObservationRecord,
     QuarantinedError, QuarantineNotice, RegistryConflict, RegistryIntegrityError,
-    RegistryLimit, StaleClaim, TraceReport, UnknownIdentity,
+    RegistryLimit, StaleClaim, TraceReport, UnknownIdentity, LimitExpansion,
 )
 from .historical import ignored_roots
 
@@ -134,8 +134,8 @@ class State:
     def trace(self, ref):
         seen, jobs = self.affected(ref)
         refs = tuple(self.artifacts[key].ref for key in sorted(seen))
-        if len(refs) > 1024:
-            raise RegistryLimit('trace exceeds bounded response; use smaller registry partition')
+        if len(refs) > self.limits.max_artifacts:
+            raise RegistryLimit('trace exceeds artifact index capacity')
         notices = tuple(notice for _, notice in sorted(self.notices.items())
                         if self.affected(notice.root)[0] & seen)
         return TraceReport(artifacts=refs, jobs=tuple(sorted(jobs)),
@@ -159,6 +159,14 @@ class State:
                                 unobserved_attempts=tuple(a for a in job.attempts if a not in covered))
 
     def apply(self, action, data):
+        if action == 'expand_limits':
+            if set(data) != {'artifacts', 'previous_limits', 'limits', 'reason'} or data['artifacts'] != []:
+                raise RegistryIntegrityError('unexpected capacity expansion payload')
+            expansion = validated(LimitExpansion, {key: value for key, value in data.items() if key != 'artifacts'})
+            if expansion.previous_limits != self.limits:
+                raise RegistryIntegrityError('capacity expansion is not contiguous with prior limits')
+            self.limits = expansion.limits
+            return
         shapes = {
             'register': {'artifacts'}, 'enqueue': {'artifacts', 'spec'},
             'claim': {'artifacts', 'claim'}, 'abandon': {'artifacts', 'claim', 'reason', 'evidence'},

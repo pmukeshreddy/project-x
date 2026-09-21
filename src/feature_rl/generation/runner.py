@@ -1,4 +1,4 @@
-"""Fresh-process execution with explicit kernel and sampled resource bounds."""
+"""Codex process execution with CPU, output, deadline and sampled memory bounds."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class ProcessOutcome:
     monitor_error: str | None = None
     cleanup_error: str | None = None
     cpu_limit_enforcement: str = "kernel_rlimit_cpu"
-    file_size_limit_enforcement: str = "kernel_rlimit_fsize"
+    output_limit_enforcement: str = "captured_output_and_final_response"
     memory_limit_enforcement: str = "sampled_process_memory"
     max_sampled_resident_bytes: int | None = None
 
@@ -111,10 +111,9 @@ def _group_absent(pid: int) -> bool:
     return False
 
 
-def _child_limits(cpu_seconds: int, file_size_bytes: int) -> None:
+def _child_limits(cpu_seconds: int) -> None:
     os.setsid()
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
-    resource.setrlimit(resource.RLIMIT_FSIZE, (file_size_bytes, file_size_bytes))
 
 
 class BoundedProcessRunner:
@@ -126,6 +125,7 @@ class BoundedProcessRunner:
         command: Sequence[str],
         stdin: bytes,
         cwd: Path,
+        response_path: Path,
         environment: Mapping[str, str],
         limits: GenerationLimits,
     ) -> ProcessOutcome:
@@ -153,7 +153,7 @@ class BoundedProcessRunner:
                     cwd=cwd,
                     env=dict(environment),
                     close_fds=True,
-                    preexec_fn=lambda: _child_limits(limits.cpu_seconds, limits.file_size_bytes),
+                    preexec_fn=lambda: _child_limits(limits.cpu_seconds),
                 )
                 termination = "process_exit"
                 samples = 0
@@ -173,7 +173,8 @@ class BoundedProcessRunner:
                             termination = "deadline"
                             break
                         combined_size = stdout_path.stat().st_size + stderr_path.stat().st_size
-                        if combined_size > limits.output_bytes:
+                        response_size = response_path.stat().st_size if response_path.exists() else 0
+                        if max(combined_size, response_size) > limits.output_bytes:
                             termination = "output_cap"
                             break
                         sample = _footprint(library, process.pid)
@@ -226,8 +227,10 @@ class BoundedProcessRunner:
                 cleanup_error = "process group still present after bounded cleanup"
                 termination = "cleanup_failure"
             try:
-                stdout = stdout_path.read_bytes()
-                stderr = stderr_path.read_bytes()
+                with stdout_path.open("rb") as stream:
+                    stdout = stream.read(limits.output_bytes + 1)
+                with stderr_path.open("rb") as stream:
+                    stderr = stream.read(limits.output_bytes + 1)
             except BaseException as caught:
                 stdout = b""
                 stderr = b""
@@ -244,9 +247,9 @@ class BoundedProcessRunner:
                     stdout = stdout[: limits.output_bytes]
                     stderr = b""
                 termination = "output_cap"
-            if exit_status == -signal.SIGXFSZ:
+            if response_path.exists() and response_path.stat().st_size > limits.output_bytes:
                 termination = "output_cap"
-            elif exit_status == -signal.SIGXCPU:
+            if exit_status == -signal.SIGXCPU:
                 termination = "cpu_cap"
         after = resource.getrusage(resource.RUSAGE_CHILDREN)
         cpu = max(

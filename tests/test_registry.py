@@ -342,6 +342,9 @@ def typed_artifacts(store):
             return [replace(item) for item in value]
         return value
     data = examples()
+    data['RequirementContract']['feature_files'] = [{'path': 'src/cli.py', 'requirement_ids': ['R1'],
+        'rationale': 'Synthetic reference-graph fixture, not feature grounding',
+        'evidence': data['RequirementContract']['requirements'][0]['evidence']}]
     for kind in ('CandidateRecord', 'SourcePair', 'RequirementContract', 'ScenarioPlan',
                  'EnvironmentRecipe', 'VerifierBundle', 'TaskBundle', 'RolloutRecord', 'TrainingCheckpoint'):
         artifact = ARTIFACT_TYPES[kind].model_validate_json(json.dumps(replace(data[kind])))

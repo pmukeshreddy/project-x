@@ -78,12 +78,12 @@ closed comparisons from exact recorded command output and private-input hashes.
 
 Controls are actual `m4-submission` refs in frozen VerifierBundle. A ControlDiagnosis
 binds ID, validity, expected failure mode and exact requirement targets to evidence.
-Required categories are omission, plausible_wrong, hardcoded, regression,
-adversarial and alternative_positive. Each mandatory requirement needs a runnable
-targeted omission; diagnosed equivalent exclusions do not count. All nine attacks
-are required: forged_verdict, evaluator_detection, hardcoded_inputs,
-skipped_execution, protocol_manipulation, excessive_output, dependency_shadowing,
-path_link and retained_state. Syntax/import/protocol/infrastructure failure does
+Required categories are omission, plausible_wrong, hardcoded and
+alternative_positive, plus regression when compatibility obligations exist.
+Each mandatory requirement needs a runnable targeted omission; diagnosed equivalent
+exclusions do not count. Behavioral controls are sufficient for qualification.
+Adversarial controls are optional; if selected, their named attack and observed
+rejection mechanism must still match. Syntax/import/protocol/infrastructure failure does
 not satisfy semantic omission. For targeted semantic coverage, every process-mode
 case must have actual clean adapter evidence with normal exit zero; M4 may still
 correctly classify nonzero process output as completed comparisons for ordinary
@@ -127,8 +127,13 @@ M6 owns global candidate/stage accounting. Policy fields `repair_history`,
 selected by a completed M6 `construct` Registry operation with exact candidate in
 its inputs/trace. RepairHistory contains candidate, initial evidence, ordered
 diagnosed RepairAttempts with before/after versions and costs, and authentic
-journal refs. Known M3 recipe repairs appear exactly once. At most two repairs
-per stage and four per candidate are allowed. M6's authentic orchestration must
+journal refs. Known M3 recipe repairs appear exactly once. At most two semantic
+repairs per stage and four per candidate are allowed. The versioned M6 transport
+classification described in [the M6 interface](interfaces-M6.md) preserves every
+physical RepairAttempt and adds authenticated proof refs to the history. M5
+recomputes each proof against the Registry and provider archives before excluding
+that attempt from the semantic count; missing or forged evidence fails closed.
+M6's authentic orchestration must
 supply this seam; M5 does not infer unknown upstream usage or add a global ledger.
 An incomplete history remains provisional. M0's required integer repair field
 cannot represent unknown: the summary has `repair_count: null` and an explicit

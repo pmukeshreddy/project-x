@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator, model_validator
 from feature_rl import contracts as c
 from feature_rl.generation import GenerationLimits
-from feature_rl.generation.backend import BackendConfig
+from feature_rl.generation import CodexConfig
 from feature_rl.intake import PullRequestIntakeSpec
 from feature_rl.splits import PartitionManifest
 from feature_rl.requirements import GroundedSource
@@ -24,12 +24,11 @@ class FeatureWorkflowSettings(c.StrictModel):
     source_max_bytes: Annotated[int,Field(gt=0,le=64*1024*1024)]
     git_timeout_seconds: Annotated[float,Field(gt=0,le=120)]=30.0
     intake_revision: c.Revision
-    backend: BackendConfig
+    codex: CodexConfig
     m2_revision: c.Revision
     m4_revision: c.Revision
     generation_limits: GenerationLimits
     authoring_caps: AuthoringCaps
-    calibration_evidence: Annotated[tuple[c.ArtifactRef,...],Field(min_length=1,max_length=32)]
     context_files: Annotated[int,Field(ge=1,le=32)]=8
     context_lines: Annotated[int,Field(ge=8,le=512)]=80
     context_bytes: Annotated[int,Field(ge=1024,le=524288)]=65536

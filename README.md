@@ -21,11 +21,11 @@ and the actual library services. See [the runbook](docs/runbook.md) for commands
 configuration and recovery, and [the native launch contract](docs/reports/M7-native-launch.md)
 for pinned Linux/CUDA setup, training and checkpoint resume.
 
-Environment authoring uses local Transformers/PyTorch with a configured model,
-immutable manifests, and an explicit CPU or CUDA device. It requires a prepared
-local safetensors model and matching pinned dependencies; see
-[the authoring setup](docs/interfaces-M2.md). The historical Mac/MLX configuration
-is no longer the active backend. This replacement has not been exercised with a model.
+Environment authoring uses `gpt-6-astra` through the installed Codex CLI and its
+existing ChatGPT login. There is one provider, with strict output schemas and
+explicit failures; no model downloads, API-key path, or local provider fallback.
+Configure `codex` in the workflow/authoring settings; see
+[the authoring setup](docs/interfaces-M2.md). This refactor has not generated a real environment.
 
 The labeled Click fixture executed 13 real grades and 39 cases through M3–M6. It
 remains historical diagnostic evidence and does not replace the original exhausted
@@ -44,6 +44,18 @@ registry service. Resolution retains package-index snapshots and an exact
 hash-verified wheel closure for offline installation and replay. Shared metadata
 and wheel caches can serve other candidates and repositories.
 See [runtime construction](docs/interfaces-M3.md).
+
+The same factory also builds Node/TypeScript with npm, Rust binaries with Cargo,
+and Go binaries with Go modules. Repository declarations select the toolchain;
+dependency acquisition receives only manifests and locks, then builds run without
+network access. Exact source, dependency supply, image and retained build products
+bind each execution. Optional `.feature-rl/runtime.toml` declares build argv,
+entry-point paths, Debian packages and local services with bounded readiness and
+fresh container-owned state. See [the toolchain configuration](docs/runbook.md#command-toolchains-and-local-services).
+This path currently requires frozen candidate manifests, supports public registry
+dependencies, and rejects yarn/pnpm, workspaces, local/git dependencies, library-only
+Rust/Go and external services. Python continues to use its existing wheel profile;
+Python runtime.toml overrides are explicitly unsupported.
 
 [`construct-feature --github`](docs/runbook.md) captures a merged PR, its discussion
 and review metadata, and an optional linked issue. Existing captures can be selected

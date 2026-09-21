@@ -2,9 +2,8 @@
 from collections import Counter
 from feature_rl.contracts import Disposition
 from .models import GateOutcome, QualificationRejected, RepairHistory
-
-ATTACKS={'forged_verdict','evaluator_detection','hardcoded_inputs','skipped_execution',
-         'protocol_manipulation','excessive_output','dependency_shadowing','path_link','retained_state'}
+from .attacks import ATTACKS, ATTACK_MODES, attack_expected_reason
+from .schedule import control_seeds
 
 
 def disposition_for(issues):
@@ -49,12 +48,24 @@ def assess_outcome(checked, receipt, mode, targets, *, store=None):
     return outcome(good,'accepted' if good else 'oracle_disagreement','Adversarial rejection must match the declared failure mechanism')
 
 
-def validate_repairs(history, candidate, neutral_repairs):
+def validate_repairs(history, candidate, neutral_repairs, *, store=None, registry=None, semantic_authorization=None):
     history=RepairHistory.model_validate(history)
     if history.candidate!=candidate:raise QualificationRejected('invalid_evidence','repair history belongs to a different candidate')
+    from feature_rl.pipeline.repair_accounting import authenticated_exclusions
+    from feature_rl.artifacts import ArtifactError
+    from feature_rl.registry import RegistryError
+    try:excluded=authenticated_exclusions(history,store=store,registry=registry)
+    except (ValueError,TypeError,ArtifactError,RegistryError) as exc:
+        raise QualificationRejected('invalid_evidence','transport classification authentication failed: '+str(exc)) from exc
+    from feature_rl.pipeline.semantic_repairs import authenticated_allowance
+    try:additional=authenticated_allowance(history,semantic_authorization,store=store,registry=registry)
+    except (ValueError,TypeError,ArtifactError,RegistryError) as exc:
+        raise QualificationRejected('invalid_evidence','semantic authorization authentication failed: '+str(exc)) from exc
     if not history.complete:return None
     attempts=history.attempts
-    if len(attempts)>4 or any(n>2 for n in Counter(r.stage for r in attempts).values()):
+    counted=tuple(item for item in attempts if item.after not in excluded)
+    regular=tuple(item for item in counted if item.after not in additional)
+    if len(regular)>4 or any(n>2 for n in Counter(r.stage for r in regular).values()):
         raise QualificationRejected('budget_exhausted','at most two repairs per stage and four total per candidate')
     transitions=set();last={}
     for item in attempts:
@@ -67,7 +78,7 @@ def validate_repairs(history, candidate, neutral_repairs):
     for repair in neutral_repairs:
         if sum(r.stage=='environment' and r.after==repair.patch for r in attempts)!=1:
             raise QualificationRejected('invalid_evidence','known recipe repair missing/duplicated in global candidate history')
-    return len(attempts)
+    return len(counted)
 
 
 def validate_control_plan(checked, policy, *, generated=()):
@@ -82,7 +93,9 @@ def validate_control_plan(checked, policy, *, generated=()):
     feature={r.requirement_id for r in checked.contract.requirements if r.mandatory}
     compat=mandatory-feature
     missing=['control diagnosis: '+name for name in controls.keys()-diagnoses.keys()]
-    present=set();omissions=set();attacks=set()
+    if len(control_seeds(policy))<3:
+        missing.append('at least three distinct qualification seeds are required for control coverage')
+    present=set();omissions=set()
     permitted={checked.task.baseline,checked.task.contract,*checked.task.solver_view.public_checks,
         checked.task.solver_view.instruction,checked.task.solver_view.workspace,checked.task.solver_view.runtime_manifest,checked.task.solver_view.inventory}
     for name,diagnosis in diagnoses.items():
@@ -103,23 +116,38 @@ def validate_control_plan(checked, policy, *, generated=()):
                 raise QualificationRejected('invalid_evidence','alternative author must bind B and visible contract')
         else:
             if control.expected_valid or control.category=='alternative_positive':raise QualificationRejected('invalid_evidence','negative control validity contradiction')
-            if control.category!='adversarial' and (diagnosis.mode!='semantic_negative' or not diagnosis.targets or set(diagnosis.targets)!=set(control.requirement_ids)):
+            if control.category!='adversarial' and diagnosis.mode!='semantic_negative':
+                raise QualificationRejected('invalid_evidence','semantic negative needs exact declared requirement targets')
+            if diagnosis.mode=='semantic_negative' and (not diagnosis.targets or set(diagnosis.targets)!=set(control.requirement_ids)):
                 raise QualificationRejected('invalid_evidence','semantic negative needs exact declared requirement targets')
             if control.category=='regression' and not set(diagnosis.targets)<=compat:
                 raise QualificationRejected('invalid_evidence','regression control must target preserved obligations')
             if control.category=='adversarial':
                 if diagnosis.attack is None or diagnosis.mode in {'positive','baseline_health'}:raise QualificationRejected('invalid_evidence','adversarial control requires a named attack and rejection mechanism')
-                attacks.add(diagnosis.attack)
+                if control.expected_reason!=attack_expected_reason(diagnosis.attack,control.requirement_ids):
+                    raise QualificationRejected('invalid_evidence','adversarial control differs from the controller attack specification')
+                if diagnosis.mode not in ATTACK_MODES[diagnosis.attack]:
+                    raise QualificationRejected('invalid_evidence','control diagnosis differs from the required attack rejection mechanism')
             if control.category=='omission':omissions.update(diagnosis.targets)
         present.add(control.category)
-    for category in {'omission','plausible_wrong','hardcoded','regression','adversarial','alternative_positive'}-present:
+    required={'omission','plausible_wrong','hardcoded','alternative_positive'}
+    if compat:required.add('regression')
+    for category in required-present:
         missing.append('missing control category: '+category)
     missing.extend('missing targeted omission: '+name for name in mandatory-omissions)
-    missing.extend('missing adversarial attack: '+name for name in ATTACKS-attacks)
     targets=set(policy.baseline_missing_requirements) or feature
     if not targets or not targets<=feature or len(set(policy.baseline_missing_requirements))!=len(policy.baseline_missing_requirements):
         raise QualificationRejected('invalid_evidence','baseline missing-feature targets must be distinct mandatory feature IDs')
     return tuple(sorted(missing)),tuple(sorted(targets))
+
+
+def _control_authoring_settings(service, job):
+    """Authenticate a historical producer against its own frozen policy."""
+    from feature_rl.pipeline.authoring import historical_settings
+    try:
+        return historical_settings(service,job)
+    except (KeyError,TypeError,ValueError) as exc:
+        raise QualificationRejected('invalid_evidence','control authorship policy differs from its Factory execution') from exc
 
 
 def control_origins(service, checked):
@@ -155,13 +183,17 @@ def control_origins(service, checked):
             for ref in (receipt_ref,receipt.request,record_ref):service.registry.assert_usable(ref)
             author=read_local(service.store,receipt.request,AuthoringRequest,'m6-authoring-request',4*1024*1024)
             job=service.registry.job(receipt.claim.job_id)
+            settings=_control_authoring_settings(service,job)
             inputs=author.call.inputs
             if (job.state!='completed' or job.result is None or job.result.disposition!=Disposition.SUCCESS
                     or job.result.artifacts!=(*receipt.outputs,receipt_ref)
                     or job.spec.operation!='construct' or job.spec.invocation!='m6-author:'+author.lane
                     or job.spec.inputs!=(history.candidate,receipt.request)
-                    or job.spec.implementation!=service.policy.factory_revision
                     or receipt.revision!=job.spec.implementation
+                    or record.generation_provenance.producer!='feature_rl.verifiers.ControlAuthoringService'
+                    or record.generation_provenance.producer_version!=settings.m4_revision
+                    or record.generation_provenance.evidence[-1].revision!=settings.m4_revision
+                    or record.generation_provenance.evidence[-1].scope!=settings.evidence_scope
                     or not any(a.claim==receipt.claim and a.state=='completed' for a in service.registry.attempts(job.job_id))
                     or author.candidate!=history.candidate or author.call.source_pair!=checked.task.source_pair
                     or not isinstance(inputs,ControlFinalizationInputs)
@@ -173,12 +205,16 @@ def control_origins(service, checked):
                     or control.author_provenance.inputs!=tuple(dict.fromkeys(c.source for c in record.author_contexts))):
                 raise QualificationRejected('invalid_evidence','control authorship differs from selected Factory execution')
             if author.origin!='factory_dispatch':continue
+            if control.category=='adversarial' and (author.call.attack not in ATTACKS
+                    or inputs.expected_reason!=attack_expected_reason(author.call.attack,inputs.requirement_ids)
+                    or inputs.expected_reason not in author.call.generation.request.instruction):
+                raise QualificationRejected('invalid_evidence','archived adversarial authoring lacks its controller attack specification')
             snapshot=observation(service,receipt.claim,'m6-generation')
             if snapshot is None:continue
             generated=archived_outcome(service,author,receipt.claim,ControlProposal)
             if not isinstance(generated,GenerationResult):continue
             evidence=record.generation_provenance.evidence[-1:]
-            if (len(evidence)!=1 or evidence[0].producer!='feature_rl.generation.LocalGenerationProvider'
+            if (len(evidence)!=1 or evidence[0].producer!='feature_rl.generation.CodexGenerationProvider'
                     or evidence[0].scope!='real_integration' or evidence[0].exit_status!=0
                     or evidence[0].command!=('generate',author.call.generation.request.request_id)
                     or evidence[0].recorded_at!=generated.record.recorded_at
@@ -222,18 +258,7 @@ def diagnose_control(service, checked, control, receipt, binding_ref, origins):
     settled=bool(origin and outcome.passed)
     mechanism_matches=True
     if control.category=='adversarial':
-        allowed={
-            'forged_verdict':{'semantic_negative','protocol_failure'},
-            'evaluator_detection':{'semantic_negative'},
-            'hardcoded_inputs':{'semantic_negative'},
-            'skipped_execution':{'semantic_negative','protocol_failure'},
-            'protocol_manipulation':{'protocol_failure'},
-            'excessive_output':{'resource_failure'},
-            'dependency_shadowing':{'semantic_negative','source_rejection'},
-            'path_link':{'semantic_negative','source_rejection','protocol_failure'},
-            'retained_state':{'semantic_negative'},
-        }
-        mechanism_matches=mode in allowed.get(attack,set())
+        mechanism_matches=mode in ATTACK_MODES.get(attack,())
         if attack=='excessive_output':
             mechanism_matches=mechanism_matches and any(case.status=='candidate_failure' and case.reason=='candidate output_limit' for case in receipt.cases)
         settled=settled and mechanism_matches
@@ -252,6 +277,10 @@ def diagnose_control(service, checked, control, receipt, binding_ref, origins):
     diagnosis=ControlDiagnosis(control_id=control.control_id,
         validity=('valid' if mode=='positive' else 'invalid') if settled else 'unresolved',
         mode=mode,targets=targets,attack=attack,evidence=(ev,),independence_evidence=independence,note=note)
-    if not settled and outcome.code!='environment_failure':
+    # Missing authorship/independence or an unestablished attack mechanism stays
+    # provisional. Authenticated controls retain their observed failure code;
+    # uncertainty about validity must not erase a measured false acceptance.
+    unverified=origin is None or (mode=='positive' and not independent)
+    if not settled and outcome.code!='environment_failure' and (unverified or outcome.passed):
         outcome=GateOutcome(passed=False,code='provisional',detail=note)
     return diagnosis,outcome

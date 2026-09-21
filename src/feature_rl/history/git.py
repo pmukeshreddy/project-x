@@ -831,6 +831,16 @@ class GitHistory:
             raise UnrecoverableHistory(f"path object is unavailable: {path}")
         return value
 
+    def optional_path_object(self, revision: str, path: str) -> str | None:
+        """Return None only for a path absent from an available commit tree."""
+        deadline = time.monotonic() + self.timeout_seconds
+        revision = self.commit(revision, _deadline=deadline).revision
+        parts = PurePosixPath(path).parts
+        if not path or path.startswith("/") or ".." in parts or ":" in path:
+            raise ValueError("Git path must be repository-relative")
+        entry = self._tree_entry(revision, path, deadline=deadline)
+        return None if entry is None else entry[2]
+
     def path_bytes(self, revision: str, path: str, *, max_bytes: int) -> bytes:
         deadline = time.monotonic() + self.timeout_seconds
         revision = self.commit(revision, _deadline=deadline).revision

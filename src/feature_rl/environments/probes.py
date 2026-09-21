@@ -52,7 +52,7 @@ while time.monotonic()-a<.6:pass
 out['cpu_busy_wall']=time.monotonic()-a;out['cpu_busy_used']=time.process_time()-b
 out['cpu_throttled']=int(dict(line.split() for line in p('/sys/fs/cgroup/cpu.stat').read_text().splitlines())['nr_throttled'])
 before=int(dict(line.split() for line in p('/sys/fs/cgroup/memory.events').read_text().splitlines())['oom_kill'])
-r=subprocess.run(['python','-I','-c','a=bytearray('+str(out['memory.max']*2)+')'],capture_output=True,timeout=4)
+r=subprocess.run(['/usr/local/bin/python','-I','-c','a=bytearray('+str(out['memory.max']*2)+')'],capture_output=True,timeout=4)
 after=int(dict(line.split() for line in p('/sys/fs/cgroup/memory.events').read_text().splitlines())['oom_kill'])
 out['memory_oom_delta']=after-before;out['memory_child_exit']=r.returncode
 print(json.dumps(out,sort_keys=True))
@@ -67,7 +67,9 @@ def check_boundary(obs,policy):
         '/workspace_exec_errno':0,'/tmp_exec_errno':0,'/workspace_native_load_errno':0,'/tmp_native_load_errno':0,
         'fork_errno':11,'/workspace_disk_errno':28,'/tmp_disk_errno':28,'/dev/shm_disk_errno':28}
     if policy.profile is not None:
-        expected['interpreter_version']=policy.profile.interpreter_version
+        from .command_profiles import CommandRuntimeProfile
+        expected['interpreter_version']=(policy.profile.harness_interpreter_version
+            if isinstance(policy.profile,CommandRuntimeProfile) else policy.profile.interpreter_version)
     else:
         import re
         if not isinstance(obs.get('interpreter_version'),str) or not re.fullmatch(r'3\.[0-9]+\.[0-9]+',obs['interpreter_version']):

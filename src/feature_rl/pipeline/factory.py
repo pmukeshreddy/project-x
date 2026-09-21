@@ -118,6 +118,11 @@ class Factory:
         from .authoring import author
         return author(self,candidate,call)
 
+    def assemble_checker(self, candidate: c.ArtifactRef, *, inputs, fragments) -> c.OperationResult:
+        """Compile authenticated scenario specifications without another model call."""
+        from .checker import assemble
+        return assemble(self,candidate,inputs,fragments)
+
     def import_rejected_authoring(self, candidate: c.ArtifactRef, *, call, journal_refs) -> c.OperationResult:
         from .authoring_import import import_rejected
         return import_rejected(self,candidate,call,journal_refs)
@@ -329,6 +334,9 @@ class Factory:
             return recover(self,claim)
         if job.spec.invocation.startswith('m6-author:'):
             from .authoring import recover
+            return recover(self,claim)
+        if job.spec.invocation=='m6-assemble-checker':
+            from .checker import recover
             return recover(self,claim)
         if job.spec.invocation=='m6-construct':
             from .construction import recover

@@ -1,87 +1,67 @@
-# M2 local generation-provider interfaces
+# M2 Codex/Astra authoring interfaces
 
-This interface covers the bounded local generation provider and grounded requirement/scenario authoring. Import the public boundaries from `feature_rl.generation`, `feature_rl.requirements`, and `feature_rl.scenarios`; M0 retains ownership of shared artifact schemas and storage. Checker implementation and reward remain later modules.
+The sole authoring provider is `CodexGenerationProvider`. It invokes `gpt-6-astra`
+through the installed Codex CLI, using the existing ChatGPT authentication.
+There is no API-key provider, local inference backend, automatic model substitution,
+or fallback authoring implementation. A live Astra authoring run has not been
+performed for this refactor.
 
-## Provider construction and call
+## Configuration and call
+
+Install a Codex CLI supporting `exec --ignore-user-config --output-schema --json`
+(the interface was checked against 0.155.1). `codex login status` must report
+ChatGPT authentication; otherwise sign in with `codex login`. The provider never
+reads/copies tokens or launches an interactive login. An unavailable CLI, login,
+model, or invalid/missing output fails explicitly.
 
 ```python
-from feature_rl.generation import BackendConfig, LocalGenerationProvider
+from feature_rl.generation import CodexConfig, CodexGenerationProvider
 
-provider = LocalGenerationProvider(
-    backend=BackendConfig(
-        python_executable=python_path,
-        model_directory=model_directory,
-        model_manifest=model_acquisition_manifest,
-        dependency_manifest=wheel_closure_manifest,
-        model_id=model_id,
-        revision=model_commit_hash,
-        model_manifest_sha256=model_manifest_sha256,
-        dependency_manifest_sha256=dependency_manifest_sha256,
-        device="cpu",  # or an explicit visible device such as "cuda:0"
-        dtype="float32",  # float16 / bfloat16 are also explicit choices
-    ),
-    archive=controller_store.put_bytes,  # write-only capability
+provider = CodexGenerationProvider(
+    config=CodexConfig(model="gpt-6-astra", reasoning_effort="high"),
+    archive=store.put_bytes,
 )
-result = provider.generate(request, OutputSchema)
+# Run only when authoring is intended:
+# result = provider.generate(validated_request, RequirementContractProposal)
 ```
 
-`BackendConfig.verify()` checks the configured model ID, immutable commit revision,
-SHA-256-pinned model/dependency manifests, exact model bytes, and installed package
-versions. Both the controller and fresh worker repeat these checks. The worker
-interpreter must be the provider interpreter whose closure was checked. The
-supported controller platforms are CPython 3.11+ on Linux and macOS. Authoring
-uses local Transformers/PyTorch with an explicit CPU or CUDA device and dtype;
-there is no device, model, or API fallback. No MLX runtime is imported.
+`CodexConfig` has `executable` (default `codex`), optional `codex_home`, fixed
+`model="gpt-6-astra"`, and `reasoning_effort` (`low`, `medium`, `high`, `xhigh`, `max`).
+`AuthoringSettings.codex` and `FeatureWorkflowSettings.codex` use this same model.
+Existing `CODEX_HOME` and the usual Codex authentication store/keychain are reused.
+API-key and alternate endpoint environment variables are not passed to the process.
+User/project configuration, plugins, hooks, skills, shell, apps, browsers, and
+other agent tools are disabled for authoring. Each call uses a fresh ephemeral
+session in an empty temporary directory with a read-only sandbox and no approvals.
+The source repository enters through the existing resolved evidence contexts.
 
-Supply a materialized, non-symlink model directory containing a standard,
-unquantized Transformers causal LM: `config.json`, `tokenizer.json`,
-`tokenizer_config.json`, a chat template, and either `model.safetensors` or
-safetensors shards with `model.safetensors.index.json`. Custom model code,
-quantization backends, pickle checkpoints, extra files and missing shards reject.
-The model must expose a KV cache, an EOS token, and `max_position_embeddings`.
+The [Codex non-interactive interface](https://learn.chatgpt.com/docs/non-interactive-mode)
+supplies JSONL events and schema-constrained output;
+[Codex authentication](https://learn.chatgpt.com/docs/auth) supplies the existing login.
 
-The existing model-manifest format is retained: `model_id`, `revision`,
-`runtime_positive_allowlist` (all filenames), `actual_total_bytes`, and `files`
-records containing `path`, `bytes`, and `sha256`. Sharded weight identity hashes
-the sorted filename-to-SHA-256 mapping. The dependency manifest has `wheels`
-records with `name`, exact `version`, `filename`, and `sha256`. It must include
-`torch`, `transformers`, `tokenizers`, `safetensors`, `packaging`, and their active
-installed dependency closure. Manifests and model files must be regular files;
-all model files are flat within the configured directory.
+## Validation
 
-Install the explicitly chosen wheel closure with hash checking before authoring.
-The provider validates installed versions; wheel hashes are installation inputs,
-not an attestation of every installed package byte. Torch wheel selection remains
-specific to the chosen host. The controller does not install packages, download
-models, change GPU drivers, or provision a server. The MLX lockfile and request
-compatibility fields have been removed.
+The output envelope contains exactly `response_id`, ordered `source_ids`,
+`requirement_ids`, and `content`. The provider rejects duplicate JSON keys,
+nonfinite values, changed identities, missing/reordered sources, unknown or
+duplicate requirement IDs, unknown fields, and invalid types. JSON Schema
+validation checks the original raw JSON; the original strict Pydantic proposal
+model then runs all existing domain validators. No artifact validator is removed
+or relaxed. Codex's transport schema requires all fields explicitly and expresses
+Pydantic's disjoint tagged unions as `anyOf`; local validation still uses the
+original schema, including `oneOf`.
 
-The provider receives only a write-only archive callback. It cannot retrieve artifacts and does not pass an artifact store, repository, task conversation, or controller state to the worker. Source existence, locator/text equality, provenance labels, frozen status, and contract/scenario joins remain caller-side authoring/controller gates. Each call stages the fixed worker in a new temporary directory with task-specific Hugging Face, Xet, Transformers, and temporary caches plus a fresh prompt cache. It preserves an existing `HOME` value and does not set or repurpose `CODEX_HOME`. The worker gets one canonical JSON request over bounded stdin, the explicitly named model directory, and an offline/local-files-only environment. It runs with Python isolated mode, loads no remote code, exposes no tools, and emits JSONL protocol events over stdout.
-
-`generate(request: GenerationRequest, output_schema: type[StrictModel]) -> GenerationResult` validates one exact JSON envelope:
-
-```json
-{
-  "response_id": "preassigned-response-id",
-  "source_ids": ["every-context-id-in-input-order"],
-  "requirement_ids": ["only-predeclared-ids"],
-  "content": {}
-}
-```
-
-Protocol v4 defines an exact strict schema for every identity, input, memory-control, model-loaded, token, completion, and input-rejection event. Every event repeats the protocol/request/response/prompt identity. The identity event binds the model revision, config/tokenizer/weight hashes, manifest hashes, exact dependency versions, seed, prompt hash, staged-worker hash, offline flags, device, dtype, and remote-code setting. Boolean and integer Literal fields have pre-conversion validators, so equality-compatible JSON numbers such as `1`, `0`, or `4.0` cannot become `true`, `false`, or protocol version `4`. Extra fields, missing fields, wrong exact types, contradictory identities, positive/nonfinite selected-model logprobs, duplicate JSON keys, tool events, event-order drift, inconsistent usage, nonzero exits, cleanup failure, and resource termination all raise `GenerationProviderError`.
-
-Envelope content is re-serialized and validated through Pydantic's strict JSON transport. Schemas whose Literals are only strings, string-valued enums or null use the original caller validator unchanged. Their callbacks, defaults, post-init hooks, JSON validation mode and serialization therefore retain ordinary Pydantic semantics. All actual M0 Literal fields use this path; `RequirementContract` and `ScenarioPlan` fixtures preserve their string-enum, tuple and UTC transport. Literal values outside JSON-native strings, nulls, Booleans, integers and floats, and enums whose values are not strings, are unsupported and refuse before execution rather than inheriting Pydantic's equality coercion.
-
-Numeric or Boolean Literal schemas use a separate exact guard because Pydantic can otherwise equate JSON numbers and Booleans during union selection. This guard is limited to callback-free models composed from strict primitives and enums, scalar/model unions, nullable fields, lists, tuples, definitions/references, typed objects, and dictionaries with string keys, including patterned keys. It replaces model construction with inert validation models, wraps every Literal with an exact raw-JSON-type check, restores only model values and returns the single selected result. There is no second branch-selection pass, so raw integer `1` in `Literal[True] | int`, raw float `4.0` in `Literal[3] | float`, model alternatives and nested containers retain their exact selected Python and JSON types.
-
-The numeric/Boolean guard refuses callbacks and chains, defaults and model lifecycle hooks, custom initialization or serialization, dataclass/call and unknown core forms, set/frozenset values, dictionaries whose keys are not strings, and models configured with `extra='allow'`. The set restriction prevents restored value-equal models from collapsing only after cardinality validation; the extra-field restriction prevents restoration from losing separately stored accepted fields. Models using ordinary `extra='forbid'` or `extra='ignore'` remain supported. Refused forms raise an attributable `GenerationSchemaUnsupportedError` before backend verification or execution, and publication failure remains replayable without execution. A future caller needing a refused guarded form must use a supported proposal schema or extend and review this boundary before the call.
-
-`GenerationResult` contains the caller-schema-validated `content`, exact `GenerationUsage`, partial `CostRecord`, and `GenerationCallRecord`. Usage includes the exact fully templated input token IDs, every emitted token ID, the selected token's pre-sampler model log-softmax score, and `sampling_policy="greedy_argmax"`. The Torch worker applies argmax to those model scores; the scores are not log probabilities under the deterministic behavior distribution. `behavior_logprobs` is therefore explicitly null. A downstream training record must not substitute these model scores for behavior logprobs or invent behavior probabilities by retokenizing. A call at the emitted-token limit is marked truncated and rejected even when its bytes parse as valid JSON. These records make an authored sample attributable; they do not by themselves establish training suitability or a learning result.
+A successful result requires one completed Codex turn, one final artifact message,
+valid reported usage, a matching final-response file, and successful local process
+completion/cleanup. Tool execution, malformed events, failed/incomplete turns,
+missing output and limit violations reject the result. Finalizers retain the
+existing grounding, permission, requirement-coverage, and cross-artifact checks.
+The controller still builds and validates the runtime definition and TaskBundle
+through the existing architecture; Astra never invents runtime execution evidence.
 
 ## Stage and context boundary
 
-Every `AuthoringContext` carries a fixed `context_id`, explicit role, immutable source reference, locator, text, and provenance label. Request, response, and prompt IDs use the M2-local ASCII identifier grammar with a 128-character maximum; the same bound applies to event, attempt, and call-record identities. The public provider boundary revalidates an already typed `GenerationRequest`, so unchecked `model_copy` or `model_construct` updates cannot bypass the limit. Request, response, prompt, context, and allowed-requirement IDs must be fixed before inference; placeholders and duplicate IDs reject.
+Every `AuthoringContext` carries a fixed `context_id`, explicit role, immutable source reference, locator, text, and provenance label. Request, response, and prompt IDs use the M2-local ASCII identifier grammar with a 128-character maximum; call-record request and response identities use the same bound. The public provider boundary revalidates an already typed `GenerationRequest`, so unchecked `model_copy` or `model_construct` updates cannot bypass the limit. Request, response, prompt, context, and allowed-requirement IDs must be fixed before inference; placeholders and duplicate IDs reject.
 
 | Stage | Admitted explicit context | Forbidden context |
 |---|---|---|
@@ -97,35 +77,25 @@ The initial contract draft therefore occurs without H or privileged checker insp
 
 Provider records for both new stages use private visibility and the existing `authoring` cost category. Attempt registration, immutable archive metadata, resource enforcement, and publication recovery are unchanged; adding the enum values does not authorize or perform a generation call.
 
-## Resource and token contract
+## Resources and accounting
 
-`GenerationLimits` declares positive wall, CPU, stdin, output/file, token, and
-process-memory limits. The worker tokenizes the full chat input before loading
-weights and checks actual input plus reserved output against the model's context.
-Greedy decoding emits each selected token and its actual model log probability;
-the controller checks token counts and rejects truncation.
+`GenerationLimits` bounds local Codex wall time (up to 3600 seconds), CPU time,
+stdin/schema size, combined stdout/stderr, final response size, and sampled process memory.
+No process-wide file-size cap is applied to Codex authentication/state databases.
+The existing process-group cleanup and Linux/macOS monitor remain in force.
+These are local CLI limits, not measurements or hard limits on remote Astra compute.
 
-Limits describe the selected model and host directly; historical MLX measurement
-labels and allocator fields are rejected. No Transformers authoring run is claimed
-by this implementation change.
+`input_tokens` and `output_tokens` are acceptance/accounting ceilings checked
+against Codex's reported counts after completion. Codex exec does not expose hard
+per-call token caps; an overrun is retained as cost and rejected. Batch accounting
+reserves declared ceilings and charges larger measured usage. Finite USD caps
+remain unsupported because subscription currency usage is not reported.
 
-| Resource | Boundary and evidence meaning |
-|---|---|
-| wall / CPU | external deadline and kernel `RLIMIT_CPU`, each at most 120 seconds per call |
-| file output | kernel `RLIMIT_FSIZE` and combined stdout/stderr byte cap |
-| stdin | oversized request/schema/prompt rejected before backend verification or spawn; worker absolute cap 1 MiB |
-| emitted tokens | bounded greedy loop and independent event-count check; truncation rejects |
-| process memory | configured `physical_footprint_kill_bytes`: Linux RSS via `/proc`, macOS physical footprint via `proc_pid_rusage`; sampled at `physical_footprint_poll_seconds` |
-| CUDA memory | CUDA calls require `cuda_memory_bytes`, enforced by Torch's per-process allocator fraction; CPU calls require null |
-| declared memory ceiling | must exceed the sum of the process threshold and CUDA allocator limit, leaving a guard band |
-| cleanup | finally-path kill/reap and process-group absence check, including failures and interruption |
-
-Linux receipts record sampled RSS and leave macOS footprint fields null. CPU
-calls leave CUDA allocator measurements null. CUDA receipts record active, peak,
-and reserved allocator bytes separately. Sampled process limits can overshoot
-between polls; the CUDA allocator limit does not include driver/context overhead.
-These are bounded execution controls, not a host-wide memory reservation. `CUDA_VISIBLE_DEVICES` is preserved, and a missing
-configured CUDA device fails rather than selecting another device.
+`GenerationUsage` contains only actual Codex `input_tokens`, `cached_input_tokens`,
+and `output_tokens`. There are no fabricated token IDs, logprobs, local model
+revisions, GPU allocations, or sampling seeds. Scenario/episode seeds are unchanged.
+Wall/CPU values describe the Codex process. Remote compute, human time and USD
+remain unknown, never zero by assumption.
 
 ## Requirement authoring
 
@@ -144,16 +114,20 @@ Every attempt creates a journal with an exact request hash and a semantic reques
 The historical MLX Click run retained one successful M3 discovery and three provider calls. Two calls reached the fixed 120-second deadline. The final concise four-ID call completed in 84.458 seconds but returned a duplicate-key response that strict JSON rejected. No contract or scenario was frozen; this is an explicit construction failure rather than an API fallback or handwritten artifact.
 
 
-## Immutable call archive
+## Immutable archives and recovery
 
-Before backend verification or subprocess execution, the provider creates UTC `GenerationAttemptMetadata` and publishes `generation-attempt`. It binds a random attempt ID, producer, protocol, request/prompt/response IDs, request and output-schema hashes, all generation source-file hashes, and configured model/revision/manifest identities plus device/dtype. Config-file hashes and installed dependency versions are unknown at registration and are recorded in the subsequently verified backend/options and worker identity events. If this registration fails, no worker runs.
+The attempt receipt binds request/schema hashes, request/response/prompt IDs,
+Astra model, reasoning effort and `codex-exec-v1`. Complete calls archive request,
+response, retrieval, schema, options, provenance (including CLI version), usage,
+cost, raw Codex events, and status. Initial contract records are authoring-visible;
+later-stage records are private. Oversized input and failed attempt registration
+retain bounded attempt/cost/status records without archiving oversized context.
 
-If a validated request, output schema, or fully templated prompt exceeds the declared stdin byte cap, the provider does not archive that oversized value. It publishes bounded `generation-preflight`, `generation-cost`, and `generation-status` objects alongside the attempt. The preflight object contains the bounded IDs, request/schema hashes, declared cap, observed component sizes, violated components, failure cause, and `execution_started=false`. The public exception remains `GenerationProviderError`; its record uses `GenerationInputLimitError` as the cause. A publication failure retains the same bounded payloads for replay without backend verification or execution. Requests with longer request/response/prompt identities are invalid at the M2 request boundary and cannot enter this archival path.
-
-After execution, every successful or failed call publishes separate `generation-request`, `generation-response`, `generation-retrieval`, `generation-schema`, `generation-options`, `generation-provenance`, `generation-usage`, `generation-cost`, `generation-events`, and `generation-status` objects. The response receipt records exit status, termination, wall/CPU measurements, watchdog failures, sample count, maximum sampled and lifetime memory observations, any breach sample, stderr/stdout, and cleanup result. The raw JSONL event stream is retained byte-for-byte. The usage object always has `accepted_response_usage`; it is true only after both event and envelope/content validation. Every failure retains independently validated input/token observations and known cost counts while setting acceptance false.
-
-An archive callback can itself be unavailable. `GenerationProviderError` then contains a partial `GenerationCallRecord`, known `cost`, bounded `response`, usage observations, and `GenerationPublicationRecovery`. `error.replay_publication(write_only_callback)` publishes only missing retained payloads and status without rerunning inference. A repeated storage failure returns another typed error with updated partial references and recovery state. The provider cannot promise an artifact when the store cannot write; it exposes that condition as `ArchivePublicationError` rather than losing measurements or silently generating again.
-
-Initial-authoring records use authoring visibility; later checker-generation records use private visibility. The cost record is deliberately partial: wall time, CPU time, and accepted token counts are measured when present; GPU time, energy, human time, and currency cost remain null/unknown. Local execution does not imply zero compute cost merely because no remote API was used.
-
-The production evidence commands and complete receipts are described in `docs/evidence/M2/production-provider-smoke.md`.
+`GenerationProviderError` retains the exact failure, call record and measured
+cost. Publication failures retain `GenerationPublicationRecovery`; replay writes
+only the retained bytes and never invokes Codex again. Recovery revalidates the
+Codex events, original output schema and artifact lineage. Authentication failures
+stop the workflow without consuming further repair calls. Validation repairs keep
+the existing diagnosed two-per-stage/four-per-candidate budget and use only Astra.
+Old local-worker archives/configuration are not a compatible authoring path;
+historical evidence under `docs/evidence` is retained solely as historical evidence.

@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 from feature_rl.contracts import ArtifactRef, CommandSpec, CostRecord, StrictModel
 from .profiles import RuntimeProfile
+from .command_profiles import CommandRuntimeProfile
 
 SECCOMP_SHA256 = '005f6ae1a0f3f9d1a0c044f83289e2ea54180c97a105b2539422588eac2fde44'
 
@@ -35,7 +36,7 @@ class SandboxPolicy(StrictModel):
     image: Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$')] | None = None
     seccomp_sha256: Literal[SECCOMP_SHA256] = SECCOMP_SHA256
     platform: Literal['linux/arm64', 'linux/amd64']
-    profile: RuntimeProfile | None = None
+    profile: RuntimeProfile | CommandRuntimeProfile | None = None
     cpus: Annotated[float,Field(ge=0.1,le=2.0)] = 0.5
     cpu_seconds: Annotated[float,Field(ge=1,le=600)] = 60.0
     memory_bytes: Annotated[int,Field(ge=64*1024*1024,le=1024*1024*1024)] = 512*1024*1024
@@ -119,5 +120,19 @@ class BuildResult(StrictModel):
     wheel_filename: str
     wheel_sha256: Annotated[str,Field(pattern=r"^[0-9a-f]{64}$")]
     source_tree_sha256: Annotated[str,Field(pattern=r"^[0-9a-f]{64}$")]
+    cost: CostRecord
+    evidence: ArtifactRef
+
+
+class CommandBuildResult(StrictModel):
+    version: Literal['command-build-result-v1'] = 'command-build-result-v1'
+    source: ArtifactRef
+    recipe: ArtifactRef
+    policy: ArtifactRef
+    dependency_resolution: ArtifactRef
+    product: ArtifactRef
+    product_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')]
+    product_tree_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')]
+    source_tree_sha256: Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')]
     cost: CostRecord
     evidence: ArtifactRef

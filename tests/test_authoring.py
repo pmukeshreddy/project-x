@@ -53,7 +53,7 @@ from feature_rl.scenarios import (
 from feature_rl.generation import (
     GenerationCallRecord,
     GenerationLimits,
-    LocalGenerationProvider,
+    CodexGenerationProvider,
     GenerationResult,
     GenerationStage,
     GenerationUsage,
@@ -235,6 +235,12 @@ def contract_proposal(**updates) -> RequirementContractProposal:
                 ),
             },
         ),
+        "feature_files": ({
+            "path": "src/click/core.py", "requirement_ids": ("FEATURE_COMMAND_SUGGESTION",),
+            "rationale": "Implement the requested suggestion at the group dispatch entry point.",
+            "evidence": ({"source": BASELINE, "locator": "src/click/core.py:1-20",
+                          "quote": "public command dispatch entry point", "provenance_label": "existing_obligation"},),
+        },),
         "allowed_changes": allowed(),
     }
     return RequirementContractProposal.model_validate(values | updates)
@@ -271,6 +277,7 @@ def test_contract_proposal_preserves_m0_constraints_without_envelope_fields():
         "entry_points",
         "requirements",
         "compatibility_obligations",
+        "feature_files",
         "ambiguities",
         "allowed_changes",
     }
@@ -506,7 +513,6 @@ def generation_limits() -> GenerationLimits:
         cpu_seconds=120,
         stdin_bytes=1_048_576,
         output_bytes=1_048_576,
-        file_size_bytes=1_048_576,
         input_tokens=8_192,
         output_tokens=4_096,
         physical_footprint_kill_bytes=4_294_967_296,
@@ -521,14 +527,8 @@ def provider_result(content, index: int = 1) -> GenerationResult:
         content=content,
         usage=GenerationUsage(
             input_tokens=2,
-            input_token_ids=(1, 2),
+            cached_input_tokens=0,
             output_tokens=1,
-            token_ids=(3,),
-            selected_model_logprobs=(-0.1,),
-            sampling_policy="greedy_argmax",
-            behavior_logprobs=None,
-            finish_reason="stop",
-            truncated=False,
         ),
         cost=cost(),
         record=GenerationCallRecord(
@@ -549,6 +549,7 @@ def archived_provider_result(
     store, request, content, index: int = 1, *, response_payload=None
 ) -> GenerationResult:
     """Publish the provider archive bindings required to resume one successful result."""
+    from codex_fixtures import events
     base = provider_result(content, index)
     visibility = (
         Visibility.AUTHORING
@@ -570,6 +571,10 @@ def archived_provider_result(
     }
     payloads = {
         "attempt": {
+            "producer": "feature_rl.generation.CodexGenerationProvider",
+            "protocol_version": "codex-exec-v1",
+            "configured_model_id": "gpt-6-astra",
+            "reasoning_effort": "high",
             "attempt_id": base.record.attempt_id,
             "recorded_at": base.record.recorded_at.isoformat(),
             "request_id": request.request_id,
@@ -579,14 +584,14 @@ def archived_provider_result(
             "output_schema_sha256": hashlib.sha256(canonical_json(schema_payload)).hexdigest(),
         },
         "request": request_payload,
-        "response": {} if response_payload is None else response_payload,
+        "response": {"output_text": json.dumps(envelope)} if response_payload is None else {**response_payload, "output_text": json.dumps(envelope)},
         "retrieval": {"contexts": [item.model_dump(mode="json") for item in request.contexts]},
         "schema": schema_payload,
-        "options": {"seed": request.seed, "limits": request.limits.model_dump(mode="json")},
+        "options": {"model": "gpt-6-astra", "limits": request.limits.model_dump(mode="json")},
         "provenance": {"observed": True},
         "usage": {"accepted_response_usage": True, "accepted": base.usage.model_dump(mode="json")},
         "cost": base.cost.model_dump(mode="json"),
-        "events": (json.dumps({"event": "completed", "output_text": json.dumps(envelope)}) + "\n").encode(),
+        "events": events(json.dumps(envelope), input_tokens=2, output_tokens=1),
     }
     refs = {}
     for name, payload in payloads.items():
@@ -658,98 +663,6 @@ def archived_provider_error(store, request, content, index: int = 1) -> Generati
     )
 
 
-def archived_preexecution_error(store, request, *, preflight: bool) -> GenerationProviderError:
-    schema_payload = RequirementContractProposal.model_json_schema()
-    request_payload = request.model_dump(mode="json")
-    attempt_id = "attempt-preflight" if preflight else "attempt-registration"
-    recorded_at = datetime(2026, 9, 19, 2, 0, tzinfo=timezone.utc)
-    attempt = {
-        "attempt_id": attempt_id,
-        "recorded_at": recorded_at.isoformat(),
-        "request_id": request.request_id,
-        "response_id": request.response_id,
-        "prompt_id": request.prompt_id,
-        "request_sha256": hashlib.sha256(canonical_json(request_payload)).hexdigest(),
-        "output_schema_sha256": hashlib.sha256(canonical_json(schema_payload)).hexdigest(),
-    }
-    refs = {
-        "attempt": store.put_bytes(
-            canonical_json(attempt), "generation-attempt", Visibility.AUTHORING
-        )
-    }
-    if preflight:
-        error_code = "GenerationInputLimitError"
-        message = "request, schema, or templated prompt exceeds the configured input byte cap"
-        response = {
-            "attempt_id": attempt_id,
-            "recorded_at": recorded_at.isoformat(),
-            "request_id": request.request_id,
-            "response_id": request.response_id,
-            "prompt_id": request.prompt_id,
-            "request_sha256": attempt["request_sha256"],
-            "output_schema_sha256": attempt["output_schema_sha256"],
-            "stdin_cap_bytes": request.limits.stdin_bytes,
-            "observed_bytes": {
-                "request_json": len(canonical_json(request_payload)),
-                "output_schema_json": len(canonical_json(schema_payload)),
-                "templated_prompt_utf8": request.limits.stdin_bytes + 1,
-            },
-            "oversized_components": ["templated_prompt_utf8"],
-            "execution_started": False,
-            "cause": message,
-        }
-        archived_cost = CostRecord(
-            category="authoring", wall_seconds=None, cpu_seconds=None, gpu_seconds=None,
-            input_tokens=None, output_tokens=None, human_minutes=None, usd=None,
-            measurement="unknown",
-            note=("Execution did not start because declared serialized-input bytes were "
-                  "exceeded; runtime and token costs are unknown."),
-        )
-        refs["preflight"] = store.put_bytes(
-            canonical_json(response), "generation-preflight", Visibility.AUTHORING
-        )
-        refs["cost"] = store.put_bytes(
-            canonical_json(archived_cost.model_dump(mode="json")),
-            "generation-cost", Visibility.AUTHORING,
-        )
-    else:
-        error_code = "ArchivePublicationError"
-        message = "attempt registration failed before execution"
-        response = None
-        archived_cost = CostRecord(
-            category="authoring", wall_seconds=None, cpu_seconds=None, gpu_seconds=None,
-            input_tokens=None, output_tokens=None, human_minutes=None, usd=None,
-            measurement="unknown",
-            note="Execution did not start because attempt registration failed; costs are unknown.",
-        )
-    status = {
-        "attempt_id": attempt_id,
-        "recorded_at": recorded_at.isoformat(),
-        "request_id": request.request_id,
-        "response_id": request.response_id,
-        "success": False,
-        "generation_succeeded": False,
-        "publication_complete": True,
-        "publication_recovered": True,
-        "publication_failure": "OSError: synthetic",
-        "error_type": error_code,
-        "error": message,
-        "archive_refs": {name: ref.model_dump(mode="json") for name, ref in refs.items()},
-    }
-    refs["status"] = store.put_bytes(
-        canonical_json(status), "generation-status", Visibility.AUTHORING
-    )
-    record = GenerationCallRecord(
-        attempt_id=attempt_id, recorded_at=recorded_at,
-        request_id=request.request_id, response_id=request.response_id,
-        success=False, generation_succeeded=False, publication_complete=True,
-        error_code=error_code, archives=refs,
-    )
-    return GenerationProviderError(
-        message, record, cost=archived_cost, response=response, usage_observation=None
-    )
-
-
 class FakeProvider:
     def __init__(self, outcomes):
         self.outcomes = list(outcomes)
@@ -784,7 +697,6 @@ def contract_request(index: int = 1):
         supported_observables=contract_inputs().supported_observables,
         allowed_changes=contract_inputs().allowed_changes,
         limits=generation_limits(),
-        seed=0,
     )
     if index > 1:
         built = built.model_copy(
@@ -1019,43 +931,16 @@ def test_recovered_failed_generation_journals_without_another_model_call(tmp_pat
     assert "malformed output" in store.get_bytes(refs[0]).decode()
 
 
-@pytest.mark.parametrize("preflight", (False, True))
-def test_recovered_preexecution_failure_journals_complete_variant(tmp_path, preflight):
-    store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
-    request = contract_request()
-    recovered = archived_preexecution_error(store, request, preflight=preflight)
-    provider = FakeProvider(())
-    with pytest.raises(AuthoringExhausted) as caught:
-        ContractAuthoringService(
-            provider=provider, store=store, resolver=FakeEvidenceResolver(sources()),
-            revision="2" * 40, evidence_scope="unit_diagnostic",
-        ).generate(
-            (GenerationCandidate(request=request),), contract_inputs(), sources(),
-            recovered_error=recovered,
-        )
-    assert len(caught.value.journal_refs) == 1
-    assert provider.calls == []
-
-
 def test_actual_registration_publication_replay_journals_without_execution(tmp_path):
     store = ArtifactStore(tmp_path / "objects", ActorRole.CONTROLLER)
 
-    class NeverVerifiedBackend:
-        verify_calls = 0
-
-        def verify(self):
-            self.verify_calls += 1
-            raise AssertionError("registration failure must precede backend verification")
-
     class NeverRun:
-        def __init__(self):
-            self.calls = []
+        calls = []
+        def run(self, **kwargs):
+            pytest.fail("unexpected runner execution")
 
-        def run(self, **values):
-            self.calls.append(values)
-            raise AssertionError("registration failure must precede runner execution")
-
-    backend = NeverVerifiedBackend()
+    from feature_rl.generation import CodexConfig
+    config = CodexConfig(executable='/must-not-run-codex')
     runner = NeverRun()
     failed = False
 
@@ -1067,8 +952,8 @@ def test_actual_registration_publication_replay_journals_without_execution(tmp_p
         return store.put_bytes(data, kind, visibility)
 
     service = ContractAuthoringService(
-        provider=LocalGenerationProvider(
-            backend=backend, archive=fail_attempt_once, runner=runner
+        provider=CodexGenerationProvider(
+            config=config, archive=fail_attempt_once, runner=runner
         ),
         store=store, resolver=FakeEvidenceResolver(sources()),
         revision="2" * 40, evidence_scope="unit_diagnostic",
@@ -1088,7 +973,6 @@ def test_actual_registration_publication_replay_journals_without_execution(tmp_p
             recovered_error=recovered,
         )
     assert len(rejected.value.journal_refs) == 1
-    assert backend.verify_calls == 0
     assert runner.calls == []
     assert no_model.calls == []
 
@@ -1171,7 +1055,6 @@ def test_scenario_request_and_service_resolve_exact_stored_contract(tmp_path):
         contract_ref=contract_ref,
         sources=sources(),
         limits=generation_limits(),
-        seed=0,
     )
     assert built.stage is GenerationStage.SCENARIO_PLANNING
     assert tuple(context.role for context in built.contexts)[-1] == "contract"
@@ -1199,7 +1082,7 @@ def test_recovered_scenario_result_must_match_archived_operation(tmp_path, mutat
     request = build_scenario_request(
         request_id="SCENARIO_RECOVER_REQ", response_id="SCENARIO_RECOVER_RESP",
         prompt_id="SCENARIO_RECOVER_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=sources(), limits=generation_limits(), seed=0,
+        contract_ref=contract_ref, sources=sources(), limits=generation_limits(),
     )
     recovered = archived_provider_result(store, request, scenario_proposal())
     if mutation == "request":
@@ -1249,7 +1132,7 @@ def test_scenario_accepts_exact_public_check_frozen_by_contract(tmp_path):
     request = build_scenario_request(
         request_id="SCENARIO_PUBLIC_REQ", response_id="SCENARIO_PUBLIC_RESP",
         prompt_id="SCENARIO_PUBLIC_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=admitted, limits=generation_limits(), seed=0,
+        contract_ref=contract_ref, sources=admitted, limits=generation_limits(),
     )
     provider = FakeProvider((provider_result(scenario_proposal()),))
     result = ScenarioAuthoringService(
@@ -1268,7 +1151,7 @@ def test_recovered_failed_scenario_generation_journals_without_provider(tmp_path
     request = build_scenario_request(
         request_id="SCENARIO_FAILED_REQ", response_id="SCENARIO_FAILED_RESP",
         prompt_id="SCENARIO_FAILED_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=sources(), limits=generation_limits(), seed=0,
+        contract_ref=contract_ref, sources=sources(), limits=generation_limits(),
     )
     recovered = archived_provider_error(store, request, scenario_proposal())
     provider = FakeProvider(())
@@ -1296,7 +1179,6 @@ def test_scenario_publication_failure_replays_without_another_generation(tmp_pat
         contract_ref=contract_ref,
         sources=sources(),
         limits=generation_limits(),
-        seed=0,
     )
     provider = FakeProvider((provider_result(scenario_proposal()),))
     service = ScenarioAuthoringService(
@@ -1333,7 +1215,6 @@ def test_scenario_service_rejects_forged_contract_context_or_ids(tmp_path, mutat
         contract_ref=contract_ref,
         sources=sources(),
         limits=generation_limits(),
-        seed=0,
     )
     if mutation == "text":
         changed = built.model_copy(
@@ -1373,7 +1254,7 @@ def test_scenario_service_rejects_evidence_set_or_observables_outside_frozen_con
     forged_request = build_scenario_request(
         request_id="SCENARIO_FOREIGN_REQ", response_id="SCENARIO_FOREIGN_RESP",
         prompt_id="SCENARIO_FOREIGN_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=foreign, limits=generation_limits(), seed=0,
+        contract_ref=contract_ref, sources=foreign, limits=generation_limits(),
     )
     service = ScenarioAuthoringService(
         provider=FakeProvider(()), store=store,
@@ -1388,7 +1269,7 @@ def test_scenario_service_rejects_evidence_set_or_observables_outside_frozen_con
     valid_request = build_scenario_request(
         request_id="SCENARIO_OBS_REQ", response_id="SCENARIO_OBS_RESP",
         prompt_id="SCENARIO_OBS_PROMPT", contract=contract,
-        contract_ref=contract_ref, sources=sources(), limits=generation_limits(), seed=0,
+        contract_ref=contract_ref, sources=sources(), limits=generation_limits(),
     )
     service.resolver = FakeEvidenceResolver(sources())
     bad_inputs = scenario_inputs(contract_ref).model_copy(
@@ -1472,7 +1353,7 @@ def test_click_discovery_runs_installed_baseline_and_publishes_sanitized_author_
     )
     execute = [call for call in runtime.calls if call[0] == "execute"][0]
     assert execute[2].save_source is False
-    assert execute[2].command.argv[:2] == ("python", "-c")
+    assert execute[2].command.argv[:2] == ("/usr/local/bin/python", "-c")
     assert runtime.calls[-1] == ("close", "handle")
 
 

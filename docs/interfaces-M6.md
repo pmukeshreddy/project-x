@@ -307,11 +307,11 @@ factory.import_rejected_authoring(candidate_ref, *, call: AuthoringCall,
                                  journal_refs: tuple[ArtifactRef, ...]) -> OperationResult
 ```
 
-`AuthoringSettings` binds actual `BackendConfig`, `m2_revision`, `m4_revision`,
+`AuthoringSettings` binds `codex: CodexConfig`, `m2_revision`, `m4_revision`,
 `evidence_scope` and an `AuthoringBatch`. Batch fields are exact `candidates`,
-`candidate_caps`, `batch_caps`, and retained `calibration_evidence`. Both cap sets
+`candidate_caps` and `batch_caps`. Both cap sets
 declare input/output tokens, wall/CPU seconds, provider command count, memory bytes
-and `spend_usd`. Null USD explicitly declares unpriced local compute and leaves
+and `spend_usd`. Null USD explicitly declares unpriced Codex subscription usage and leaves
 monetary comparison verification unavailable. A finite cap rejects without the
 actual missing currency meter. Cumulative full-call reservations are not refunded
 by failed attempts; larger known actual use is retained. Same-batch dispatch is
@@ -322,7 +322,11 @@ Controller/storage overhead stays separately unknown rather than becoming zero.
 `AuthoringCall` contains exact SourcePair, PreparedEnvironment, ResolverInputs,
 actual M2 `GenerationCandidate`, `sources`, and one actual M2/M4 finalization input:
 `ContractFinalizationInputs`, `ScenarioFinalizationInputs`,
-`CheckerFinalizationInputs` or `ControlFinalizationInputs`. Controls also supply
+`CheckerFragmentInputs`, `CheckerFinalizationInputs` or `ControlFinalizationInputs`.
+The workflow authors one bounded checker fragment per scenario and uses
+`Factory.assemble_checker` to assemble the complete validated verifier. The full
+checker proposal remains the deterministic assembly format and historical
+authoring format. Controls also supply
 the frozen `ControlPlan` and, for adversarial roles, its named `attack`. A control
 slot is category + sorted mandatory requirement IDs + attack; changing control IDs
 does not create another initial role. The candidate's first plan cannot change.
@@ -340,13 +344,25 @@ output provenance and current dependency usability. Recovery never infers again;
 status or frozen result. Missing status remains explicit unknown work.
 
 Repair mappings are contract → `authoring`, scenario → `scenarios`, and checker,
-control and alternative → shared `verifier`. Maximum two repairs per stage and
-four per candidate include actual M3 neutral repairs. Every retry needs a recorded
+control and alternative → shared `verifier`. Maximum two semantic repairs per
+stage and four per candidate include actual M3 neutral repairs. Every retry needs a recorded
 diagnosis and meaningful request change; IDs do not count as changes.
 
+Authoring policy V2 makes one transport-accounting correction explicit. An
+archived, completed `CodexUnavailable` attempt with no generated output and a
+terminal `max_output_tokens` error can receive an append-only
+`m6-transport-repair-classification` proof only when removing unsafe integer
+bounds alone makes its archived transport schema exactly match the corrected
+schema for that original request. All original repair flags, attempts, journals,
+costs and physical command limits remain intact. Both authoring admission and M5
+authenticate the same proof before excluding that attempt from semantic repair
+allowances. Malformed generated output remains a semantic repair. Historical V1
+policy bytes are authenticated as V1, not reinterpreted as V2.
+
 Supported complete order: contract → scenario → controls/alternative → final
-checker with the actual `ControlRecord.control` values in its inputs → construct.
-The final checker ref must be the selected author output. An unauthenticated later
+checker fragments → controller assembly with the actual `ControlRecord.control`
+values in its inputs → construct. The final checker ref must be the selected
+authenticated assembly output (or a retained direct author output). An unauthenticated later
 `attach_controls` derivation remains incomplete. Construction request V2 freezes
 history before building, including all initial and repaired calls and current
 terminal outputs; V1 bytes/readback are preserved. Complete means the explicitly

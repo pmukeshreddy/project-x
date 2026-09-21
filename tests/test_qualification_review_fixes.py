@@ -13,6 +13,7 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.environments import SourceArchive
 from feature_rl.environments.models import Ownership
 from feature_rl.grading import AssertionResult,CaseResult
+from feature_rl.grading.bootstrap import adapter_argv
 from feature_rl.qualification import (QualificationRejected,derive_reference,assess_outcome)
 from feature_rl.qualification.evidence import put_record,_assert_case_observation
 from feature_rl.registry import QuarantinedError
@@ -46,7 +47,8 @@ def process_observations(tmp_path,*,exit_code,stderr=b'',mode='process'):
         owner=Ownership(operation_id=str(index+1)*32,owner_token='a'*32,daemon_id='synthetic',
             container_name='synthetic-'+str(index),container_id='synthetic-id-'+str(index),phase='removed',
             binding={},saved_source={},created_at='2026-09-19T00:00:00Z')
-        row={'argv':['diagnostic-docker','exec',owner.container_id,'python','-c',adapter.decode()],
+        environment=q.store.get_artifact(task.environment).environment
+        row={'argv':['diagnostic-docker','exec',owner.container_id,*adapter_argv(adapter,((v.name,v.value) for v in environment))],
             'exit_code':code,'reason':'exited','stdin_bytes':len(stdin),'stdin_sha256':hashlib.sha256(stdin).hexdigest(),
             'stdout_b64':base64.b64encode(output).decode(),'stderr_b64':base64.b64encode(stderr if index==0 else b'').decode()}
         value={'phase':'execute','record':owner.model_dump(mode='json'),'cleanup_verified':True,'commands':[row],
@@ -56,7 +58,7 @@ def process_observations(tmp_path,*,exit_code,stderr=b'',mode='process'):
             assertions=(AssertionResult(assertion_id='value',requirement_ids=(requirement,),passed=index!=0),),
             evidence=ref,reason='compared externally')
         comparisons.append(comparison);cases.append(actual)
-        checked=SimpleNamespace(adapter=adapter,verifier=SimpleNamespace(permissions=SimpleNamespace(output_limit_bytes=65536)))
+        checked=SimpleNamespace(adapter=adapter,recipe=SimpleNamespace(environment=environment),verifier=SimpleNamespace(permissions=SimpleNamespace(output_limit_bytes=65536)))
         _assert_case_observation(checked,actual,case,comparison,value,owner)  # M4's process observation remains valid.
     checked.comparisons=tuple(comparisons)
     checked.contract=SimpleNamespace(requirements=(SimpleNamespace(requirement_id='F1',mandatory=True),),
@@ -101,12 +103,17 @@ def source_run(tmp_path,visibility=c.Visibility.PRIVATE):
 
 
 @pytest.mark.parametrize('visibility',[c.Visibility.PRIVATE,c.Visibility.PUBLIC])
-def test_run_config_consumes_source_delta_and_quarantine_blocks_selected_reuse(tmp_path,visibility):
+def test_run_config_consumes_source_delta_and_quarantine_blocks_selected_reuse(tmp_path,visibility,monkeypatch):
     q,checked,projection,submission,delta,parent=source_run(tmp_path,visibility)
-    # This synthetic recipe has no runtime policy, so actual M4 returns an
-    # unsupported receipt before any workspace/engine invocation.
+    # The complete synthetic recipe passes inert validation. Stop specifically
+    # at the runtime boundary: this diagnostic has no configured worker engine.
+    # M4 still constructs/publishes its real typed unsupported receipt and costs.
+    def no_worker(prepared):
+        raise ValueError('Synthetic unit runtime boundary: no worker configured')
+    monkeypatch.setattr(q.grader.runtime,'recipe',no_worker)
     binding,result,receipt=q._run(checked,projection,submission,11,'fresh_0','positive',(),parent,False,set())
     assert receipt.disposition==c.Disposition.UNSUPPORTED
+    assert 'Synthetic unit runtime boundary' in receipt.reason and not receipt.runtime_evidence
     trace=q.registry.trace(delta)
     assert binding in trace.artifacts and trace.jobs
     q.registry.quarantine(delta,notice_id='synthetic-delta-defect',reason='Synthetic source-delta quarantine regression',evidence=(delta,))

@@ -1,6 +1,6 @@
 """M5 controller-local contracts; opaque CAS bytes, no shared schema changes."""
 from typing import Annotated, Literal
-from pydantic import Field
+from pydantic import Field, model_validator
 from feature_rl.contracts import ArtifactRef, Digest, StrictModel
 
 ReasonCode = Literal['accepted','provisional','ambiguous_requirement','unsupported_semantics',
@@ -39,7 +39,7 @@ Evidence = Annotated[tuple[EvidenceRecord,...],Field(min_length=1,max_length=64)
 Costs = Annotated[tuple[CostRecord,...],Field(min_length=1,max_length=64)]
 Stage = Literal['source','environment','authoring','scenarios','verifier','qualification']
 Mode = Literal['positive','baseline_health','semantic_negative','source_rejection','protocol_failure','resource_failure']
-Attack = Literal['forged_verdict','evaluator_detection','hardcoded_inputs','skipped_execution',
+Attack = Literal['forged_verdict','observation_spoofing','evaluator_detection','hardcoded_inputs','skipped_execution',
     'protocol_manipulation','excessive_output','dependency_shadowing','path_link','retained_state']
 
 class GateOutcome(StrictModel):
@@ -79,13 +79,14 @@ class QualificationPolicy(StrictModel):
     policy_id: Name='pilot-v1'
     baseline_missing_requirements: tuple[Name,...]=()
     controls: Annotated[tuple[ControlDiagnosis,...],Field(max_length=128)]=()
-    fresh_seeds: Annotated[tuple[Annotated[int,Field(ge=0,lt=2**63)],...],Field(min_length=3,max_length=10)]=(11,11,11)
-    reset_seeds: Annotated[tuple[Annotated[int,Field(ge=0,lt=2**63)],...],Field(min_length=3,max_length=10)]=(11,11,11)
+    fresh_seeds: Annotated[tuple[Annotated[int,Field(ge=0,lt=2**63)],...],Field(min_length=3,max_length=10)]=(11,23,47)
+    reset_seeds: Annotated[tuple[Annotated[int,Field(ge=0,lt=2**63)],...],Field(min_length=3,max_length=10)]=(11,23,47)
     max_grade_calls: Annotated[int,Field(ge=7,le=256)]=64
     max_wall_seconds: Annotated[float,Field(gt=0,le=21600)]=3600.0
     repair_history: ArtifactRef | None=None
     repair_history_job: Annotated[str,Field(pattern=r'^[0-9a-f]{64}$')] | None=None
     factory_revision: Revision | None=None
+    semantic_repair_authorization: ArtifactRef | None=Field(default=None,exclude_if=lambda value:value is None)
 
 
 class RunBinding(StrictModel):
@@ -125,9 +126,16 @@ class QualificationSummary(StrictModel):
     bindings: Annotated[tuple[ArtifactRef,...],Field(max_length=256)]
     control_diagnoses: Annotated[tuple[ControlDiagnosis,...],Field(max_length=128)]=()
     issues: Annotated[tuple[str,...],Field(max_length=1024)]
-    repair_count: Annotated[int,Field(ge=0,le=4)] | None
+    repair_count: Annotated[int,Field(ge=0,le=7)] | None
+    semantic_repair_authorization: ArtifactRef | None=Field(default=None,exclude_if=lambda value:value is None)
     qualification_job: Digest
     wall_seconds: Annotated[float,Field(ge=0)] | None=None
+
+    @model_validator(mode='after')
+    def explicit_additional_repairs(self):
+        if self.repair_count is not None and self.repair_count>4 and self.semantic_repair_authorization is None:
+            raise ValueError('repair count above four requires explicit semantic authorization')
+        return self
 
 
 from dataclasses import dataclass

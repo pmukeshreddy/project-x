@@ -33,11 +33,13 @@ def validate_link(link: EvidenceLink, sources: tuple[GroundedSource, ...]) -> No
     catalog = _catalog(sources)
     grounded = catalog.get((link.source, link.locator))
     if grounded is None:
-        raise GroundingError("evidence source or locator is outside the authoring allowlist")
+        raise GroundingError("evidence source or locator is outside the authoring allowlist: "
+            f"{link.source.kind}:{link.source.sha256} at {link.locator!r}; "
+            "copy the exact source and locator from one admitted context")
     if link.provenance_label != grounded.provenance_label:
         raise GroundingError("evidence provenance label does not match its grounded source")
     if link.quote not in grounded.text:
-        raise GroundingError("evidence quote is not present at the declared locator")
+        raise GroundingError(f"evidence quote is not present at the declared locator {link.locator!r}")
 
 
 class ContractFinalizer:

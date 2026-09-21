@@ -33,7 +33,7 @@ from .models import DependencyUnavailable, PolicyRejected, SourceRejected
 from .profiles import RuntimeProfile, WheelPin, metadata_digest
 
 
-_SOLVER_VERSION = 'candidate-wheel-solver-v2'
+_SOLVER_VERSION = 'candidate-wheel-solver-v3'
 _METADATA_BYTES = 1024 * 1024
 _MARKER_KEYS = frozenset({
     'implementation_name', 'implementation_version', 'os_name', 'platform_machine',
@@ -137,7 +137,8 @@ def _inspect_wheel(store, item, policy):
                 if (mode not in (0, stat.S_IFDIR if info.is_dir() else stat.S_IFREG)
                         or info.flag_bits & 1 or info.file_size < 0 or info.compress_size < 0):
                     raise PolicyRejected('linked, special, encrypted or invalid dependency wheel member')
-                if any(part.endswith('.dist-info') and part != metadata_root for part in path.split('/')):
+                root = path.split('/', 1)[0]
+                if root.endswith('.dist-info') and root != metadata_root:
                     raise PolicyRejected('dependency wheel contains foreign distribution metadata')
                 if info.is_dir():
                     continue

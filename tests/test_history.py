@@ -456,6 +456,26 @@ def test_git_inspection_ignores_hostile_external_diff_configuration(tmp_path):
     assert not marker.exists()
 
 
+def test_optional_path_lookup_distinguishes_absence_from_unavailable_history(tmp_path):
+    """Optional repository metadata may be absent; missing Git objects remain errors."""
+    from feature_rl.history import GitHistory, UnrecoverableHistory
+
+    repo = init_repo(tmp_path)
+    revision = commit(repo, 'root.txt', 'root\n')
+    history = GitHistory(repo / '.git')
+    assert history.optional_path_object(revision, '.github') is None
+    assert history.optional_path_object(revision, 'root.txt') == git(repo, 'rev-parse', f'{revision}:root.txt')
+    with pytest.raises(UnrecoverableHistory):
+        history.path_object(revision, '.github')
+    with pytest.raises(UnrecoverableHistory):
+        history.optional_path_object('f' * 40, '.github')
+
+    tree = git(repo, 'rev-parse', f'{revision}^{{tree}}')
+    (repo / '.git' / 'objects' / tree[:2] / tree[2:]).unlink()
+    with pytest.raises(UnrecoverableHistory):
+        history.optional_path_object(revision, '.github')
+
+
 def test_incomplete_promisor_repository_fails_without_fetching(tmp_path):
     """Catches read-only inspection lazily fetching and mutating missing objects."""
     from feature_rl.history import GitHistory, UnrecoverableHistory

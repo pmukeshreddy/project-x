@@ -192,21 +192,26 @@ requires reconciliation and must not be dispatched again. The Registry remains
 the authoritative attempt/cost ledger, and JSONL is its verified projection.
 
 Authoring commands require `authoring: AuthoringSettings` in the same configuration:
-actual M2 backend settings, exact M2/M4 revisions, evidence scope and a frozen
+Codex settings, exact M2/M4 revisions, evidence scope and a frozen
 candidate/batch budget. `authoring-call.json` is an actual `AuthoringCall`, including
 the complete M0/M3 resolver inputs and the selected M2/M4 finalization inputs.
-Authoring now uses local Transformers/PyTorch. Configure the model ID, immutable
-revision, model/dependency manifest SHA-256 pins, explicit `device` (`cpu` or
-`cuda:0`, etc.) and `dtype`. Supply materialized unquantized safetensors and install
-the chosen hash-pinned Torch/Transformers wheel closure into the controller's
-Python environment first. The old MLX model/configuration is incompatible.
-See [the M2 interface](interfaces-M2.md) for the manifest formats, resource limits,
-and offline worker contract. No dependencies or models are downloaded by authoring.
+Authoring uses Astra (`gpt-6-astra`) through `codex exec`. Sign into the installed
+Codex CLI with ChatGPT (`codex login`); the same existing authentication is reused.
+Set `codex` to `{"executable":"codex","model":"gpt-6-astra","reasoning_effort":"high"}`
+in `authoring` or `workflow`. Optional `codex_home` selects an existing Codex home;
+otherwise the current `CODEX_HOME`/default home is used. Do not put credentials in
+pipeline configuration. Old `backend`, model manifests, calibration evidence, CUDA/file-size fields,
+and generation sampling seeds are rejected. Episode/scenario seed policies remain unchanged.
+See [the M2 interface](interfaces-M2.md) for limits, validation, and recovery.
 
-Use the supported order contract → scenario → controls/alternative → final checker
-with those controls → construction. Each repeated semantic lane consumes the
+Use the supported order contract → scenario → controls/alternative → bounded
+checker fragments → controller assembly with those controls → construction.
+Each repeated semantic lane consumes the
 shared stage/candidate repair allowance; new request or control IDs do not create
-another allowance. Complete history is limited to the frozen controller scope.
+another allowance. The narrow, authenticated transport correction in
+[the M6 interface](interfaces-M6.md) retains all original attempts and costs while
+separating proven controller transport failures from semantic repairs. Complete
+history is limited to the frozen controller scope.
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m feature_rl --config controller.json author --request candidate-request.json --call authoring-call.json
@@ -302,3 +307,80 @@ delegates to concrete publication validation. An early grade publication outage
 retains its actual M4 result in this capability. Other concrete M2/M3/M4/M5 pending
 capabilities remain available through their documented library retry APIs or
 selected durable recovery; the command does not deserialize arbitrary classes.
+
+## Command toolchains and local services
+
+`construct-feature` selects a repository's root toolchain and uses the existing
+Docker boundary for source preparation, builds, discovery, grading and reset.
+Python packaging retains the wheel pipeline, including Python projects with
+native extensions. Other supported roots are:
+
+| Root | Required declarations | Built entry points |
+| --- | --- | --- |
+| Node/TypeScript | `package.json`, npm `package-lock.json` v2/v3, numeric Node selector in `.node-version`, `.nvmrc` or `engines.node` | `main`, `bin`, or `index.js`; optional `npm run build` |
+| Rust | `Cargo.toml`, `Cargo.lock`, numeric `rust-toolchain[.toml]` or `package.rust-version` | Declared binaries, `src/main.rs`, or `src/bin/*.rs` |
+| Go | `go.mod` with `go` version, optional `toolchain` version, `go.sum` when dependencies exist | Packages declaring `package main`, compiled into `bin/` |
+
+Numeric selectors resolve immediately to an official Debian Bookworm image
+digest. npm's `packageManager`, when present, must match the installed exact npm
+version. npm packages require registry.npmjs.org URLs and SHA512 integrity;
+Cargo packages require crates.io checksums; Go uses the public module proxy and
+checksum database. Only declarations enter networked acquisition. Repository
+build hooks run later inside a qualified, unprivileged, networkless container.
+The complete captured dependency supply and each build product are hash-bound
+artifacts. Builds do not reuse a previous candidate's output.
+
+For these three command toolchains, an optional `.feature-rl/runtime.toml` can
+select the primary language in a polyglot repository and replace the build argv
+sequence. Commands run in `/workspace/site`, copied from the saved source, and
+entry points name paths relative to that directory. Keep dependency installation
+in a replacement build sequence when the project requires it:
+
+```toml
+language = "node"
+build = [
+  ["npm", "ci", "--offline", "--no-audit", "--no-fund"],
+  ["npm", "run", "build", "--offline"],
+]
+entry_points = ["dist/index.js"]
+system_packages = ["redis-server", "redis-tools"]
+
+[[services]]
+name = "cache"
+start = ["redis-server", "--bind", "127.0.0.1", "--port", "6379", "--save", ""]
+readiness = ["redis-cli", "-h", "127.0.0.1", "ping"]
+ready_stdout = "PONG\n"
+startup_seconds = 10.0
+```
+
+Declared Debian packages are installed during source-free image construction;
+their observed versions and immutable image are retained. Up to four local
+services may run as the sandbox user. Each starts in a fresh
+`/workspace/services/<name>` directory before a build or execution. Readiness
+requires a live foreground process, exit zero and exact declared stdout within
+the bounded startup deadline. Services share only that container's loopback
+network; no host ports, external network, sidecars or persistent volumes are
+enabled. Verified container removal tears down all service processes and state;
+the next execution starts fresh, including after workspace reset.
+
+This implementation rejects yarn/pnpm, package-manager workspaces, Cargo git/local
+dependencies, Go workspace/replace declarations, library-only Rust/Go observers,
+Compose/CI service declarations without an implemented interpretation, and
+external services. Candidate manifests and lockfiles remain frozen to the
+prepared supply. Explicit Python runtime.toml overrides are rejected; Python
+continues to use the wheel profile. Unsupported declarations fail preparation or
+candidate admission and never select a substitute runtime.
+
+The focused real Docker tests use labeled test-only sources and do not constitute
+generated or qualified feature tasks:
+
+```sh
+FEATURE_RL_COMMAND_RUNTIME_DOCKER=1 uv run pytest tests/test_command_toolchains_docker.py -v
+```
+
+They require the configured local registry (default
+`localhost:5000/feature-rl-toolchain-tests`), Docker's Linux arm64 runtime, and
+Buildx at `~/.docker/cli-plugins`. Set `FEATURE_RL_TEST_IMAGE_REPOSITORY` to change
+the test registry repository. They exercise npm, a real TypeScript compiler,
+checksum-locked Rust/Go dependencies, discovery, fresh execution, stale-build
+rejection, saved-source reset, service readiness and cleanup.

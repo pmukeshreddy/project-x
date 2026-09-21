@@ -7,6 +7,7 @@ from feature_rl.submission.source import validate_rules
 from feature_rl.environments import SourceRejected
 from .models import InputPlan, CaseComparison, CaseManifest, RealizedCase, unique, Constant, Choice
 from .language import decode_json, realize_inputs, check_value
+from .authoring_models import MAX_CHECKER_OUTPUT_BYTES
 
 PRIVATE={Visibility.PRIVATE,Visibility.EVALUATION}
 
@@ -97,7 +98,7 @@ def validate_verifier_bundle(store,verifier,*,contract_ref,environment,baseline)
     except SourceRejected as exc:raise ValueError('unsupported contract submission policy: '+str(exc)) from exc
     if verifier.permissions.worker_inputs!=(verifier.worker_adapter.code,):raise ValueError('worker allowlist must contain adapter alone')
     if not 1<=len(verifier.cases)<=256:raise ValueError('case count limit')
-    if verifier.permissions.output_limit_bytes>min(recipe.limits.output_bytes,contract.episode_limits.output_bytes,2*1024*1024):
+    if verifier.permissions.output_limit_bytes>min(recipe.limits.output_bytes,contract.episode_limits.output_bytes,MAX_CHECKER_OUTPUT_BYTES):
         raise ValueError('output budget mismatch')
     if plan.seed_policy.algorithm!='m4-sha256-v1' or not plan.seed_policy.same_cases_within_group:
         raise ValueError('unsupported seed policy')

@@ -48,7 +48,7 @@ def main():
         owner=Ownership.model_validate_json(json.dumps(value['record']))
         for change in ('stdin_sha256','stdout_b64'):
             drift=copy.deepcopy(value)
-            row=next(r for r in drift['commands'] if r.get('argv',[])[-3:]==['python','-c',checked.adapter.decode()])
+            row=next(r for r in drift['commands'] if r.get('argv',[])[-3:]==['/usr/local/bin/python','-c',checked.adapter.decode()])
             row[change]='0'*64 if change=='stdin_sha256' else ''
             try:_assert_case_observation(checked,case,manifest.cases[0],checked.comparisons[0],drift,owner)
             except QualificationRejected:negative_checks+=1

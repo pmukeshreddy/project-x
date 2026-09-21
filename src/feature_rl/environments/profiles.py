@@ -119,7 +119,7 @@ class RuntimeProfile(StrictModel):
         from .images import LINK_DEPS
         # The build backend chooses the ABI/platform tag. Keep its actual wheel
         # name, including for native extensions, and require a single product.
-        install = CommandSpec(argv=('python', '-I', '-c',
+        install = CommandSpec(argv=('/usr/local/bin/python', '-I', '-c',
             "import pathlib,subprocess,sys;w=list(pathlib.Path('/workspace/built').glob('*.whl'));"
             "assert len(w)==1,'one project wheel required';subprocess.run([sys.executable,'-I','-m','pip',"
             "'--isolated','install','--no-index','--no-deps','--no-compile','--target','/workspace/site',str(w[0])],check=True)"),
@@ -174,6 +174,10 @@ class RuntimeProfile(StrictModel):
 
 
 def dependency_files(store, pins, policy):
+    from .command_profiles import CommandRuntimeProfile
+    if isinstance(policy.profile, CommandRuntimeProfile):
+        from .command_resolution import dependency_supply
+        return dependency_supply(store, pins, policy).files
     from .archive import SourceFile
     from .models import PolicyRejected
     expected = {p.name: p for p in policy.profile.dependencies}
@@ -202,7 +206,11 @@ def validate_recipe_profile(recipe, policy, store):
     profile = policy.profile
     if profile is None or policy.image is None:
         raise PolicyRejected('recipe requires a resolved repository runtime')
-    if profile.metadata_sha256 is not None:
+    from .command_profiles import CommandRuntimeProfile
+    if isinstance(profile, CommandRuntimeProfile):
+        from .command_runtime import validate_resolution
+        validate_resolution(recipe, policy, store)
+    elif profile.metadata_sha256 is not None:
         import json
         if (profile.resolution is None or profile.resolution.kind!='repository-runtime-resolution'
                 or profile.resolution not in recipe.provenance.inputs):
@@ -215,8 +223,9 @@ def validate_recipe_profile(recipe, policy, store):
             raise PolicyRejected('runtime resolution inputs differ from the pinned profile')
     validate_runtime_image(recipe, policy, store)
     setup = profile.setup
+    services=profile.service_recipes(recipe.image_digest) if isinstance(profile,CommandRuntimeProfile) else ()
     if (recipe.interpreter_version != profile.interpreter_version
-            or recipe.services or recipe.network_policy != 'none' or recipe.setup != setup
+            or recipe.services != services or recipe.network_policy != ('declared_local_services' if services else 'none') or recipe.setup != setup
             or recipe.reset != recipe.setup or tuple((v.name, v.value) for v in recipe.environment) != profile.environment
             or recipe.locale != 'C.UTF-8' or recipe.timezone != 'UTC'
             or recipe.randomness != SeedPolicy(algorithm='PYTHONHASHSEED', seeds=(0,), same_cases_within_group=True)):

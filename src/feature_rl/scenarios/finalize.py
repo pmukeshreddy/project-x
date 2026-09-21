@@ -54,6 +54,14 @@ class ScenarioFinalizer:
         covered: set[str] = set()
         try:
             for scenario in proposal.scenarios:
+                if scenario.reset_needs:
+                    raise ScenarioJoinError(
+                        f"scenario {scenario.scenario_id} has unsupported reset_needs; the current "
+                        "adapter grants no additional reset capability. Each case uses a fresh "
+                        "runtime and process. Describe local fixture creation in preconditions "
+                        "and keep reset_needs=[] for self-contained cases; do not conceal "
+                        "genuine cross-case state or external reset requirements."
+                    )
                 if any(identifier not in known_ids for identifier in scenario.requirement_ids):
                     raise ScenarioJoinError("scenario contains an unknown requirement ID")
                 if any(

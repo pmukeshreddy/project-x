@@ -27,12 +27,11 @@ def journal(store,ref,index,stage):
     if 'request' not in record.archives:
         raise ValueError('this importer needs the exact retained request archive; incomplete variants remain unresolved')
     request=GenerationRequest.model_validate_json(read_bytes(store,record.archives['request'],1024*1024,kind='generation-request'))
-    if (identity(request)!=value['request_sha256'] or ('semantic_request_sha256' in value
-            and a.semantic_request_sha256(request)!=value['semantic_request_sha256'])):
+    if (identity(request)!=value['request_sha256'] or a.semantic_request_sha256(request)!=value.get('semantic_request_sha256')):
         raise ValueError('journal request/semantic digest differs from its retained bytes')
     cost=c.CostRecord.model_validate_json(canonical_json(value['cost']))
     schema=RequirementContractProposal if stage=='initial_authoring' else ScenarioPlanProposal
-    outcome=a.provider_outcome(store,request,record,schema,cost)
+    outcome=a.provider_outcome(store,request,record,schema)
     if outcome.cost!=cost:raise ValueError('retained journal changed its actual provider cost')
     return value,request,outcome
 

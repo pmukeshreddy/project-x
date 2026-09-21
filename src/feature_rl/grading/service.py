@@ -15,6 +15,7 @@ from feature_rl.verifiers import load_verifier, materialize_manifest, parse_obse
 from feature_rl.verifiers.language import compare, operand_value, check_value, decode_json
 from feature_rl.verifiers.loader import read_local, read_bytes
 from .models import GradeReceipt, CaseResult, AssertionResult
+from .bootstrap import adapter_argv
 
 
 class GradePublicationFailed(Exception):
@@ -125,7 +126,7 @@ class GradingService:
                         if time.monotonic()-start>=self.max_wall_seconds:
                             disposition=Disposition.REJECTED;reward=0;reason='declared total grading wall budget exceeded';break
                         stdin=canonical_json({'case_id':case.case_id,'inputs':case.model_dump(mode='json')['inputs']})
-                        command=CommandSpec(argv=('python','-c',checked.adapter.decode('utf-8')),working_directory='/workspace',timeout_seconds=comparison.timeout_seconds)
+                        command=CommandSpec(argv=adapter_argv(checked.adapter,self.runtime.profile.environment),working_directory='/workspace',timeout_seconds=comparison.timeout_seconds)
                         output=timed(lambda:self.runtime.execute(handle,ExecutionRequest(command=command,stdin=stdin,save_source=False),build=build),'execution')
                         runtime_evidence.append(output.evidence);costs.append(output.cost)
                         cleanup=output.cleanup_verified

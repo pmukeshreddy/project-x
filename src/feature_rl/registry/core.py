@@ -45,9 +45,22 @@ class Registry:
         if not isinstance(store, ArtifactStore) or store.role != ActorRole.CONTROLLER:
             raise TypeError('registry requires an M0 controller ArtifactStore')
         self.store = store
-        self.limits = RegistryLimits() if limits is None else validated(RegistryLimits, limits)
-        self._storage = Storage(root, self.limits, store.root)
+        limits = RegistryLimits() if limits is None else validated(RegistryLimits, limits)
+        self._storage = Storage(root, limits, store.root)
         self.root = self._storage.root
+
+    @property
+    def limits(self):
+        return self._storage.limits
+
+    def expand_limits(self, limits: RegistryLimits, *, reason: str) -> RegistryLimits:
+        """Audit monotonic storage growth without changing jobs or execution budgets.
+
+        Existing clients adopt this exact verified event chain on their next
+        locked operation. A failed reply may follow commit: recover/query before
+        retrying; requesting the already-current capacity is an idempotent no-op.
+        """
+        return self._storage.expand_limits(validated(RegistryLimits, limits), reason)
 
     def _ref(self, ref):
         if not isinstance(ref, ArtifactRef):
@@ -59,7 +72,9 @@ class Registry:
     def _refs(self, values):
         if type(values) is not tuple:
             raise TypeError('references must be a tuple')
-        if len(values) > self.limits.max_closure_artifacts:
+        # The exact active closure bound is enforced after the storage lock has
+        # adopted any audited expansion made by another controller process.
+        if len(values) > 10000:
             raise RegistryLimit('reference count exceeds closure bound')
         return tuple(self._ref(ref) for ref in values)
 
@@ -187,12 +202,14 @@ class Registry:
 
     def complete(self, claim: Claim, result: OperationResult, *, observations: tuple[str, ...]) -> JobRecord:
         claim, result = validated(Claim, claim), validated(OperationResult, result)
-        if type(observations) is not tuple or len(observations) > self.limits.max_events:
+        if type(observations) is not tuple or len(observations) > 100000:
             raise RegistryLimit('completion snapshot identities must be a bounded tuple')
         if len(set(observations)) != len(observations):
             raise RegistryConflict('duplicate completion accounting snapshot')
         observations = tuple(sorted(observations))
         def build(state):
+            if len(observations) > state.limits.max_events:
+                raise RegistryLimit('completion snapshot identities must be a bounded tuple')
             attempt, job = state.authenticate(claim)
             if attempt.state == 'abandoned':
                 raise StaleClaim('abandoned attempt cannot finalize a job; reconcile its receipts separately')

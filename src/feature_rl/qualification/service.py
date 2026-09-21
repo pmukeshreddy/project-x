@@ -19,7 +19,8 @@ from .models import (QualificationRejected, QualificationPolicy, RepairHistory,
     CompletionPending, FrozenPublication, GradePending, RunCompletionPending)
 from .projection import derive_reference
 from .controls import assess_outcome, validate_control_plan, validate_repairs, control_origins, diagnose_control
-from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade, validate_reset, check_consumed
+from .evidence import put_record, unknown_cost, collapse_costs, evidence, validate_grade, validate_reset, check_consumed, assert_reference_determinism
+from .schedule import control_run_name, control_seeds
 
 
 class QualificationService:
@@ -38,7 +39,7 @@ class QualificationService:
         self.configuration=put_record(store,{'version':'m5-configuration-v1','policy':self.policy_ref.model_dump(mode='json'),
             'grading_revision':grader.revision,'runtime_revision':grader.runtime.revision,
             'builder_revision':builder.revision if builder is not None else None},'m5-qualification-configuration')
-        policy_inputs=tuple(dict.fromkeys((*tuple(r for r in (self.policy.repair_history,) if r is not None),
+        policy_inputs=tuple(dict.fromkeys((*tuple(r for r in (self.policy.repair_history,self.policy.semantic_repair_authorization) if r is not None),
             *(r for d in self.policy.controls for e in (*d.evidence,*d.independence_evidence) for r in e.artifacts))))
         self.registry.register(self.policy_ref,dependencies=policy_inputs)
         self.registry.register(self.configuration,dependencies=(self.policy_ref,))
@@ -168,7 +169,8 @@ class QualificationService:
         if job.state!='completed' or job.result is None or policy.repair_history not in job.result.artifacts or job.spec.implementation!=policy.factory_revision or job.spec.operation!='construct' or pair.candidate not in job.spec.inputs or policy.repair_history_job not in self.registry.trace(pair.candidate).jobs:
             raise QualificationRejected('invalid_evidence','repair history is not selected by the configured M6 candidate operation')
         for ref in history.journal_refs:self.registry.assert_usable(ref)
-        count=validate_repairs(history,pair.candidate,checked.recipe.neutral_repairs)
+        count=validate_repairs(history,pair.candidate,checked.recipe.neutral_repairs,
+            store=self.store,registry=self.registry,semantic_authorization=policy.semantic_repair_authorization)
         return count,None if count is not None else 'global candidate repair history is explicitly incomplete'
 
     def _execute(self,task_version,claim):
@@ -182,20 +184,27 @@ class QualificationService:
                 raise QualificationRejected('budget_exhausted','declared qualification grade-call/wall budget reached')
             binding,result,receipt=self._run(checked,projection_ref,submission,seed,name,mode,targets,claim,reset,seen)
             bindings.append(binding);costs.extend(result.costs)
+            determinism_failure=None
             if name.startswith(('fresh_','reset_')):
-                signature=tuple((item.status,tuple(a.passed for a in item.assertions)) for item in receipt.cases)
-                if seed in signatures and signatures[seed]!=signature:issues.append('flaky_task: repeated reference inputs produced different outcomes')
-                signatures[seed]=signature
+                try:assert_reference_determinism(self.store,checked,receipt,signatures)
+                except QualificationRejected as exc:
+                    if exc.code!='flaky_task':raise
+                    determinism_failure=exc
             if control is not None:
                 diagnosis,outcome=diagnose_control(self,checked,control,receipt,binding,origins)
                 diagnoses.append(diagnosis)
             else:
                 outcome=assess_outcome(checked,receipt,mode,targets,store=self.store)
-            if not outcome.passed:issues.append(outcome.code+': '+name+': '+outcome.detail)
             gate=c.RunAssessment(name=name,subject=task_version,disposition=c.Disposition.SUCCESS if outcome.passed else c.Disposition.REJECTED,
                 passed=outcome.passed,requirement_ids=targets,reason=outcome.detail,
                 evidence=(evidence(binding,self.revision,('QualificationService.execute',name,task_version.sha256),scope='real_integration'),))
             assessments[name]=gate
+            # Freeze the completed failing run before dispatching any later work.
+            # Accepted reports still replay the entire original schedule.
+            if not outcome.passed:
+                if determinism_failure is not None:issues.append(determinism_failure.code+': '+determinism_failure.detail)
+                raise QualificationRejected(outcome.code,name+': '+outcome.detail)
+            if determinism_failure is not None:raise determinism_failure
             return receipt
         try:
             checked=load_verifier(self.store,task_version)
@@ -218,20 +227,22 @@ class QualificationService:
             baseline=self.grader.submissions.create(checked.task.baseline,SourceArchive({}).to_tar(),(),checked.contract.allowed_changes)
             first=run('baseline_absence',baseline,self.policy.fresh_seeds[0],'semantic_negative',targets)
             healthy=assess_outcome(checked,first,'baseline_health',())
-            if not healthy.passed:issues.append(healthy.code+': baseline_health: '+healthy.detail)
             assessments['baseline_health']=c.RunAssessment(name='baseline_health',subject=task_version,
                 disposition=c.Disposition.SUCCESS if healthy.passed else c.Disposition.REJECTED,passed=healthy.passed,
                 requirement_ids=tuple(r.requirement_id for r in checked.contract.compatibility_obligations if r.mandatory),
                 reason=healthy.detail,evidence=assessments['baseline_absence'].evidence)
+            if not healthy.passed:raise QualificationRejected(healthy.code,'baseline_health: '+healthy.detail)
             for index,seed in enumerate(self.policy.fresh_seeds):run('fresh_'+str(index),projection.submission,seed,'positive',())
             by_id={d.control_id:d for d in self.policy.controls}
             for control in checked.verifier.controls:
                 diagnosis=by_id.get(control.control_id)
-                if diagnosis is None:
-                    run('control_'+control.control_id,control.patch,self.policy.fresh_seeds[0],None,
-                        control.requirement_ids,control=control)
-                elif diagnosis.validity not in {'equivalent','unresolved'}:
-                    run('control_'+control.control_id,control.patch,self.policy.fresh_seeds[0],diagnosis.mode,diagnosis.targets)
+                for index,seed in enumerate(control_seeds(self.policy)):
+                    if diagnosis is None:
+                        run(control_run_name(control.control_id,index),control.patch,seed,None,
+                            control.requirement_ids,control=control)
+                        diagnosis=diagnoses[-1]
+                    elif diagnosis.validity not in {'equivalent','unresolved'}:
+                        run(control_run_name(control.control_id,index),control.patch,seed,diagnosis.mode,diagnosis.targets)
             for index,seed in enumerate(self.policy.reset_seeds):run('reset_'+str(index),projection.submission,seed,'positive',(),True)
         except QualificationRejected as exc:issues.append(exc.code+': '+exc.detail)
         except (ArtifactError,ValueError,EnvironmentError) as exc:issues.append('environment_failure: '+type(exc).__name__+': '+str(exc)[:1200])
@@ -256,6 +267,7 @@ class QualificationService:
             assessments=frozen['assessments'];issues=frozen['issues'];count=frozen['count'];frozen_time=frozen['recorded_at']
             summary=put_record(self.store,QualificationSummary(task=task_version,policy=self.policy_ref,projection=projection_ref,
                 bindings=bindings,issues=issues,repair_count=count,qualification_job=claim.job_id,
+                semantic_repair_authorization=self.policy.semantic_repair_authorization,
                 wall_seconds=frozen['wall_seconds'],control_diagnoses=frozen.get('control_diagnoses',())),'m5-qualification-summary')
             diagnosis_refs=tuple(r for d in frozen.get('control_diagnoses',()) for ev in (*d.evidence,*d.independence_evidence) for r in ev.artifacts)
             dependencies=tuple(dict.fromkeys((task_version,self.policy_ref,*bindings,*diagnosis_refs,*([projection_ref] if projection_ref else []))))
@@ -270,7 +282,8 @@ class QualificationService:
                 controls=tuple(v for name,v in assessments.items() if name.startswith('control_')),
                 fresh_runs=tuple(v for name,v in assessments.items() if name.startswith('fresh_')),
                 interrupted_reset_runs=tuple(v for name,v in assessments.items() if name.startswith('reset_')),
-                rejection_reasons=issues,repair_attempts=count or 0,policy_version=self.policy.policy_id)
+                rejection_reasons=issues,repair_attempts=count or 0,policy_version=self.policy.policy_id,
+                semantic_repair_authorization=self.policy.semantic_repair_authorization)
             report_ref=self.store.put_artifact(report)
             outputs=[report_ref,summary]
             result=c.OperationResult(operation='qualify',disposition=disposition,artifacts=tuple(outputs),
@@ -365,11 +378,11 @@ class QualificationService:
             # the original confirmed source must be restored before grading.
             path,_=reset_probe(initial_source,checked.contract.allowed_changes,runtime.profile)
             mutation=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(
-                argv=('python','-I','-c','import pathlib,sys\nwith pathlib.Path(sys.argv[1]).open("ab") as stream: stream.write(sys.stdin.buffer.read())','/workspace/source/'+path),
+                argv=('/usr/local/bin/python','-I','-c','import pathlib,sys\nwith pathlib.Path(sys.argv[1]).open("ab") as stream: stream.write(sys.stdin.buffer.read())','/workspace/source/'+path),
                 working_directory='/workspace',timeout_seconds=2.0),stdin=RESET_PROBE_BYTES,save_source=True))
             if mutation.reason!='completed' or not mutation.cleanup_verified or mutation.saved_source.artifact==initial.artifact:
                 raise QualificationRejected('environment_failure','reset canary was not actually saved with verified cleanup')
-            interrupted=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(argv=('python','-I','-c','import time;time.sleep(5)'),
+            interrupted=runtime.execute_development(handle,ExecutionRequest(command=CommandSpec(argv=('/usr/local/bin/python','-I','-c','import time;time.sleep(5)'),
                 working_directory='/workspace',timeout_seconds=0.25),save_source=False))
             if interrupted.reason!='timeout' or not interrupted.cleanup_verified:
                 raise QualificationRejected('environment_failure','actual bounded interruption and cleanup required')

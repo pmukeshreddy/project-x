@@ -629,11 +629,15 @@ class QualificationReport(ArtifactModel):
     rejection_reasons: tuple[Text, ...]
     repair_attempts: NonnegativeInt
     policy_version: Text
+    semantic_repair_authorization: ArtifactRef | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode='after')
     def successful_report(self):
         require_ref(self.task,'TaskBundle')
-        if self.repair_attempts > 4: raise ValueError('pilot repair budget exceeded')
+        if self.semantic_repair_authorization is not None:
+            require_ref(self.semantic_repair_authorization,'m6-semantic-repair-authorization')
+        if self.repair_attempts > (7 if self.semantic_repair_authorization is not None else 4):
+            raise ValueError('pilot repair budget exceeded')
         if self.disposition == Disposition.SUCCESS:
             if any(x is None for x in (self.baseline_health,self.baseline_absence,self.reference_run)) or not self.controls or len(self.fresh_runs)<3 or len(self.interrupted_reset_runs)<3:
                 raise ValueError('successful qualification requires all gate records')

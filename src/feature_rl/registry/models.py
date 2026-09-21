@@ -9,7 +9,8 @@ from feature_rl.contracts.models import Digest, Revision, UTCDateTime
 
 Name = Annotated[str, Field(min_length=1, max_length=200, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')]
 Reason = Annotated[str, Field(min_length=1, max_length=4096, pattern=r'\S')]
-Refs = Annotated[tuple[ArtifactRef, ...], Field(max_length=1024)]
+Refs = Annotated[tuple[ArtifactRef, ...], Field(max_length=10000)]
+TraceRefs = Annotated[tuple[ArtifactRef, ...], Field(max_length=100000)]
 Operation = Literal['construct', 'qualify', 'release', 'run', 'grade', 'audit', 'train', 'evaluate']
 
 
@@ -62,16 +63,32 @@ class RegistryLimits(StrictModel):
     max_jobs: Annotated[int, Field(ge=1, le=100000)] = 1000
     max_attempts_per_job: Annotated[int, Field(ge=1, le=100)] = 3
     max_artifacts: Annotated[int, Field(ge=1, le=100000)] = 10000
-    max_closure_artifacts: Annotated[int, Field(ge=1, le=1024)] = 256
+    max_closure_artifacts: Annotated[int, Field(ge=1, le=10000)] = 256
     max_graph_edges: Annotated[int, Field(ge=1, le=100000)] = 20000
-    max_event_bytes: Annotated[int, Field(ge=512, le=1048576)] = 262144
+    max_event_bytes: Annotated[int, Field(ge=512, le=16777216)] = 262144
     max_events: Annotated[int, Field(ge=1, le=100000)] = 10000
     max_journal_bytes: Annotated[int, Field(ge=1024, le=1073741824)] = 67108864
     max_database_bytes: Annotated[int, Field(ge=65536, le=1073741824)] = 134217728
     max_artifact_envelope_bytes: Annotated[int, Field(ge=128, le=67108864)] = 8388608
     max_artifact_payload_bytes: Annotated[int, Field(ge=0, le=67108864)] = 4194304
-    max_closure_bytes: Annotated[int, Field(ge=128, le=134217728)] = 33554432
+    max_closure_bytes: Annotated[int, Field(ge=128, le=1073741824)] = 33554432
     lock_timeout_seconds: Annotated[float, Field(gt=0, le=30)] = 1.0
+
+
+class LimitExpansion(StrictModel):
+    previous_limits: RegistryLimits
+    limits: RegistryLimits
+    reason: Reason
+
+    @model_validator(mode='after')
+    def capacity_only(self):
+        fixed = {'max_active_jobs', 'max_attempts_per_job', 'lock_timeout_seconds'}
+        before, after = self.previous_limits.model_dump(), self.limits.model_dump()
+        if any(after[name] != before[name] if name in fixed else after[name] < before[name] for name in before):
+            raise ValueError('capacity expansion cannot shrink limits or change execution/lock policy')
+        if before == after:
+            raise ValueError('capacity expansion must increase a storage/count limit')
+        return self
 
 
 class ArtifactRecord(StrictModel):
@@ -157,10 +174,10 @@ class QuarantineNotice(StrictModel):
 
 
 class TraceReport(StrictModel):
-    artifacts: Refs
+    artifacts: TraceRefs
     jobs: tuple[Digest, ...]
-    runs: Refs
-    checkpoints: Refs
+    runs: TraceRefs
+    checkpoints: TraceRefs
     notices: tuple[QuarantineNotice, ...]
 
 
@@ -170,7 +187,7 @@ class RegistryEvent(StrictModel):
     previous: Digest
     semantic_key: Annotated[str, Field(min_length=1, max_length=500)]
     recorded_at: UTCDateTime
-    action: Literal['register', 'enqueue', 'claim', 'abandon', 'retry', 'reconcile', 'complete', 'quarantine', 'lift']
+    action: Literal['register', 'enqueue', 'claim', 'abandon', 'retry', 'reconcile', 'complete', 'quarantine', 'lift', 'expand_limits']
     data: dict[str, Any]
 
 

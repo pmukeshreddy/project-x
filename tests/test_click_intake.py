@@ -106,7 +106,7 @@ def test_connected_intake_builds_private_source_pair_and_safe_authoring_view(tmp
                 {
                     "number": 7,
                     "title": "Add suggestions",
-                    "body": "Implementation-aware PR body",
+                    "body": "Implementation-aware PR body. Fixes #3.",
                     "created_at": "2026-02-23T16:10:36Z",
                     "updated_at": "2026-05-15T00:45:46Z",
                     "merged_at": "2026-04-29T23:53:15Z",
@@ -248,13 +248,17 @@ def test_connected_intake_builds_private_source_pair_and_safe_authoring_view(tmp
     author_store = ArtifactStore(store_root, ActorRole.AUTHOR)
     baseline_tar = author_store.get_bytes(result.authoring.baseline)
     request_evidence = author_store.get_bytes(result.authoring.request_evidence)
-    request_payload = json.loads(request_evidence)
+    from feature_rl.intake.request_document import parse_authoring_request
+    request_payload = parse_authoring_request(request_evidence)
     assert request_payload["provenance_label"] == "reconstructed_specification"
     assert request_payload["issue"]["retrieved_at"] == "2026-09-19T00:00:00Z"
     assert len(request_payload["issue"]["source_response_sha256"]) == 64
-    assert [item["id"] for item in request_payload["comments"]] == [1]
-    assert integrated.encode() not in request_evidence
-    assert source_head.encode() not in request_evidence
+    assert [item["id"] for item in request_payload["comments"]] == [1, 2, 3]
+    assert request_payload["history"]["baseline_commit"] == baseline
+    assert request_payload["history"]["reference_commit"] == integrated
+    assert [item["sha"] for item in request_payload["commits"]] == [source_head]
+    assert b"FEATURE = 'suggestions'" not in request_evidence
+    assert b"FORMAT = 'changed too'" not in request_evidence
     assert b"suggestions" not in baseline_tar
     with pytest.raises(AccessDenied):
         author_store.get_artifact(result.source_pair)
@@ -306,6 +310,12 @@ def test_connected_intake_builds_private_source_pair_and_safe_authoring_view(tmp
     assert historical_result.provenance_label == "historical_request"
     assert historical_candidate.provenance_label == "historical_request"
     assert historical_pair.provenance_label == "historical_request"
+    historical_request = parse_authoring_request(
+        historical_store.get_bytes(historical_result.authoring.request_evidence))
+    assert historical_request["issue"]["body"] == "Archived preimplementation request"
+    assert historical_request["pull_request"] is None
+    assert historical_request["comments"] == []
+    assert "commits" not in historical_request and "history" not in historical_request
 
     bad_license_sources = dict(sources)
     bad_license_sources["license-text"] = (
@@ -360,7 +370,7 @@ def test_connected_intake_builds_private_source_pair_and_safe_authoring_view(tmp
         history=GitHistory(repo / ".git"),
         factory_revision="d" * 40,
     )
-    with pytest.raises(ValueError, match="reference changes LICENSE"):
+    with pytest.raises(ValueError, match="reference changes the configured license"):
         changed_license_intake.ingest(
             replace(spec, mixed_paths={"LICENSE.txt": "License change requires review"}),
             split,
@@ -408,7 +418,7 @@ def test_connected_intake_maps_distinct_rebased_commits(tmp_path):
                 {
                     "number": 8,
                     "title": "Rebased feature",
-                    "body": "Current PR",
+                    "body": "Current PR. Fixes #4.",
                     "created_at": "2026-02-23T16:10:36Z",
                     "updated_at": "2026-04-29T23:53:15Z",
                     "merged_at": "2026-04-29T23:53:15Z",

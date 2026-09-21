@@ -21,6 +21,8 @@ def selected_history(factory,request):
     selected=jobs(factory,request.candidate)
     if any(job.state!='completed' or job.result is None for job,_ in selected):
         raise ValueError('authoring attempt unresolved; reconcile before freezing construction history')
+    from .repair_accounting import classifications
+    transport_proofs=classifications(factory,selected)
     order={};after=0
     while True:
         batch=factory.registry.events(after=after,limit=1000)
@@ -32,7 +34,10 @@ def selected_history(factory,request):
     base_ref=incomplete_history(factory,request)
     base=read_record(factory.store,base_ref,RepairHistory,'m5-repair-history')
     attempts=list(base.attempts);last={item.stage:item.after for item in attempts}
-    journal_refs=[*base.journal_refs,front_ref,front.batch]
+    journal_refs=[*base.journal_refs,front_ref,front.batch,*transport_proofs.values()]
+    from .authoring import historical_settings
+    journal_refs.extend(ref for job,_ in selected
+        if (ref:=historical_settings(factory,job).semantic_repair_authorization) is not None)
     initial=list(base.initial_evidence);terminals={};complete=bool(selected) and front.scope=='factory-controlled-after-source-disposition'
     for job,author in selected:
         receipt_ref=job.result.artifacts[-1];receipt=read_authoring_receipt(factory.store,receipt_ref)
@@ -57,6 +62,12 @@ def selected_history(factory,request):
     # Every selected task artifact and control must come from the terminal
     # authenticated producer lane. Externally supplied artifacts stay incomplete.
     outputs={ref for _,_,receipt in terminals.values() if receipt.disposition==c.Disposition.SUCCESS for ref in receipt.outputs}
+    if request.inputs.verifier not in outputs:
+        from .checker import selected_assembly
+        assembly=selected_assembly(factory,request.candidate,request.inputs.verifier,outputs)
+        if assembly is not None:
+            outputs.add(request.inputs.verifier)
+            journal_refs.append(assembly)
     complete=complete and {request.inputs.contract,request.inputs.scenario_plan,request.inputs.verifier}<=outputs
     verifier=typed(factory.store,request.inputs.verifier,c.VerifierBundle)
     controls=[]

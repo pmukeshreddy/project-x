@@ -2,11 +2,12 @@
 from typing import Annotated, Literal
 from pydantic import Field, model_validator
 from feature_rl import contracts as c
-from feature_rl.generation.backend import BackendConfig
+from feature_rl.generation import CodexConfig
 from feature_rl.requirements import (GenerationCandidate, GroundedSource,
     ContractFinalizationInputs, RetrievalPolicy)
 from feature_rl.scenarios import ScenarioFinalizationInputs
 from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs
+from feature_rl.verifiers.fragments import CheckerFragmentInputs
 from feature_rl.environments import PreparedEnvironment
 from feature_rl.registry import Claim
 from feature_rl.qualification.models import Attack
@@ -17,11 +18,11 @@ class AuthoringBudgetExceeded(ValueError):
 
 
 class AuthoringBudgetUnverified(ValueError):
-    """A finite monetary cap cannot be verified by the actual local backend."""
+    """A finite monetary cap cannot be verified by the Codex subscription."""
 
 
 class AuthoringCaps(c.StrictModel):
-    """Cumulative provider reservations; memory is the serialized peak ceiling."""
+    """Cumulative admission reservations; Codex token overruns are charged after completion."""
     input_tokens: Annotated[int,Field(gt=0)]
     output_tokens: Annotated[int,Field(gt=0)]
     wall_seconds: Annotated[float,Field(gt=0)]
@@ -36,7 +37,6 @@ class AuthoringBatch(c.StrictModel):
     candidates: Annotated[tuple[c.ArtifactRef,...],Field(min_length=1,max_length=128)]
     candidate_caps: AuthoringCaps
     batch_caps: AuthoringCaps
-    calibration_evidence: Annotated[tuple[c.ArtifactRef,...],Field(min_length=1,max_length=32)]
 
     @model_validator(mode='after')
     def unique_candidates(self):
@@ -46,11 +46,12 @@ class AuthoringBatch(c.StrictModel):
 
 
 class AuthoringSettings(c.StrictModel):
-    backend: BackendConfig
+    codex: CodexConfig
     m2_revision: c.Revision
     m4_revision: c.Revision
     batch: AuthoringBatch
     evidence_scope: Literal['real_integration','unit_diagnostic']='real_integration'
+    semantic_repair_authorization: c.ArtifactRef | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ResolverInputs(c.StrictModel):
@@ -99,7 +100,7 @@ class AuthoringCall(c.StrictModel):
     environment: PreparedEnvironment
     resolver: ResolverInputs
     generation: GenerationCandidate
-    inputs: ContractFinalizationInputs | ScenarioFinalizationInputs | CheckerFinalizationInputs | ControlFinalizationInputs
+    inputs: ContractFinalizationInputs | ScenarioFinalizationInputs | CheckerFinalizationInputs | ControlFinalizationInputs | CheckerFragmentInputs
     sources: Annotated[tuple[GroundedSource,...],Field(min_length=1,max_length=128)]
     control_plan: ControlPlan | None=None
     attack: Attack | None=None
@@ -107,7 +108,7 @@ class AuthoringCall(c.StrictModel):
     @model_validator(mode='after')
     def actual_stage(self):
         allowed={ContractFinalizationInputs:'initial_authoring',ScenarioFinalizationInputs:'scenario_planning',
-            CheckerFinalizationInputs:'checker_generation',ControlFinalizationInputs:
+            CheckerFinalizationInputs:'checker_generation',CheckerFragmentInputs:'checker_generation',ControlFinalizationInputs:
                 'alternative_authoring' if getattr(self.inputs,'category',None)=='alternative_positive' else 'control_authoring'}
         if allowed[type(self.inputs)]!=self.generation.request.stage.value:
             raise ValueError('actual M2 stage and finalization inputs differ')
@@ -116,6 +117,11 @@ class AuthoringCall(c.StrictModel):
                 raise ValueError('control call requires its exact frozen contract plan')
             slot=ControlSlot(category=self.inputs.category,requirement_ids=tuple(sorted(self.inputs.requirement_ids)),attack=self.attack)
             if slot not in self.control_plan.slots:raise ValueError('control is outside the frozen role plan')
+            if self.attack is not None:
+                from feature_rl.qualification.attacks import attack_expected_reason
+                expected=attack_expected_reason(self.attack,self.inputs.requirement_ids)
+                if self.inputs.expected_reason!=expected or expected not in self.generation.request.instruction:
+                    raise ValueError('adversarial call differs from the controller attack specification')
         elif self.control_plan is not None or self.attack is not None:
             raise ValueError('only control authoring consumes a control plan/attack')
         return self

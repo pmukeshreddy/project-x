@@ -4,11 +4,50 @@ import pytest
 from feature_rl import contracts as c
 from feature_rl.artifacts import canonical_json
 from feature_rl.requirements import GenerationCandidate
-from feature_rl.verifiers import (ControlFinalizationInputs, ControlProposal, SourceEdit,
+from feature_rl.verifiers import (ControlFinalizationInputs, ControlProposal, SourceEdit, SourceCreation, TextReplacement,
     ControlAuthoringService, ControlFinalizer, ControlPublicationPending, ReferenceExcerpt,
     build_control_request)
 from test_checker_authoring import checker_fixture, configured_diagnostic_provider
 from test_generation import limits
+
+
+def test_exact_edits_preserve_unseen_source_and_executable_mode():
+    from feature_rl.environments import SourceArchive, SourceFile, SandboxPolicy
+    baseline = SourceArchive({'src/tool.js': SourceFile(b'#!/usr/bin/env node\nconst value = 1;\n// unseen tail\n', True)})
+    proposal = ControlProposal(files=(SourceEdit(path='src/tool.js', replacements=(
+        TextReplacement(before='const value = 1;', after='const value = 2;'),)),),
+        deletions=(), rationale='Change the grounded declaration only.')
+    changed = SourceArchive.read(proposal.delta(baseline), SandboxPolicy(platform='linux/arm64'))
+    assert changed.files['src/tool.js'] == SourceFile(b'#!/usr/bin/env node\nconst value = 2;\n// unseen tail\n', True)
+
+
+@pytest.mark.parametrize('anchor', ['missing', 'repeated'])
+def test_edits_reject_missing_or_ambiguous_anchors(anchor):
+    from feature_rl.environments import SourceArchive, SourceFile
+    baseline = SourceArchive({'source.rs': SourceFile(b'repeated repeated', False)})
+    proposal = ControlProposal(files=(SourceEdit(path='source.rs', replacements=(
+        TextReplacement(before=anchor, after='replacement'),)),), deletions=(), rationale='Diagnostic anchor.')
+    with pytest.raises(ValueError, match='exactly once'):
+        proposal.delta(baseline)
+
+
+def test_edit_anchor_rejects_overlapping_matches():
+    from feature_rl.environments import SourceArchive, SourceFile
+    baseline = SourceArchive({'tool.js': SourceFile(b'const text = "aaa";', False)})
+    proposal = ControlProposal(files=(SourceEdit(path='tool.js', replacements=(
+        TextReplacement(before='aa', after='x'),)),), deletions=(), rationale='Ambiguous overlapping anchor.')
+    with pytest.raises(ValueError, match='exactly once'):
+        proposal.delta(baseline)
+
+
+def test_create_cannot_overwrite_and_delete_requires_existing_path():
+    from feature_rl.environments import SourceArchive, SourceFile
+    baseline = SourceArchive({'source.go': SourceFile(b'package main\n', False)})
+    proposal = ControlProposal(files=(SourceCreation(path='source.go', source=''),), deletions=(), rationale='Diagnostic create.')
+    with pytest.raises(ValueError, match='existing baseline'):
+        proposal.delta(baseline)
+    with pytest.raises(ValueError, match='missing baseline'):
+        ControlProposal(files=(), deletions=('absent.go',), rationale='Diagnostic delete.').delta(baseline)
 
 
 def control_fixture(tmp_path, *, alternative=False):
@@ -18,11 +57,39 @@ def control_fixture(tmp_path, *, alternative=False):
         expected_valid=alternative, expected_reason='DIAGNOSTIC ONLY; semantic validity unverified',
         baseline=base.baseline, contract=base.contract, environment=base.environment,
         provenance=base.provenance, costs=base.costs)
-    proposal = ControlProposal(files=(SourceEdit(path='src/click/__init__.py', source='raise AssertionError("must never execute on host")\n'),), deletions=(), rationale='DIAGNOSTIC ONLY; no independence or semantic claim')
-    request = build_control_request(request_id='CONTROL_1', response_id='RESPONSE_1', prompt_id='PROMPT_1', store=store, resolver=resolver, inputs=inputs, sources=sources, limits=limits(), seed=0)
+    proposal = ControlProposal(files=(SourceEdit(path='src/click/__init__.py', replacements=(TextReplacement(before='# diagnostic', after='raise AssertionError("must never execute on host")\n'),)),), deletions=(), rationale='DIAGNOSTIC ONLY; no independence or semantic claim')
+    request = build_control_request(request_id='CONTROL_1', response_id='RESPONSE_1', prompt_id='PROMPT_1', store=store, resolver=resolver, inputs=inputs, sources=sources, limits=limits())
     provider, runner = configured_diagnostic_provider(store, request, proposal)
     service = ControlAuthoringService(provider=provider, store=store, resolver=resolver, revision='a'*40, evidence_scope='unit_diagnostic')
     return store, inputs, sources, resolver, proposal, request, runner, service
+
+
+def test_explicit_adversarial_workloads_keep_offline_sandbox_bounds(tmp_path):
+    store, inputs, sources, resolver, _, _, _, _ = control_fixture(tmp_path)
+    inputs=inputs.model_copy(update={'category':'adversarial'})
+    request=build_control_request(request_id='CONTROL_1',response_id='RESPONSE_1',prompt_id='PROMPT_1',
+        store=store,resolver=resolver,inputs=inputs,sources=sources,limits=limits())
+    recipe = store.get_artifact(inputs.environment)
+    assert 'finite diagnostic workloads' in request.instruction
+    assert 'network disabled' in request.instruction
+    assert f'output_bytes={recipe.limits.output_bytes}' in request.instruction
+    assert 'at most twice the output byte limit' in request.instruction
+
+
+@pytest.mark.parametrize('alternative', [False, True])
+def test_behavioral_control_prompts_request_ordinary_behavior_only(tmp_path, alternative):
+    *_, request, runner, service = control_fixture(tmp_path, alternative=alternative)
+    assert 'ordinary API behavior' in request.instruction
+    for instruction in ('excessive-output','process proliferation','host access',
+                        'Adversarial protocol/resource','finite diagnostic workloads'):
+        assert instruction not in request.instruction
+    if alternative:
+        assert 'complete disclosed feature' in request.instruction
+        assert 'A semantic negative must' not in request.instruction
+    else:
+        assert 'fail every targeted requirement' in request.instruction
+        assert 'satisfy every other mandatory requirement' in request.instruction
+    assert not runner.calls
 
 
 @pytest.mark.parametrize('alternative', [False, True])
@@ -36,7 +103,7 @@ def test_actual_control_stage_source_delta_cost_and_authorship(tmp_path, alterna
     assert json.loads(store.get_bytes(result.record_ref))['qualification']=='unverified'
     from feature_rl.verifiers.finalize import submission_service
     archive = submission_service(store, inputs.environment).resolve(result.control.patch, inputs.baseline, store.get_artifact(inputs.contract).allowed_changes)
-    assert archive.files['src/click/__init__.py'].data == proposal.files[0].source.encode()
+    assert archive.files['src/click/__init__.py'].data == proposal.files[0].replacements[0].after.encode()
     if alternative:
         assert request.stage.value=='alternative_authoring'
         assert {context.role for context in request.contexts} == {'baseline','contract'}
@@ -77,7 +144,7 @@ def test_reference_excerpts_bind_actual_private_pair_and_cannot_enter_alternativ
     supplied=inputs.model_copy(update={'reference':h,'source_pair':pair_ref,
         'reference_excerpts':(ReferenceExcerpt(context_id='REF1',path='src/click/__init__.py',line_ranges=((1,1),)),ReferenceExcerpt(context_id='REF2',path='src/click/__init__.py',line_ranges=((2,2),))),
         'provenance':inputs.provenance.model_copy(update={'inputs':inputs.provenance.inputs+(h,pair_ref)})})
-    req=build_control_request(request_id='REFCONTROL',response_id='REFRESP',prompt_id='REFPROMPT',store=store,resolver=resolver,inputs=supplied,sources=sources,limits=limits(),seed=0)
+    req=build_control_request(request_id='REFCONTROL',response_id='REFRESP',prompt_id='REFPROMPT',store=store,resolver=resolver,inputs=supplied,sources=sources,limits=limits())
     references=[context for context in req.contexts if context.role=='reference']
     assert len(references)==2 and all(context.source==h for context in references)
     assert references[1].text=='value = 2\n'
@@ -87,13 +154,13 @@ def test_reference_excerpts_bind_actual_private_pair_and_cannot_enter_alternativ
         ControlFinalizationInputs.model_validate(supplied.model_copy(update={'category':'alternative_positive','expected_valid':True,'requirement_ids':()}))
     wrong=supplied.model_copy(update={'baseline':h})
     with pytest.raises(ValueError):
-        build_control_request(request_id='WRONG',response_id='RESP',prompt_id='PROMPT',store=store,resolver=resolver,inputs=wrong,sources=sources,limits=limits(),seed=0)
+        build_control_request(request_id='WRONG',response_id='RESP',prompt_id='PROMPT',store=store,resolver=resolver,inputs=wrong,sources=sources,limits=limits())
 
 
 def test_generated_disallowed_source_is_rejected_with_cost(tmp_path):
     from feature_rl.requirements import AuthoringExhausted
     store, inputs, sources, resolver, proposal, request, runner, service = control_fixture(tmp_path)
-    broken = proposal.model_copy(update={'files':(SourceEdit(path='setup.py',source='raise AssertionError()'),)})
+    broken = proposal.model_copy(update={'files':(SourceCreation(path='setup.py',source='raise AssertionError()'),)})
     service.provider, runner = configured_diagnostic_provider(store,request,broken)
     with pytest.raises(AuthoringExhausted) as caught:
         service.generate((GenerationCandidate(request=request),),inputs,sources)
@@ -116,7 +183,6 @@ def test_explicit_hostile_control_import_retains_outer_join(tmp_path):
 
 def test_attach_controls_freezes_new_verifier_without_regeneration(tmp_path):
     from feature_rl.verifiers import CheckerFinalizer
-    from test_checker_authoring import request_for
     store, task, checker, base, sources, resolver = checker_fixture(tmp_path)
     finalizer=CheckerFinalizer(store=store,resolver=resolver)
     original=finalizer.prepare(checker,base,sources).publish(store)

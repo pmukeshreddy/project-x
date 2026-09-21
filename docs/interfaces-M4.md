@@ -21,7 +21,7 @@ receipt = read_grade(controller_store, result.artifacts[0])
 
 `runtime` is the actual reviewed `EnvironmentRuntime`, using the identical controller store. Its engine must already have passed M3 boundary qualification. The exact M0 transport is `GradeRequest`; `grade(...) -> OperationResult` has `operation='grade'`. Supported seeds are exact nonnegative integers below 2**63, never Boolean/float coercions. Return dispositions: `success` with reward 1; `candidate_rejection` with reward 0; unsupported/invalid/infrastructure outcomes with null reward. Failed artifact publication raises typed replayable recovery because no successful immutable output can be promised while storage is unavailable.
 
-`SubmissionService.create` takes an uncompressed inert tar of changed regular non-executable `.py` files plus explicit deletions. `from_saved` computes that delta from two bounded M3 source archives, preserving baseline files and confirmed source bytes. The current reviewed Click profile supports roots under `src`, immutable dependencies/build files, no additional artifact types, and Python-source changes only. Other policies reject explicitly. Archive traversal, absolute/backslash/history/cache paths, duplicate members, links, devices, sparse/compressed content, size/file-count overflows, file ancestry collisions, ambiguous trailing slashes, duplicate/missing/contradictory deletions, forbidden paths and package/result file transfers reject. M3 enforces aggregate reconstructed-source bounds again. The host never extracts or imports the source.
+`SubmissionService.create` takes an uncompressed inert tar of changed regular files plus explicit deletions. `from_saved` computes that delta from two bounded M3 source archives, preserving baseline files and executable modes. The frozen contract selects allowed paths and artifact types; the actual runtime profile validates dependency declarations and build inputs before execution. Archive traversal, absolute/backslash/history/cache paths, duplicate members, links, devices, sparse/compressed content, size/file-count overflows, file ancestry collisions, ambiguous trailing slashes, duplicate/missing/contradictory deletions, forbidden paths and package/result file transfers reject. M3 enforces aggregate reconstructed-source bounds again. The host never extracts or imports the source.
 
 `m4-submission` opaque bytes contain canonical JSON validated as `Submission(version='m4-submission-v1', baseline, changes, deletions)`. `changes` references `m4-source-delta` bytes. These use existing M0 `ArtifactRef` fields and storage APIs; no shared artifact registration was added. Grade revalidates the original submission against the task's exact B and `AllowedChanges` before rebuilding. `resolve` first validates the trusted B once, independently of candidate parsing: malformed or oversized B raises `ArtifactIntegrityError` and grading returns infrastructure/null. Candidate-controlled manifest, delta and deletion violations remain candidate zeros. A candidate can store a malformed raw submission, but cannot convert it to a passing grade. Missing/corrupt storage also remains an infrastructure failure rather than a candidate zero.
 
@@ -33,7 +33,7 @@ Public models in `feature_rl.verifiers` provide exact JSON schemas through `mode
 | --- | --- |
 | `CaseDefinition.inputs` | `m4-case-input` / `InputPlan`: version `m4-input-v1`, scenario ID, requirement IDs, named fields with tagged `constant`, finite `choice`, or inclusive bounded `integer` domains |
 | `CaseDefinition.comparison` | `m4-case-comparison` / `CaseComparison`: version `m4-comparison-v1`, scenario/requirement IDs, observation mode/schema, nonempty assertions, bounded positive timeout |
-| `WorkerAdapter.code` | `m4-worker-adapter` UTF-8 Python source, at most 65,536 bytes, executed only as `python -c <source>` inside M3's installed-wheel worker |
+| `WorkerAdapter.code` | `m4-worker-adapter` UTF-8 Python source, at most 65,536 bytes, executed only as `/usr/local/bin/python -c <source>` inside M3's isolated runtime |
 
 The adapter version is `m4-worker-v1`; `supported_observables` includes its declared `json` and/or `process` modes. The complete `permissions.worker_inputs` allowlist must be exactly the adapter code reference. Runtime requests add only the current case's realized inputs and ID; no comparison, expected values, full manifest, H, other cases, controller storage or verdict code is transferred. Any fixture/setup code belongs inside the untrusted worker adapter under existing M3 policy. Arbitrary extra fixtures and stateful resets are unsupported in this initial core.
 
@@ -67,52 +67,48 @@ The original core handoff consumed already supplied real M0 values. The complete
 
 ## Checker and control authoring (code-completion handoff)
 
-The remaining authoring implementation uses reviewed M2's actual provider/evidence
-API, including `control_authoring` and `alternative_authoring` from `29412648`.
-No native task-generation call was made to verify this slice. The 28 new checks use
-explicit diagnostic backend/process responses through the real
-`LocalGenerationProvider` schema, protocol, archive and cost pipeline; the focused
-combined M4 check passed 84 tests. No model-authored feature or qualification is
-claimed.
+Checker and control authoring use the M2 `CodexGenerationProvider` and existing
+evidence API, including `control_authoring` and `alternative_authoring`.
+Focused tests use explicit test-only Codex subprocess responses through the real
+schema, archive, cost and finalizer paths. No model-authored environment or
+qualification is claimed by the Codex/Astra refactor.
 
-```python
-from feature_rl.verifiers import (
-    CheckerProposal, CheckerFinalizationInputs, CheckerFinalizer,
-    CheckerAuthoringService, build_checker_request,
-    ControlProposal, SourceEdit, ReferenceExcerpt, ControlFinalizationInputs,
-    ControlFinalizer, ControlAuthoringService, build_control_request,
-)
+The default factory authors one `CheckerFragmentProposal` per frozen scenario.
+Each bounded response contains only API action bodies, input domains, observation
+types, and typed assertions. It contains at most four cases and 32 KiB. Each
+Python action body takes `inputs` and returns ordinary observations; the controller
+supplies JSON transport, dispatch, IDs, mandatory flags, versions, timeouts and
+exact oracle evidence from the frozen scenario. Expected values and input domains
+remain private controller artifacts, separate from the worker action bodies.
 
-checker_service = CheckerAuthoringService(
-    provider=configured_local_generation_provider, store=controller_store,
-    resolver=actual_m2_authoring_evidence_resolver, revision=git_revision,
-    evidence_scope="real_integration",  # unit_diagnostic for test doubles
-)
-result = checker_service.generate(
-    candidates, checker_inputs, grounded_sources,
-    prior_journal_refs=(), recovered_result=None, recovered_error=None,
-)
-# result.verifier: actual M0 VerifierBundle
-# result.verifier_ref: ArtifactRef; result.generation: actual GenerationResult
-# result.journal_refs: immutable checker-authoring-journal refs
-```
+`build_fragment_request` takes `request_id`, `response_id`, `prompt_id`, `contract`,
+`contract_ref`, `plan`, `plan_ref`, `sources`, `limits`, and `scenario_id`.
+It binds the selected scenario explicitly, including when multiple scenarios
+share the same requirement IDs. `CheckerFragmentService` resolves the exact
+stored evidence, validates the complete selected scenario, and retains its
+`m4-checker-fragment` and `checker-fragment-authoring-journal` through the existing
+provider/archive/cost/recovery path. Action syntax is compiled for validation but
+never executed on the host. Worker execution remains in M3.
 
-`build_checker_request` takes keyword arguments `request_id`, `response_id`,
-`prompt_id`, `contract`, `contract_ref`, `plan`, `plan_ref`, `sources`, `limits`,
-`seed`. It returns M2 `GenerationRequest(CHECKER_GENERATION)` containing exact
-canonical frozen contract/plan contexts plus grounded B/request/public evidence.
-The service reconstructs every evidence byte using the actual same-store
-`AuthoringEvidenceResolver`; caller-supplied strings cannot replace stored bytes.
-Requirement IDs, oracle evidence, request provenance, B, contract, scenarios,
-runtime-discovery recipe and environment are joined before finalization. Controls
-and H are absent from checker generation contexts.
+`Factory.assemble_checker(candidate, inputs=checker_inputs, fragments=refs)`
+authenticates each fragment against its completed terminal Factory authoring job,
+rejects missing/extra/duplicate scenario coverage, and deterministically assembles
+the existing `CheckerProposal`. The unchanged `CheckerFinalizer` validates and
+publishes the real `VerifierBundle`. Assembly has its own durable operation and
+can be recovered without model calls. Construction history includes both the
+original authoring receipts and the assembly record; failed old calls and their
+costs are retained.
 
-`CheckerProposal` contains bounded `WorkerProposal(source, supported_observables,
-limitations)` and `CaseProposal(case_id, requirement_ids, mandatory, inputs,
-comparison)` values. Shared case identity fields are derived from M0; inputs and
-comparisons are the existing closed M4 language. The controller fixes version,
-permissions, manifest, provenance and costs. Source text is never compiled,
-imported or executed on the host. Only the existing M3 grading path executes it.
+The controller formats assembled Python source compactly before applying the
+unchanged 65,536-byte adapter limit. It requires the complete syntax tree to match
+before and after formatting and compiles the result without executing it. Every
+probe, literal, identifier and statement remains present; a genuinely oversized
+adapter still fails validation.
+
+The monolithic `CheckerProposal` format remains the internal assembly/finalizer
+format and the decoder for retained authoring receipts. Default environment
+creation does not request that large response from Astra. Controls and H are
+absent from checker generation contexts.
 
 `CheckerFinalizationInputs` requires exact `contract`, `scenario_plan`, `baseline`,
 `environment`, `output_limit_bytes`, `visibility`, `provenance`, `costs`, and optional
@@ -136,7 +132,7 @@ Controls use a separate service and provider stage:
 request = build_control_request(
     request_id=..., response_id=..., prompt_id=..., store=controller_store,
     resolver=resolver, inputs=control_inputs, sources=grounded_sources,
-    limits=generation_limits, seed=seed,
+    limits=generation_limits,
 )
 control_service = ControlAuthoringService(
     provider=provider, store=controller_store, resolver=resolver,
@@ -164,10 +160,13 @@ internally but omitted from this prompt. `author_provenance.inputs` records
 exactly the consumed source refs, matching M5's admitted alternative input set.
 Expected validity is a controller-selected hypothesis, not a finding.
 
-`ControlProposal(files: tuple[SourceEdit(path, source), ...], deletions, rationale)`
-becomes a bounded source-only delta via the existing SubmissionService policy.
-Build/dependency files, path aliases, conflicting changes and unauthorized roots
-reject without executing source. The proposal cannot author verdicts, provenance,
+`ControlProposal(files, deletions, rationale)` accepts exact edits to existing files
+(`SourceEdit(path, replacements=(TextReplacement(before, after), ...))`) or explicit
+new files (`SourceCreation(path, source, executable)`). Each anchor must occur exactly
+once, including overlapping occurrences. Edits preserve unseen source and existing
+executable modes; creation cannot overwrite a baseline file. The resulting bounded
+delta passes the existing SubmissionService policy. Path aliases, conflicting changes
+and unauthorized roots reject without executing source. The proposal cannot author verdicts, provenance,
 costs or independence evidence. `ControlFinalizer.prepare(...)` returns
 `PreparedControl`; `.publish(store)` publishes the private control record and its
 submission. `ControlFinalizer.import_submission(submission, inputs, sources,
@@ -198,15 +197,15 @@ For future native alternative calls, the evidence seam is concrete:
   schema, accepted result, usage and cost on fresh and recovered outcomes.
 - `result.record.generation_provenance.evidence[-1]` records producer, command
   `("generate", request_id)`, time, revision, explicit evidence scope and those
-  archive refs. Provider event/provenance archives preserve process/prompt-cache
-  freshness and configured backend identity observations. M6 should use distinct
+  archive refs. Provider event/provenance archives preserve the Codex turn, configured Astra
+  model, reported usage, and CLI version. M6 should use distinct
   request/response/prompt IDs for each actual alternative call, retain the complete
   record, and bind these existing refs in M5 diagnosis/independence evidence.
 
 These artifacts establish what the selected provider recorded; they do not prove
 semantic validity, human review or independent origin by themselves. Test-double
 records are `unit_diagnostic`, with no native/model authorship claim. Future
-native calls require the configured real backend and separately assessed
+native calls require the configured Codex/Astra provider and separately assessed
 independence; M5 owns that assessment and human approval.
 
 Each service permits one initial candidate and at most two diagnosed repairs.

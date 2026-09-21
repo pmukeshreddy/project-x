@@ -6,6 +6,7 @@ from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import ArtifactRef, CostRecord, Disposition, EvidenceRecord, Visibility
 from feature_rl.environments.models import Ownership
 from feature_rl.grading import read_grade
+from feature_rl.grading.bootstrap import recipe_adapter_argv
 from feature_rl.verifiers import materialize_manifest
 from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_bytes
@@ -135,15 +136,15 @@ def _assert_case_observation(checked,actual,case,comparison,value,owner):
     """Recompute M4's closed comparisons from its exact recorded command output."""
     from feature_rl.verifiers import parse_observations
     from feature_rl.verifiers.language import compare,operand_value,check_value
-    command=['python','-c',checked.adapter.decode('utf-8')]
-    rows=[r for r in value.get('commands',[]) if r.get('argv',[])[-3:]==command]
+    command=list(recipe_adapter_argv(checked))
+    rows=[r for r in value.get('commands',[]) if r.get('argv',[])[-len(command):]==command]
     extra=value.get('extra',{})
     if actual.status=='infrastructure_failure':
         if extra.get('failure_category') not in {'infrastructure','unresolved'}:
             raise QualificationRejected('invalid_evidence','case infrastructure classification differs from runtime')
         return
     stdin=canonical_json({'case_id':case.case_id,'inputs':case.model_dump(mode='json')['inputs']})
-    if len(rows)!=1 or rows[0].get('stdin_sha256')!=hashlib.sha256(stdin).hexdigest() or rows[0].get('stdin_bytes')!=len(stdin) or rows[0].get('argv',[])[-4]!=(owner.container_id or owner.container_name):
+    if len(rows)!=1 or rows[0].get('stdin_sha256')!=hashlib.sha256(stdin).hexdigest() or rows[0].get('stdin_bytes')!=len(stdin) or len(rows[0].get('argv',[]))<=len(command) or rows[0]['argv'][-len(command)-1]!=(owner.container_id or owner.container_name):
         raise QualificationRejected('invalid_evidence','case command or private input bytes mismatch')
     row=rows[0]
     if extra.get('error') is not None or extra.get('failure_category') not in {'none','candidate'}:
@@ -173,6 +174,46 @@ def _assert_case_observation(checked,actual,case,comparison,value,owner):
         raise QualificationRejected('invalid_evidence','assertion verdict differs from actual closed comparison')
 
 
+def assert_reference_determinism(store,checked,receipt,signatures):
+    """Compare retained candidate bytes for repeated reference seeds, not verdicts.
+
+    Call only after validate_grade has authenticated the run. Reuse observation
+    replay to select the exact adapter command; container IDs, timestamps and
+    resource measurements are intentionally excluded. Candidate stdout/stderr
+    receive no normalization, including JSON formatting or printed timestamps.
+    """
+    manifest=materialize_manifest(checked,receipt.case_seed)
+    if (receipt.expected_case_ids!=tuple(case.case_id for case in manifest.cases)
+            or len(receipt.cases)!=len(checked.comparisons)):
+        raise QualificationRejected('invalid_evidence','reference observation case ledger differs from its manifest')
+    signature=[];used=0
+    command=list(recipe_adapter_argv(checked))
+    for actual,case,comparison in zip(receipt.cases,manifest.cases,checked.comparisons):
+        observation=None
+        if actual.status=='completed':
+            raw=read_bytes(store,actual.evidence,32*1024*1024,'environment-execution',True);used+=len(raw)
+            if used>64*1024*1024:
+                raise QualificationRejected('invalid_evidence','aggregate reference observation receipt limit')
+            value=decode_json(raw,32*1024*1024)
+            owner=Ownership.model_validate_json(canonical_json(value.get('record')))
+            _assert_case_observation(checked,actual,case,comparison,value,owner)
+            row=next(row for row in value['commands'] if row.get('argv',[])[-len(command):]==command)
+            # The same parser has already checked output bounds and strict base64.
+            stdout=base64.b64decode(row['stdout_b64'],validate=True)
+            stderr=base64.b64decode(row['stderr_b64'],validate=True)
+            if type(row['exit_code']) is not int:
+                raise QualificationRejected('invalid_evidence','reference exit code is not an integer')
+            observation=(row['exit_code'],row['reason'],hashlib.sha256(stdout).hexdigest(),hashlib.sha256(stderr).hexdigest())
+        # Failed/unrun reference cases already fail the positive outcome gate;
+        # retaining their statuses also preserves the earlier verdict-flake check.
+        signature.append((actual.case_id,actual.status,tuple(a.passed for a in actual.assertions),observation))
+    signature=tuple(signature)
+    seed=receipt.case_seed
+    if seed in signatures and signatures[seed]!=signature:
+        raise QualificationRejected('flaky_task','repeated reference seed '+str(seed)+' produced different candidate observations')
+    signatures.setdefault(seed,signature)
+
+
 def require_semantic_execution(store,checked,receipt):
     """A compared process crash is not proof of a runnable semantic omission.
 
@@ -190,9 +231,9 @@ def require_semantic_execution(store,checked,receipt):
             raise QualificationRejected('invalid_evidence','actual process evidence required for targeted semantic coverage')
         value=decode_json(read_bytes(store,actual.evidence,32*1024*1024,'environment-execution',True),32*1024*1024)
         owner=Ownership.model_validate_json(canonical_json(value.get('record')))
-        command=['python','-c',checked.adapter.decode('utf-8')]
-        rows=[row for row in value.get('commands',[]) if row.get('argv',[])[-3:]==command]
-        if value.get('phase')!='execute' or value.get('cleanup_verified') is not True or owner.phase!='removed' or len(rows)!=1 or rows[0].get('argv',[])[-4]!=(owner.container_id or owner.container_name):
+        command=list(recipe_adapter_argv(checked))
+        rows=[row for row in value.get('commands',[]) if row.get('argv',[])[-len(command):]==command]
+        if value.get('phase')!='execute' or value.get('cleanup_verified') is not True or owner.phase!='removed' or len(rows)!=1 or len(rows[0].get('argv',[]))<=len(command) or rows[0]['argv'][-len(command)-1]!=(owner.container_id or owner.container_name):
             raise QualificationRejected('invalid_evidence','targeted semantics lack exact clean adapter execution evidence')
         extra=value.get('extra',{})
         if rows[0].get('reason')!='exited' or rows[0].get('exit_code')!=0 or extra.get('reason')!='completed' or extra.get('failure_category')!='none' or extra.get('error') is not None:
@@ -206,16 +247,18 @@ def reset_probe(source,rules,profile):
     """Choose the same inert diagnostic mutation during execution and validation."""
     from feature_rl.environments import SourceFile, SourceRejected
     from feature_rl.submission.source import change_path
-    from feature_rl.environments.inference import infer_repository
-    from feature_rl.environments import PolicyRejected
-    try:manifests=set(infer_repository(source)['manifest_paths'])
-    except PolicyRejected:manifests={profile.manifest_path}
+    from feature_rl.environments.command_profiles import CommandRuntimeProfile
+    if isinstance(profile, CommandRuntimeProfile):
+        manifests=set(profile.manifest_paths)
+        roots=profile.source_roots
+    else:
+        manifests={profile.manifest_path}
+        roots=tuple(mapping.source for mapping in profile.source_mappings)
     candidates=[]
     for path,entry in source.files.items():
         try:change_path(path,rules)
         except SourceRejected:continue
-        mapped=any(path==mapping.source or path.startswith(mapping.source+'/')
-                   for mapping in profile.source_mappings)
+        mapped=any(path==root or path.startswith(root+'/') for root in roots)
         candidates.append((path in manifests,not mapped,path,entry))
     if not candidates:
         raise QualificationRejected('unsupported_semantics','reset requires an existing allowed source file')
@@ -268,7 +311,7 @@ def validate_reset(store,checked,projection_ref,reset_ref,grader,*,seen):
     extra=value.get('extra',{})
     if value.get('phase')!='development' or value.get('revision')!=grader.runtime.revision or value.get('cleanup_verified') is not True or owner.phase!='removed' or owner.operation_id!=reset.interruption_operation or any(owner.binding.get(k)!=v for k,v in expected.items()) or extra.get('reason')!='timeout' or extra.get('failure_category')!='candidate' or extra.get('error') is not None or extra.get('saved_source')!=saved.model_dump(mode='json'):
         raise QualificationRejected('invalid_evidence','reset interruption/runtime/source binding mismatch')
-    command=['python','-I','-c','import time;time.sleep(5)']
+    command=['/usr/local/bin/python','-I','-c','import time;time.sleep(5)']
     rows=[r for r in value.get('commands',[]) if r.get('argv',[])[-len(command):]==command]
     if len(rows)!=1 or rows[0].get('reason')!='timeout' or rows[0].get('stdin_bytes')!=0:
         raise QualificationRejected('invalid_evidence','reset lacks actual fixed bounded timeout command')

@@ -135,7 +135,7 @@ class UnixHTTP(http.client.HTTPConnection):
         self.sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);self.sock.settimeout(self.timeout);self.sock.connect(self.path)
 
 class DockerEngine:
-    def __init__(self,*,state_root:Path,socket_path:Path,policy:SandboxPolicy,image_repository=None,image_seconds=600.0):
+    def __init__(self,*,state_root:Path,socket_path:Path,policy:SandboxPolicy,image_repository=None,image_seconds=600.0,buildx_plugin_directory:Path|None=None):
         from pydantic import TypeAdapter
         from .images import ImageRepository
         self.image_repository=None if image_repository is None else TypeAdapter(ImageRepository).validate_python(image_repository)
@@ -152,8 +152,18 @@ class DockerEngine:
         data=self.profile.read_bytes()
         if hashlib.sha256(data).hexdigest()!=SECCOMP_SHA256:raise PolicyRejected('bundled seccomp profile changed')
         self.profile_data=json.loads(data)
-        # Separate empty CLI config prevents ambient credential-helper/plugin configuration.
+        # Only the explicitly selected build plugin directory enters the private
+        # CLI config. Ambient registry credentials/helpers are never copied.
         config=self.state.path/'docker-client';ArtifactStore(config,ActorRole.CONTROLLER)
+        settings={}
+        if buildx_plugin_directory is not None:
+            plugin=buildx_plugin_directory/'docker-buildx'
+            if not buildx_plugin_directory.is_absolute() or not plugin.is_file() or not os.access(plugin,os.X_OK):
+                raise DockerUnavailable('buildx_plugin_directory must contain an executable docker-buildx plugin')
+            settings['cliPluginsExtraDirs']=[str(buildx_plugin_directory.resolve())]
+        target=config/'config.json'
+        if target.is_symlink():raise PolicyRejected('Docker client configuration must not be a symlink')
+        target.write_bytes(canonical_json(settings))
         self.base=[docker,'--config',str(config),'--host','unix://'+self.socket_path]
         r=stream_process(self.base+['info','--format','{{json .}}'],b'',time.monotonic()+policy.control_seconds,1024*1024)
         if r.reason!='exited' or r.exit_code!=0:raise DockerUnavailable(r.stderr.decode(errors='replace')[:2000])
@@ -241,7 +251,7 @@ class DockerEngine:
     def qualify_boundary(self,*,image=None):
         from .probes import BOUNDARY_CODE,check_boundary
         with self.session(binding={'purpose':'trusted-boundary'},saved_source={},image=image) as s:
-            r=s.execute(CommandSpec(argv=('python','-I','-c',BOUNDARY_CODE),working_directory='/workspace',timeout_seconds=8.0),check_oom=False)
+            r=s.execute(CommandSpec(argv=('/usr/local/bin/python','-I','-c',BOUNDARY_CODE),working_directory='/workspace',timeout_seconds=8.0),check_oom=False)
             if r.reason!='exited' or r.exit_code!=0:raise PolicyRejected('trusted boundary command failed')
             obs=json.loads(r.stdout);check_boundary(obs,self.policy)
         result={'qualified':True,'cleanup_verified':s.cleanup_verified,'observations':obs,'operation_id':s.record.operation_id,'receipts':s.receipts,'effective':s.effective,'policy':self.policy.model_dump(mode='json')}
@@ -336,7 +346,7 @@ class DockerSession:
         except (OSError,ValueError,KeyError,TimeoutError,http.client.HTTPException):return 'monitor_failure'
         return None
     def memory_events(self):
-        r=self.control(['exec','--workdir','/',self.name,'python','-I','-c',"print(open('/sys/fs/cgroup/memory.events').read())"],cap=4096)
+        r=self.control(['exec','--workdir','/',self.name,'/usr/local/bin/python','-I','-c',"print(open('/sys/fs/cgroup/memory.events').read())"],cap=4096)
         if r.reason!='exited' or r.exit_code!=0:return None
         try:return int(dict(line.split() for line in r.stdout.decode().splitlines() if line.strip())['oom_kill'])
         except (ValueError,KeyError):return None
@@ -373,7 +383,7 @@ class DockerSession:
     def export_source(self):
         from .workers import EXPORT_CODE
         started=utc_now()
-        command=CommandSpec(argv=('python','-I','-c',EXPORT_CODE,str(self.policy.max_source_bytes),str(self.policy.max_files),str(self.policy.max_archive_bytes)),working_directory='/workspace',timeout_seconds=self.policy.control_seconds)
+        command=CommandSpec(argv=('/usr/local/bin/python','-I','-c',EXPORT_CODE,str(self.policy.max_source_bytes),str(self.policy.max_files),str(self.policy.max_archive_bytes)),working_directory='/workspace',timeout_seconds=self.policy.control_seconds)
         # Export is an untrusted source submission, not an atomic filesystem claim.
         # Use its own archive cap instead of the ordinary command output cap.
         args=self.engine.base+['exec','-i','--workdir','/',self.name,*command.argv]

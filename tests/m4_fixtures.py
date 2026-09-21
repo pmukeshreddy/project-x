@@ -4,7 +4,12 @@ The ordinary echo preservation probe exercises Click's public CLI. It says
 nothing about the requested missing feature, H, model generation or admission.
 """
 from datetime import datetime, timezone
+import base64
+import csv
+import hashlib
+import io
 import json
+import zipfile
 from feature_rl import contracts as c
 from feature_rl.artifacts import canonical_json
 from feature_rl.environments import SourceArchive, SourceFile
@@ -32,6 +37,84 @@ def runtime_policy(**overrides):
                            for name, (version, filename, digest) in WHEELS.items()))
     return SandboxPolicy(**(dict(image='python@sha256:eb5be8e5b4d0a159c237946bbdd06356dda5d19c30fc4f7843e8046d3a590333',
                                 platform='linux/arm64', profile=profile) | overrides))
+
+
+def diagnostic_wheel(name, version, *, extra_files=None):
+    """Valid, deterministic metadata-only wheel; no implementation or runtime claim."""
+    directory = name.replace('-', '_') + '-' + version + '.dist-info'
+    files = {
+        directory + '/METADATA': (
+            f'Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n'
+            'Summary: Synthetic unit diagnostic only; not the named package implementation\n\n'
+        ).encode(),
+        directory + '/WHEEL': (
+            'Wheel-Version: 1.0\nGenerator: feature-rl-unit-diagnostic\n'
+            'Root-Is-Purelib: true\nTag: py3-none-any\n'
+        ).encode(),
+    }
+    files.update(extra_files or {})
+    records = io.StringIO(newline='')
+    writer = csv.writer(records, lineterminator='\n')
+    for path, data in files.items():
+        digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b'=').decode()
+        writer.writerow((path, 'sha256=' + digest, len(data)))
+    writer.writerow((directory + '/RECORD', '', ''))
+    files[directory + '/RECORD'] = records.getvalue().encode()
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_STORED) as archive:
+        for path, data in sorted(files.items()):
+            entry = zipfile.ZipInfo(path, date_time=(2000, 1, 1, 0, 0, 0))
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, data)
+    return output.getvalue()
+
+
+def diagnostic_environment(store, *, baseline, limits, provenance, costs):
+    """Structurally complete image receipts, explicitly synthetic unit evidence."""
+    from feature_rl.environments import WheelPin
+    from feature_rl.environments.images import image_context, RuntimeImage, HostRequirements
+
+    pins, wheel_specs = [], []
+    for name, (version, filename, _) in WHEELS.items():
+        data = diagnostic_wheel(name, version)
+        digest = hashlib.sha256(data).hexdigest()
+        ref = store.put_bytes(data, 'dependency-wheel', c.Visibility.AUTHORING)
+        pins.append(c.DependencyPin(name=name, version=version, sha256=digest, artifact=ref))
+        wheel_specs.append(WheelPin(name=name, version=version, filename=filename, sha256=digest))
+    profile = runtime_policy().profile.model_copy(update={'dependencies': tuple(wheel_specs)})
+    policy = runtime_policy(profile=profile)
+    policy_ref = store.put_bytes(canonical_json(policy.model_dump(mode='json')),
+                                 'sandbox-policy', c.Visibility.AUTHORING)
+    payload = image_context(store, tuple(pins), policy)
+    context = store.put_bytes(payload, 'runtime-image-context', c.Visibility.AUTHORING)
+    image = RuntimeImage(image_digest='unit-diagnostic.invalid/runtime@sha256:' + 'd' * 64,
+        base_image=policy.image, context_sha256=hashlib.sha256(payload).hexdigest(),
+        context=context, host_requirements=HostRequirements(platform=policy.platform))
+    image_ref = store.put_bytes(canonical_json(image.model_dump(mode='json')),
+                                'runtime-image', c.Visibility.AUTHORING)
+    summary = store.put_bytes(canonical_json(dict(
+        baseline=baseline.model_dump(mode='json'), image_digest=image.image_digest,
+        context_sha256=image.context_sha256, cleanup_verified=True,
+        scope='unit_diagnostic', note='Synthetic receipts only; no Docker build or execution occurred.')),
+        'runtime-image-construction-summary', c.Visibility.AUTHORING)
+    evidence = c.EvidenceRecord(producer='Synthetic runtime fixture; no build or execution',
+        command=('unit-diagnostic-runtime-fixture',), recorded_at=provenance.created_at,
+        exit_status=0, artifacts=(image_ref, context, summary), revision='a' * 40,
+        scope='unit_diagnostic')
+    recipe = c.EnvironmentRecipe(kind='EnvironmentRecipe', schema_version=1,
+        visibility=c.Visibility.AUTHORING,
+        provenance=c.Provenance(producer='Synthetic unit runtime fixture', producer_version='1',
+            created_at=provenance.created_at,
+            inputs=(baseline, policy_ref, image_ref, context, *(pin.artifact for pin in pins)),
+            evidence=(evidence,)), costs=costs,
+        runtime_image=image_ref, image_digest=image.image_digest,
+        interpreter_version=profile.interpreter_version, dependencies=tuple(pins),
+        setup=profile.setup, reset=profile.setup, services=(), limits=limits,
+        neutral_repairs=profile.neutral_repairs, locale='C.UTF-8', timezone='UTC',
+        environment=tuple(c.EnvironmentVariable(name=k, value=v) for k, v in profile.environment),
+        randomness=c.SeedPolicy(algorithm='PYTHONHASHSEED', seeds=(0,), same_cases_within_group=True),
+        network_policy='none', baseline=baseline)
+    return store.put_artifact(recipe)
 
 
 ADAPTER='''import json,sys
@@ -65,6 +148,7 @@ def diagnostic(store, *, baseline=None, environment=None, adapter=ADAPTER, case_
     req=c.Requirement(requirement_id='echo',statement='DIAGNOSTIC ONLY echo supplied word',mandatory=True,evidence=(origin,),observable='CLI output')
     contract=c.RequirementContract(kind='RequirementContract',**common,visible_request='DIAGNOSTIC ONLY',capability='ordinary echo diagnostic',
         entry_points=('click.command','click.echo','click.testing.CliRunner.invoke'),requirements=(req,),compatibility_obligations=(),
+        feature_files=(c.FeatureFile(path='src/click/__init__.py',requirement_ids=('echo',),rationale='Diagnostic echo implementation',evidence=(origin,)),),
         ambiguities=(),allowed_changes=rules,public_checks=(),episode_limits=limits,provenance_label='reconstructed_specification')
     contract_ref=store.put_artifact(contract)
     scenarios=tuple(c.Scenario(scenario_id='s'+str(i),requirement_ids=('echo',),preconditions=('echo command registered',),
@@ -94,10 +178,8 @@ def diagnostic(store, *, baseline=None, environment=None, adapter=ADAPTER, case_
     if baseline is None:
         baseline=raw(SourceArchive({'src/click/__init__.py':SourceFile(b'# diagnostic',False)}).to_tar(),'source-archive',c.Visibility.AUTHORING)
     if environment is None:
-        command=c.CommandSpec(argv=('python','--version'),working_directory='/workspace',timeout_seconds=1.0)
-        environment=store.put_artifact(c.EnvironmentRecipe(kind='EnvironmentRecipe',**common,runtime_image=raw(b'DIAGNOSTIC ONLY', 'runtime-image', c.Visibility.AUTHORING),image_digest='example@sha256:'+'a'*64,
-            interpreter_version='3.12.14',dependencies=(),setup=(command,),reset=(command,),services=(),limits=limits,
-            neutral_repairs=(),locale='C.UTF-8',timezone='UTC',environment=(),randomness=plan.seed_policy,network_policy='none',baseline=baseline))
+        environment=diagnostic_environment(store, baseline=baseline, limits=limits,
+            provenance=common['provenance'], costs=common['costs'])
     # No real private SourcePair/H is inspected or loaded by this fixture.
     source_pair=c.ArtifactRef(sha256='0'*64,kind='SourcePair',schema_version=2,visibility=c.Visibility.PRIVATE,encoding='json')
     task=c.TaskBundle(kind='TaskBundle',**common,state=c.TaskState.BUILT,partition=c.Partition.DEVELOPMENT,

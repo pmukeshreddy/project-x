@@ -110,16 +110,43 @@ def test_missing_review_does_not_quarantine_but_known_defect_tracks_dependents(t
     with pytest.raises(QuarantinedError):q.qualify(task)
 
 
-def test_control_plan_requires_every_missing_category_attack_and_mandatory_omission(tmp_path):
+def test_control_plan_requires_behavioral_categories_and_mandatory_omission(tmp_path):
     from test_qualification_service import service
     from m5_fixtures import task_fixture
     from feature_rl.verifiers import load_verifier
     from feature_rl.qualification import validate_control_plan
-    from feature_rl.qualification.controls import ATTACKS
     q=service(tmp_path);checked=load_verifier(q.store,task_fixture(q.store))
     missing,targets=validate_control_plan(checked,q.policy)
     assert targets==('echo',)
-    for category in ('omission','plausible_wrong','hardcoded','regression','adversarial','alternative_positive'):
+    for category in ('omission','plausible_wrong','hardcoded','alternative_positive'):
         assert 'missing control category: '+category in missing
-    for attack in ATTACKS:assert 'missing adversarial attack: '+attack in missing
+    assert 'missing control category: regression' not in missing
+    assert 'missing control category: adversarial' not in missing
+    assert not any(item.startswith('missing adversarial attack:') for item in missing)
     assert 'missing targeted omission: echo' in missing
+
+
+@pytest.mark.parametrize('independent', [False, True])
+def test_behavioral_coverage_needs_independent_alternative_without_adversarial_controls(tmp_path, independent):
+    from dataclasses import replace
+    from test_qualification_service import service
+    from m5_fixtures import task_fixture
+    from feature_rl.verifiers import load_verifier
+    from feature_rl.qualification import ControlDiagnosis, validate_control_plan
+    q=service(tmp_path);loaded=load_verifier(q.store,task_fixture(q.store))
+    controls=[];diagnoses=[]
+    for category in ('omission','plausible_wrong','hardcoded','alternative_positive'):
+        positive=category=='alternative_positive'
+        targets=() if positive else ('echo',)
+        controls.append(SimpleNamespace(control_id=category,category=category,expected_valid=positive,
+            requirement_ids=targets,author_provenance=loaded.task.provenance.model_copy(update={
+                'inputs':(loaded.task.baseline,loaded.task.contract)})))
+        diagnoses.append(ControlDiagnosis(control_id=category,validity='valid' if positive else 'invalid',
+            mode='positive' if positive else 'semantic_negative',targets=targets,attack=None,
+            evidence=loaded.task.provenance.evidence,
+            independence_evidence=loaded.task.provenance.evidence if positive and independent else (),
+            note='Synthetic policy coverage only; no actual qualification claimed'))
+    selected=replace(loaded,verifier=SimpleNamespace(controls=tuple(controls)))
+    missing,targets=validate_control_plan(selected,q.policy.model_copy(update={'controls':tuple(diagnoses)}))
+    assert targets==('echo',)
+    assert missing==(() if independent else ('alternative independence evidence: alternative_positive',))

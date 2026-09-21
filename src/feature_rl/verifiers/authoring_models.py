@@ -6,6 +6,8 @@ from feature_rl.contracts import (ArtifactRef, CaseDefinition, ControlPatch, Cos
 from feature_rl.requirements.models import derived_model
 from .models import InputPlan, CaseComparison, unique
 
+MAX_CHECKER_OUTPUT_BYTES = 2 * 1024 * 1024
+
 _CaseFields = derived_model('_CaseFields', CaseDefinition,
     ('case_id', 'requirement_ids', 'mandatory'), module=__name__)
 
@@ -41,7 +43,7 @@ class CheckerFinalizationInputs(StrictModel):
     scenario_plan: ArtifactRef
     baseline: ArtifactRef
     environment: ArtifactRef
-    output_limit_bytes: Annotated[int, Field(gt=0, le=2*1024*1024)]
+    output_limit_bytes: Annotated[int, Field(gt=0, le=MAX_CHECKER_OUTPUT_BYTES)]
     public_examples: Annotated[tuple[ArtifactRef, ...], Field(max_length=128)] = ()
     controls: Annotated[tuple[ControlPatch, ...], Field(max_length=128)] = ()
     visibility: Literal[Visibility.PRIVATE, Visibility.EVALUATION]
