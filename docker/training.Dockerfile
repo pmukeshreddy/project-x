@@ -8,7 +8,7 @@
 # The upstream SkyRL Dockerfile also installs the CUDA 12.8 toolkit for DeepSpeed source builds.
 # This FSDP profile uses the prebuilt cu128/cu129 wheels on the Ray cu128 runtime.
 
-FROM --platform=linux/amd64 anyscale/ray:2.56.0-slim-py312-cu128
+FROM --platform=linux/amd64 anyscale/ray:2.56.0-slim-py312-cu128@sha256:668299e09552447461ceb120d88cd1ad26ce486f821a41398e132d3fb62f46c2
 
 # Record the image Python before switching user. Login shell picks up the image PATH.
 RUN bash -lc 'python -c "import sys; assert sys.version_info[:2]==(3, 12), sys.version; open(\"/tmp/feature-rl-python\", \"w\").write(sys.executable)"'

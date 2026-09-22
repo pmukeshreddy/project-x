@@ -287,8 +287,10 @@ Point `native-controller.json` at these container paths:
 - `runtime.state_root`: a directory under `/artifacts`
 - `runtime.socket_path`: `/var/run/docker.sock`
 
-The image runs as root. Those directories must be owned by the container user and
-not writable by group or others; that is the existing native path check.
+The image runs as root. `NativeSession` rejects the model, reference, tokenizer,
+and work directories unless those trees are owned by that user, contain no
+symlinks, and are not writable by group or others. The run below applies that
+to the `/models`, `/artifacts`, and `/checkpoints` mounts.
 
 ### Build
 
@@ -300,9 +302,25 @@ docker build \
   -t feature-rl-training .
 ```
 
+Existing DeepSWE verifier images are only in the local Docker daemon, under
+`feature-rl-deepswe`. Save them once, copy the archive to the server, and load
+it there before training. `docker load` restores the same image IDs the artifact
+records already use.
+
+```bash
+docker save $(docker image ls --format '{{.Repository}}:{{.Tag}}' feature-rl-deepswe) -o deepswe-images.tar
+```
+
+```bash
+docker load -i deepswe-images.tar
+```
+
 ### Run on GPU server
 
 ```bash
+sudo chown -R root:root "$PWD/models" "$PWD/.artifacts" "$PWD/checkpoints"
+sudo chmod -R go-w "$PWD/models" "$PWD/.artifacts" "$PWD/checkpoints"
+
 docker run --rm --gpus all \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD/.artifacts:/artifacts" \
