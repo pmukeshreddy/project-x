@@ -78,6 +78,8 @@ def parser():
     root=argparse.ArgumentParser(prog='feature-rl',description='Immutable artifact Factory and current admission commands.')
     root.add_argument('--config',help='strict local CLIConfiguration JSON; config-schema prints its schema')
     commands=root.add_subparsers(dest='command',required=True)
+    from feature_rl.pipeline.deepswe import add_cli
+    add_cli(commands)
     commands.add_parser('config-schema',help='print the strict composition schema without opening state or a runtime')
     preparation=commands.add_parser('prepare-github',help='capture one GitHub PR, discussion, optional linked issue and Git objects for construct-feature; no model or Docker required')
     preparation.add_argument('--request',required=True,help='strict GitHubPreparationRequest JSON')
@@ -226,9 +228,13 @@ def main(argv=None):
     args=parser().parse_args(argv)
     if args.command=='config-schema':
         _emit(CLIConfiguration.model_json_schema(),None);return 0
-    operation={'prepare-github':'construct','screen-source':'construct','construct-feature':'construct','author':'construct',
+    operation={'deepswe':'construct','prepare-github':'construct','screen-source':'construct','construct-feature':'construct','author':'construct',
         'resolve':'release','recover':'construct','retry-publication':'construct'}.get(args.command,args.command)
     try:
+        if args.command=='deepswe':
+            from feature_rl.pipeline.deepswe import dispatch_cli
+            _emit(dispatch_cli(args),None)
+            return 0
         if args.command=='prepare-github':
             from feature_rl.intake.prepare import GitHubPreparationRequest, prepare_github
             request=read_json(args.request,GitHubPreparationRequest)
