@@ -426,36 +426,6 @@ class RequirementContract(ArtifactModel):
         return self
 
 
-class Scenario(StrictModel):
-    scenario_id: Identifier
-    requirement_ids: Annotated[tuple[Identifier, ...], Field(min_length=1)]
-    preconditions: Annotated[tuple[Text, ...], Field(min_length=1)]
-    actions: Annotated[tuple[Text, ...], Field(min_length=1)]
-    observations: Annotated[tuple[Text, ...], Field(min_length=1)]
-    expected_relation: Text
-    input_domain: Text
-    oracle_origin: EvidenceLink
-    reset_needs: tuple[Text, ...]
-
-
-class ScenarioPlan(ArtifactModel):
-    kind: Literal['ScenarioPlan']
-    visibility: Literal[Visibility.PRIVATE, Visibility.EVALUATION]
-    contract: ArtifactRef
-    mandatory_requirement_ids: Annotated[tuple[Identifier, ...], Field(min_length=1)]
-    scenarios: Annotated[tuple[Scenario, ...], Field(min_length=1)]
-    seed_policy: SeedPolicy
-
-    @model_validator(mode='after')
-    def coverage(self):
-        require_ref(self.contract,'RequirementContract')
-        unique([s.scenario_id for s in self.scenarios], 'scenario IDs')
-        covered={r for s in self.scenarios for r in s.requirement_ids}
-        if not set(self.mandatory_requirement_ids) <= covered:
-            raise ValueError('mandatory requirements lack scenarios')
-        return self
-
-
 class CommandSpec(StrictModel):
     argv: Annotated[tuple[Text, ...], Field(min_length=1)]
     working_directory: Text
@@ -511,48 +481,31 @@ class CaseDefinition(StrictModel):
     case_id: Identifier
     requirement_ids: Annotated[tuple[Identifier, ...], Field(min_length=1)]
     inputs: ArtifactRef
-    comparison: ArtifactRef
+    expected: ArtifactRef
     mandatory: bool
-
-
-class ControlPatch(StrictModel):
-    control_id: Identifier
-    category: Literal['partial','happy_path','hardcoded','regression']
-    patch: ArtifactRef
-    requirement_ids: tuple[Identifier, ...]
-    expected_reason: Text
-    author_provenance: Provenance
-
-
-class WorkerAdapter(StrictModel):
-    code: ArtifactRef
-    version: Text
-    supported_observables: Annotated[tuple[Text, ...], Field(min_length=1)]
-    limitations: tuple[Text, ...]
 
 
 class VerifierPermissions(StrictModel):
     controller_role: Literal[ActorRole.CONTROLLER, ActorRole.EVALUATOR]
-    worker_inputs: tuple[ArtifactRef, ...]
     output_limit_bytes: PositiveInt
     submission_policy: AllowedChanges
 
 
 class VerifierBundle(ArtifactModel):
     kind: Literal['VerifierBundle']
+    schema_version: Literal[2]
     visibility: Literal[Visibility.PRIVATE, Visibility.EVALUATION]
     contract: ArtifactRef
-    scenario_plan: ArtifactRef
+    source_pair: ArtifactRef
+    validation: ArtifactRef
     cases: Annotated[tuple[CaseDefinition, ...], Field(min_length=1)]
     completion_manifest: Annotated[tuple[Identifier, ...], Field(min_length=1)]
-    worker_adapter: WorkerAdapter
     public_examples: tuple[ArtifactRef, ...]
-    controls: tuple[ControlPatch, ...]
     permissions: VerifierPermissions
 
     @model_validator(mode='after')
     def manifest_matches(self):
-        require_ref(self.contract,'RequirementContract'); require_ref(self.scenario_plan,'ScenarioPlan')
+        require_ref(self.contract,'RequirementContract'); require_ref(self.source_pair,'SourcePair')
         unique([c.case_id for c in self.cases], 'case IDs')
         unique(self.completion_manifest,'completion IDs')
         if set(self.completion_manifest) != {c.case_id for c in self.cases}:
@@ -616,15 +569,13 @@ class RunAssessment(StrictModel):
 
 class QualificationReport(ArtifactModel):
     kind: Literal['QualificationReport']
+    schema_version: Literal[2]
     visibility: Literal[Visibility.PRIVATE, Visibility.EVALUATION]
     task: ArtifactRef
     disposition: Disposition
     baseline_health: RunAssessment | None
     baseline_absence: RunAssessment | None
     reference_run: RunAssessment | None
-    controls: tuple[RunAssessment, ...]
-    fresh_runs: tuple[RunAssessment, ...]
-    interrupted_reset_runs: tuple[RunAssessment, ...]
     rejection_reasons: tuple[Text, ...]
     policy_version: Text
 
@@ -632,9 +583,9 @@ class QualificationReport(ArtifactModel):
     def successful_report(self):
         require_ref(self.task,'TaskBundle')
         if self.disposition == Disposition.SUCCESS:
-            if any(x is None for x in (self.baseline_health,self.baseline_absence,self.reference_run)) or not self.controls or len(self.fresh_runs)!=1 or len(self.interrupted_reset_runs)!=1:
+            if any(x is None for x in (self.baseline_health,self.baseline_absence,self.reference_run)):
                 raise ValueError('successful qualification requires all gate records')
-            gates = (self.baseline_health,self.baseline_absence,self.reference_run)+self.controls+self.fresh_runs+self.interrupted_reset_runs
+            gates = (self.baseline_health,self.baseline_absence,self.reference_run)
             if any(g.disposition != Disposition.SUCCESS or g.passed is not True for g in gates):
                 raise ValueError('successful qualification cannot contain failed gates')
             if any(not any(e.scope == 'real_integration' for e in g.evidence) for g in gates):
@@ -825,12 +776,12 @@ def require_ref(ref: ArtifactRef, kind: str):
 
 
 ARTIFACT_TYPES = {cls.__name__: cls for cls in (
-    CandidateRecord, SourcePair, RequirementContract, ScenarioPlan, EnvironmentRecipe,
+    CandidateRecord, SourcePair, RequirementContract, EnvironmentRecipe,
     VerifierBundle, TaskBundle, QualificationReport, RolloutRecord, TrainingCheckpoint,
     EvaluationReport,
 )}
 
-ARTIFACT_SCHEMA_VERSIONS = {kind: 2 if kind in {'CandidateRecord', 'SourcePair'} else 1
+ARTIFACT_SCHEMA_VERSIONS = {kind: 2 if kind in {'CandidateRecord', 'SourcePair', 'VerifierBundle', 'QualificationReport'} else 1
                             for kind in ARTIFACT_TYPES}
 
 

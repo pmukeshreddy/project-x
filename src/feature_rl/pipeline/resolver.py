@@ -55,7 +55,7 @@ class ReleasedTaskResolver:
             policy = read_record(self.store, policy_ref, QualificationPolicy, 'm5-qualification-policy')
             template = profile.qualification
             qualification = QualificationService(store=self.store, registry=self.registry,
-                grader=template.grader, builder=template.builder, revision=template.revision, policy=policy)
+                builder=template.builder, revision=template.revision, policy=policy)
             accepted = qualification.verify_accepted(task_ref, report_ref)
             built = typed(self.store, accepted.task, c.TaskBundle)
             if built.state != c.TaskState.BUILT or built.qualification is not None:

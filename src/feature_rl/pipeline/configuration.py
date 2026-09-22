@@ -148,7 +148,7 @@ def compose(config: CLIConfiguration, *, runtime=False, qualification=False, aut
             max_wall_seconds=settings.grade_wall_seconds)
     if qualification:
         settings=config.qualification
-        q=QualificationService(store=store,registry=registry,grader=grader,builder=builder,
+        q=QualificationService(store=store,registry=registry,builder=builder,
             revision=settings.revision,policy=settings.policy)
         lifecycle=TaskLifecycle(store=store,registry=registry,qualification=q,revision=config.revision)
         resolver=ReleasedTaskResolver(profiles=(lifecycle,),revision=config.revision)

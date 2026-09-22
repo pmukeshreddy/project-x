@@ -17,9 +17,8 @@ from feature_rl.requirements import (AuthoringEvidenceResolver, ContractFinaliza
     GroundedSource, RetrievalPolicy)
 from feature_rl.requirements.retrieval import BaselineRetriever
 from feature_rl.requirements.service import build_contract_request
-from feature_rl.scenarios import build_scenario_plan
-from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs, build_checker_request
-from feature_rl.verifiers.control_authoring import build_control_request, ControlRecord
+from feature_rl.verifiers.reference import freeze_reference
+from feature_rl.verifiers.inputs import NoBehavioralInputs
 from feature_rl.qualification.evidence import unknown_cost, collapse_costs
 from feature_rl.registry import Claim, CostObservation, JobSpec
 from .authoring_models import (AuthoringSettings, AuthoringBatch, AuthoringCall, ResolverInputs,
@@ -48,27 +47,6 @@ def phase_costs(previous, observed):
     """Replace measured channels while retaining incurred, still unknown channels."""
     categories = {cost.category for cost in observed}
     return collapse_costs((*observed, *(cost for cost in previous if cost.category not in categories)))
-
-
-def validate_seed_policy(policy):
-    if policy.algorithm!='m4-sha256-v1' or not policy.same_cases_within_group:
-        raise ValueError('automatic checker construction requires seed algorithm m4-sha256-v1 with the same cases within each group')
-
-
-def checker_output_limit(runtime_limit,episode_limit):
-    from feature_rl.verifiers.authoring_models import MAX_CHECKER_OUTPUT_BYTES
-    return min(runtime_limit,episode_limit,MAX_CHECKER_OUTPUT_BYTES)
-
-
-def wrong_implementations(has_compatibility):
-    cases = (
-        ('partial', 'Implement only part of the requested feature.'),
-        ('happy_path', 'Implement normal inputs but mishandle an important edge case.'),
-        ('hardcoded', 'Overfit disclosed examples while leaving general behavior wrong.'),
-    )
-    if has_compatibility:
-        cases += (('regression', 'Implement the feature while breaking existing compatibility behavior.'),)
-    return cases
 
 
 class FeatureWorkflow:
@@ -103,7 +81,6 @@ class FeatureWorkflow:
 
     def construct(self,request:FeatureWorkflowRequest):
         request=checked(FeatureWorkflowRequest,request)
-        validate_seed_policy(request.seed_policy)
         ref=put(self.factory,request,'m6-feature-request',dependencies=references(document(request)))
         with candidate_lock(self.store,ref):
             job=self.registry.enqueue(self._spec(ref))
@@ -222,6 +199,18 @@ class FeatureWorkflow:
                     or {data['build_evidence_sha256'],data['execution_evidence_sha256']}
                     !={ref.sha256 for ref in output.private_evidence}):
                 raise ValueError('workflow discovery lost its private execution evidence')
+        elif step.key=='reference-capture' and output.artifacts:
+            from feature_rl.verifiers.loader import validate_reference
+            if output.disposition!=c.Disposition.SUCCESS or len(output.artifacts)!=1:
+                raise ValueError('invalid reference capture result')
+            verifier=typed(self.store,output.artifacts[0],c.VerifierBundle)
+            expected=inputs['inputs']
+            pair=typed(self.store,verifier.source_pair,c.SourcePair)
+            if (document(verifier.source_pair)!=expected['source_pair']
+                    or document(verifier.contract)!=expected['contract']):
+                raise ValueError('reference capture changed its source/contract')
+            environment=c.ArtifactRef.model_validate_json(canonical_json(expected['environment']['recipe']))
+            validate_reference(self.store,verifier,environment,pair.baseline,pair.reference)
         elif output.artifacts:
             # Each successful/failed child selection comes from the actual
             # source/author/build receipt and remains in its original cost job.
@@ -328,7 +317,7 @@ class FeatureWorkflow:
 
     def _author_factory(self,selected):
         conf=self.settings
-        settings=AuthoringSettings(codex=conf.codex,m2_revision=conf.m2_revision,m4_revision=conf.m4_revision,
+        settings=AuthoringSettings(codex=conf.codex,m2_revision=conf.m2_revision,
             evidence_scope=conf.evidence_scope,batch=AuthoringBatch(candidates=(selected.candidate,),
                 candidate_caps=conf.authoring_caps,batch_caps=conf.authoring_caps))
         return Factory(store=self.store,registry=self.registry,revision=self.factory.revision,
@@ -394,7 +383,6 @@ class FeatureWorkflow:
     def _execute(self,claim,ref,request):
         job,_,_=self._validated(claim)
         if job.state=='completed':return job.result
-        validate_seed_policy(request.seed_policy)
         for value in (ref,self.configuration):self.registry.assert_usable(value)
         selected,_=self._step(claim,ref,'intake',document(request),lambda:self._source(request))
         source,_=self._step(claim,ref,'source',{'candidate':document(selected.candidate)},
@@ -427,37 +415,22 @@ class FeatureWorkflow:
                 supported_observables=prepared.supported_observables,allowed_changes=allowed))
         if contract_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,contract_result)
         contract_ref=contract_result.artifacts[0];contract=typed(self.store,contract_ref,c.RequirementContract)
-        scenario=build_scenario_plan(contract, contract_ref, request.seed_policy,
-            provenance=self._provenance(claim,sources,(contract_ref,)), costs=overhead())
-        scenario_ref=self.store.put_artifact(scenario)
-        self.registry.register(scenario_ref)
-        feature=tuple(r.requirement_id for r in contract.requirements if r.mandatory)
-        compatibility=tuple(r.requirement_id for r in contract.compatibility_obligations if r.mandatory)
-        controls=[]
-        evidence_resolver=AuthoringEvidenceResolver(store=self.store,**resolver.model_dump())
-        for index,(category,reason) in enumerate(wrong_implementations(bool(compatibility)),1):
-            fixed=(selected.baseline,contract_ref,prepared.environment.recipe,scenario_ref)
-            control_inputs=ControlFinalizationInputs(control_id='wrong-'+str(index),category=category,
-                requirement_ids=compatibility if category=='regression' else feature,
-                expected_reason=reason,baseline=selected.baseline,contract=contract_ref,
-                environment=prepared.environment.recipe,scenario_plan=scenario_ref,
-                provenance=self._provenance(claim,sources,fixed),costs=overhead())
-            result=self._author(claim,ref,author,selected,prepared,resolver,sources,control_inputs,
-                lambda attempt:build_control_request(**identifiers('wrong-'+str(index),attempt),store=self.store,
-                    resolver=evidence_resolver,inputs=control_inputs,sources=sources))
-            if result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,result)
-            controls.append(read_record(self.store,result.artifacts[0],ControlRecord,'m4-control-record').control)
-        checker_inputs=CheckerFinalizationInputs(contract=contract_ref,scenario_plan=scenario_ref,baseline=selected.baseline,
-            environment=prepared.environment.recipe,output_limit_bytes=checker_output_limit(
-                self.runtime.policy.output_bytes,contract.episode_limits.output_bytes),
-            public_examples=request.public_checks,controls=tuple(controls),visibility=c.Visibility.PRIVATE,
-            provenance=self._provenance(claim,sources,(contract_ref,scenario_ref,selected.baseline,prepared.environment.recipe)),costs=overhead())
-        checker_result=self._author(claim,ref,author,selected,prepared,resolver,sources,checker_inputs,
-            lambda index:build_checker_request(**identifiers('checker',index),contract=contract,
-                contract_ref=contract_ref,plan=scenario,plan_ref=scenario_ref,sources=sources))
-        if checker_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,checker_result)
-        inputs=BuildInputs(source_pair=selected.source_pair,contract=contract_ref,scenario_plan=scenario_ref,
-            verifier=checker_result.artifacts[0],environment=prepared.environment,
+        def capture():
+            try:
+                result=freeze_reference(store=self.store,runtime=self.runtime,source_pair=selected.source_pair,
+                    contract_ref=contract_ref,prepared=prepared.environment,revision=self.settings.m4_revision,
+                    behavioral_inputs=request.behavioral_inputs)
+                for artifact in result.artifacts:self.registry.register(artifact)
+                return result,result.costs
+            except NoBehavioralInputs as exc:
+                return c.OperationResult(operation='construct',disposition=c.Disposition.UNSUPPORTED,
+                    artifacts=(),evidence=(),costs=overhead(),reason=str(exc)),overhead()
+        verifier_result,_=self._step(claim,ref,'reference-capture',
+            {'source_pair':document(selected.source_pair),'contract':document(contract_ref),
+             'environment':document(prepared.environment)},capture)
+        if verifier_result.disposition!=c.Disposition.SUCCESS:return self._finish(claim,ref,verifier_result)
+        inputs=BuildInputs(source_pair=selected.source_pair,contract=contract_ref,
+            verifier=verifier_result.artifacts[0],environment=prepared.environment,
             baseline_files=tuple(sorted(baseline.files)),invocation=request.invocation)
         result,_=self._step(claim,ref,'construction',{'candidate':document(selected.candidate),'inputs':document(inputs)},
             lambda:(self._child(lambda:author.construct(selected.candidate,inputs=inputs)),overhead()),child=True)
@@ -473,8 +446,7 @@ class FeatureWorkflow:
             if row.attempt_id==claim.attempt_id for r in row.observation.receipts if r.kind=='m6-feature-step')
         outcome=FeatureOutcome(claim=claim,request=ref,selected=result,steps=tuple(dict.fromkeys(steps)),
             recorded_at=self._claimed_at(claim),limitations=(
-                'BUILT artifacts require baseline, gold, wrong-implementation and reset validation before release.',
-                'Negative controls use B and the frozen contract/scenarios; reference behavior is never supplied.',
+                'Reference outputs are frozen from repository inputs during construction; coverage is limited to those inputs.',
                 'Monetary costs and unmeasured controller overhead remain unknown; child costs remain in their original Registry jobs.'))
         return self._publish_outcome(canonical_json(document(outcome)),claim)
 

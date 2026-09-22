@@ -68,7 +68,7 @@ def test_requirement_requires_grounding():
         m.Requirement.model_validate_json(json.dumps(dict(requirement_id='R1', statement='Add behavior', mandatory=True, evidence=[], observable='cli output')))
 
 
-ARTIFACT_KINDS=('CandidateRecord','SourcePair','RequirementContract','ScenarioPlan','EnvironmentRecipe','VerifierBundle','TaskBundle','QualificationReport','RolloutRecord','TrainingCheckpoint','EvaluationReport')
+ARTIFACT_KINDS=('CandidateRecord','SourcePair','RequirementContract','EnvironmentRecipe','VerifierBundle','TaskBundle','QualificationReport','RolloutRecord','TrainingCheckpoint','EvaluationReport')
 
 
 @pytest.mark.parametrize('kind',ARTIFACT_KINDS)

@@ -17,12 +17,12 @@ def test_complete_manifest_joins_actual_m0_cases_and_preserves_seed_replay(store
     checked=load_verifier(store,task_ref)
     first=materialize_manifest(checked,11)
     assert [case.case_id for case in first.cases]==['c0','c1']
-    assert [case.scenario_id for case in first.cases]==['s0','s1']
+    assert [case.input_plan for case in first.cases]==[case.inputs for case in checked.verifier.cases]
     assert first==materialize_manifest(checked,11)
     assert {r for case in first.cases for r in case.requirement_ids}=={'echo'}
 
 
-@pytest.mark.parametrize('change',['task_contract','adapter','submission_policy','case_requirement','mandatory','input_scenario','origin','unknown_operand','operand_type','coverage','worker_leak'])
+@pytest.mark.parametrize('change',['task_contract','adapter','submission_policy','case_requirement','mandatory'])
 def test_join_defects_reject_before_execution(store,change):
     from feature_rl.verifiers import load_verifier
     task_ref=diagnostic(store);task=store.get_artifact(task_ref);verifier=store.get_artifact(task.private_oracle)
@@ -35,16 +35,6 @@ def test_join_defects_reject_before_execution(store,change):
         if change=='submission_policy':data['permissions']['submission_policy']['forbidden_paths']=['src/x.py']
         if change=='case_requirement':data['cases'][0]['requirement_ids']=['unknown']
         if change=='mandatory':data['cases'][0]['mandatory']=False
-        if change in ('input_scenario','origin','unknown_operand','operand_type'):
-            case=data['cases'][0];field='inputs' if change=='input_scenario' else 'comparison'
-            ref=c.ArtifactRef.model_validate_json(json.dumps(case[field]));value=json.loads(store.get_bytes(ref))
-            if change=='input_scenario':value['scenario_id']='missing'
-            if change=='origin':value['assertions'][0]['oracle_origin']['quote']='invented'
-            if change=='unknown_operand':value['assertions'][0]['expected']['name']='missing'
-            if change=='operand_type':value['assertions'][0]['expected']={'kind':'literal','value':True}
-            case[field]=store.put_bytes(canonical_json(value),ref.kind,c.Visibility.PRIVATE).model_dump(mode='json')
-        if change=='coverage':data['cases']=data['cases'][:1];data['completion_manifest']=['c0']
-        if change=='worker_leak':data['permissions']['worker_inputs'].append(data['cases'][0]['comparison'])
         new=store.put_artifact(c.VerifierBundle.model_validate_json(json.dumps(data)))
         task_ref=replace_artifact(store,task_ref,private_oracle=new)
     with pytest.raises(ValueError):load_verifier(store,task_ref)
@@ -66,7 +56,7 @@ def test_grading_malformed_submission_is_zero_before_runtime(store):
     task=diagnostic(store)
     # Diagnostic at the pre-execution boundary only; real Docker tests exercise
     # build/probe behavior. This object has no callable execution methods mocked.
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.base_policy=runtime.policy
     bad=store.put_bytes(b'{"version":"forged","reward":1}','m4-submission',c.Visibility.PRIVATE)
     service=GradingService(store=store,runtime=runtime,revision='a'*40)
     result=service.grade(task,bad,11)
@@ -80,7 +70,7 @@ def test_missing_submission_is_unmeasured_and_replay_retains_seed(store):
     from feature_rl.grading import GradingService, read_grade
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy
     task=diagnostic(store)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.base_policy=runtime.policy
     missing=c.ArtifactRef(sha256='f'*64,kind='m4-submission',schema_version=1,visibility=c.Visibility.PRIVATE,encoding='bytes')
     result=GradingService(store=store,runtime=runtime,revision='a'*40).grade(task,missing,12)
     receipt=read_grade(store,result.artifacts[-1])
@@ -92,7 +82,7 @@ def test_grade_publication_recovery_reuses_exact_receipt_without_execution(store
     from feature_rl.grading import GradingService, GradePublicationFailed, read_grade
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy
     task=diagnostic(store)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.base_policy=runtime.policy
     bad=store.put_bytes(b'{}','m4-submission',c.Visibility.PRIVATE)
     service=GradingService(store=store,runtime=runtime,revision='a'*40)
     real=store.put_bytes
@@ -113,15 +103,14 @@ def test_unsupported_contract_source_policy_is_not_reported_as_an_outage(store):
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy
     task_ref=diagnostic(store);task=store.get_artifact(task_ref)
     contract=store.get_artifact(task.contract).model_dump(mode='json')
-    contract['allowed_changes']['dependencies']='pinned_allowlist'
+    contract['allowed_changes']['additional_artifact_types']=['unknown']
     cref=store.put_artifact(c.RequirementContract.model_validate_json(json.dumps(contract)))
     verifier=store.get_artifact(task.private_oracle).model_dump(mode='json')
-    planref=replace_artifact(store,c.ArtifactRef.model_validate_json(json.dumps(verifier['scenario_plan'])),contract=cref)
-    verifier['contract']=cref.model_dump(mode='json');verifier['scenario_plan']=planref.model_dump(mode='json')
+    verifier['contract']=cref.model_dump(mode='json')
     verifier['permissions']['submission_policy']=contract['allowed_changes']
     vref=store.put_artifact(c.VerifierBundle.model_validate_json(json.dumps(verifier)))
     task_ref=replace_artifact(store,task_ref,contract=cref,private_oracle=vref)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.base_policy=runtime.policy
     raw=store.put_bytes(b'{}','m4-submission',c.Visibility.PRIVATE)
     result=GradingService(store=store,runtime=runtime,revision='a'*40).grade(task_ref,raw,11)
     assert result.disposition==c.Disposition.UNSUPPORTED
@@ -134,8 +123,7 @@ def task_with_limits(store,task_ref,updates):
     contract['episode_limits'].update(updates)
     cref=store.put_artifact(c.RequirementContract.model_validate_json(json.dumps(contract)))
     verifier=store.get_artifact(task.private_oracle)
-    pref=replace_artifact(store,verifier.scenario_plan,contract=cref)
-    vref=replace_artifact(store,task.private_oracle,contract=cref,scenario_plan=pref)
+    vref=replace_artifact(store,task.private_oracle,contract=cref)
     return replace_artifact(store,task_ref,contract=cref,private_oracle=vref)
 
 
@@ -147,7 +135,7 @@ def test_recipe_cannot_exceed_any_contract_worker_limit(store,field,limit):
     from feature_rl.grading import GradingService, read_grade
     from feature_rl.environments import EnvironmentRuntime, SandboxPolicy
     task_ref=task_with_limits(store,diagnostic(store),{field:limit})
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy()
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.base_policy=runtime.policy
     submission=store.put_bytes(b'{}','m4-submission',c.Visibility.PRIVATE)
     result=GradingService(store=store,runtime=runtime,revision='a'*40).grade(task_ref,submission,11)
     receipt=read_grade(store,result.artifacts[0])
@@ -186,11 +174,14 @@ def test_trusted_baseline_failures_are_null_but_candidate_delta_failure_is_zero(
     delta=store.put_bytes(delta_bytes,'m4-source-delta',c.Visibility.PRIVATE)
     submission=store.put_bytes(canonical_json({'version':'m4-submission-v1','baseline':baseline.model_dump(mode='json'),
         'changes':delta.model_dump(mode='json'),'deletions':[]}),'m4-submission',c.Visibility.PRIVATE)
-    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=policy
+    runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=policy;runtime.base_policy=policy
     result=GradingService(store=store,runtime=runtime,revision='a'*40).grade(task_ref,submission,11)
     receipt=read_grade(store,result.artifacts[0])
     if bad_part=='candidate_format':
         assert result.disposition==c.Disposition.REJECTED and receipt.reward==0
+    elif bad_part in {'baseline_payload_size','baseline_expanded_size'}:
+        # Configured archive caps are stricter than this fixture's frozen recipe.
+        assert result.disposition==c.Disposition.UNSUPPORTED and receipt.reward is None
     else:
         assert result.disposition==c.Disposition.INFRASTRUCTURE and receipt.reward is None
     assert receipt.submission==submission and receipt.case_seed==11

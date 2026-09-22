@@ -39,4 +39,6 @@ def task_fixture(store, *, changes=None, classifications=None):
         costs=task.costs,provenance_label='reconstructed_specification',candidate=cref,baseline_commit='1'*40,
         reference_commit='2'*40,baseline=baseline,reference=reference,relationship=relationship,
         changed_files=categories,admissible_cutoff=now,verification=proof)
-    return replace_artifact(store,task_ref,source_pair=store.put_artifact(pair),reference_solution=reference)
+    pair_ref=store.put_artifact(pair)
+    verifier=replace_artifact(store,task.private_oracle,source_pair=pair_ref)
+    return replace_artifact(store,task_ref,source_pair=pair_ref,reference_solution=reference,private_oracle=verifier)

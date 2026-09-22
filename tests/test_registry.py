@@ -345,7 +345,7 @@ def typed_artifacts(store):
     data['RequirementContract']['feature_files'] = [{'path': 'src/cli.py', 'requirement_ids': ['R1'],
         'rationale': 'Synthetic reference-graph fixture, not feature grounding',
         'evidence': data['RequirementContract']['requirements'][0]['evidence']}]
-    for kind in ('CandidateRecord', 'SourcePair', 'RequirementContract', 'ScenarioPlan',
+    for kind in ('CandidateRecord', 'SourcePair', 'RequirementContract',
                  'EnvironmentRecipe', 'VerifierBundle', 'TaskBundle', 'RolloutRecord', 'TrainingCheckpoint'):
         artifact = ARTIFACT_TYPES[kind].model_validate_json(json.dumps(replace(data[kind])))
         published[kind] = store.put_artifact(artifact)

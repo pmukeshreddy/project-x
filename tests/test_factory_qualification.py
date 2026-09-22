@@ -17,7 +17,7 @@ def configured(tmp_path,monkeypatch):
     runtime.store=store;runtime.policy=runtime_policy();runtime.revision='b'*40
     grader=GradingService(store=store,runtime=runtime,revision='c'*40)
     # Actual M5 missing package-validator denial runs without a worker/backend.
-    q=QualificationService(store=store,registry=registry,grader=grader,builder=None,revision='d'*40)
+    q=QualificationService(store=store,registry=registry,builder=None,revision='d'*40)
     factory=Factory(store=store,registry=registry,builder=builder,qualification=q,revision='e'*40)
     candidate=store.get_artifact(inputs.source_pair).candidate
     built=factory.construct(candidate,inputs=inputs)
@@ -28,7 +28,7 @@ def test_actual_m5_keeps_a_small_policy_and_freezes_failed_qualification(tmp_pat
     factory,built=configured(tmp_path,monkeypatch)
     result=factory.qualify(built.artifacts[0])
     assert result.disposition!=c.Disposition.SUCCESS
-    assert set(QualificationPolicy.model_fields)=={'version','policy_id','seed','max_wall_seconds'}
+    assert set(QualificationPolicy.model_fields)=={'version','policy_id'}
     report=factory.store.get_artifact(result.artifacts[0])
     assert report.task==built.artifacts[0] and report.disposition==result.disposition
 

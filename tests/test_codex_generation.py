@@ -272,13 +272,10 @@ def test_archive_recovery_preserves_validated_response_without_redispatch(
 def test_transport_schema_preserves_actual_proposal_constraints():
     from feature_rl.generation.schema import output_envelope_schema, codex_output_schema
     from feature_rl.requirements import RequirementContractProposal
-    from feature_rl.verifiers import CheckerProposal, ControlProposal
     from jsonschema import Draft202012Validator
 
     for model in (
         RequirementContractProposal,
-        CheckerProposal,
-        ControlProposal,
     ):
         schema = codex_output_schema(output_envelope_schema(request(), model))
         Draft202012Validator.check_schema(schema)

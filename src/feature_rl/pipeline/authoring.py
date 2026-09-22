@@ -12,11 +12,6 @@ from feature_rl.requirements import (AuthoringEvidenceResolver, ContractAuthorin
     ContractFinalizationInputs, RequirementContractProposal, AuthoringExhausted,
     AuthoringPublicationPending, AuthoringJournalPublicationPending)
 from feature_rl.requirements.service import validate_recovered_generation
-from feature_rl.verifiers import (CheckerAuthoringService, CheckerFinalizationInputs,
-    ControlAuthoringService, ControlFinalizationInputs, ControlProposal)
-from feature_rl.verifiers.service import CheckerPublicationPending, AuthoringPreparationPending
-from feature_rl.verifiers.control_authoring import ControlPublicationPending
-from feature_rl.verifiers.behavioral import behavioral_schema
 from feature_rl.qualification.evidence import unknown_cost, collapse_costs
 from feature_rl.registry import JobSpec, Claim, CostObservation
 from .authoring_models import (AuthoringSettings, AuthoringCall, AuthoringFrontier,
@@ -39,10 +34,7 @@ def read_authoring_receipt(store, ref):
 
 
 def stage_lane(call):
-    if isinstance(call.inputs,ContractFinalizationInputs):return 'authoring','contract'
-    if isinstance(call.inputs,CheckerFinalizationInputs):return 'verifier','checker'
-    role={'control_id':call.inputs.control_id,'category':call.inputs.category}
-    return 'verifier','control-'+hashlib.sha256(canonical_json(role)).hexdigest()
+    return 'authoring','contract'
 
 
 def settings(factory):
@@ -53,8 +45,7 @@ def settings(factory):
 def policy_document(revision, configured):
     return {'version':'m6-authoring-policy-v4','revision':revision,
         'settings':document(configured),'attempts_per_role':3,
-        'stage_map':{'initial_authoring':'authoring',
-            'checker_generation':'verifier','control_authoring':'verifier'}}
+        'stage_map':{'initial_authoring':'authoring'}}
 
 
 def historical_settings(factory,job):
@@ -164,13 +155,6 @@ def validate_call(factory,candidate,call):
             raise ValueError('contract request contexts differ from resolved evidence')
         if call.inputs.runtime_discovery!=call.resolver.runtime_discovery:
             raise ValueError('contract runtime discovery differs from actual resolver')
-    else:
-        contract=typed(factory.store,call.inputs.contract,c.RequirementContract)
-        if call.resolver.request not in contract.provenance.inputs or pair.baseline not in contract.provenance.inputs:
-            raise ValueError('frozen contract does not bind the exact authoring request/B')
-    if isinstance(call.inputs,(CheckerFinalizationInputs,ControlFinalizationInputs)):
-        if call.inputs.baseline!=pair.baseline or call.inputs.environment!=call.environment.recipe:
-            raise ValueError('M4 inputs changed the selected B/environment')
     return recipe
 
 
@@ -257,20 +241,12 @@ def archive_writer(factory,claim,request_ref):
     return archive
 
 
-def checker_schema(factory,call):
-    plan=typed(factory.store,call.inputs.scenario_plan,c.ScenarioPlan)
-    return behavioral_schema(plan)
-
-
 def service(factory,call,claim,request_ref):
     conf=settings(factory)
     provider=CodexGenerationProvider(config=conf.codex,archive=archive_writer(factory,claim,request_ref))
     resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump())
-    if isinstance(call.inputs,ContractFinalizationInputs):cls,schema=ContractAuthoringService,RequirementContractProposal
-    elif isinstance(call.inputs,CheckerFinalizationInputs):cls,schema=CheckerAuthoringService,checker_schema(factory,call)
-    else:cls,schema=ControlAuthoringService,ControlProposal
-    revision=conf.m2_revision if cls is ContractAuthoringService else conf.m4_revision
-    return cls(provider=provider,store=factory.store,resolver=resolver,revision=revision,evidence_scope=conf.evidence_scope),schema
+    return ContractAuthoringService(provider=provider,store=factory.store,resolver=resolver,
+        revision=conf.m2_revision,evidence_scope=conf.evidence_scope),RequirementContractProposal
 
 
 def dispatch(factory,job,request):
@@ -292,16 +268,13 @@ def execute(factory,claim,ref,request,*,recovered=None):
             recovered_result=recovered if isinstance(recovered,GenerationResult) else None,
             recovered_error=recovered if isinstance(recovered,GenerationProviderError) else None)
         validate_recovered_generation(factory.store,candidate,schema,result.generation)
-        outputs=tuple(getattr(result,name) for name in ('contract_ref','verifier_ref','record_ref') if hasattr(result,name))
+        outputs=tuple(getattr(result,name) for name in ('contract_ref',) if hasattr(result,name))
         if len(outputs)!=1:raise ValueError('actual authoring result must select one concrete output')
         journals=result.journal_refs;disposition=c.Disposition.SUCCESS;reason='Actual M2/M4 authored artifact selected; qualification remains pending'
     except AuthoringExhausted as exc:
         outputs=();journals=exc.journal_refs;disposition=c.Disposition.REJECTED;reason=str(exc)
-    except (GenerationProviderError,AuthoringPublicationPending,AuthoringJournalPublicationPending,
-            CheckerPublicationPending,ControlPublicationPending) as exc:
+    except (GenerationProviderError,AuthoringPublicationPending,AuthoringJournalPublicationPending) as exc:
         raise AuthoringPending(claim,exc) from exc
-    except AuthoringPreparationPending as exc:
-        raise FactoryRecoveryRequired('validated provider result is retained; recover inert finalization without provider execution',claim) from exc
     except Exception as exc:
         raise FactoryRecoveryRequired('authoring controller outcome unknown; inspect retained archives before any new call',claim) from exc
     # Provider wall is already in its own cumulative record. Controller overhead
@@ -313,18 +286,7 @@ def execute(factory,claim,ref,request,*,recovered=None):
 
 
 def register_output(factory,ref):
-    if ref.encoding=='json':
-        value=factory.store.get_artifact(ref,max_envelope_bytes=MAX_DOCUMENT)
-        for child in references(document(value)):
-            if child.kind in ('m4-case-input','m4-case-comparison'):register_output(factory,child)
-        factory.registry.register(ref)
-    elif ref.kind in ('m4-control-record','m4-submission','m4-case-input','m4-case-comparison'):
-        raw=read_bytes(factory.store,ref,MAX_DOCUMENT)
-        deps=references(json.loads(raw))
-        for child in deps:
-            if child.kind=='m4-submission':register_output(factory,child)
-        factory.registry.register(ref,dependencies=deps)
-    else:factory.registry.register(ref)
+    factory.registry.register(ref)
 
 
 def validated(factory,claim):
@@ -378,11 +340,10 @@ def publish(factory,payload,claim):
 
 def validate_receipt(factory,request,receipt):
     """Frozen replay binds the actual journal/archive selection and output lineage."""
-    classes={ContractFinalizationInputs:(RequirementContractProposal,'contract-authoring-journal','RequirementContract','feature_rl.requirements.ContractAuthoringService'),
-        CheckerFinalizationInputs:(None,'checker-authoring-journal','VerifierBundle','feature_rl.verifiers.CheckerAuthoringService'),
-        ControlFinalizationInputs:(ControlProposal,'control-authoring-journal','m4-control-record','feature_rl.verifiers.ControlAuthoringService')}
-    schema,journal_kind,output_kind,producer=classes[type(request.call.inputs)]
-    if schema is None:schema=checker_schema(factory,request.call)
+    schema=RequirementContractProposal
+    journal_kind='contract-authoring-journal'
+    output_kind='RequirementContract'
+    producer='feature_rl.requirements.ContractAuthoringService'
     if len(receipt.journal_refs)!=1:raise ValueError('one authoring attempt journal required')
     raw=read_bytes(factory.store,receipt.journal_refs[0],65536,kind=journal_kind)
     last=json.loads(raw)
@@ -402,16 +363,8 @@ def validate_receipt(factory,request,receipt):
     if len(receipt.outputs)!=1 or receipt.outputs[0].kind!=output_kind or not isinstance(outcome,GenerationResult):
         raise ValueError('successful authoring requires exact output kind and successful archived generation')
     output=receipt.outputs[0]
-    if output_kind=='m4-control-record':
-        from feature_rl.verifiers.control_authoring import ControlRecord
-        model=read_record(factory.store,output,ControlRecord,output_kind);provenance=model.generation_provenance
-        if (model.baseline,model.contract,model.environment)!=(request.call.inputs.baseline,request.call.inputs.contract,request.call.inputs.environment):
-            raise ValueError('control output changed exact B/contract/environment')
-    else:
-        model=factory.store.get_artifact(output,max_envelope_bytes=MAX_DOCUMENT);provenance=model.provenance
-        if isinstance(request.call.inputs,CheckerFinalizationInputs) and model.contract!=request.call.inputs.contract:
-            raise ValueError('authored output changed its exact frozen contract')
-    revision=settings(factory).m2_revision if isinstance(request.call.inputs,ContractFinalizationInputs) else settings(factory).m4_revision
+    model=factory.store.get_artifact(output,max_envelope_bytes=MAX_DOCUMENT);provenance=model.provenance
+    revision=settings(factory).m2_revision
     ev=provenance.evidence[-1]
     if (provenance.producer!=producer or provenance.producer_version!=revision
             or ev.producer!='feature_rl.generation.CodexGenerationProvider'
@@ -483,12 +436,9 @@ def retry(factory,pending):
         # archive is already selected and is not called again.
         if isinstance(upstream,AuthoringJournalPublicationPending):
             upstream.replay(factory.store)
-        elif isinstance(upstream,(AuthoringPublicationPending,CheckerPublicationPending,ControlPublicationPending)):
+        elif isinstance(upstream,AuthoringPublicationPending):
             output=upstream.replay(factory.store)
-            if isinstance(upstream,AuthoringPublicationPending):outputs,journals=(output[0],),output[1]
-            else:
-                outputs=(output.verifier_ref,) if hasattr(output,'verifier_ref') else (output.record_ref,)
-                journals=output.journal_refs
+            outputs,journals=(output[0],),output[1]
             receipt=AuthoringReceipt(claim=pending.claim,request=job.spec.inputs[1],outputs=outputs,journal_refs=journals,
                 disposition=c.Disposition.SUCCESS,reason='Actual retained authoring publication selected without provider redispatch',
                 stage=request.stage,lane=request.lane,costs=authoring_costs(factory,pending.claim),

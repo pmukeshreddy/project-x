@@ -42,7 +42,7 @@ try:
     runtime=EnvironmentRuntime(store=store,engine=engine,revision=old['context']['runtime_revision'])
     grader=GradingService(store=store,runtime=runtime,revision=old['context']['grading_revision'])
     builder=TaskBuilder(store=store,registry=registry,revision=old['context']['builder_revision'])
-    qualification=QualificationService(store=store,registry=registry,grader=grader,builder=builder,
+    qualification=QualificationService(store=store,registry=registry,builder=builder,
         revision=revision,policy=QualificationPolicy(policy_id='m7-scripted-diagnostic-only'))
     lifecycle=TaskLifecycle(store=store,registry=registry,qualification=qualification,revision=revision)
     task_ref=ref(old['context']['task'])

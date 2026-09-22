@@ -143,7 +143,7 @@ class TaskBuilder:
             state=c.TaskState.BUILT, qualification=None, partition=candidate.partition,
             repository_family=candidate.repository_family, request_lineage=candidate.request_lineage,
             source_pair=inputs.source_pair, baseline=pair.baseline, solver_view=receipt.solver_view,
-            contract=inputs.contract, environment=inputs.environment.recipe, adapter_version=verifier.worker_adapter.version,
+            contract=inputs.contract, environment=inputs.environment.recipe, adapter_version='behavioral-command-v1',
             private_oracle=inputs.verifier, reference_solution=pair.reference)
 
     def _finish(self, receipt, ref):

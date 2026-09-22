@@ -298,7 +298,7 @@ def main(argv=None):
         if isinstance(exc,ValueError) and not isinstance(exc,ConfigurationRequired):disposition=c.Disposition.INVALID
         from feature_rl.pipeline import AdmissionRejected
         from feature_rl.qualification import QualificationRejected
-        from feature_rl.qualification.controls import disposition_for
+        from feature_rl.qualification.models import disposition_for
         from feature_rl.registry import QuarantinedError
         if isinstance(exc,AdmissionRejected):disposition=c.Disposition.PROVISIONAL
         if isinstance(exc,QualificationRejected):disposition=disposition_for((exc.code,))

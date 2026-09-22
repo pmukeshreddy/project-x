@@ -27,15 +27,12 @@ GenerationIdentifier = Annotated[
 class GenerationStage(str, Enum):
     DISCOVERY = "discovery"
     INITIAL_AUTHORING = "initial_authoring"
-    CONTROL_AUTHORING = "control_authoring"
-    CHECKER_GENERATION = "checker_generation"
 
 
 class AuthoringContext(StrictModel):
     context_id: Identifier
     role: Literal[
-        "request", "baseline", "public_check", "contract", "scenario",
-        "reference", "solver_safe",
+        "request", "baseline", "public_check",
     ]
     source: ArtifactRef
     locator: Text
@@ -105,72 +102,6 @@ class GenerationRequest(StrictModel):
                     raise ValueError("initial authoring cannot receive private or evaluation artifacts")
                 if item.source.kind in {"SourcePair", "reference", "reference-tree"}:
                     raise ValueError("reference implementation context is forbidden")
-        elif self.stage is GenerationStage.CONTROL_AUTHORING:
-            contracts = 0
-            baselines = 0
-            scenarios = 0
-            for item in self.contexts:
-                if item.role == "contract":
-                    contracts += 1
-                    valid = (
-                        item.source.kind == "RequirementContract"
-                        and item.source.encoding == "json"
-                        and item.source.visibility is Visibility.AUTHORING
-                    )
-                elif item.role == "baseline":
-                    baselines += 1
-                    valid = (
-                        item.source.kind in {"source-archive", "runtime-discovery"}
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
-                    )
-                elif item.role == "request":
-                    valid = (
-                        item.source.kind == "authoring-request"
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
-                    )
-                elif item.role == "public_check":
-                    valid = (
-                        item.source.kind == "public-check"
-                        and item.source.encoding == "bytes"
-                        and item.source.visibility in {Visibility.PUBLIC, Visibility.AUTHORING}
-                    )
-                elif item.role == "scenario":
-                    scenarios += 1
-                    valid = (
-                        item.source.kind == "ScenarioPlan"
-                        and item.source.encoding == "json"
-                        and item.source.visibility in {Visibility.PRIVATE, Visibility.EVALUATION}
-                    )
-                else:
-                    valid = False
-                if not valid:
-                    raise ValueError("control authoring context kind, encoding, or visibility is invalid")
-            if contracts != 1 or baselines < 1 or scenarios > 1:
-                raise ValueError("control authoring requires one frozen contract and baseline context")
-
-        else:
-            for item in self.contexts:
-                expected_kind = {"contract": "RequirementContract", "scenario": "ScenarioPlan"}.get(
-                    item.role
-                )
-                if expected_kind is not None and item.source.kind != expected_kind:
-                    raise ValueError("checker contract/scenario kind does not match its explicit role")
-                if expected_kind is None and item.role not in {"request", "baseline", "public_check"}:
-                    raise ValueError("checker context role is not allowlisted")
-                if expected_kind is None and item.source.kind in {"SourcePair", "reference", "reference-tree"}:
-                    raise ValueError("checker baseline context cannot contain reference implementation data")
-                allowed = ({Visibility.AUTHORING, Visibility.PRIVATE, Visibility.EVALUATION}
-                           if item.role == "contract" else
-                           {Visibility.PRIVATE, Visibility.EVALUATION}
-                           if item.role == "scenario" else
-                           {Visibility.PUBLIC, Visibility.AUTHORING})
-                if item.source.visibility not in allowed:
-                    raise ValueError("checker context visibility does not match its role")
-            roles = {item.role for item in self.contexts}
-            if not {"contract", "scenario"}.issubset(roles):
-                raise ValueError("checker generation requires explicit frozen contract and scenario data")
         return self
 
 

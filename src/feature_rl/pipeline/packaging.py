@@ -51,7 +51,6 @@ class Resolved:
     pair: c.SourcePair
     candidate: c.CandidateRecord
     contract: c.RequirementContract
-    plan: c.ScenarioPlan
     verifier: c.VerifierBundle
     recipe: c.EnvironmentRecipe
     policy: SandboxPolicy
@@ -76,7 +75,6 @@ def resolve(store, inputs):
     pair = typed(store, inputs.source_pair, c.SourcePair)
     candidate = typed(store, pair.candidate, c.CandidateRecord)
     contract = typed(store, inputs.contract, c.RequirementContract)
-    plan = typed(store, inputs.scenario_plan, c.ScenarioPlan)
     verifier = typed(store, inputs.verifier, c.VerifierBundle)
     recipe = typed(store, inputs.environment.recipe, c.EnvironmentRecipe)
     policy = read_record(store, inputs.environment.policy, SandboxPolicy, 'sandbox-policy')
@@ -89,17 +87,11 @@ def resolve(store, inputs):
             or pair.baseline.visibility not in (c.Visibility.AUTHORING, c.Visibility.PUBLIC)
             or recipe.visibility != c.Visibility.AUTHORING or inputs.environment.policy.visibility != c.Visibility.AUTHORING):
         raise BuildRejected('B-only source/recipe/visibility mismatch')
-    if (plan.contract != inputs.contract or verifier.contract != inputs.contract
-            or verifier.scenario_plan != inputs.scenario_plan):
-        raise BuildRejected('contract/scenario/verifier identity mismatch')
-    requirements = contract.requirements + contract.compatibility_obligations
-    ids = {r.requirement_id for r in requirements}
-    mandatory = {r.requirement_id for r in requirements if r.mandatory}
-    if (set(plan.mandatory_requirement_ids) != mandatory
-            or any(not set(s.requirement_ids) <= ids for s in plan.scenarios)
-            or any(not set(case.requirement_ids) <= ids for case in verifier.cases)
-            or not mandatory <= {r for case in verifier.cases if case.mandatory for r in case.requirement_ids}):
-        raise BuildRejected('requirement coverage/identity mismatch')
+    if verifier.contract != inputs.contract or verifier.source_pair != inputs.source_pair:
+        raise BuildRejected('contract/source/verifier identity mismatch')
+    from feature_rl.verifiers.loader import validate_verifier_bundle
+    _,_,behavioral_inputs,_=validate_verifier_bundle(store,verifier,contract_ref=inputs.contract,
+        environment=inputs.environment.recipe,baseline=pair.baseline)
     if any(a.disposition == 'unresolved' or (a.disposition == 'clarified' and a.resolution is None) for a in contract.ambiguities):
         raise BuildRejected('unresolved contract ambiguity')
     allowed = validate_rules(contract.allowed_changes)
@@ -134,15 +126,16 @@ def resolve(store, inputs):
         raise BuildRejected('case-colliding source paths')
     profile.validate_source(source)
     read_bytes(store, pair.reference, policy.max_archive_bytes, kind='source-archive')
-    dependencies = tuple(dict.fromkeys((inputs.source_pair, pair.candidate, inputs.contract, inputs.scenario_plan,
+    dependencies = tuple(dict.fromkeys((inputs.source_pair, pair.candidate, inputs.contract,
         inputs.verifier, inputs.environment.recipe, inputs.environment.policy,
-        pair.baseline, pair.reference, *allowed.dependency_artifacts)))
-    return Resolved(pair, candidate, contract, plan, verifier, recipe, policy, source, dependencies)
+        pair.baseline, pair.reference, *allowed.dependency_artifacts,
+        *(item.stdin for item in behavioral_inputs), *(item.origin for item in behavioral_inputs))))
+    return Resolved(pair, candidate, contract, verifier, recipe, policy, source, dependencies)
 
 
 def public_values(store, resolved):
     contract, recipe = resolved.contract, resolved.recipe
-    instruction = ['# Feature task', '', contract.visible_request, '', '## Capability', contract.capability,
+    instruction = ['# Feature task', '', contract.capability,
                    '', '## Entry points', *('- ' + entry for entry in contract.entry_points), '', '## Requirements']
     for item in contract.requirements + contract.compatibility_obligations:
         instruction.append(f'- {item.requirement_id} ({"mandatory" if item.mandatory else "optional"}): {item.statement}; observable: {item.observable}')

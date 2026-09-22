@@ -5,7 +5,6 @@ from feature_rl import contracts as c
 from feature_rl.generation import CodexConfig, GenerationRequest
 from feature_rl.requirements import (GroundedSource,
     ContractFinalizationInputs, RetrievalPolicy)
-from feature_rl.verifiers import CheckerFinalizationInputs, ControlFinalizationInputs
 from feature_rl.environments import PreparedEnvironment
 from feature_rl.registry import Claim
 
@@ -45,7 +44,6 @@ class AuthoringBatch(c.StrictModel):
 class AuthoringSettings(c.StrictModel):
     codex: CodexConfig
     m2_revision: c.Revision
-    m4_revision: c.Revision
     batch: AuthoringBatch
     evidence_scope: Literal['real_integration','unit_diagnostic']='real_integration'
 
@@ -65,14 +63,12 @@ class AuthoringCall(c.StrictModel):
     environment: PreparedEnvironment
     resolver: ResolverInputs
     generation: GenerationRequest
-    inputs: ContractFinalizationInputs | CheckerFinalizationInputs | ControlFinalizationInputs
+    inputs: ContractFinalizationInputs
     sources: Annotated[tuple[GroundedSource,...],Field(min_length=1,max_length=128)]
 
     @model_validator(mode='after')
     def actual_stage(self):
-        allowed={ContractFinalizationInputs:'initial_authoring',
-            CheckerFinalizationInputs:'checker_generation',ControlFinalizationInputs:'control_authoring'}
-        if allowed[type(self.inputs)]!=self.generation.stage.value:
+        if self.generation.stage.value!='initial_authoring':
             raise ValueError('actual M2 stage and finalization inputs differ')
         return self
 
@@ -92,7 +88,7 @@ class AuthoringRequest(c.StrictModel):
     candidate: c.ArtifactRef
     frontier: c.ArtifactRef
     call: AuthoringCall
-    stage: Literal['authoring','verifier']
+    stage: Literal['authoring']
     lane: c.Identifier
 
 
@@ -104,7 +100,7 @@ class AuthoringReceipt(c.StrictModel):
     journal_refs: tuple[c.ArtifactRef,...]
     disposition: c.Disposition
     reason: Annotated[str,Field(min_length=1,max_length=4096)]
-    stage: Literal['authoring','verifier']
+    stage: Literal['authoring']
     lane: c.Identifier
     costs: tuple[c.CostRecord,...]
     revision: c.Revision

@@ -84,95 +84,10 @@ def test_initial_authoring_rejects_private_or_reference_context():
             request(contexts=(forbidden,))
 
 
-def test_checker_stage_accepts_only_explicit_contract_and_scenario_context():
-    """Broadening checker input beyond frozen contract/scenario data is a leak."""
-    admitted = (
-        context(role="contract", kind="RequirementContract", visibility=Visibility.PRIVATE),
-        context(
-            context_id="SRC_2",
-            role="scenario",
-            kind="ScenarioPlan",
-            visibility=Visibility.EVALUATION,
-        ),
-        context(
-            context_id="SRC_3", role="public_check", kind="public-check",
-            visibility=Visibility.PUBLIC,
-        ),
-    )
-    built = request(stage=GenerationStage.CHECKER_GENERATION, contexts=admitted)
-    assert tuple(item.role for item in built.contexts) == ("contract", "scenario", "public_check")
-    with pytest.raises(ValidationError):
-        request(stage=GenerationStage.CHECKER_GENERATION, contexts=(context(role="baseline"),))
-
-
-def test_control_authoring_requires_frozen_contract_and_baseline_without_gold():
-    contract = context(
-        context_id="CONTRACT", role="contract", kind="RequirementContract"
-    ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
-    baseline = context(context_id="BASELINE", role="baseline", kind="source-archive")
-    scenario = context(
-        context_id="SCENARIO", role="scenario", kind="ScenarioPlan",
-        visibility=Visibility.EVALUATION,
-    ).model_copy(
-        update={"source": artifact("ScenarioPlan", Visibility.EVALUATION, encoding="json")}
-    )
-    reference = context(
-        context_id="REFERENCE", role="reference", kind="source-archive",
-        visibility=Visibility.PRIVATE,
-    )
-    built = request(
-        stage=GenerationStage.CONTROL_AUTHORING,
-        contexts=(contract, baseline, scenario),
-    )
-    assert tuple(item.role for item in built.contexts) == (
-        "contract", "baseline", "scenario"
-    )
-    invalid = (
-        (contract, baseline, reference),
-        (baseline,),
-        (contract,),
-        (contract, contract.model_copy(update={"context_id": "CONTRACT_2"}), baseline),
-        (contract, baseline, scenario, scenario.model_copy(update={"context_id": "SCENARIO_2"})),
-        (contract, baseline, reference.model_copy(
-            update={"source": artifact("source-archive", Visibility.AUTHORING)}
-        )),
-        (contract, baseline, reference.model_copy(
-            update={"source": artifact("SourcePair", Visibility.PRIVATE, encoding="json")}
-        )),
-        (contract, baseline, scenario.model_copy(
-            update={"source": artifact("ScenarioPlan", Visibility.AUTHORING, encoding="json")}
-        )),
-    )
-    for contexts in invalid:
-        with pytest.raises(ValidationError):
-            request(stage=GenerationStage.CONTROL_AUTHORING, contexts=contexts)
-
-
-
-
-def test_gold_is_excluded_from_all_authoring_stages():
-    reference = context(
-        context_id="REFERENCE", role="reference", kind="source-archive",
-        visibility=Visibility.PRIVATE,
-    )
-    contract = context(
-        context_id="CONTRACT", role="contract", kind="RequirementContract"
-    ).model_copy(update={"source": artifact("RequirementContract", encoding="json")})
-    scenario = context(
-        context_id="SCENARIO", role="scenario", kind="ScenarioPlan",
-        visibility=Visibility.EVALUATION,
-    ).model_copy(
-        update={"source": artifact("ScenarioPlan", Visibility.EVALUATION, encoding="json")}
-    )
-    for stage, contexts in (
-        (GenerationStage.INITIAL_AUTHORING, (reference,)),
-        (GenerationStage.CONTROL_AUTHORING, (contract, reference)),
-        (GenerationStage.CHECKER_GENERATION, (contract, scenario, reference)),
-    ):
-        with pytest.raises(ValidationError):
-            request(stage=stage, contexts=contexts)
-
-
+@pytest.mark.parametrize('stage',['checker_generation','control_authoring'])
+def test_removed_generation_stages_are_rejected(stage):
+    value=request().model_dump(mode='json');value['stage']=stage
+    with pytest.raises(ValidationError):GenerationRequest.model_validate_json(json.dumps(value))
 
 
 def test_request_rejects_duplicate_ids_placeholders_and_relaxed_resource_policy():

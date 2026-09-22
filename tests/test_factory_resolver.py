@@ -15,7 +15,7 @@ def configured(tmp_path, monkeypatch):
     api = importlib.import_module('feature_rl.pipeline')
     assert hasattr(api, 'ReleasedTaskResolver'), 'multi-policy admission resolver is missing'
     first = service(tmp_path)
-    second = QualificationService(store=first.store, registry=first.registry, grader=first.grader,
+    second = QualificationService(store=first.store, registry=first.registry,
         builder=None, revision=first.revision, policy=QualificationPolicy(policy_id='diagnostic-second'))
     lifecycles = tuple(TaskLifecycle(store=q.store, registry=q.registry, qualification=q, revision='d'*40)
         for q in (first, second))
@@ -41,7 +41,6 @@ def test_two_frozen_policies_use_one_trusted_version_profile_without_events(tmp_
         raise AssertionError('frozen resolver must not execute or replay operation history')
     for name in ('enqueue', 'claim', 'job', 'attempts', 'accounting', 'reconcile', 'complete', 'trace'):
         monkeypatch.setattr(q.registry, name, no_execution_or_history)
-    monkeypatch.setattr(q.grader, 'grade', no_execution_or_history)
     before = q.registry.events(limit=1000)
     for ref in (*released, *released):
         assert resolver.resolve_released(ref) == q.store.get_artifact(ref)
@@ -50,7 +49,7 @@ def test_two_frozen_policies_use_one_trusted_version_profile_without_events(tmp_
 
 def test_unknown_qualification_revision_fails_without_mutation(tmp_path, monkeypatch):
     api, resolver, q, _, _, released = configured(tmp_path, monkeypatch)
-    unknown=QualificationService(store=q.store,registry=q.registry,grader=q.grader,
+    unknown=QualificationService(store=q.store,registry=q.registry,
         builder=q.builder,revision='f'*40)
     incompatible = TaskLifecycle(store=q.store, registry=q.registry, qualification=unknown, revision='d'*40)
     other = api.ReleasedTaskResolver(profiles=(incompatible,), revision='e'*40)

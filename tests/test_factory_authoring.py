@@ -7,7 +7,48 @@ from feature_rl.registry import Registry
 from feature_rl.pipeline import Factory
 from feature_rl.pipeline.authoring_models import AuthoringSettings,AuthoringCall,ResolverInputs
 from feature_rl.environments import PreparedEnvironment
-from test_checker_authoring import authoring_fixture
+from feature_rl.requirements import (AuthoringEvidenceResolver, GroundedSource, RetrievalPolicy,
+    ContractFinalizationInputs, RequirementContractProposal, ContractAuthoringService, build_contract_request)
+
+
+def authoring_fixture(tmp_path):
+    from feature_rl.artifacts import ArtifactStore
+    from test_authoring import bound_discovery_text
+    from test_generation import limits
+    from codex_fixtures import config, CodexRunner, events, response
+    from feature_rl.generation import CodexGenerationProvider
+    store=ArtifactStore(tmp_path/'objects',c.ActorRole.CONTROLLER)
+    task=store.get_artifact(task_fixture(store))
+    contract=store.get_artifact(task.contract)
+    text='DIAGNOSTIC ONLY echo supplied word'
+    request_ref=store.put_bytes(text.encode(),'authoring-request',c.Visibility.AUTHORING)
+    discovery_text=bound_discovery_text(baseline=task.baseline,recipe=task.environment)
+    discovery=store.put_bytes(discovery_text.encode(),'runtime-discovery',c.Visibility.AUTHORING)
+    sources=(GroundedSource(context_id='REQUEST',role='request',source=request_ref,locator='authoring-request:whole',text=text,provenance_label='reconstructed_specification'),
+        GroundedSource(context_id='BASELINE',role='baseline',source=task.baseline,locator='src/click/__init__.py:1-1',text='# synthetic baseline\n',provenance_label='existing_obligation'),
+        GroundedSource(context_id='DISCOVERY',role='baseline',source=discovery,locator='m3:runtime-discovery-v1',text=discovery_text,provenance_label='existing_obligation'))
+    def link(source):
+        return c.EvidenceLink(source=source.source,locator=source.locator,quote=source.text.strip(),provenance_label=source.provenance_label)
+    req=contract.requirements[0].model_copy(update={'evidence':(link(sources[0]),),'observable':'combined terminal output'})
+    feature=contract.feature_files[0].model_copy(update={'evidence':(link(sources[1]),)})
+    data=contract.model_dump()
+    data.update(requirements=(req,),feature_files=(feature,),entry_points=tuple(json.loads(discovery_text)['entry_points']))
+    proposal=RequirementContractProposal(**{name:data[name] for name in RequirementContractProposal.model_fields})
+    inputs=ContractFinalizationInputs(visible_request=text,allowed_requirement_ids=('echo',),entry_points=data['entry_points'],
+        supported_observables=tuple(json.loads(discovery_text)['supported_observables']),runtime_discovery=discovery,
+        allowed_changes=contract.allowed_changes,public_checks=(),episode_limits=contract.episode_limits,
+        provenance_label='reconstructed_specification',visibility=c.Visibility.AUTHORING,
+        provenance=contract.provenance.model_copy(update={'inputs':(request_ref,task.baseline,discovery)}),costs=contract.costs)
+    resolver=AuthoringEvidenceResolver(store=store,request=request_ref,baseline=task.baseline,runtime_discovery=discovery,
+        public_checks=(),retrieval_policy=RetrievalPolicy(allowed_paths=('src/click/__init__.py',),max_archive_bytes=1048576,max_files=10,max_selected_bytes=10000,max_spans=10))
+    request=build_contract_request(request_id='CONTRACT_1',response_id='RESPONSE_1',prompt_id='PROMPT_1',sources=sources,
+        allowed_requirement_ids=('echo',),entry_points=inputs.entry_points,supported_observables=inputs.supported_observables,
+        allowed_changes=inputs.allowed_changes,limits=limits())
+    runner=CodexRunner(events(response(request,proposal.model_dump(mode='json'))))
+    provider=CodexGenerationProvider(config=config(store.root),archive=store.put_bytes,runner=runner)
+    service=ContractAuthoringService(provider=provider,store=store,resolver=resolver,revision='a'*40,evidence_scope='unit_diagnostic')
+    return store,proposal,inputs,sources,request,service,runner,request
+
 from m5_fixtures import task_fixture
 
 
@@ -15,9 +56,9 @@ def setup(tmp_path,monkeypatch):
     store,proposal,inputs,sources,request,service,runner,generation=authoring_fixture(tmp_path)
     parent=store.get_artifact(task_fixture(store))
     pair=store.get_artifact(parent.source_pair)
-    pair=pair.model_copy(update={'baseline':inputs.baseline})
+    pair=pair.model_copy(update={'baseline':service.resolver.baseline})
     pair_ref=store.put_artifact(pair)
-    recipe=store.get_artifact(inputs.environment)
+    recipe=store.get_artifact(parent.environment)
     policy=next(ref for ref in recipe.provenance.inputs if ref.kind=='sandbox-policy')
     from feature_rl.generation.provider import CodexGenerationProvider
     actual_init=CodexGenerationProvider.__init__
@@ -28,23 +69,23 @@ def setup(tmp_path,monkeypatch):
     from feature_rl.pipeline.authoring_models import AuthoringBatch,AuthoringCaps
     caps=AuthoringCaps(input_tokens=20_000_000,output_tokens=20_000_000,wall_seconds=100_000.0,
         cpu_seconds=100_000.0,commands=1000,memory_bytes=5_368_709_120,spend_usd=None)
-    settings=AuthoringSettings(codex=service.provider._config,m2_revision='a'*40,m4_revision='a'*40,evidence_scope='unit_diagnostic',
+    settings=AuthoringSettings(codex=service.provider._config,m2_revision='a'*40,evidence_scope='unit_diagnostic',
         batch=AuthoringBatch(candidates=(pair.candidate,),candidate_caps=caps,batch_caps=caps))
     assert hasattr(Factory,'author'),'Factory actual authoring is missing'
     factory=Factory(store=store,registry=Registry(tmp_path/'registry',store),revision='e'*40,authoring=settings)
     resolver=service.resolver
-    call=AuthoringCall(source_pair=pair_ref,environment=PreparedEnvironment(recipe=inputs.environment,policy=policy),
+    call=AuthoringCall(source_pair=pair_ref,environment=PreparedEnvironment(recipe=parent.environment,policy=policy),
         resolver=ResolverInputs(request=resolver.request,baseline=resolver.baseline,runtime_discovery=resolver.runtime_discovery,
             public_checks=resolver.public_checks,retrieval_policy=resolver.retrieval_policy,request_provenance=resolver.request_provenance),
         generation=generation,inputs=inputs,sources=sources)
     return factory,pair.candidate,call,runner
 
 
-def test_actual_checker_result_costs_archives_and_idempotent_completion(tmp_path,monkeypatch):
+def test_actual_contract_result_costs_archives_and_idempotent_completion(tmp_path,monkeypatch):
     factory,candidate,call,runner=setup(tmp_path,monkeypatch)
     result=factory.author(candidate,call=call)
     assert result.disposition==c.Disposition.SUCCESS
-    assert result.artifacts[0].kind=='VerifierBundle'
+    assert result.artifacts[0].kind=='RequirementContract'
     assert len(runner.calls)==1
     from feature_rl.pipeline.authoring import read_authoring_receipt
     receipt=read_authoring_receipt(factory.store,result.artifacts[-1])
@@ -141,7 +182,7 @@ def bind_events(runner,request):
     runner.stdout=('\n'.join(json.dumps(event) for event in events)+'\n').encode()
 
 
-def test_attempt_limit_is_per_role_and_new_controls_have_their_own_limit(tmp_path,monkeypatch):
+def test_contract_authoring_attempt_limit(tmp_path,monkeypatch):
     factory,candidate,call,runner=setup(tmp_path,monkeypatch)
     factory.author(candidate,call=call)
     for index in (1,2):
@@ -150,23 +191,6 @@ def test_attempt_limit_is_per_role_and_new_controls_have_their_own_limit(tmp_pat
     with pytest.raises(ValueError,match='three attempts'):
         factory.author(candidate,call=retry_call(call,3))
     assert len(runner.calls)==3
-    from feature_rl.verifiers import ControlFinalizationInputs,ControlProposal,SourceChange,TextReplacement,build_control_request
-    from feature_rl.requirements import AuthoringEvidenceResolver
-    from test_checker_authoring import configured_diagnostic_provider
-    inputs=ControlFinalizationInputs(control_id='PARTIAL',category='partial',requirement_ids=('echo',),
-        expected_reason='TEST ONLY unverified partial implementation',baseline=call.inputs.baseline,
-        contract=call.inputs.contract,environment=call.inputs.environment,provenance=call.inputs.provenance,costs=call.inputs.costs)
-    resolver=AuthoringEvidenceResolver(store=factory.store,**call.resolver.model_dump())
-    request=build_control_request(request_id='CONTROL',response_id='CONTROL_RESPONSE',prompt_id='CONTROL_PROMPT',
-        store=factory.store,resolver=resolver,inputs=inputs,sources=call.sources,limits=call.generation.limits)
-    proposal=ControlProposal(files=(SourceChange(path='src/click/__init__.py',replacements=(TextReplacement(before='# diagnostic', after='# TEST control only\n'),)),),
-        deletions=(),rationale='TEST semantic validity unknown')
-    _,prepared_runner=configured_diagnostic_provider(factory.store,request,proposal)
-    runner.stdout=prepared_runner.stdout
-    control=call.model_copy(update={'inputs':inputs,'generation':request})
-    result=factory.author(candidate,call=control)
-    assert result.disposition==c.Disposition.SUCCESS and result.artifacts[0].kind=='m4-control-record'
-    assert len(runner.calls)==4
 
 
 def test_failed_generation_cost_link_is_reconciled_by_publication_replay(tmp_path,monkeypatch):

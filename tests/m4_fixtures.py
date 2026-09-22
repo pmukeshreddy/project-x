@@ -117,20 +117,7 @@ def diagnostic_environment(store, *, baseline, limits, provenance, costs):
     return store.put_artifact(recipe)
 
 
-ADAPTER='''import json,sys
-import click
-from click.testing import CliRunner
-request=json.load(sys.stdin)
-@click.command()
-@click.argument("word")
-def command(word):
-    click.echo(word)
-result=CliRunner().invoke(command,[request["inputs"]["word"]])
-print(json.dumps({"case_id":request["case_id"],"observations":{"output":result.output,"exit":result.exit_code}}))
-'''
-
-
-def diagnostic(store, *, baseline=None, environment=None, adapter=ADAPTER, case_count=2):
+def diagnostic(store, *, baseline=None, environment=None, case_count=2):
     now=datetime(2026,9,19,tzinfo=timezone.utc)
     def raw(data,kind='m4-diagnostic',visibility=c.Visibility.PRIVATE):
         return store.put_bytes(data if isinstance(data,bytes) else canonical_json(data),kind,visibility)
@@ -151,29 +138,24 @@ def diagnostic(store, *, baseline=None, environment=None, adapter=ADAPTER, case_
         feature_files=(c.FeatureFile(path='src/click/__init__.py',requirement_ids=('echo',),rationale='Diagnostic echo implementation',evidence=(origin,)),),
         ambiguities=(),allowed_changes=rules,public_checks=(),episode_limits=limits,provenance_label='reconstructed_specification')
     contract_ref=store.put_artifact(contract)
-    scenarios=tuple(c.Scenario(scenario_id='s'+str(i),requirement_ids=('echo',),preconditions=('echo command registered',),
-        actions=('invoke with supplied word',),observations=('output and API exit',),expected_relation='word followed by newline; exit zero',
-        input_domain='diagnostic arbitrary word',oracle_origin=origin,reset_needs=()) for i in range(case_count))
-    plan=c.ScenarioPlan(kind='ScenarioPlan',**common,contract=contract_ref,mandatory_requirement_ids=('echo',),scenarios=scenarios,
-        seed_policy=c.SeedPolicy(algorithm='m4-sha256-v1',seeds=(11,),same_cases_within_group=True))
-    plan_ref=store.put_artifact(plan)
-    adapter_ref=raw(adapter.encode(),'m4-worker-adapter')
+    source_pair=c.ArtifactRef(sha256='0'*64,kind='SourcePair',schema_version=2,visibility=c.Visibility.PRIVATE,encoding='json')
+    validation=raw(b'No reference executed; unit diagnostic only','reference-validation')
     cases=[]
     for i in range(case_count):
-        inp={'version':'m4-input-v1','scenario_id':'s'+str(i),'requirement_ids':['echo'],'fields':[
-            {'name':'word','domain':{'kind':'choice','values':['indigo','saffron','cobalt','amber']}}]}
-        comparison={'version':'m4-comparison-v1','scenario_id':'s'+str(i),'requirement_ids':['echo'],'mode':'json',
-            'timeout_seconds':2.0,'observations':[{'name':'output','type':'string'},{'name':'exit','type':'integer'}],
-            'assertions':[{'assertion_id':'output','requirement_ids':['echo'],'oracle_origin':origin.model_dump(mode='json'),
-                'actual':'output','operator':'equal','expected':{'kind':'input','name':'word','suffix':'\n'}},
-                {'assertion_id':'exit','requirement_ids':['echo'],'oracle_origin':origin.model_dump(mode='json'),
-                'actual':'exit','operator':'equal','expected':{'kind':'literal','value':0}}]}
-        cases.append(c.CaseDefinition(case_id='c'+str(i),requirement_ids=('echo',),inputs=raw(inp,'m4-case-input'),
-            comparison=raw(comparison,'m4-case-comparison'),mandatory=True))
-    verifier=c.VerifierBundle(kind='VerifierBundle',**common,contract=contract_ref,scenario_plan=plan_ref,cases=tuple(cases),
-        completion_manifest=tuple(x.case_id for x in cases),worker_adapter=c.WorkerAdapter(code=adapter_ref,version='m4-worker-v1',
-            supported_observables=('json',),limitations=('diagnostic only',)),public_examples=(),controls=(),
-        permissions=c.VerifierPermissions(controller_role=c.ActorRole.CONTROLLER,worker_inputs=(adapter_ref,),output_limit_bytes=65536,submission_policy=rules))
+        word=('indigo','saffron','cobalt','amber')[i % 4]
+        # Fixed command and expected bytes for a synthetic fixture only.
+        code='import click; click.echo('+repr(word)+')'
+        stdin=raw(b'', 'behavioral-stdin')
+        inp={'mode':'output','command':{'argv':['/usr/local/bin/python','-c',code],
+            'working_directory':'/workspace','timeout_seconds':2.0},'stdin':stdin.model_dump(mode='json'),
+            'origin':source.model_dump(mode='json')}
+        expected={'exit_code':0,'stdout_hex':(word+'\n').encode().hex(),'stderr_hex':''}
+        cases.append(c.CaseDefinition(case_id='c'+str(i),requirement_ids=('echo',),
+            inputs=raw(inp,'behavioral-input'),expected=raw(expected,'reference-output'),mandatory=True))
+    verifier=c.VerifierBundle(kind='VerifierBundle',**(common|{'schema_version':2}),contract=contract_ref,
+        source_pair=source_pair,validation=validation,cases=tuple(cases),
+        completion_manifest=tuple(x.case_id for x in cases),public_examples=(),
+        permissions=c.VerifierPermissions(controller_role=c.ActorRole.CONTROLLER,output_limit_bytes=65536,submission_policy=rules))
     verifier_ref=store.put_artifact(verifier)
     if baseline is None:
         baseline=raw(SourceArchive({'src/click/__init__.py':SourceFile(b'# diagnostic',False)}).to_tar(),'source-archive',c.Visibility.AUTHORING)
@@ -185,7 +167,7 @@ def diagnostic(store, *, baseline=None, environment=None, adapter=ADAPTER, case_
     task=c.TaskBundle(kind='TaskBundle',**common,state=c.TaskState.BUILT,partition=c.Partition.DEVELOPMENT,
         repository_family='diagnostic-click',request_lineage=('diagnostic',),source_pair=source_pair,baseline=baseline,
         solver_view=c.SolverView(instruction=source,workspace=source,public_checks=(),runtime_manifest=source,inventory=source),
-        contract=contract_ref,environment=environment,adapter_version=verifier.worker_adapter.version,private_oracle=verifier_ref,
+        contract=contract_ref,environment=environment,adapter_version='behavioral-command-v1',private_oracle=verifier_ref,
         reference_solution=raw(b'No reference used','diagnostic-no-reference'),qualification=None)
     return store.put_artifact(task)
 

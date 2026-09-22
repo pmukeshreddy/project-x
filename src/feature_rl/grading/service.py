@@ -11,11 +11,11 @@ from feature_rl.contracts import (ArtifactRef, CostRecord, Disposition, Evidence
 from feature_rl.environments import (EnvironmentRuntime, PreparedEnvironment, ExecutionRequest,
     BuildFailed, EnvironmentError, SourceRejected, DependencyUnavailable, EvidencePublicationFailed)
 from feature_rl.submission import SubmissionService
-from feature_rl.verifiers import load_verifier, materialize_manifest, parse_observations
-from feature_rl.verifiers.language import compare, operand_value, check_value, decode_json
+from feature_rl.verifiers import load_verifier, materialize_manifest
+from feature_rl.verifiers.language import decode_json
 from feature_rl.verifiers.loader import read_local, read_bytes
 from .models import GradeReceipt, CaseResult, AssertionResult
-from .bootstrap import adapter_argv
+from feature_rl.verifiers.inputs import execution_request, observe, matches
 
 
 class GradePublicationFailed(Exception):
@@ -121,13 +121,12 @@ class GradingService:
                     reason='build '+exc.reason
                 else:
                     build_evidence=build.evidence;runtime_evidence.append(build.evidence);costs.append(build.cost)
-                    disposition=Disposition.SUCCESS;reward=1;reason='all required externally compared probes passed'
-                    for index,(case,comparison) in enumerate(zip(manifest.cases,checked.comparisons)):
+                    disposition=Disposition.SUCCESS;reward=1;reason='all repository observations match frozen H outputs'
+                    for index,(case,expected) in enumerate(zip(manifest.cases,checked.expected)):
                         if time.monotonic()-start>=self.max_wall_seconds:
                             disposition=Disposition.REJECTED;reward=0;reason='declared total grading wall budget exceeded';break
-                        stdin=canonical_json({'case_id':case.case_id,'inputs':case.model_dump(mode='json')['inputs']})
-                        command=CommandSpec(argv=adapter_argv(checked.adapter,self.runtime.profile.environment),working_directory='/workspace',timeout_seconds=comparison.timeout_seconds)
-                        output=timed(lambda:self.runtime.execute(handle,ExecutionRequest(command=command,stdin=stdin,save_source=False),build=build),'execution')
+                        inp=checked.inputs[index]
+                        output=timed(lambda:self.runtime.execute(handle,execution_request(self.store,inp,self.runtime.policy),build=build),'execution')
                         runtime_evidence.append(output.evidence);costs.append(output.cost)
                         cleanup=output.cleanup_verified
                         if not cleanup or output.failure_category in {'infrastructure','unresolved'}:
@@ -137,22 +136,16 @@ class GradingService:
                                 passed=None,assertions=(),evidence=output.evidence,reason=reason);break
                         # A CLI process may deliberately exit nonzero. JSON adapter
                         # failure and every resource termination are terminal zeros.
-                        if output.reason not in {'completed','command_failed'} or (comparison.mode=='json' and output.exit_code!=0):
+                        if output.reason not in {'completed','command_failed'}:
                             disposition=Disposition.REJECTED;reward=0;reason='candidate '+output.reason
                             results[index]=CaseResult(case_id=case.case_id,mandatory=case.mandatory,status='candidate_failure',
                                 passed=None,assertions=(),evidence=output.evidence,reason=reason)
                             continue
                         try:
                             cap=checked.verifier.permissions.output_limit_bytes
-                            if len(output.stdout)+len(output.stderr)>cap:raise ValueError('combined output byte cap')
-                            if comparison.mode=='json':
-                                observations=parse_observations(output.stdout,case.case_id,comparison.observations,cap)
-                            else:
-                                raw={'exit_code':output.exit_code,'stdout':output.stdout.decode('utf-8'),'stderr':output.stderr.decode('utf-8')}
-                                observations={f.name:raw[f.name] for f in comparison.observations}
-                                if any(not check_value(observations[f.name],f.type) for f in comparison.observations):raise ValueError('process observation type/size mismatch')
-                            assertions=tuple(AssertionResult(assertion_id=a.assertion_id,requirement_ids=a.requirement_ids,
-                                passed=compare(a.operator,observations[a.actual],operand_value(a.expected,case.inputs,observations))) for a in comparison.assertions)
+                            observed=observe(output,cap)
+                            assertions=(AssertionResult(assertion_id='reference-match',requirement_ids=case.requirement_ids,
+                                passed=matches(inp,observed,expected)),)
                             passed=all(a.passed for a in assertions)
                             results[index]=CaseResult(case_id=case.case_id,mandatory=case.mandatory,status='completed',passed=passed,
                                 assertions=assertions,evidence=output.evidence,reason='compared externally')

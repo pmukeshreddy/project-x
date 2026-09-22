@@ -15,7 +15,7 @@ def service(tmp_path):
     registry=Registry(tmp_path/'registry',store)
     runtime=object.__new__(EnvironmentRuntime);runtime.store=store;runtime.policy=runtime_policy();runtime.base_policy=runtime.policy;runtime.revision='a'*40
     grader=GradingService(store=store,runtime=runtime,revision='b'*40)
-    return QualificationService(store=store,registry=registry,grader=grader,builder=None,revision='c'*40)
+    return QualificationService(store=store,registry=registry,builder=None,revision='c'*40)
 
 
 def test_missing_real_package_validator_returns_precise_provisional_without_worker_execution(tmp_path):

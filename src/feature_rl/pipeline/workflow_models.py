@@ -48,8 +48,8 @@ class FeatureWorkflowRequest(c.StrictModel):
     partitions: PartitionManifest
     invocation: Name
     episode_limits: c.ResourceLimits
-    seed_policy: c.SeedPolicy
     public_checks: Annotated[tuple[c.ArtifactRef,...],Field(max_length=32)]=()
+    behavioral_inputs: Annotated[tuple[c.ArtifactRef,...],Field(max_length=64)]=()
     allowed_requirement_ids: Annotated[tuple[c.Identifier,...],Field(min_length=1,max_length=16)]=(
         'F1','F2','F3','F4','F5','F6','F7','F8','C1','C2','C3','C4')
 
@@ -57,8 +57,6 @@ class FeatureWorkflowRequest(c.StrictModel):
     def closed_inputs(self):
         if len(set(self.allowed_requirement_ids))!=len(self.allowed_requirement_ids):
             raise ValueError('duplicate workflow requirement namespace')
-        if not self.seed_policy.same_cases_within_group or any(seed>=2**63 for seed in self.seed_policy.seeds):
-            raise ValueError('workflow requires explicit same-case seeds in the grading domain')
         if any(ref.visibility!=c.Visibility.PUBLIC for ref in self.public_checks):
             raise ValueError('workflow public checks must be public artifacts')
         return self

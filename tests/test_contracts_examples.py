@@ -10,7 +10,7 @@ from test_contracts import cost, evidence, ref, ARTIFACT_KINDS
 
 def examples():
     def r(kind, visibility='private', encoding='json'):
-        return ref(kind,visibility) | {'encoding':encoding,'schema_version':2 if kind in {'CandidateRecord','SourcePair'} else 1}
+        return ref(kind,visibility) | {'encoding':encoding,'schema_version':2 if kind in {'CandidateRecord','SourcePair','VerifierBundle','QualificationReport'} else 1}
     raw=ref(); public=ref(visibility='public')
     ev=evidence(); costs=[cost()]
     prov=dict(producer='unit fixture',producer_version='1',created_at='2026-09-19T00:00:00Z',inputs=[],evidence=[ev])
@@ -30,11 +30,10 @@ def examples():
       'CandidateRecord':dict(schema_version=2,provenance_label='reconstructed_specification',repository_url='https://example.test/repo',repository_family='family',request_lineage=['request-1'],partition='train',sources=[dict(url='https://example.test/issue/1',content=raw,retrieved_at='2026-09-19T00:00:00Z',published_at=None,edited_at=None,edit_history='unavailable',media_type='text/plain',redirect_chain=None)],license=dict(spdx_id=None,license_text=None,status='unknown',evidence=[ev]),commits=relation,screening=dict(disposition='provisional',reason='unit diagnostic',evidence=[ev])),
       'SourcePair':dict(schema_version=2,provenance_label='reconstructed_specification',candidate=r('CandidateRecord'),baseline_commit='a'*40,reference_commit='b'*40,baseline=public,reference=raw,relationship=relation,changed_files=[dict(path='src/cli.py',category='implementation',rationale='feature')],admissible_cutoff='2026-09-01T00:00:00Z',verification=[ev]),
       'RequirementContract':dict(visible_request='Add command suggestions',capability='Suggestions',entry_points=['CLI'],requirements=[req],feature_files=[dict(path='src/cli.py',requirement_ids=['R1'],rationale='Feature implementation',evidence=[link])],compatibility_obligations=[],ambiguities=[],allowed_changes=allowed,public_checks=[],episode_limits=limits,provenance_label='historical_request'),
-      'ScenarioPlan':dict(contract=r('RequirementContract'),mandatory_requirement_ids=['R1'],scenarios=[dict(scenario_id='S1',requirement_ids=['R1'],preconditions=['command exists'],actions=['invoke typo'],observations=['stderr'],expected_relation='suggests command',input_domain='one edit typo',oracle_origin=link,reset_needs=[])],seed_policy=seeds),
       'EnvironmentRecipe':dict(runtime_image=r('runtime-image','authoring','bytes'),image_digest='python@sha256:'+'d'*64,interpreter_version='3.13.7',dependencies=[],setup=[command],reset=[command],services=[],limits=limits,neutral_repairs=[],locale='C.UTF-8',timezone='UTC',environment=[],randomness=seeds,network_policy='none',baseline=public),
-      'VerifierBundle':dict(contract=r('RequirementContract'),scenario_plan=r('ScenarioPlan'),cases=[dict(case_id='C1',requirement_ids=['R1'],inputs=raw,comparison=raw,mandatory=True)],completion_manifest=['C1'],worker_adapter=dict(code=public,version='1',supported_observables=['stderr'],limitations=[]),public_examples=[],controls=[],permissions=dict(controller_role='controller',worker_inputs=[public],output_limit_bytes=1024,submission_policy=allowed)),
+      'VerifierBundle':dict(schema_version=2,contract=r('RequirementContract'),source_pair=r('SourcePair'),validation=raw,cases=[dict(case_id='C1',requirement_ids=['R1'],inputs=raw,expected=raw,mandatory=True)],completion_manifest=['C1'],public_examples=[],permissions=dict(controller_role='controller',output_limit_bytes=1024,submission_policy=allowed)),
       'TaskBundle':dict(state='built',partition='train',repository_family='family',request_lineage=['request-1'],source_pair=r('SourcePair'),baseline=public,solver_view=dict(instruction=public,workspace=public,public_checks=[],runtime_manifest=public,inventory=public),contract=r('RequirementContract'),environment=r('EnvironmentRecipe'),adapter_version='1',private_oracle=r('VerifierBundle'),reference_solution=raw,qualification=None),
-      'QualificationReport':dict(task=r('TaskBundle'),disposition='provisional',baseline_health=None,baseline_absence=None,reference_run=None,controls=[],fresh_runs=[],interrupted_reset_runs=[],rejection_reasons=['not executed'],policy_version='pilot-v1'),
+      'QualificationReport':dict(schema_version=2,task=r('TaskBundle'),disposition='provisional',baseline_health=None,baseline_absence=None,reference_run=None,rejection_reasons=['not executed'],policy_version='pilot-v1'),
       'RolloutRecord':dict(run_id='run-1',task=r('TaskBundle'),policy=policy,limits=limits,seeds=seeds,steps=[],submission=None,stopping_reason='infrastructure_failure',disposition='infrastructure_failure',reward=None,grading_evidence=[],training_eligible=False),
       'TrainingCheckpoint':dict(weights=raw,optimizer_state=raw,reference_checkpoint=raw,data_position=0,policy_version='p1',configuration=training,consumed_tasks=[r('TaskBundle')],optimizer_steps=0,update_evidence=[ev],reload_evidence=[ev]),
       'EvaluationReport':dict(configuration=evaluation,frozen_task_roster=[r('TaskBundle')],trials=[],paired_metrics=[],audits=[],disposition='provisional',limitations=['not executed']),
@@ -56,7 +55,6 @@ def test_all_artifact_kinds_round_trip_typed_and_immutable(tmp_path,kind):
 
 @pytest.mark.parametrize('kind,field,bad',[
  ('SourcePair','candidate',ref()),
- ('ScenarioPlan','mandatory_requirement_ids',['R2']),
  ('VerifierBundle','completion_manifest',[]),
  ('VerifierBundle','completion_manifest',['C1','C1']),
  ('TaskBundle','private_oracle',ref('VerifierBundle','public')|{'encoding':'json'}),
@@ -80,7 +78,7 @@ def test_public_artifact_cannot_embed_private_references(tmp_path):
 def test_successful_qualification_rejects_recorded_failed_gates():
     value=examples()['QualificationReport']
     run=dict(name='gate',subject=ref(),disposition='invalid_measurement',passed=False,requirement_ids=['R1'],reason='failed',evidence=[evidence()])
-    value.update(disposition='success',baseline_health=run,baseline_absence=run,reference_run=run,controls=[run],fresh_runs=[run],interrupted_reset_runs=[run])
+    value.update(disposition='success',baseline_health=run,baseline_absence=run,reference_run=run)
     with pytest.raises(ValidationError): c.QualificationReport.model_validate_json(json.dumps(value))
 
 

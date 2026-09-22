@@ -35,11 +35,14 @@ def verify_accepted(service,task_ref,report_ref):
             raise QualificationRejected('provisional','qualification did not pass')
         if (report.policy_version!=service.policy.policy_id or len(report.provenance.inputs)!=3
                 or report.provenance.inputs[:2]!=(report.task,service.policy_ref)
-                or report.provenance.inputs[2].kind!='m5-reference-projection'):
+                or report.provenance.inputs[2].kind!='reference-validation'):
             raise QualificationRejected('invalid_evidence','qualification task/policy/reference mismatch')
         built=_artifact(service,report.task,c.TaskBundle)
         if built.state!=c.TaskState.BUILT or built.qualification is not None:
             raise QualificationRejected('invalid_evidence','qualification requires its original BUILT task')
+        verifier=_artifact(service,built.private_oracle,c.VerifierBundle)
+        if report.provenance.inputs[2]!=verifier.validation:
+            raise QualificationRejected('invalid_evidence','report changed frozen B/H evidence')
         later=built if task_ref==report.task else _artifact(service,task_ref,c.TaskBundle)
         assert_lifecycle_subject(built,later)
         if task_ref!=report.task and (later.state not in {c.TaskState.QUALIFIED,c.TaskState.CALIBRATED,c.TaskState.RELEASED}

@@ -16,7 +16,6 @@ class BuildInputs(StrictModel):
     version: Literal['m6-build-v1'] = 'm6-build-v1'
     source_pair: ArtifactRef
     contract: ArtifactRef
-    scenario_plan: ArtifactRef
     verifier: ArtifactRef
     environment: PreparedEnvironment
     baseline_files: Annotated[tuple[Annotated[str, Field(min_length=1, max_length=1024)], ...], Field(min_length=1, max_length=2000)]

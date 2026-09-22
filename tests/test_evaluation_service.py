@@ -235,7 +235,7 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
         })
         built_ref = context.store.put_artifact(built)
         report = c.QualificationReport(
-            kind="QualificationReport", schema_version=1, visibility=c.Visibility.PRIVATE,
+            kind="QualificationReport", schema_version=2, visibility=c.Visibility.PRIVATE,
             provenance=c.Provenance(
                 producer="diagnostic.lifecycle", producer_version="6" * 40,
                 created_at=NOW, inputs=(built_ref,), evidence=origin_evidence,
@@ -243,7 +243,6 @@ def test_native_composition_diagnostic_uses_claimed_factory_and_live_activation_
             costs=original.costs,
             task=built_ref, disposition=c.Disposition.PROVISIONAL,
             baseline_health=None, baseline_absence=None, reference_run=None,
-            controls=(), fresh_runs=(), interrupted_reset_runs=(),
             rejection_reasons=("labeled lifecycle diagnostic",),
             policy_version="diagnostic-" + label,
         )

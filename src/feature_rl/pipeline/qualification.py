@@ -13,7 +13,7 @@ def template(factory):
 
 def configured_service(factory,policy):
     current=template(factory)
-    return QualificationService(store=factory.store,registry=factory.registry,grader=current.grader,
+    return QualificationService(store=factory.store,registry=factory.registry,
         builder=current.builder,revision=current.revision,policy=policy)
 
 

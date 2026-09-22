@@ -84,11 +84,15 @@ def fixture(tmp_path, monkeypatch, *, archive=None, files=None):
         feature_files=[dict(path='src/click/__init__.py',requirement_ids=['R1'],
             rationale='DIAGNOSTIC implementation scope',evidence=data['RequirementContract']['requirements'][0]['evidence'])])
     data['RequirementContract']['allowed_changes'].update(source_roots=['src'], forbidden_paths=[])
-    for kind in ('CandidateRecord', 'SourcePair', 'RequirementContract', 'ScenarioPlan', 'VerifierBundle'):
+    data['RequirementContract']['episode_limits'].update(wall_seconds=policy.lifecycle_seconds,cpu_seconds=policy.cpu_seconds,memory_bytes=policy.memory_bytes,pids=policy.pids,output_bytes=policy.output_bytes,disk_bytes=policy.disk_bytes)
+    for kind in ('CandidateRecord', 'SourcePair', 'RequirementContract', 'VerifierBundle'):
         if kind == 'VerifierBundle':
             data[kind]['permissions']['submission_policy'] = data['RequirementContract']['allowed_changes']
-            data[kind]['worker_adapter']['code'] = private.model_dump(mode='json')
-            data[kind]['permissions']['worker_inputs'] = [private.model_dump(mode='json')]
+            stdin=store.put_bytes(b'', 'behavioral-stdin', c.Visibility.PRIVATE)
+            inp=store.put_bytes(canonical_json(dict(mode='output',command=dict(argv=['/usr/local/bin/python','-c','print(1)'],working_directory='/workspace',timeout_seconds=2.0),stdin=stdin.model_dump(mode='json'),origin=private.model_dump(mode='json'))),'behavioral-input',c.Visibility.PRIVATE)
+            expected=store.put_bytes(canonical_json(dict(exit_code=0,stdout_hex='310a',stderr_hex='')),'reference-output',c.Visibility.PRIVATE)
+            data[kind]['cases'][0].update(inputs=inp.model_dump(mode='json'),expected=expected.model_dump(mode='json'))
+            data[kind]['permissions']['output_limit_bytes']=1024
         published[kind] = store.put_artifact(c.ARTIFACT_TYPES[kind].model_validate_json(json.dumps(replace(data[kind]))))
 
     repair = store.put_bytes(b'DIAGNOSTIC evidence only', 'neutral-environment-repair', c.Visibility.AUTHORING)
@@ -127,7 +131,7 @@ def fixture(tmp_path, monkeypatch, *, archive=None, files=None):
         network_policy='none', baseline=baseline)
     prepared = PreparedEnvironment(recipe=store.put_artifact(recipe), policy=policy_ref)
     inputs = m.BuildInputs(source_pair=published['SourcePair'], contract=published['RequirementContract'],
-        scenario_plan=published['ScenarioPlan'], verifier=published['VerifierBundle'], environment=prepared,
+        verifier=published['VerifierBundle'], environment=prepared,
         baseline_files=tuple(sorted(files if files is not None else baseline_files)), invocation='diagnostic-build')
     builder = m.TaskBuilder(store=store, registry=reg, revision='a' * 40)
     return m, store, reg, builder, inputs, baseline, reference, private
@@ -206,7 +210,7 @@ def test_oversized_inventory_fails_before_freeze_and_replays_accounting(tmp_path
     assert reg.events() == before and reg.accounting(job_id) == account
 
 
-@pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'scenario', 'public-check'])
+@pytest.mark.parametrize('drift', ['missing', 'baseline', 'policy', 'verifier', 'public-check'])
 def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeypatch, drift):
     m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
     if drift == 'missing':
@@ -217,8 +221,8 @@ def test_prerequisite_failure_is_typed_and_never_builds_a_root(tmp_path, monkeyp
     elif drift == 'policy':
         changed = mutate(store, inputs.environment.recipe, setup=[{'argv': ['sh', '-c', 'unsafe'], 'working_directory': '/workspace', 'timeout_seconds': 2.0}])
         inputs = inputs.model_copy(update={'environment': PreparedEnvironment(recipe=changed, policy=inputs.environment.policy)})
-    elif drift == 'scenario':
-        inputs = inputs.model_copy(update={'scenario_plan': mutate(store, inputs.scenario_plan, contract=inputs.environment.recipe.model_dump(mode='json') | {'kind': 'RequirementContract'})})
+    elif drift == 'verifier':
+        inputs = inputs.model_copy(update={'verifier': mutate(store, inputs.verifier, contract=inputs.environment.recipe.model_dump(mode='json') | {'kind': 'RequirementContract'})})
     else:
         inputs = inputs.model_copy(update={'contract': mutate(store, inputs.contract, public_checks=[private.model_dump(mode='json')])})
     result = builder.build(inputs, owner='diagnostic', claim_key='bad-1')
@@ -305,10 +309,9 @@ def test_changed_contract_requires_new_complete_root_and_keeps_raw_H(tmp_path, m
     m, store, reg, builder, inputs, baseline, reference, private = fixture(tmp_path, monkeypatch)
     first = builder.build(inputs, owner='diagnostic', claim_key='original')
     first_bytes = builder.solver_package(first.artifacts[0])
-    contract = mutate(store, inputs.contract, visible_request='DIAGNOSTIC changed public request')
-    plan = mutate(store, inputs.scenario_plan, contract=contract)
-    verifier = mutate(store, inputs.verifier, contract=contract, scenario_plan=plan)
-    changed = inputs.model_copy(update={'contract': contract, 'scenario_plan': plan, 'verifier': verifier})
+    contract = mutate(store, inputs.contract, capability='DIAGNOSTIC changed public capability')
+    verifier = mutate(store, inputs.verifier, contract=contract)
+    changed = inputs.model_copy(update={'contract': contract, 'verifier': verifier})
     second = builder.build(changed, owner='diagnostic', claim_key='changed')
     assert second.disposition == c.Disposition.SUCCESS and first.artifacts != second.artifacts
     for result in (first, second):
