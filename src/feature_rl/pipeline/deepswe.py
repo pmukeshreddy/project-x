@@ -77,11 +77,14 @@ def package_solver(store, instruction, baseline, runtime):
 SNAPSHOT = r'''
 import hashlib,json,os,pathlib,stat,subprocess
 root=pathlib.Path('/app'); rows=[]
-names=subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+names=subprocess.check_output(['git','ls-files','--recurse-submodules','-z']).decode().split('\0')
 for name in sorted(filter(None,names)):
     p=root/name
     try:
         s=p.lstat()
+        # Uninitialized Git submodules are empty directories, not file blobs.
+        if stat.S_ISDIR(s.st_mode):
+            rows.append([name,'directory']); continue
         data=os.readlink(p).encode() if stat.S_ISLNK(s.st_mode) else p.read_bytes()
         rows.append([name,stat.S_IFMT(s.st_mode),stat.S_IMODE(s.st_mode),hashlib.sha256(data).hexdigest()])
     except FileNotFoundError: rows.append([name,'missing'])
@@ -230,7 +233,28 @@ class DeepSWE:
                   'official_input_sha256':input_hash, 'platform':platform, 'image_digest':image,
                   'official_files':{n:self._put(b, 'deepswe-official-file') for n,b in input_files.items()},
                   'image_architecture':image_info['Architecture']}
-        # Only replace the mutable FROM reference with the same resolved image.
+        verifier_base = image
+        # Polars' optimized x86 runtime segfaults under ARM-hosted emulation.
+        # Its official compat wheel preserves the installed version and API.
+        if platform == 'linux/amd64' and self._command(
+                ['info', '--format', '{{.Architecture}}']).stdout.strip() in (b'arm64', b'aarch64'):
+            with self._container(image, record, 'runtime-compatibility-probe') as name:
+                version = self._exec(name, ['python3', '-c',
+                    "import importlib.metadata as m; print(next((d.version for d in "
+                    "m.distributions() if d.metadata['Name'] == 'polars-runtime-32'), ''))"
+                    ]).stdout.decode().strip()
+            if version:
+                runtime_tag = 'feature-rl-deepswe:'+input_hash[:24]+'-runtime'
+                dockerfile = 'FROM '+image+'\nRUN '+json.dumps(['python3', '-m', 'pip',
+                    'install', '--no-cache-dir', '--no-deps', 'polars-runtime-compat=='+version])+'\n'
+                built = self._command(['build', '--platform', platform, '-t', runtime_tag, '-'],
+                                      stdin=dockerfile.encode(), timeout=1800)
+                record['runtime_build_log'] = self._put(built.stdout+built.stderr, 'deepswe-build-log')
+                record['official_image_digest'] = image
+                record['runtime_compatibility'] = {'polars-runtime-compat':version}
+                image = record['image_digest'] = self._inspect(runtime_tag)['Id']
+                verifier_base = runtime_tag
+        # Resolve FROM to the runtime image without changing verifier code.
         # The official verifier code and test files are copied byte-for-byte.
         context = self.state.path/'build-contexts'/task_id
         context.mkdir(parents=True, exist_ok=True)
@@ -240,7 +264,7 @@ class DeepSWE:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(path.read_bytes())
         dockerfile = (context/'Dockerfile').read_text()
-        dockerfile, count = re.subn(r'^FROM\s+\S+', 'FROM '+image, dockerfile, count=1, flags=re.M)
+        dockerfile, count = re.subn(r'^FROM\s+\S+', 'FROM '+verifier_base, dockerfile, count=1, flags=re.M)
         if count != 1:
             raise ValueError('official verifier Dockerfile has no FROM')
         (context/'Dockerfile').write_text(dockerfile)
@@ -253,7 +277,9 @@ class DeepSWE:
             p.relative_to(context).as_posix():digest(p.read_bytes()) for p in context.rglob('*') if p.is_file()}))
         with self._container(image, record, 'baseline-construction') as name:
             snapshot = self.snapshot(name)
-            if snapshot['head'] != metadata['metadata']['base_commit_hash']:
+            base_commit = self._exec(name, ['git', 'rev-parse', '--verify',
+                metadata['metadata']['base_commit_hash']+'^{commit}']).stdout.decode().strip()
+            if snapshot['head'] != base_commit:
                 raise ValueError('official image HEAD differs from official B commit')
             if snapshot['private_paths_present']:
                 raise ValueError('official solver image contains private task material')
@@ -445,10 +471,10 @@ Path('/tmp/feature-rl-reset-probe').write_text('dirty')
         metadata = record['metadata']
         runtime = {'version':'deepswe-official-runtime-v1', 'task_id':task_id,
             'repository_url':metadata['metadata']['repository_url'],
-            'base_commit':metadata['metadata']['base_commit_hash'],
+            'base_commit':record['baseline_snapshot']['head'],
             'image_digest':record['image_digest'], 'platform':record['platform'],
             'working_directory':'/app', 'instruction_path':'/instruction.md',
-            'network':'none', 'tools':'Tools and dependencies preinstalled in the official image',
+            'network':'none', 'tools':'Tools and dependencies preinstalled in the task image',
             'limits':{k:v for k,v in metadata['environment'].items() if k in
                       ('cpus','memory_mb','storage_mb','gpus')},
             'episode_timeout_seconds':metadata['agent']['timeout_sec'],

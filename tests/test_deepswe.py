@@ -93,3 +93,100 @@ def test_official_docker_episode_can_read_instruction_and_reset_edits():
         assert pipeline.snapshot(reset['container']) == before
     finally:
         pipeline.close(episode['episode'])
+
+
+@pytest.mark.parametrize('initialized', [True, False])
+def test_baseline_snapshot_supports_git_submodules(tmp_path, initialized):
+    import subprocess
+    import sys
+    from feature_rl.pipeline.deepswe import SNAPSHOT
+
+    def git(directory, *args):
+        return subprocess.check_output(['git', '-c', 'user.name=Test', '-c',
+            'user.email=test@example.invalid', '-c', 'protocol.file.allow=always',
+            '-C', str(directory), *args], stderr=subprocess.PIPE)
+
+    dependency = tmp_path/'dependency'
+    dependency.mkdir()
+    git(dependency, 'init')
+    (dependency/'data.txt').write_text('baseline')
+    git(dependency, 'add', '.')
+    git(dependency, 'commit', '-m', 'baseline')
+    repository = tmp_path/'repo'
+    repository.mkdir()
+    git(repository, 'init')
+    git(repository, 'submodule', 'add', str(dependency), 'data')
+    git(repository, 'commit', '-am', 'add submodule')
+    if not initialized:
+        git(repository, 'submodule', 'deinit', '-f', '--all')
+    script = SNAPSHOT.replace("pathlib.Path('/app')", 'pathlib.Path('+repr(str(repository))+')')
+
+    def snapshot():
+        return json.loads(subprocess.check_output([sys.executable, '-c', script], cwd=repository))
+
+    baseline = snapshot()
+    assert baseline['status'] == ''
+    if initialized:
+        (repository/'data/data.txt').write_text('changed')
+        dirty = snapshot()
+        assert dirty['tree_sha256'] != baseline['tree_sha256']
+        assert dirty['status']
+        git(repository/'data', 'reset', '--hard', 'HEAD')
+    assert snapshot() == baseline
+
+
+@pytest.mark.skipif(not os.environ.get('FEATURE_RL_DEEPSWE_STATE'), reason='requires official Eicrud image')
+def test_official_build_resolves_abbreviated_base_commit(tmp_path):
+    import uuid
+    from feature_rl.pipeline.deepswe import DeepSWE
+    pipeline = DeepSWE(tmp_path/'state')
+    official = Path(os.environ['FEATURE_RL_DEEPSWE_STATE']).resolve().parent/'upstream/tasks/eicrud-keyset-pagination-cursor'
+    # Keep this fresh-state integration build from retagging a live run's image.
+    tag = 'feature-rl-deepswe-test:'+uuid.uuid4().hex
+    command = pipeline._command
+    def isolated_command(argv, **kwargs):
+        return command([tag if arg.startswith('feature-rl-deepswe:') else arg
+                        for arg in argv], **kwargs)
+    pipeline._command = isolated_command
+    try:
+        record = pipeline.build(official)
+        assert record['metadata']['metadata']['base_commit_hash'] == '68dafce'
+        assert record['baseline_snapshot']['head'] == '68dafce500a85227b996d8fcab466d7a0c88809e'
+    finally:
+        command(['image', 'rm', tag], checked=False)
+
+
+@pytest.mark.skipif(not os.environ.get('FEATURE_RL_DEEPSWE_STATE'), reason='requires official Narwhals image')
+def test_official_polars_runtime_can_construct_dataframe(tmp_path):
+    import uuid
+    from feature_rl.pipeline.deepswe import DeepSWE
+    existing = DeepSWE(Path(os.environ['FEATURE_RL_DEEPSWE_STATE']))
+    original = existing._record('narwhals-rolling-window-suite')
+    pipeline = DeepSWE(tmp_path/'state')
+    official = existing.state.path.parent/'upstream/tasks/narwhals-rolling-window-suite'
+    prefix = 'feature-rl-deepswe-test:'+uuid.uuid4().hex
+    tags = {}
+    command = pipeline._command
+    def isolated_command(argv, **kwargs):
+        for arg in argv:
+            if arg.startswith('feature-rl-deepswe:'):
+                tags.setdefault(arg, prefix+'-'+str(len(tags)))
+        if argv[0] == 'build' and argv[-1] != '-':
+            dockerfile = Path(argv[-1])/'Dockerfile'
+            content = dockerfile.read_text()
+            for original_tag, test_tag in tags.items():
+                content = content.replace(original_tag, test_tag)
+            dockerfile.write_text(content)
+        return command([tags.get(arg, arg) for arg in argv], **kwargs)
+    pipeline._command = isolated_command
+    try:
+        record = pipeline.build(official)
+        assert record['baseline_snapshot'] == original['baseline_snapshot']
+        with pipeline._container(record['image_digest'], record, 'runtime-test') as name:
+            result = pipeline._exec(name, ['python3', '-c',
+                "import polars as pl; assert pl.__version__ == '1.39.3'; "
+                "assert pl.DataFrame({'x': [1, 2]}).shape == (2, 1)"], checked=False)
+            assert result.exit_code == 0, result.stderr.decode(errors='replace')
+    finally:
+        for tag in reversed(list(tags.values())):
+            command(['image', 'rm', tag], checked=False)
