@@ -31,14 +31,50 @@ def _absolute(path, name):
     return path
 
 
+def _package_root():
+    import feature_rl
+    return Path(feature_rl.__file__).resolve().parent
+
+
+def _git_revision(package_root):
+    """Commit of this project only. A venv nested in another checkout is not this repo."""
+    for parent in (package_root, *package_root.parents):
+        if not (parent / '.git').exists():
+            continue
+        try:
+            text = (parent / 'pyproject.toml').read_text()
+        except OSError:
+            continue
+        if 'name = "feature-rl"' not in text and "name = 'feature-rl'" not in text:
+            continue
+        try:
+            value = subprocess.check_output(
+                ['git', '-C', str(parent), 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+        except (OSError, subprocess.CalledProcessError):
+            return None
+        if len(value) in (40, 64) and all(item in '0123456789abcdef' for item in value):
+            return value
+        return None
+    return None
+
+
+def _source_revision(package_root):
+    rows = {}
+    for path in package_root.rglob('*'):
+        if not path.is_file() or path.is_symlink() or path.suffix != '.py' or '__pycache__' in path.parts:
+            continue
+        rows[path.relative_to(package_root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    if not rows:
+        raise ValueError('installed feature_rl source is unavailable')
+    return hashlib.sha256(canonical_json(dict(sorted(rows.items())))).hexdigest()
+
+
 def _revision():
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        if (parent / '.git').exists():
-            value = subprocess.check_output(['git', '-C', str(parent), 'rev-parse', 'HEAD'], text=True).strip()
-            if len(value) in (40, 64) and all(item in '0123456789abcdef' for item in value):
-                return value
-    raise ValueError('current implementation revision is unavailable')
+    root = _package_root()
+    git = _git_revision(root)
+    if git is not None:
+        return git
+    return _source_revision(root)
 
 
 def _task_ref(record):

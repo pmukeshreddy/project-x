@@ -51,6 +51,33 @@ def _bootstrap(tmp_path, task_id):
     return model, artifacts, output, package, result
 
 
+def test_revision_without_git_hashes_installed_source(tmp_path, monkeypatch):
+    from feature_rl.pipeline import native_bootstrap
+    root = tmp_path / 'feature_rl'
+    (root / 'pipeline').mkdir(parents=True)
+    (root / '__init__.py').write_text('value = 1\n')
+    (root / 'pipeline' / 'native_bootstrap.py').write_text('def revision():\n    return 1\n')
+    (root / '__pycache__').mkdir()
+    (root / '__pycache__' / 'native_bootstrap.pyc').write_bytes(b'compiled')
+    (root / 'model.safetensors').write_bytes(b'weights')
+    monkeypatch.setattr(native_bootstrap, '_package_root', lambda: root)
+    first = native_bootstrap._revision()
+    copy = tmp_path / 'same'
+    copy.mkdir()
+    for path in root.rglob('*'):
+        if path.is_dir():
+            continue
+        target = copy / path.relative_to(root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(path.read_bytes())
+    monkeypatch.setattr(native_bootstrap, '_package_root', lambda: copy)
+    assert native_bootstrap._revision() == first
+    assert len(first) == 64 and all(item in '0123456789abcdef' for item in first)
+    (root / 'pipeline' / 'native_bootstrap.py').write_text('def revision():\n    return 2\n')
+    monkeypatch.setattr(native_bootstrap, '_package_root', lambda: root)
+    assert native_bootstrap._revision() != first
+
+
 def test_bootstrap_native_command_exists():
     from feature_rl.cli import parser
     args = parser().parse_args(['bootstrap-native', '--model', '/models/qwen', '--work', '/checkpoints/qwen',
