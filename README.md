@@ -19,6 +19,8 @@ and `evaluate`, plus source screening, authoring, resolution and publication rec
 and the actual library services. See [the runbook](docs/runbook.md) for commands,
 configuration and recovery, and [the native launch contract](docs/reports/M7-native-launch.md)
 for pinned Linux/CUDA setup, training and checkpoint resume.
+The GPU training stack is one image; build and run it from
+[the training image section](docs/runbook.md#training-image).
 
 Environment authoring uses `gpt-6-astra` through the installed Codex CLI and its
 existing ChatGPT login. There is one provider, with strict output schemas and
@@ -67,7 +69,7 @@ packages stay fixed. Unavailable dependency resolution leaves the result unmeasu
 unsafe declarations are candidate rejections. Candidate resolutions are build
 artifacts; the task and environment recipe retain their original identities.
 Experiment splits and authoring budgets remain explicit.
-GPU training,
-native GPU inference, new task generation and experimental results remain
-deferred and unverified. No real task has been fully qualified and released.
+The GPU training stack is packaged as the training image. Native GPU execution,
+new task generation and experimental results remain unverified on this machine.
+No real task has been fully qualified and released.
 SSH human approval is not required for new task admission.

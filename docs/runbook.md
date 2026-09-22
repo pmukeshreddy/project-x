@@ -257,17 +257,68 @@ evidence; CLI flags cannot replace them.
 The run result's `RolloutRecord.run_id` is the selected child Registry run job ID;
 the native parent separately retains startup/activation/shutdown and child costs.
 
-Native launch is deferred and unverified. The executable Linux setup, pinned
-SkyRL/Harbor versions, model/reference/tokenizer manifest imports, exact probe
-inputs, GRPO launch and interrupted-update recovery are specified in
-[the M7 native launch contract](reports/M7-native-launch.md). Use the qualified
-Linux Python 3.12/CUDA environment's interpreter with the same `-m feature_rl`
-commands. This Mac's CPU tests and arm64 Docker worker do not establish GPU fit or
-the future protected worker socket forwarding. No download or installation is
+Native launch behavior, pinned SkyRL/Harbor versions, model/reference/tokenizer
+manifest imports, exact probe inputs, GRPO launch and interrupted-update recovery
+are specified in [the M7 native launch contract](reports/M7-native-launch.md).
+On a GPU server, run the same `feature-rl` command inside the training image
+below. This Mac does not establish CUDA fit. No download or installation is
 performed by composition. Native constructors are inert; actual initialization
 occurs only after the service selects its Registry claim and unknown-cost intent.
 Every one-shot native command calls the service's cleanup-only `close()` in
 `finally`; original and cleanup failures are both retained on stderr.
+
+## Training image
+
+`docker/training.Dockerfile` is the Linux x86_64 training stack already pinned by
+the training code: Python 3.12, Ray 2.56.0, Torch 2.11.0+cu128, vLLM 0.23.0+cu129,
+Transformers 5.8.0, SkyRL `f5bc3b78dfddfb352870d5d7430cd226e5785838`, and Harbor
+`3de07a0e01f3368921766437fc7afece3ddec23d`, plus the project Pydantic 2.13.5 /
+pydantic-core 2.46.5 overlay. The image has the Docker client. It launches existing
+task containers through the host socket. It does not contain model weights, DeepSWE
+artifacts, datasets, checkpoints, or training outputs.
+
+The server needs an NVIDIA driver, Docker, and the NVIDIA Container Toolkit.
+Point `native-controller.json` at these container paths:
+
+- `native.settings.skyrl_checkout`: `/opt/skyrl`
+- `native.settings.model_directory`, `reference_directory`, and `tokenizer_directory`: directories under `/models`
+- `native.settings.work_directory`: a directory under `/checkpoints`, not inside the model, reference, or tokenizer directories
+- `store_root` and `registry_root`: directories under `/artifacts`
+- `runtime.state_root`: a directory under `/artifacts`
+- `runtime.socket_path`: `/var/run/docker.sock`
+
+The image runs as root. Those directories must be owned by the container user and
+not writable by group or others; that is the existing native path check.
+
+### Build
+
+Build on the GPU server. The image is the CUDA training stack.
+
+```bash
+docker build \
+  -f docker/training.Dockerfile \
+  -t feature-rl-training .
+```
+
+### Run on GPU server
+
+```bash
+docker run --rm --gpus all \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.artifacts:/artifacts" \
+  -v "$PWD/models:/models" \
+  -v "$PWD/checkpoints:/checkpoints" \
+  -v "$PWD/native-controller.json:/config/native-controller.json:ro" \
+  -v "$PWD/train-request.json:/config/train-request.json:ro" \
+  feature-rl-training \
+  feature-rl \
+    --config /config/native-controller.json \
+    train \
+    --request /config/train-request.json \
+    --invocation grpo-001
+```
+
+`nvidia-smi`, CUDA availability, vLLM, and GRPO itself are checked on that server.
 
 Audit requires `audit` with the actual M8 `revision`, frozen `selection_manifest`,
 selection-ID-to-attestation `attestations` mapping, and external `human` enrollment

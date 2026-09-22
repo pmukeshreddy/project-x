@@ -1,0 +1,17 @@
+.git
+.venv
+.venv-training-cpu
+.feature-rl
+.superpowers
+.local
+.artifacts
+.pytest_cache
+.ruff_cache
+docs
+models
+checkpoints
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+**/*.egg-info
+dist
