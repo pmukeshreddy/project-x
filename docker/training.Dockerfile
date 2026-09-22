@@ -66,7 +66,9 @@ RUN set -euxo pipefail \
         'pydantic==2.13.5 --hash=sha256:346a034f080da3755d8e9cb5e00e8b07de1d39e4f6e2c87d8ab7cafa0b269a73' \
         'pydantic-core==2.46.5 --hash=sha256:0fc5be0abd4a407e200d844b404e33639a554e7bd0d448e7b9ae181be4789ac2' \
         > /tmp/overlay/requirements.txt \
+    && cd /tmp/overlay \
     && uv pip install --python /opt/skyrl/.venv/bin/python --no-deps --require-hashes --no-index --find-links /tmp/overlay -r /tmp/overlay/requirements.txt \
+    && cd /opt/skyrl \
     && uv pip install --python /opt/skyrl/.venv/bin/python --no-deps --editable /opt/skyrl \
     && git -C /opt/skyrl checkout -- . \
     && rm -rf /tmp/overlay /tmp/feature-rl-python /root/.cache /tmp/uv-cache \
