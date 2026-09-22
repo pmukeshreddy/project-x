@@ -27,7 +27,7 @@ class QualificationService:
         task_version=c.ArtifactRef.model_validate(task_version)
         self.registry.register(task_version)
         self.registry.assert_usable(task_version)
-        validation=None;assessments={};issues=[]
+        validation=None;dependencies=();assessments={};issues=[]
         try:
             checked=load_verifier(self.store,task_version)
             if checked.task.state!=c.TaskState.BUILT or checked.task.qualification is not None:
@@ -38,9 +38,9 @@ class QualificationService:
             proof=validate_reference(self.store,checked.verifier,checked.task.environment,pair.baseline,pair.reference)
             validation=checked.verifier.validation
             runs=(proof.baseline,proof.reference,proof.repeated_reference)
-            self.registry.register(validation,dependencies=tuple(dict.fromkeys((proof.source_pair,proof.environment,
+            dependencies=tuple(dict.fromkeys((proof.source_pair,proof.environment,
                 *proof.inputs,*proof.expected,*(ref for run in runs for ref in
-                    (run.source,run.build,*run.executions,*run.outputs))))))
+                    (run.source,run.build,*run.executions,*run.outputs)))))
             for name,detail in (
                     ('baseline_health','B builds and executes the selected commands'),
                     ('baseline_absence','B fails at least one selected feature input'),
@@ -59,7 +59,7 @@ class QualificationService:
             baseline_health=assessments.get('baseline_health'),baseline_absence=assessments.get('baseline_absence'),
             reference_run=assessments.get('reference_run'),rejection_reasons=tuple(issues),policy_version=self.policy.policy_id)
         report_ref=self.store.put_artifact(report)
-        self.registry.register(report_ref)
+        self.registry.register(report_ref,dependencies=dependencies)
         return c.OperationResult(operation='qualify',disposition=disposition,artifacts=(report_ref,),
             evidence=(ev,),costs=report.costs,reason='; '.join(issues) or 'Frozen B/H evidence and solver package validated')
 

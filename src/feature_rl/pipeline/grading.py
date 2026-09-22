@@ -39,7 +39,7 @@ def configuration(factory,request):
     verifier=typed(factory.store,task.private_oracle,c.VerifierBundle)
     inner=[]
     for case in verifier.cases:
-        for ref in (case.inputs,case.comparison):
+        for ref in (case.inputs,case.expected):
             try:value=json.loads(read_bytes(factory.store,ref,MAX_DOCUMENT))
             except (ValueError,UnicodeDecodeError):continue  # actual M4 records malformed input
             inner.extend(references(value))

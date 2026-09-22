@@ -1362,6 +1362,8 @@ def _infer(repo):
             reqs, cons = repo.requirements(path)
             requirements.extend(reqs)
             constraints.extend(cons)
+    groups = _table(manifest.get('dependency-groups', {}), 'dependency-groups')
+    requirements.extend(_strings(groups.get('tests', []), 'dependency-groups.tests'))
     for path in ('constraints.txt', 'constraints.in'):
         if path in repo.files:
             reqs, cons = repo.requirements(path, constraint=True)
