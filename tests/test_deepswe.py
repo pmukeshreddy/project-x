@@ -1,4 +1,5 @@
 """DeepSWE import must preserve official grading and the solver projection."""
+from contextlib import contextmanager
 import io
 import json
 import os
@@ -56,6 +57,37 @@ def test_cli_exposes_deepswe_without_configuring_authoring_or_training():
                               '--task', '/tmp/upstream/tasks/one'])
     assert args.command == 'deepswe' and args.action == 'build'
     assert args.config is None
+
+
+def test_legacy_verifier_state_uses_deterministic_tag_without_rewriting_json(tmp_path):
+    from feature_rl.pipeline.deepswe import DeepSWE
+    pipeline = DeepSWE(tmp_path/'state')
+    source_hash = 'ab'*32
+    tag = 'feature-rl-deepswe:'+source_hash[:24]
+    local_id = 'sha256:'+'cd'*32
+    pipeline.state.write('task-legacy-task.json', {
+        'task_id': 'legacy-task', 'official_input_sha256': source_hash, 'verifier_image': local_id})
+    path = pipeline.state.path/'task-legacy-task.json'
+    before = path.read_bytes()
+    assert b'verifier_tag' not in before
+
+    def command(argv, **kwargs):
+        assert argv == ['image', 'inspect', tag]
+        return type('Result', (), {'reason': 'exited', 'exit_code': 0, 'stdout': b'[{}]', 'stderr': b''})()
+    pipeline._command = command
+    started = []
+
+    @contextmanager
+    def container(image, task, role):
+        started.append((image, role))
+        raise RuntimeError('stop after verifier selection')
+        yield
+
+    pipeline._container = container
+    with pytest.raises(RuntimeError, match='stop after verifier selection'):
+        pipeline.grade('legacy-task', b'')
+    assert started == [(tag, 'official-verifier')]
+    assert path.read_bytes() == before
 
 
 def test_package_requires_successful_controls_and_reset(tmp_path):

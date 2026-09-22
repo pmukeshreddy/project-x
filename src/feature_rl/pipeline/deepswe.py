@@ -129,6 +129,19 @@ class DeepSWE:
     def _inspect(self, image):
         return json.loads(self._command(['image', 'inspect', image]).stdout)[0]
 
+    def _resolve_verifier(self, record):
+        """Use the deterministic tag when this daemon has it.
+
+        Saved image IDs are not stable across Docker Desktop and Linux Engine.
+        Old records omit verifier_tag; the tag is still the first 24 hex digits
+        of official_input_sha256. A missing tag keeps the stored image ID.
+        """
+        tag = record.get('verifier_tag') or 'feature-rl-deepswe:'+record['official_input_sha256'][:24]
+        inspected = self._command(['image', 'inspect', tag], checked=False)
+        if inspected.reason == 'exited' and inspected.exit_code == 0:
+            return tag
+        return record['verifier_image']
+
     def _create(self, image, task, role):
         operation = uuid.uuid4().hex
         name = 'feature-rl-ds-'+operation
@@ -216,7 +229,7 @@ class DeepSWE:
             if existing['official_input_sha256'] != input_hash:
                 raise ValueError('official task bytes changed; use a new state directory')
             self._inspect(existing['image_digest'])
-            self._inspect(existing['verifier_image'])
+            self._inspect(self._resolve_verifier(existing))
             return existing
         tag = metadata['environment']['docker_image']
         manifest = json.loads(self._command(['manifest', 'inspect', '--verbose', tag], timeout=120).stdout)
@@ -272,6 +285,7 @@ class DeepSWE:
         built = self._command(['build', '--platform', platform, '--network', 'none',
                                '-t', verifier_tag, str(context)], timeout=1800)
         record['build_log'] = self._put(built.stdout+built.stderr, 'deepswe-build-log')
+        record['verifier_tag'] = verifier_tag
         record['verifier_image'] = self._inspect(verifier_tag)['Id']
         record['verifier_build_context_sha256'] = digest(canonical_json({
             p.relative_to(context).as_posix():digest(p.read_bytes()) for p in context.rglob('*') if p.is_file()}))
@@ -303,7 +317,7 @@ class DeepSWE:
                    'verifier_image':record['verifier_image'],
                    'official_input_sha256':record['official_input_sha256'],
                    'patch_sha256':digest(patch), 'reward':None}
-        with self._container(record['verifier_image'], record, 'official-verifier') as name:
+        with self._container(self._resolve_verifier(record), record, 'official-verifier') as name:
             self._exec(name, ['mkdir', '-p', '/logs/artifacts'])
             self._copy_bytes(name, '/logs/artifacts/model.patch', patch)
             for key, value in record['metadata']['verifier'].get('env', {}).items():

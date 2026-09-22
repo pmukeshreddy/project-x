@@ -302,17 +302,13 @@ docker build \
   -t feature-rl-training .
 ```
 
-Existing DeepSWE verifier images are only in the local Docker daemon, under
-`feature-rl-deepswe`. Save them once, copy the archive to the server, and load
-it there before training. `docker load` restores the same image IDs the artifact
-records already use.
+Transfer each DeepSWE verifier by its deterministic tag,
+`feature-rl-deepswe:` plus the first 24 hex characters of `official_input_sha256`.
+The task state JSON stays unchanged. Docker may assign a different image ID on load.
 
 ```bash
-docker save $(docker image ls --format '{{.Repository}}:{{.Tag}}' feature-rl-deepswe) -o deepswe-images.tar
-```
-
-```bash
-docker load -i deepswe-images.tar
+VERIFIER_TAG="feature-rl-deepswe:<task hash>"
+docker save "$VERIFIER_TAG" | ssh server 'docker load'
 ```
 
 ### Run on GPU server
