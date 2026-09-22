@@ -334,6 +334,19 @@ docker run --rm --gpus all \
 
 `nvidia-smi`, CUDA availability, vLLM, and GRPO itself are checked on that server.
 
+One packaged DeepSWE task uses the same image and the existing GRPO update.
+`native-controller.json` supplies the Qwen settings. `train-request.json` supplies
+the training config when `native.bootstrap` is absent. The command overrides
+group size and update count, uses one GPU and LoRA, grades the collected patch
+with DeepSWE `grade()`, and checkpoints after the update.
+
+```bash
+feature-rl deepswe --state /artifacts/deepswe train \
+  --task-id abs-module-cache-flags \
+  --group-size 4 \
+  --max-updates 1
+```
+
 Audit requires `audit` with the actual M8 `revision`, frozen `selection_manifest`,
 selection-ID-to-attestation `attestations` mapping, and external `human` enrollment
 path/digest. It needs no Docker or native configuration. Patch IDs must exactly
