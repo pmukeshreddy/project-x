@@ -340,8 +340,21 @@ the training config when `native.bootstrap` is absent. The command overrides
 group size and update count, uses one GPU and LoRA, grades the collected patch
 with DeepSWE `grade()`, and checkpoints after the update.
 
+On a fresh server, create the native configuration from the local Qwen directory
+and the packaged task record. This publishes real model manifests and does not
+download weights.
+
 ```bash
-feature-rl deepswe --state /artifacts/deepswe train \
+feature-rl bootstrap-native \
+  --model /models/qwen \
+  --work /checkpoints/qwen \
+  --state /state \
+  --task-id abs-module-cache-flags \
+  --output /config
+```
+
+```bash
+feature-rl deepswe --state /state train \
   --task-id abs-module-cache-flags \
   --group-size 4 \
   --max-updates 1
