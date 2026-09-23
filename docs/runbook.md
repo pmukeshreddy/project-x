@@ -294,12 +294,35 @@ to the `/models`, `/artifacts`, and `/checkpoints` mounts.
 
 ### Build
 
-Build on the GPU server. The image is the CUDA training stack.
+Build on the GPU server from a clean training source tree. The image records that commit as `FEATURE_RL_REVISION`.
 
 ```bash
+cd ~/project-x
+
+test -z "$(git status --porcelain -- src pyproject.toml docker/training.Dockerfile)" \
+  || { echo "dirty training source tree"; exit 1; }
+
+REV="$(git rev-parse HEAD)"
+
 docker build \
+  --build-arg FEATURE_RL_REVISION="$REV" \
   -f docker/training.Dockerfile \
   -t feature-rl-training .
+```
+
+Download the model explicitly. Bootstrap does not download weights. `docker run -i` is required so the script is passed on stdin.
+
+```bash
+docker run --rm -i \
+  -e HF_HUB_OFFLINE=0 \
+  -e TRANSFORMERS_OFFLINE=0 \
+  -e HF_TOKEN \
+  -v "$PWD/models:/models" \
+  feature-rl-training \
+  python - <<'PY'
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id="Qwen/Qwen2.5-Coder-7B-Instruct", local_dir="/models/qwen")
+PY
 ```
 
 Transfer each DeepSWE verifier by its deterministic tag,
@@ -340,24 +363,40 @@ the training config when `native.bootstrap` is absent. The command overrides
 group size and update count, uses one GPU and LoRA, grades the collected patch
 with DeepSWE `grade()`, and checkpoints after the update.
 
-On a fresh server, create the native configuration from the local Qwen directory
-and the packaged task record. This publishes real model manifests and does not
-download weights.
+On a fresh server, create the native configuration from the local model directory
+and the packaged task record.
 
 ```bash
-feature-rl bootstrap-native \
-  --model /models/qwen \
-  --work /checkpoints/qwen \
-  --state /state \
-  --task-id abs-module-cache-flags \
-  --output /config
+docker run --rm --gpus all \
+  -v "$PWD/.local/deepswe-v1.1/private/run-2026-09-22:/state" \
+  -v "$PWD/.artifacts:/artifacts" \
+  -v "$PWD/models:/models" \
+  -v "$PWD/checkpoints:/checkpoints" \
+  -v "$PWD/config:/config" \
+  feature-rl-training \
+  feature-rl bootstrap-native \
+    --model /models/qwen \
+    --model-id Qwen/Qwen2.5-Coder-7B-Instruct \
+    --work /checkpoints/qwen \
+    --state /state \
+    --task-id abs-module-cache-flags \
+    --output /config
 ```
 
 ```bash
-feature-rl deepswe --state /state train \
-  --task-id abs-module-cache-flags \
-  --group-size 4 \
-  --max-updates 1
+docker run --rm --gpus all \
+  --ipc=host \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.local/deepswe-v1.1/private/run-2026-09-22:/state" \
+  -v "$PWD/.artifacts:/artifacts" \
+  -v "$PWD/models:/models" \
+  -v "$PWD/checkpoints:/checkpoints" \
+  -v "$PWD/config:/config" \
+  feature-rl-training \
+  feature-rl deepswe --state /state train \
+    --task-id abs-module-cache-flags \
+    --group-size 4 \
+    --max-updates 1
 ```
 
 Audit requires `audit` with the actual M8 `revision`, frozen `selection_manifest`,

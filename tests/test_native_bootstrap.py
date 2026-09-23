@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from feature_rl.agents.protocol import HARNESS, INSTRUCTIONS
+from feature_rl.agents.protocol import DEEPSWE_INSTRUCTIONS, HARNESS
 from feature_rl.artifacts import canonical_json
 from feature_rl.contracts import ActorRole, TrainRequest, Visibility
 from feature_rl.pipeline.configuration import CLIConfiguration
@@ -39,59 +39,57 @@ def _task(root, task_id):
     return state, package
 
 
-def _bootstrap(tmp_path, task_id):
+def _bootstrap(tmp_path, task_id, monkeypatch, model_id='Example/Model'):
     from feature_rl.pipeline.native_bootstrap import bootstrap_native
+    monkeypatch.setenv('FEATURE_RL_REVISION', 'ab' * 20)
     model = tmp_path / task_id / 'model'
     _model(model)
     state, package = _task(tmp_path, task_id)
     output = tmp_path / task_id / 'config'
     artifacts = tmp_path / task_id / 'artifacts'
-    result = bootstrap_native(model=model, work=tmp_path / task_id / 'work', state=state,
+    result = bootstrap_native(model=model, model_id=model_id, work=tmp_path / task_id / 'work', state=state,
                               task_id=task_id, output=output, artifacts=artifacts)
     return model, artifacts, output, package, result
 
 
-def test_revision_without_git_hashes_installed_source(tmp_path, monkeypatch):
+def test_revision_requires_explicit_commit(monkeypatch):
+    import pytest
     from feature_rl.pipeline import native_bootstrap
-    root = tmp_path / 'feature_rl'
-    (root / 'pipeline').mkdir(parents=True)
-    (root / '__init__.py').write_text('value = 1\n')
-    (root / 'pipeline' / 'native_bootstrap.py').write_text('def revision():\n    return 1\n')
-    (root / '__pycache__').mkdir()
-    (root / '__pycache__' / 'native_bootstrap.pyc').write_bytes(b'compiled')
-    (root / 'model.safetensors').write_bytes(b'weights')
-    monkeypatch.setattr(native_bootstrap, '_package_root', lambda: root)
-    first = native_bootstrap._revision()
-    copy = tmp_path / 'same'
-    copy.mkdir()
-    for path in root.rglob('*'):
-        if path.is_dir():
-            continue
-        target = copy / path.relative_to(root)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(path.read_bytes())
-    monkeypatch.setattr(native_bootstrap, '_package_root', lambda: copy)
-    assert native_bootstrap._revision() == first
-    assert len(first) == 64 and all(item in '0123456789abcdef' for item in first)
-    (root / 'pipeline' / 'native_bootstrap.py').write_text('def revision():\n    return 2\n')
-    monkeypatch.setattr(native_bootstrap, '_package_root', lambda: root)
-    assert native_bootstrap._revision() != first
+    monkeypatch.delenv('FEATURE_RL_REVISION', raising=False)
+    with pytest.raises(ValueError, match='FEATURE_RL_REVISION is required'):
+        native_bootstrap._revision()
+    monkeypatch.setenv('FEATURE_RL_REVISION', 'abc')
+    with pytest.raises(ValueError, match='40 lowercase hex'):
+        native_bootstrap._revision()
+    monkeypatch.setenv('FEATURE_RL_REVISION', 'AB' * 20)
+    with pytest.raises(ValueError, match='40 lowercase hex'):
+        native_bootstrap._revision()
+    commit = 'ab' * 20
+    monkeypatch.setenv('FEATURE_RL_REVISION', commit)
+    assert native_bootstrap._revision() == commit
+    assert not hasattr(native_bootstrap, '_source_revision')
+    assert not hasattr(native_bootstrap, '_git_revision')
 
 
 def test_bootstrap_native_command_exists():
+    import pytest
     from feature_rl.cli import parser
-    args = parser().parse_args(['bootstrap-native', '--model', '/models/qwen', '--work', '/checkpoints/qwen',
+    args = parser().parse_args(['bootstrap-native', '--model', '/models/qwen',
+                                 '--model-id', 'Qwen/Qwen2.5-Coder-7B-Instruct', '--work', '/checkpoints/qwen',
                                  '--state', '/state', '--task-id', 'abs-module-cache-flags', '--output', '/config'])
     assert args.command == 'bootstrap-native'
-    assert args.task_id == 'abs-module-cache-flags' and args.model == '/models/qwen'
+    assert args.model_id == 'Qwen/Qwen2.5-Coder-7B-Instruct'
+    with pytest.raises(SystemExit):
+        parser().parse_args(['bootstrap-native', '--model', '/models/qwen', '--work', '/checkpoints/qwen',
+                              '--state', '/state', '--task-id', 'abs-module-cache-flags', '--output', '/config'])
 
 
-def test_bootstrap_writes_real_native_configuration(tmp_path):
+def test_bootstrap_writes_real_native_configuration(tmp_path, monkeypatch):
     from feature_rl.artifacts import ArtifactStore
     from feature_rl.cli import read_json
     from feature_rl.registry import Registry
     from transformers import AutoTokenizer
-    model, artifacts, output, package, result = _bootstrap(tmp_path, 'widget-cache')
+    model, artifacts, output, package, result = _bootstrap(tmp_path, 'widget-cache', monkeypatch)
     controller = read_json(output / 'native-controller.json', CLIConfiguration)
     request = read_json(output / 'train-request.json', TrainRequest)
     training = request.config
@@ -112,7 +110,12 @@ def test_bootstrap_writes_real_native_configuration(tmp_path):
     expected = tuple(int(item) for item in tokenizer.encode('probe', add_special_tokens=False))
     assert settings.probe_tokens == expected
     assert all(0 <= item < len(tokenizer) for item in settings.probe_tokens)
-    assert store.get_bytes(training.initial_policy.system_prompt) == INSTRUCTIONS.encode()
+    assert store.get_bytes(training.initial_policy.system_prompt) == DEEPSWE_INSTRUCTIONS.encode()
+    assert '/app' in DEEPSWE_INSTRUCTIONS and '/workspace/source' not in DEEPSWE_INSTRUCTIONS
+    assert 'fresh isolated worker' not in DEEPSWE_INSTRUCTIONS
+    assert training.initial_policy.identity.model == 'Example/Model'
+    assert training.initial_policy.identity.revision == published.sha256
+    assert controller.revision == 'ab' * 20 and controller.native.revision == 'ab' * 20
     assert training.initial_policy.system_prompt.visibility == Visibility.PUBLIC
     assert training.initial_policy.harness_version == HARNESS
     assert training.initial_policy.identity.provider == 'skyrl'
@@ -131,9 +134,44 @@ def test_bootstrap_writes_real_native_configuration(tmp_path):
     assert result['weights']['sha256'] == published.sha256
 
 
-def test_bootstrap_accepts_another_packaged_task(tmp_path):
+def test_bootstrap_failure_reports_the_original_reason(tmp_path, capsys):
+    import json
+    from feature_rl.cli import main
+    status = main(['bootstrap-native', '--model', str(tmp_path / 'missing-model'),
+                   '--model-id', 'Example/Model', '--work', str(tmp_path / 'work'),
+                   '--state', str(tmp_path / 'state'), '--task-id', 'missing-task',
+                   '--output', str(tmp_path / 'out')])
+    assert status == 2
+    value = json.loads(capsys.readouterr().out)
+    assert value['operation'] == 'construct'
+    assert 'local model directory is required' in value['reason']
+    assert str(tmp_path / 'missing-model') in value['reason']
+    assert 'ValidationError' not in value['reason']
+
+
+def test_bootstrap_requires_packaged_task_artifact(tmp_path, monkeypatch):
+    import pytest
+    from feature_rl.pipeline.deepswe import DeepSWE
+    from feature_rl.pipeline.native_bootstrap import bootstrap_native
+    monkeypatch.setenv('FEATURE_RL_REVISION', 'ab' * 20)
+    model = tmp_path / 'model'
+    _model(model)
+    state = tmp_path / 'state'
+    pipeline = DeepSWE(state)
+    pipeline.state.write('task-unpackaged.json', {
+        'task_id': 'unpackaged',
+        'official_files': {'instruction.md': {'sha256': 'ab' * 32, 'kind': 'deepswe-instruction',
+                                              'schema_version': 1, 'visibility': 'public', 'encoding': 'bytes'}},
+        'metadata': {'agent': {'timeout_sec': 300}, 'environment': {'memory_mb': 2048, 'storage_mb': 4096}},
+    })
+    with pytest.raises(ValueError, match='packaged DeepSWE task artifact is required'):
+        bootstrap_native(model=model, model_id='Example/Model', work=tmp_path / 'work', state=state,
+                         task_id='unpackaged', output=tmp_path / 'out', artifacts=tmp_path / 'artifacts')
+
+
+def test_bootstrap_accepts_another_packaged_task(tmp_path, monkeypatch):
     from feature_rl.cli import read_json
-    _, _, output, package, _ = _bootstrap(tmp_path, 'other-packaged-task')
+    _, _, output, package, _ = _bootstrap(tmp_path, 'other-packaged-task', monkeypatch)
     request = read_json(output / 'train-request.json', TrainRequest)
     assert request.config.tasks == (package,)
     assert request.config.tasks[0].kind == 'deepswe-solver-package'

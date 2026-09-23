@@ -90,6 +90,31 @@ def test_legacy_verifier_state_uses_deterministic_tag_without_rewriting_json(tmp
     assert path.read_bytes() == before
 
 
+def test_missing_verifier_tag_does_not_use_daemon_local_image_id(tmp_path):
+    from feature_rl.pipeline.deepswe import DeepSWE
+    pipeline = DeepSWE(tmp_path/'state')
+    source_hash = 'ab'*32
+    tag = 'feature-rl-deepswe:'+source_hash[:24]
+    local_id = 'sha256:'+'cd'*32
+    pipeline.state.write('task-legacy-task.json', {
+        'task_id': 'legacy-task', 'official_input_sha256': source_hash, 'verifier_image': local_id})
+    path = pipeline.state.path/'task-legacy-task.json'
+    before = path.read_bytes()
+    seen = []
+
+    def command(argv, **kwargs):
+        seen.append(argv[2])
+        if argv[2] == local_id:
+            return type('Result', (), {'reason': 'exited', 'exit_code': 0, 'stdout': b'[{}]', 'stderr': b''})()
+        return type('Result', (), {'reason': 'exited', 'exit_code': 1, 'stdout': b'', 'stderr': b'No such image'})()
+
+    pipeline._command = command
+    with pytest.raises(RuntimeError, match=tag):
+        pipeline._resolve_verifier(pipeline._record('legacy-task'))
+    assert seen == [tag]
+    assert path.read_bytes() == before
+
+
 def test_package_requires_successful_controls_and_reset(tmp_path):
     from feature_rl.pipeline.deepswe import DeepSWE
     pipeline = DeepSWE(tmp_path/'state')

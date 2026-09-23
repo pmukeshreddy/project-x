@@ -6,11 +6,13 @@ from feature_rl.training.core import group_advantages
 class _Backend:
     max_seq_len = 128
     vocab_size = 32
+    messages = None
 
     def verify_policy(self, policy):
         return None
 
     def render(self, messages):
+        self.messages = messages
         return 'prompt', (1, 2)
 
     def generate(self, context, *, policy, max_tokens, timeout, session_id):
@@ -19,7 +21,8 @@ class _Backend:
 
 class _Store:
     def get_bytes(self, ref, **kwargs):
-        return b'system'
+        from feature_rl.agents.protocol import DEEPSWE_INSTRUCTIONS
+        return DEEPSWE_INSTRUCTIONS.encode()
 
 
 class _Policy:
@@ -131,3 +134,10 @@ def test_collected_grade_reward_enters_existing_grpo_update(tmp_path):
     assert [row.turn.advantage for row in rows] == list(advantages)
     assert {row.instance_id for row in rows} == {task_id}
     assert calls[-1][0] == 'close'
+    from feature_rl.agents.protocol import DEEPSWE_INSTRUCTIONS, INSTRUCTIONS
+    system, user = session.backend.messages
+    assert system['content'] == DEEPSWE_INSTRUCTIONS
+    assert user['content'] == 'Fix the cache.\n'
+    assert '/workspace/source' not in system['content'] + user['content']
+    assert 'fresh isolated worker' not in system['content'] + user['content']
+    assert INSTRUCTIONS not in user['content']

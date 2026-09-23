@@ -92,6 +92,12 @@ ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1 \
     HF_HUB_DISABLE_TELEMETRY=1
 
+ARG FEATURE_RL_REVISION
+RUN test -n "${FEATURE_RL_REVISION}" \
+    && printf '%s\n' "${FEATURE_RL_REVISION}" | grep -Eq '^[0-9a-f]{40}$'
+ENV FEATURE_RL_REVISION=${FEATURE_RL_REVISION}
+LABEL org.opencontainers.image.revision=${FEATURE_RL_REVISION}
+
 RUN mkdir -p /artifacts /models /checkpoints /config /workspace
 
 WORKDIR /workspace

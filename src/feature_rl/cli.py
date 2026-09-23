@@ -82,6 +82,7 @@ def parser():
     add_cli(commands)
     bootstrap=commands.add_parser('bootstrap-native',help='write native-controller.json and train-request.json from a local model directory and a packaged DeepSWE task')
     bootstrap.add_argument('--model',required=True,help='absolute local Hugging Face model directory')
+    bootstrap.add_argument('--model-id',required=True,help='explicit model identity, such as the Hugging Face repository id')
     bootstrap.add_argument('--work',required=True,help='absolute native work directory, separate from the model')
     bootstrap.add_argument('--state',required=True,help='DeepSWE state directory containing the packaged task')
     bootstrap.add_argument('--task-id',required=True)
@@ -234,7 +235,7 @@ def main(argv=None):
     args=parser().parse_args(argv)
     if args.command=='config-schema':
         _emit(CLIConfiguration.model_json_schema(),None);return 0
-    operation={'deepswe':'construct','prepare-github':'construct','screen-source':'construct','construct-feature':'construct','author':'construct',
+    operation={'bootstrap-native':'construct','deepswe':'construct','prepare-github':'construct','screen-source':'construct','construct-feature':'construct','author':'construct',
         'resolve':'release','recover':'construct','retry-publication':'construct'}.get(args.command,args.command)
     try:
         if args.command=='deepswe':
@@ -243,7 +244,7 @@ def main(argv=None):
             return 0
         if args.command=='bootstrap-native':
             from feature_rl.pipeline.native_bootstrap import bootstrap_native
-            _emit(bootstrap_native(model=args.model,work=args.work,state=args.state,task_id=args.task_id,output=args.output),None)
+            _emit(bootstrap_native(model=args.model,model_id=args.model_id,work=args.work,state=args.state,task_id=args.task_id,output=args.output),None)
             return 0
         if args.command=='prepare-github':
             from feature_rl.intake.prepare import GitHubPreparationRequest, prepare_github

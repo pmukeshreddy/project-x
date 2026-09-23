@@ -130,17 +130,20 @@ class DeepSWE:
         return json.loads(self._command(['image', 'inspect', image]).stdout)[0]
 
     def _resolve_verifier(self, record):
-        """Use the deterministic tag when this daemon has it.
+        """Start only the deterministic verifier tag.
 
-        Saved image IDs are not stable across Docker Desktop and Linux Engine.
-        Old records omit verifier_tag; the tag is still the first 24 hex digits
-        of official_input_sha256. A missing tag keeps the stored image ID.
+        Image IDs differ across Docker daemons. A stored verifier_tag must equal
+        feature-rl-deepswe plus the first 24 hex characters of official_input_sha256.
+        Records without verifier_tag use that same derived tag. A missing image fails.
         """
-        tag = record.get('verifier_tag') or 'feature-rl-deepswe:'+record['official_input_sha256'][:24]
+        tag = 'feature-rl-deepswe:'+record['official_input_sha256'][:24]
+        if 'verifier_tag' in record and record['verifier_tag'] != tag:
+            raise ValueError('verifier_tag differs from the deterministic DeepSWE tag '+tag)
         inspected = self._command(['image', 'inspect', tag], checked=False)
-        if inspected.reason == 'exited' and inspected.exit_code == 0:
-            return tag
-        return record['verifier_image']
+        if inspected.reason != 'exited' or inspected.exit_code != 0:
+            detail = inspected.stderr.decode(errors='replace').strip()
+            raise RuntimeError('deterministic DeepSWE verifier image is required: '+tag+((': '+detail) if detail else ''))
+        return tag
 
     def _create(self, image, task, role):
         operation = uuid.uuid4().hex

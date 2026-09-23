@@ -1,12 +1,12 @@
 """Create native GRPO configuration from a local model directory and a packaged DeepSWE task."""
 import hashlib
-import json
+import os
+import re
 import shutil
-import subprocess
 from pathlib import Path
 
 from feature_rl import contracts as c
-from feature_rl.agents.protocol import HARNESS, INSTRUCTIONS
+from feature_rl.agents.protocol import DEEPSWE_INSTRUCTIONS, HARNESS
 from feature_rl.artifacts import ArtifactStore, canonical_json
 from feature_rl.pipeline.configuration import CLIConfiguration, NativeConfiguration
 from feature_rl.pipeline.deepswe import DeepSWE
@@ -31,62 +31,19 @@ def _absolute(path, name):
     return path
 
 
-def _package_root():
-    import feature_rl
-    return Path(feature_rl.__file__).resolve().parent
-
-
-def _git_revision(package_root):
-    """Commit of this project only. A venv nested in another checkout is not this repo."""
-    for parent in (package_root, *package_root.parents):
-        if not (parent / '.git').exists():
-            continue
-        try:
-            text = (parent / 'pyproject.toml').read_text()
-        except OSError:
-            continue
-        if 'name = "feature-rl"' not in text and "name = 'feature-rl'" not in text:
-            continue
-        try:
-            value = subprocess.check_output(
-                ['git', '-C', str(parent), 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
-        except (OSError, subprocess.CalledProcessError):
-            return None
-        if len(value) in (40, 64) and all(item in '0123456789abcdef' for item in value):
-            return value
-        return None
-    return None
-
-
-def _source_revision(package_root):
-    rows = {}
-    for path in package_root.rglob('*'):
-        if not path.is_file() or path.is_symlink() or path.suffix != '.py' or '__pycache__' in path.parts:
-            continue
-        rows[path.relative_to(package_root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
-    if not rows:
-        raise ValueError('installed feature_rl source is unavailable')
-    return hashlib.sha256(canonical_json(dict(sorted(rows.items())))).hexdigest()
-
-
 def _revision():
-    root = _package_root()
-    git = _git_revision(root)
-    if git is not None:
-        return git
-    return _source_revision(root)
+    value = os.environ.get('FEATURE_RL_REVISION')
+    if value is None:
+        raise ValueError('FEATURE_RL_REVISION is required')
+    if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+        raise ValueError('FEATURE_RL_REVISION must be exactly 40 lowercase hex characters')
+    return value
 
 
 def _task_ref(record):
-    if 'package' in record:
-        value = record['package']
-    else:
-        view = record.get('solver_view') or {}
-        files = record.get('official_files') or {}
-        value = view.get('instruction') or files.get('instruction.md')
-    if value is None:
-        raise ValueError('packaged DeepSWE task record has no published artifact')
-    return c.ArtifactRef.model_validate_json(canonical_json(value))
+    if 'package' not in record:
+        raise ValueError('packaged DeepSWE task artifact is required')
+    return c.ArtifactRef.model_validate_json(canonical_json(record['package']))
 
 
 def _bounded(manifest):
@@ -131,30 +88,16 @@ def _tokenizer_directory(model, artifacts):
     return destination
 
 
-def _model_identity(model):
-    config_path = model / 'config.json'
-    if not config_path.is_file():
-        return model.name, inspect_directory(model).files[0].sha256
-    raw = config_path.read_bytes()
-    value = json.loads(raw)
-    name = value.get('_name_or_path') if isinstance(value, dict) else None
-    if type(name) is not str or not name.strip() or name.startswith('/'):
-        name = value.get('model_type') if isinstance(value, dict) else None
-    if type(name) is not str or not name.strip():
-        name = model.name
-    return name, hashlib.sha256(raw).hexdigest()
-
-
 def _limits(record):
     metadata = record['metadata']
     agent = metadata['agent']
-    environment = metadata.get('environment') or {}
+    environment = metadata['environment']
     wall = float(agent['timeout_sec'])
     return c.ResourceLimits(
-        wall_seconds=wall, cpu_seconds=max(wall, 1.0),
-        memory_bytes=int(environment.get('memory_mb') or 4096) * 1024 * 1024,
+        wall_seconds=wall, cpu_seconds=wall,
+        memory_bytes=int(environment['memory_mb']) * 1024 * 1024,
         pids=1024, output_bytes=8 * 1024 * 1024,
-        disk_bytes=int(environment.get('storage_mb') or 10240) * 1024 * 1024,
+        disk_bytes=int(environment['storage_mb']) * 1024 * 1024,
         tool_calls=16, input_tokens=8192, output_tokens=1024)
 
 
@@ -162,8 +105,6 @@ def _probe_tokens(tokenizer_directory):
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_directory), local_files_only=True, trust_remote_code=False)
     identifiers = tuple(int(item) for item in tokenizer.encode('probe', add_special_tokens=False)[:32])
-    if not identifiers:
-        identifiers = tuple(int(item) for item in tokenizer.encode('probe', add_special_tokens=True)[:32])
     if not identifiers or any(item < 0 or item >= len(tokenizer) for item in identifiers):
         raise ValueError('tokenizer did not produce valid probe token IDs')
     return identifiers
@@ -174,14 +115,16 @@ def _digest(directory):
     return hashlib.sha256(canonical_json({item.path: item.sha256 for item in manifest.files})).hexdigest()
 
 
-def bootstrap_native(*, model, work, state, task_id, output, artifacts=Path('/artifacts')):
+def bootstrap_native(*, model, model_id, work, state, task_id, output, artifacts=Path('/artifacts')):
     model = _absolute(model, 'model')
     work = _absolute(work, 'work')
     state = _absolute(state, 'state')
     output = _absolute(output, 'output')
     artifacts = _absolute(artifacts, 'artifacts')
+    if type(model_id) is not str or not model_id.strip():
+        raise ValueError('explicit model id is required')
     if not model.is_dir():
-        raise ValueError('local model directory is required')
+        raise ValueError('local model directory is required: '+str(model))
     record = DeepSWE(state)._record(task_id)
     task = _task_ref(record)
     store = ArtifactStore(artifacts / 'store', c.ActorRole.CONTROLLER)
@@ -190,11 +133,10 @@ def bootstrap_native(*, model, work, state, task_id, output, artifacts=Path('/ar
     reference = publish_directory(store=store, registry=registry, path=model)
     tokenizer_directory = _tokenizer_directory(model, artifacts)
     tokenizer_sha256 = _digest(tokenizer_directory)
-    prompt = store.put_bytes(INSTRUCTIONS.encode(), 'agent-system-prompt', c.Visibility.PUBLIC)
+    prompt = store.put_bytes(DEEPSWE_INSTRUCTIONS.encode(), 'agent-system-prompt', c.Visibility.PUBLIC)
     registry.register(prompt)
-    name, model_revision = _model_identity(model)
     policy = c.PolicyConfig(
-        identity=c.ModelIdentity(provider='skyrl', model=name, revision=model_revision,
+        identity=c.ModelIdentity(provider='skyrl', model=model_id, revision=weights.sha256,
                                  weights=weights, tokenizer_digest=tokenizer_sha256),
         policy_version='base-' + weights.sha256[:16], temperature=1.0, top_p=1.0, seed=0,
         system_prompt=prompt, harness_version=HARNESS, require_token_probabilities=True)

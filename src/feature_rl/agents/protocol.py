@@ -19,6 +19,19 @@ Each stdout/stderr message shows at most 65536 bytes and reports omitted byte co
 Full bounded worker outputs remain in the controller's execution receipt.
 Submit the current saved source when finished. The environment and public request follow.
 '''
+DEEPSWE_INSTRUCTIONS = '''Return exactly one JSON action, without markdown:
+{"action":"read","path":"src/package/__init__.py"}
+{"action":"write","path":"src/package/example.py","content":"Python source"}
+{"action":"command","argv":["python","-c","..."],"stdin":"","timeout_seconds":10.0}
+{"action":"public_test","argv":["python","-m","pytest"],"stdin":"","timeout_seconds":10.0}
+{"action":"submit"}
+The repository root is /app. Read and write paths are relative to /app.
+Commands execute with /app as the working directory.
+Edits persist within the current DeepSWE episode until reset.
+Reset replaces the workspace with a fresh baseline.
+The private verifier is unavailable.
+Submit finishes the rollout.
+'''
 PathText = Annotated[str, Field(min_length=1,max_length=1024)]
 
 class Read(c.StrictModel):

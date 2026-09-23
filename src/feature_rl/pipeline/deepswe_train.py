@@ -5,7 +5,7 @@ The optimizer step and checkpoint are NativeSession.update and save_reload.
 """
 from pathlib import Path
 
-from feature_rl.agents.protocol import INSTRUCTIONS, Read, Submit, Write, parse_action
+from feature_rl.agents.protocol import Read, Submit, Write, parse_action
 from feature_rl.training.core import group_advantages
 from feature_rl.training.skyrl_bridge import UpdateRow
 from feature_rl.training.torch_backend import CausalTurn
@@ -93,8 +93,7 @@ def _episode(pipeline, session, task_id, episode_id, index, timeout):
         raise RuntimeError('DeepSWE instruction is unavailable')
     messages = [
         {'role': 'system', 'content': system.decode()},
-        {'role': 'user', 'content': 'Repository root for every path and command is /app.\n'
-         + INSTRUCTIONS + instruction['stdout']},
+        {'role': 'user', 'content': instruction['stdout']},
     ]
     turns = []
     for _ in range(_MAX_TURNS):
