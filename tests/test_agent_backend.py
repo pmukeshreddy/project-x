@@ -17,9 +17,11 @@ def backend(tmp_path,monkeypatch):
         def __len__(self):return 256
         def decode(self,tokens,**kwargs):return bytes(tokens).decode()
         def encode(self,text,**kwargs):return list(text.encode())
-        def apply_chat_template(self,messages,*,tokenize,add_generation_prompt):
+        def apply_chat_template(self,messages,*,tokenize,add_generation_prompt,return_dict=False):
             text=json.dumps(messages)+'ASSISTANT:'
-            return list(text.encode()) if tokenize else text
+            if not tokenize:return text
+            ids=list(text.encode())
+            return {'input_ids':ids} if return_dict else ids
     monkeypatch.setitem(sys.modules,'transformers',SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a,**kw:Tokenizer())))
     barrier=PolicyBarrier(('worker',))
     client=SkyRLTokenBackend(tokenizer_directory=path,tokenizer_sha256=digest,endpoint='http://127.0.0.1:9999',
@@ -30,6 +32,29 @@ def backend(tmp_path,monkeypatch):
     stamp=PolicyStamp('v1','f'*64,digest,client.template_digest)
     barrier.begin(stamp,(1,));barrier.acknowledge('worker',stamp,(1,))
     return client,policy
+
+
+def test_render_reads_transformers5_batch_encoding_and_rejects_token_mismatch(tmp_path,monkeypatch):
+    client,_policy=backend(tmp_path,monkeypatch)
+    class BatchEncoding(dict):
+        pass
+    messages=[{'role':'user','content':'visible only'}]
+    class Tokenizer:
+        def encode(self,text,**kwargs):
+            return list(text.encode()) if not text.endswith('MISMATCH') else [9]
+        def apply_chat_template(self,messages,*,tokenize,add_generation_prompt,return_dict=False):
+            text=json.dumps(messages)+'ASSISTANT:'
+            if not tokenize:return text
+            assert return_dict is True
+            return BatchEncoding(input_ids=list(text.encode()))
+    client.tokenizer=Tokenizer()
+    text,ids=client.render(messages)
+    assert isinstance(client.tokenizer.apply_chat_template(messages,tokenize=True,add_generation_prompt=True,return_dict=True),BatchEncoding)
+    assert ids==tuple(text.encode()) and ids!=('input_ids',)
+    client.tokenizer.apply_chat_template=lambda messages,*,tokenize,add_generation_prompt,return_dict=False:(
+        json.dumps(messages)+'ASSISTANT:MISMATCH' if not tokenize else BatchEncoding(input_ids=list(b'other')))
+    with pytest.raises(InvalidGeneration,match='rendered chat context and token IDs differ'):
+        client.render(messages)
 
 
 def test_http_sampling_uses_exact_ids_seed_and_behavior_probs(monkeypatch,tmp_path):

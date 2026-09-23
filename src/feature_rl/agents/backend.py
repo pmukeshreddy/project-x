@@ -108,7 +108,8 @@ class SkyRLTokenBackend(PolicyBackend):
 
     def render(self,messages):
         text=self.tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True)
-        ids=tuple(self.tokenizer.apply_chat_template(messages,tokenize=True,add_generation_prompt=True))
+        encoded=self.tokenizer.apply_chat_template(messages,tokenize=True,add_generation_prompt=True,return_dict=True)
+        ids=tuple(encoded['input_ids'])
         if tuple(self.tokenizer.encode(text,add_special_tokens=False))!=ids:
             raise InvalidGeneration('rendered chat context and token IDs differ')
         return text,ids
