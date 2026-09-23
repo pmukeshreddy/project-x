@@ -61,13 +61,16 @@ def test_loader_rejects_writable_files_and_ancestor_redirects(tmp_path):
 
 def test_native_sync_probes_every_actual_endpoint_and_refuses_partial_ack(tmp_path,monkeypatch):
     import feature_rl.training.native as module
-    session=object.__new__(NativeSession);session.settings=settings(tmp_path)
+    session=object.__new__(NativeSession);session.settings=settings(tmp_path,lora=module.LoRASettings(enabled=False))
     session.barrier=PolicyBarrier(('http://one','http://two'))
     policy=config().initial_policy
     policy=policy.model_copy(update={'identity':policy.identity.model_copy(update={'weights':config().reference_checkpoint})})
-    session.backend=SimpleNamespace(model_name=policy.identity.model,tokenizer_digest='c'*64,template_digest='d'*64,vocab_size=256)
+    session.backend=SimpleNamespace(model_name=policy.identity.model,inference_model=policy.identity.model,
+        tokenizer_digest='c'*64,template_digest='d'*64,vocab_size=256)
     calls=[]
+    async def ensure():return None
     async def sync():calls.append('actual API boundary double: awaited broadcast')
+    session.bridge=SimpleNamespace(_ensure_colocated_inference_asleep=ensure)
     session.trainer=SimpleNamespace(dispatch=SimpleNamespace(save_weights_for_sampler=sync))
     finish=['stop','stop']
     class Response:
@@ -107,6 +110,96 @@ def test_synchronize_rechecks_colocated_sleep_before_broadcast(tmp_path,monkeypa
     monkeypatch.setattr(module,'urlopen',lambda request,timeout: Response())
     session.synchronize(policy)
     assert order==['ensure_asleep','save_weights_for_sampler']
+
+
+def test_colocated_sleep_guard_requires_native_bridge():
+    session=object.__new__(NativeSession)
+    with pytest.raises(RuntimeError,match='native bridge is required before colocated inference residency checks'):
+        session._ensure_colocated_inference_asleep()
+
+
+def _residency_session(tmp_path):
+    """Real NativeSession methods with the same isolated doubles as the probe tests."""
+    import feature_rl.training.native as module
+    session=object.__new__(NativeSession)
+    session.settings=settings(tmp_path,lora=module.LoRASettings(enabled=False))
+    session.policy=config().initial_policy
+    session.backend=SimpleNamespace(verify_policy=lambda policy:None)
+    session.barrier=SimpleNamespace(stamp=('stamp',),probe=(1,),begin=lambda *args:None)
+    session.last_probe={'outputs':{}}
+    snapshot=[{'rank':0,'trainable_parameters':{'w':{'dtype':'float32','shape':[1],'sha256':'ab'}},
+        'optimizer_sha256':'cd'}]
+    session.worker_snapshot=lambda:snapshot
+    root=tmp_path/'native-output'
+    session.trainer=SimpleNamespace(global_step=0,cfg=SimpleNamespace(trainer=SimpleNamespace(
+        export_path=str(root/'export'),ckpt_path=str(root/'ckpt'))))
+    return session
+
+
+def test_update_export_sleeps_before_save_models(tmp_path):
+    session=_residency_session(tmp_path)
+    order=[]
+    async def bridge_update(rows,*,algorithm):
+        return {'grad_norm':1.}
+    async def ensure():
+        order.append('ensure_asleep')
+    def save_models():
+        order.append('save_models')
+        raise RuntimeError('export boundary')
+    session.bridge=SimpleNamespace(update=bridge_update,_ensure_colocated_inference_asleep=ensure)
+    session.trainer.save_models=save_models
+    with pytest.raises(RuntimeError,match='export boundary'):
+        session.update([],algorithm='grpo')
+    assert order==['ensure_asleep','save_models']
+
+
+def test_update_export_does_not_save_models_when_sleep_guard_fails(tmp_path):
+    session=_residency_session(tmp_path)
+    order=[]
+    async def bridge_update(rows,*,algorithm):
+        return {'grad_norm':1.}
+    async def ensure():
+        order.append('ensure_asleep')
+        raise RuntimeError('colocated inference engine did not enter sleep state before policy backload')
+    def save_models():
+        order.append('save_models')
+    session.bridge=SimpleNamespace(update=bridge_update,_ensure_colocated_inference_asleep=ensure)
+    session.trainer.save_models=save_models
+    with pytest.raises(RuntimeError,match='did not enter sleep state before policy backload'):
+        session.update([],algorithm='grpo')
+    assert order==['ensure_asleep']
+    assert 'save_models' not in order
+
+
+def test_save_reload_sleeps_before_checkpoints(tmp_path):
+    session=_residency_session(tmp_path)
+    order=[]
+    async def ensure():
+        order.append('ensure_asleep')
+    def save_checkpoints():
+        order.append('save_checkpoints')
+        raise RuntimeError('checkpoint boundary')
+    session.bridge=SimpleNamespace(_ensure_colocated_inference_asleep=ensure)
+    session.trainer.save_checkpoints=save_checkpoints
+    with pytest.raises(RuntimeError,match='checkpoint boundary'):
+        session.save_reload()
+    assert order==['ensure_asleep','save_checkpoints']
+
+
+def test_save_reload_does_not_checkpoint_when_sleep_guard_fails(tmp_path):
+    session=_residency_session(tmp_path)
+    order=[]
+    async def ensure():
+        order.append('ensure_asleep')
+        raise RuntimeError('colocated inference engine did not enter sleep state before policy backload')
+    def save_checkpoints():
+        order.append('save_checkpoints')
+    session.bridge=SimpleNamespace(_ensure_colocated_inference_asleep=ensure)
+    session.trainer.save_checkpoints=save_checkpoints
+    with pytest.raises(RuntimeError,match='did not enter sleep state before policy backload'):
+        session.save_reload()
+    assert order==['ensure_asleep']
+    assert 'save_checkpoints' not in order
 
 
 def test_activation_receipt_binds_checkpoint_and_requires_live_barrier(tmp_path,monkeypatch):

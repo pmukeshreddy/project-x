@@ -359,8 +359,10 @@ class NativeSession:
 
     def _ensure_colocated_inference_asleep(self):
         """Pinned weight sync and HF export backload policy without checking vLLM."""
-        if getattr(self,'bridge',None) is not None:
-            asyncio.run(self.bridge._ensure_colocated_inference_asleep())
+        bridge=getattr(self,'bridge',None)
+        if bridge is None:
+            raise RuntimeError('native bridge is required before colocated inference residency checks')
+        asyncio.run(bridge._ensure_colocated_inference_asleep())
 
     def synchronize(self,policy):
         """Await native broadcast, then independently probe each actual worker endpoint."""
