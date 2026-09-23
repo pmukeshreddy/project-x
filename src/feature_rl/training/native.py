@@ -357,6 +357,11 @@ class NativeSession:
         self.backend.verify_policy(policy)
         return value
 
+    def _ensure_colocated_inference_asleep(self):
+        """Pinned weight sync and HF export backload policy without checking vLLM."""
+        if getattr(self,'bridge',None) is not None:
+            asyncio.run(self.bridge._ensure_colocated_inference_asleep())
+
     def synchronize(self,policy):
         """Await native broadcast, then independently probe each actual worker endpoint."""
         if policy.identity.weights is None:raise ValueError('Exact synchronized weights required')
@@ -365,6 +370,7 @@ class NativeSession:
             raise ValueError('Fixed-input probe exceeds native context/vocabulary')
         stamp=PolicyStamp(policy.policy_version,policy.identity.weights.sha256,self.backend.tokenizer_digest,self.backend.template_digest)
         self.barrier.begin(stamp,(0,))  # Revokes all old acknowledgments before any call.
+        self._ensure_colocated_inference_asleep()
         asyncio.run(self.trainer.dispatch.save_weights_for_sampler())
         if self.settings.lora.enabled:
             self._validate_adapter(Path(self.settings.work_directory)/'lora-sync')
@@ -409,6 +415,8 @@ class NativeSession:
         if type(norm) not in (float,int) or not math.isfinite(norm) or norm<0:
             raise ValueError('Actual finite native optimizer gradient norm missing')
         after=self.worker_snapshot();change=compare_states(before,after)
+        # Export backloads policy. The sampler sync above left vLLM awake.
+        self._ensure_colocated_inference_asleep()
         self.trainer.save_models()
         path=Path(self.trainer.cfg.trainer.export_path)/('global_step_'+str(self.trainer.global_step))/'policy'
         if self.settings.lora.enabled:self._validate_adapter(path)
@@ -435,6 +443,7 @@ class NativeSession:
         before_state=self.worker_snapshot()
         if (Path(self.trainer.cfg.trainer.ckpt_path)/('global_step_'+str(self.trainer.global_step))).exists():
             raise ValueError('Native checkpoint step already exists; retained files are immutable')
+        self._ensure_colocated_inference_asleep()
         path=Path(self.trainer.save_checkpoints()).resolve()
         import torch,random,numpy
         torch.save({'python':random.getstate(),'numpy':numpy.random.get_state(),

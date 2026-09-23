@@ -86,6 +86,29 @@ def test_native_sync_probes_every_actual_endpoint_and_refuses_partial_ack(tmp_pa
     with pytest.raises(ValueError,match='incomplete'):session.barrier.require(session.barrier.stamp)
 
 
+def test_synchronize_rechecks_colocated_sleep_before_broadcast(tmp_path,monkeypatch):
+    import feature_rl.training.native as module
+    session=object.__new__(NativeSession)
+    session.settings=settings(tmp_path,lora=module.LoRASettings(enabled=False))
+    session.barrier=PolicyBarrier(('http://one',))
+    policy=config().initial_policy
+    policy=policy.model_copy(update={'identity':policy.identity.model_copy(update={'weights':config().reference_checkpoint})})
+    session.backend=SimpleNamespace(model_name=policy.identity.model,inference_model=policy.identity.model,
+        tokenizer_digest='c'*64,template_digest='d'*64,vocab_size=256)
+    order=[]
+    async def ensure():order.append('ensure_asleep')
+    async def sync():order.append('save_weights_for_sampler')
+    session.bridge=SimpleNamespace(_ensure_colocated_inference_asleep=ensure)
+    session.trainer=SimpleNamespace(dispatch=SimpleNamespace(save_weights_for_sampler=sync))
+    class Response:
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def read(self,cap):return json.dumps({'choices':[{'token_ids':[3],'finish_reason':'stop'}]}).encode()
+    monkeypatch.setattr(module,'urlopen',lambda request,timeout: Response())
+    session.synchronize(policy)
+    assert order==['ensure_asleep','save_weights_for_sampler']
+
+
 def test_activation_receipt_binds_checkpoint_and_requires_live_barrier(tmp_path,monkeypatch):
     from test_agent_runner import fixture
     from feature_rl.training.files import publish_directory

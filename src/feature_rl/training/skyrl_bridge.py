@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import copy
 import importlib.metadata
 import json
+import logging
 import threading
 import types
 
@@ -19,6 +20,17 @@ PINNED_SKYRL = 'f5bc3b78dfddfb352870d5d7430cd226e5785838'
 PINNED_HARBOR = '3de07a0e01f3368921766437fc7afece3ddec23d'
 GRPO_LOSS = 'feature_rl_sampled_clipped'
 _LOSS_REGISTRATION_LOCK = threading.RLock()
+_LOGGER = logging.getLogger(__name__)
+
+
+def _info(message):
+    """SkyRL training logs through loguru; stdlib logging stays available for tests."""
+    _LOGGER.info(message)
+    try:
+        from loguru import logger
+    except ImportError:
+        return
+    logger.info(message)
 
 
 def feature_grpo_loss(log_probs, old_log_probs, advantages, config, loss_mask=None, rollout_logprobs=None):
@@ -191,8 +203,47 @@ class SkyRLUpdateBridge:
             raise ValueError('Expected synchronous grouped FSDP/token-mean configuration without filtering/critic/ref updates')
         self.ready = False
 
+    async def _inference_engine_is_sleeping(self, client):
+        """Read vLLM sleep state through the pinned inference client.
+
+        Pinned RemoteInferenceClient exposes sleep() and control-plane fan-out,
+        not is_sleeping(). Newer SkyRL added that method as GET /is_sleeping,
+        which vLLM 0.23 already serves. Use the method when present and the
+        same existing fan-out otherwise. Do not treat a missing report as asleep.
+        """
+        query = getattr(client, 'is_sleeping', None)
+        if query is None:
+            responses = await client._call_all_servers('/is_sleeping', method='GET')
+            if not isinstance(responses, dict) or not responses:
+                raise RuntimeError('colocated inference engine sleep state was not reported')
+            try:
+                flags = [response['body']['is_sleeping'] for response in responses.values()]
+            except (KeyError, TypeError) as exc:
+                raise RuntimeError('colocated inference engine sleep state was not reported') from exc
+            if any(type(flag) is not bool for flag in flags):
+                raise RuntimeError('colocated inference engine sleep state was not reported')
+            return all(flags)
+        sleeping = await query()
+        if type(sleeping) is not bool:
+            raise RuntimeError('colocated inference engine sleep state was not reported')
+        return sleeping
+
+    async def _ensure_colocated_inference_asleep(self):
+        """Fail closed unless colocated vLLM is asleep before policy backload."""
+        trainer = self.trainer
+        if not trainer.colocate_all:
+            return
+        client = trainer.inference_engine_client
+        if not await self._inference_engine_is_sleeping(client):
+            _info('colocated inference engine is awake before policy weight sync')
+            await client.sleep()
+            if not await self._inference_engine_is_sleeping(client):
+                raise RuntimeError('colocated inference engine did not enter sleep state before policy backload')
+        _info('colocated inference sleep verified before policy weight sync')
+
     async def initialize_sync(self):
         self.trainer.init_weight_sync_state()
+        await self._ensure_colocated_inference_asleep()
         await self.trainer.dispatch.save_weights_for_sampler()
         self.ready = True
 
@@ -237,6 +288,7 @@ class SkyRLUpdateBridge:
         trainer.global_step += 1
         self.ready = False  # Failure requires explicit recovery, never stale collection.
         status = trainer.train_critic_and_policy(data)
+        await self._ensure_colocated_inference_asleep()
         await trainer.dispatch.save_weights_for_sampler()
         self.ready = True
         return status

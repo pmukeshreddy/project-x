@@ -1,5 +1,6 @@
 """Actual CPU tensor functions and source-contract checks; no SkyRL runtime claim."""
 import ast
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
@@ -136,3 +137,218 @@ def test_singleton_rows_are_omitted_without_replacing_assigned_records_or_costs(
     assert [r.reward for r in rows] == [0.,1.,1.,0.,1.]
     assert original == [(g.records,tuple(r.costs for r in g.records)) for g in groups]
     assert sum(len(g.records) for g in groups) == 12
+
+
+def _bridge(*, colocate, client, calls):
+    from feature_rl.training.skyrl_bridge import SkyRLUpdateBridge
+    trainer = SimpleNamespace(
+        colocate_all=colocate, inference_engine_client=client,
+        dispatch=SimpleNamespace(save_weights_for_sampler=_record(calls, 'save_weights_for_sampler')),
+        init_weight_sync_state=lambda: calls.append('init_weight_sync_state'))
+    bridge = object.__new__(SkyRLUpdateBridge)
+    bridge.trainer = trainer
+    bridge.ready = False
+    return bridge
+
+
+def _record(calls, name):
+    async def call():
+        calls.append(name)
+    return call
+
+
+class _SleepClient:
+    """Scripted is_sleeping() results. This does not claim a GPU fit."""
+    def __init__(self, flags, calls):
+        self.flags = list(flags)
+        self.calls = calls
+
+    async def is_sleeping(self):
+        self.calls.append('is_sleeping')
+        return self.flags.pop(0)
+
+    async def sleep(self):
+        self.calls.append('sleep')
+
+
+def test_initial_sync_sleeps_awake_colocated_engine_before_policy_backload(caplog):
+    import logging
+    calls = []
+    bridge = _bridge(colocate=True, client=_SleepClient([False, True], calls), calls=calls)
+    with caplog.at_level(logging.INFO, logger='feature_rl.training.skyrl_bridge'):
+        asyncio.run(bridge.initialize_sync())
+    assert calls == ['init_weight_sync_state', 'is_sleeping', 'sleep', 'is_sleeping', 'save_weights_for_sampler']
+    assert bridge.ready is True
+    assert 'colocated inference sleep verified before policy weight sync' in caplog.text
+
+
+def test_initial_sync_does_not_sleep_an_engine_that_is_already_asleep():
+    calls = []
+    bridge = _bridge(colocate=True, client=_SleepClient([True], calls), calls=calls)
+    asyncio.run(bridge.initialize_sync())
+    assert calls == ['init_weight_sync_state', 'is_sleeping', 'save_weights_for_sampler']
+    assert 'sleep' not in calls
+
+
+def test_initial_sync_refuses_policy_backload_when_sleep_does_not_stick():
+    calls = []
+    bridge = _bridge(colocate=True, client=_SleepClient([False, False], calls), calls=calls)
+    with pytest.raises(RuntimeError, match='did not enter sleep state before policy backload'):
+        asyncio.run(bridge.initialize_sync())
+    assert calls == ['init_weight_sync_state', 'is_sleeping', 'sleep', 'is_sleeping']
+    assert 'save_weights_for_sampler' not in calls
+    assert bridge.ready is False
+
+
+def test_non_colocated_sync_does_not_manage_inference_sleep_state():
+    calls = []
+    bridge = _bridge(colocate=False, client=_SleepClient([False], calls), calls=calls)
+    asyncio.run(bridge.initialize_sync())
+    asyncio.run(bridge._ensure_colocated_inference_asleep())
+    assert calls == ['init_weight_sync_state', 'save_weights_for_sampler']
+
+
+class _PinnedSleepClient:
+    """Pinned f5bc3b78 client shape: fan-out GET /is_sleeping, no is_sleeping()."""
+    def __init__(self, calls, *, stick):
+        self.calls = calls
+        self.sleeping = False
+        self.stick = stick
+
+    async def _call_all_servers(self, endpoint, json=None, method='POST', params=None):
+        self.calls.append((endpoint, method))
+        return {'http://127.0.0.1:8000': {'status': 200, 'body': {'is_sleeping': self.sleeping}}}
+
+    async def sleep(self):
+        self.calls.append('sleep')
+        if self.stick:
+            self.sleeping = True
+
+
+def test_initial_sync_queries_pinned_http_sleep_route_before_policy_backload():
+    calls = []
+    bridge = _bridge(colocate=True, client=_PinnedSleepClient(calls, stick=True), calls=calls)
+    asyncio.run(bridge.initialize_sync())
+    assert calls == [
+        'init_weight_sync_state', ('/is_sleeping', 'GET'), 'sleep', ('/is_sleeping', 'GET'),
+        'save_weights_for_sampler']
+
+
+def test_pinned_http_sleep_query_failure_blocks_policy_backload():
+    calls = []
+    bridge = _bridge(colocate=True, client=_PinnedSleepClient(calls, stick=False), calls=calls)
+    with pytest.raises(RuntimeError, match='did not enter sleep state before policy backload'):
+        asyncio.run(bridge.initialize_sync())
+    assert calls == ['init_weight_sync_state', ('/is_sleeping', 'GET'), 'sleep', ('/is_sleeping', 'GET')]
+    assert 'save_weights_for_sampler' not in calls
+
+
+def test_unreported_sleep_state_blocks_policy_backload():
+    calls = []
+
+    class Client:
+        async def _call_all_servers(self, endpoint, json=None, method='POST', params=None):
+            calls.append((endpoint, method))
+            return {'http://127.0.0.1:8000': {'status': 200, 'body': None}}
+
+        async def sleep(self):
+            calls.append('sleep')
+
+    bridge = _bridge(colocate=True, client=Client(), calls=calls)
+    with pytest.raises(RuntimeError, match='sleep state was not reported'):
+        asyncio.run(bridge.initialize_sync())
+    assert calls == ['init_weight_sync_state', ('/is_sleeping', 'GET')]
+    assert 'save_weights_for_sampler' not in calls and 'sleep' not in calls
+
+
+def _install_update_fakes(monkeypatch, calls):
+    import sys
+    import types
+    from feature_rl.training.skyrl_bridge import GRPO_LOSS
+    torch = pytest.importorskip('torch')
+    names = (
+        'skyrl', 'skyrl.train', 'skyrl.train.generators', 'skyrl.train.generators.base',
+        'skyrl.train.utils', 'skyrl.train.utils.trainer_utils')
+    modules = {name: types.ModuleType(name) for name in names}
+    for name, module in modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
+
+    class GeneratorOutput(dict):
+        def __init__(self, **kwargs):
+            super().__init__(kwargs)
+
+    class TrajectoryID:
+        def __init__(self, instance_id, repetition_id):
+            self.instance_id, self.repetition_id = instance_id, repetition_id
+
+    modules['skyrl.train.generators.base'].GeneratorOutput = GeneratorOutput
+    modules['skyrl.train.generators.base'].TrajectoryID = TrajectoryID
+    modules['skyrl.train.utils.trainer_utils'].validate_generator_output = lambda *args, **kwargs: calls.append(
+        'validate_generator_output')
+
+    def convert(trainer, output, uids):
+        calls.append('convert_eligible_batch')
+
+        class Batch(dict):
+            def __init__(self):
+                super().__init__(loss_mask=torch.ones(len(uids), 1), rewards=torch.zeros(len(uids), 1))
+                self.metadata = {}
+
+        return Batch()
+
+    monkeypatch.setattr('feature_rl.training.skyrl_bridge.convert_eligible_batch', convert)
+    return GRPO_LOSS
+
+
+def _update_bridge(monkeypatch, calls, *, colocate, client):
+    from feature_rl.training.skyrl_bridge import UpdateRow
+    from feature_rl.training.torch_backend import CausalTurn
+    loss = _install_update_fakes(monkeypatch, calls)
+    bridge = _bridge(colocate=colocate, client=client, calls=calls)
+    trainer = bridge.trainer
+    trainer.cfg = SimpleNamespace(trainer=SimpleNamespace(algorithm=SimpleNamespace(
+        policy_loss_type=loss, max_seq_len=32)))
+    trainer.global_step = 0
+    trainer.fwd_logprobs_values_reward = lambda data: calls.append('fwd_logprobs_values_reward') or data
+    trainer.train_critic_and_policy = lambda data: calls.append('train_critic_and_policy') or {'grad_norm': 1.}
+    bridge.ready = True
+    row = UpdateRow(CausalTurn((1, 2), (3,), (True,), (-.5,), 1.), 'group', 0, True, 1.)
+    return bridge, row
+
+
+def test_post_update_sync_rechecks_sleep_before_policy_backload(monkeypatch):
+    calls = []
+    bridge, row = _update_bridge(monkeypatch, calls, colocate=True, client=_SleepClient([False, True], calls))
+    asyncio.run(bridge.update([row], algorithm='grpo'))
+    assert calls[calls.index('train_critic_and_policy'):] == [
+        'train_critic_and_policy', 'is_sleeping', 'sleep', 'is_sleeping', 'save_weights_for_sampler']
+    assert calls.index('sleep') < calls.index('convert_eligible_batch')
+    assert bridge.ready is True
+
+
+def test_post_update_sync_does_not_sleep_again_when_engine_stays_asleep(monkeypatch):
+    calls = []
+    bridge, row = _update_bridge(monkeypatch, calls, colocate=True, client=_SleepClient([True], calls))
+    asyncio.run(bridge.update([row], algorithm='grpo'))
+    assert calls.count('sleep') == 1
+    assert calls[calls.index('train_critic_and_policy'):] == [
+        'train_critic_and_policy', 'is_sleeping', 'save_weights_for_sampler']
+
+
+def test_post_update_sync_blocks_backload_when_engine_stays_awake(monkeypatch):
+    calls = []
+    bridge, row = _update_bridge(monkeypatch, calls, colocate=True, client=_SleepClient([False, False], calls))
+    with pytest.raises(RuntimeError, match='did not enter sleep state before policy backload'):
+        asyncio.run(bridge.update([row], algorithm='grpo'))
+    assert calls[calls.index('train_critic_and_policy'):] == [
+        'train_critic_and_policy', 'is_sleeping', 'sleep', 'is_sleeping']
+    assert 'save_weights_for_sampler' not in calls
+    assert bridge.ready is False
+
+
+def test_non_colocated_update_does_not_manage_inference_sleep_state(monkeypatch):
+    calls = []
+    bridge, row = _update_bridge(monkeypatch, calls, colocate=False, client=_SleepClient([False], calls))
+    asyncio.run(bridge.update([row], algorithm='grpo'))
+    assert 'is_sleeping' not in calls and 'sleep' not in calls
+    assert calls[-1] == 'save_weights_for_sampler'
