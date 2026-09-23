@@ -550,6 +550,8 @@ def add_cli(commands):
     train.add_argument('--task-id', required=True)
     train.add_argument('--group-size', type=int, default=4)
     train.add_argument('--max-updates', type=int, default=1)
+    train.add_argument('--diagnostic-force-update', action='store_true',
+                       help='force one optimizer step from sampled trajectories when GRPO advantages are zero')
 
 
 def dispatch_cli(args):
@@ -566,7 +568,8 @@ def dispatch_cli(args):
         return pipeline.package(args.task_id, args.output)
     if args.action == 'train':
         from feature_rl.pipeline.deepswe_train import train_task
-        return train_task(pipeline, args.task_id, group_size=args.group_size, max_updates=args.max_updates)
+        return train_task(pipeline, args.task_id, group_size=args.group_size, max_updates=args.max_updates,
+                           diagnostic_force_update=args.diagnostic_force_update)
     if args.action == 'start':
         return pipeline.start(args.task_id)
     if args.action == 'grade':

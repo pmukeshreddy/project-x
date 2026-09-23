@@ -1,5 +1,6 @@
 """Pinned-source/config and isolated control-plane checks. No native/GPU/model call."""
 import ast
+import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -80,13 +81,17 @@ def test_native_sync_probes_every_actual_endpoint_and_refuses_partial_ack(tmp_pa
     def open_(request,timeout):
         calls.append((request.full_url,json.loads(request.data)));return Response()
     monkeypatch.setattr(module,'urlopen',open_)
-    receipt=session.synchronize(policy)
-    assert len(receipt['outputs'])==2 and len(calls)==3
-    assert calls[1][1]['sampling_params']['temperature']==0.
-    session.barrier.require(session.barrier.stamp)
-    finish[:]=['stop','abort']
-    with pytest.raises(ValueError,match='interrupted'):session.synchronize(policy)
-    with pytest.raises(ValueError,match='incomplete'):session.barrier.require(session.barrier.stamp)
+    session._async_runner=asyncio.Runner()
+    try:
+        receipt=session.synchronize(policy)
+        assert len(receipt['outputs'])==2 and len(calls)==3
+        assert calls[1][1]['sampling_params']['temperature']==0.
+        session.barrier.require(session.barrier.stamp)
+        finish[:]=['stop','abort']
+        with pytest.raises(ValueError,match='interrupted'):session.synchronize(policy)
+        with pytest.raises(ValueError,match='incomplete'):session.barrier.require(session.barrier.stamp)
+    finally:
+        session._async_runner.close()
 
 
 def test_synchronize_rechecks_colocated_sleep_before_broadcast(tmp_path,monkeypatch):
@@ -108,7 +113,11 @@ def test_synchronize_rechecks_colocated_sleep_before_broadcast(tmp_path,monkeypa
         def __exit__(self,*args):pass
         def read(self,cap):return json.dumps({'choices':[{'token_ids':[3],'finish_reason':'stop'}]}).encode()
     monkeypatch.setattr(module,'urlopen',lambda request,timeout: Response())
-    session.synchronize(policy)
+    session._async_runner=asyncio.Runner()
+    try:
+        session.synchronize(policy)
+    finally:
+        session._async_runner.close()
     assert order==['ensure_asleep','save_weights_for_sampler']
 
 
@@ -133,6 +142,7 @@ def _residency_session(tmp_path):
     root=tmp_path/'native-output'
     session.trainer=SimpleNamespace(global_step=0,cfg=SimpleNamespace(trainer=SimpleNamespace(
         export_path=str(root/'export'),ckpt_path=str(root/'ckpt'))))
+    session._async_runner=asyncio.Runner()
     return session
 
 
@@ -148,9 +158,12 @@ def test_update_export_sleeps_before_save_models(tmp_path):
         raise RuntimeError('export boundary')
     session.bridge=SimpleNamespace(update=bridge_update,_ensure_colocated_inference_asleep=ensure)
     session.trainer.save_models=save_models
-    with pytest.raises(RuntimeError,match='export boundary'):
-        session.update([],algorithm='grpo')
-    assert order==['ensure_asleep','save_models']
+    try:
+        with pytest.raises(RuntimeError,match='export boundary'):
+            session.update([],algorithm='grpo')
+        assert order==['ensure_asleep','save_models']
+    finally:
+        session._async_runner.close()
 
 
 def test_update_export_does_not_save_models_when_sleep_guard_fails(tmp_path):
@@ -165,10 +178,13 @@ def test_update_export_does_not_save_models_when_sleep_guard_fails(tmp_path):
         order.append('save_models')
     session.bridge=SimpleNamespace(update=bridge_update,_ensure_colocated_inference_asleep=ensure)
     session.trainer.save_models=save_models
-    with pytest.raises(RuntimeError,match='did not enter sleep state before policy backload'):
-        session.update([],algorithm='grpo')
-    assert order==['ensure_asleep']
-    assert 'save_models' not in order
+    try:
+        with pytest.raises(RuntimeError,match='did not enter sleep state before policy backload'):
+            session.update([],algorithm='grpo')
+        assert order==['ensure_asleep']
+        assert 'save_models' not in order
+    finally:
+        session._async_runner.close()
 
 
 def test_save_reload_sleeps_before_checkpoints(tmp_path):
@@ -181,9 +197,12 @@ def test_save_reload_sleeps_before_checkpoints(tmp_path):
         raise RuntimeError('checkpoint boundary')
     session.bridge=SimpleNamespace(_ensure_colocated_inference_asleep=ensure)
     session.trainer.save_checkpoints=save_checkpoints
-    with pytest.raises(RuntimeError,match='checkpoint boundary'):
-        session.save_reload()
-    assert order==['ensure_asleep','save_checkpoints']
+    try:
+        with pytest.raises(RuntimeError,match='checkpoint boundary'):
+            session.save_reload()
+        assert order==['ensure_asleep','save_checkpoints']
+    finally:
+        session._async_runner.close()
 
 
 def test_save_reload_does_not_checkpoint_when_sleep_guard_fails(tmp_path):
@@ -196,10 +215,49 @@ def test_save_reload_does_not_checkpoint_when_sleep_guard_fails(tmp_path):
         order.append('save_checkpoints')
     session.bridge=SimpleNamespace(_ensure_colocated_inference_asleep=ensure)
     session.trainer.save_checkpoints=save_checkpoints
-    with pytest.raises(RuntimeError,match='did not enter sleep state before policy backload'):
-        session.save_reload()
-    assert order==['ensure_asleep']
-    assert 'save_checkpoints' not in order
+    try:
+        with pytest.raises(RuntimeError,match='did not enter sleep state before policy backload'):
+            session.save_reload()
+        assert order==['ensure_asleep']
+        assert 'save_checkpoints' not in order
+    finally:
+        session._async_runner.close()
+
+
+def test_one_runner_owns_inference_teardown(monkeypatch):
+    session=object.__new__(NativeSession)
+    session._async_runner=asyncio.Runner()
+    session.experiment=None
+    loops=[]
+    order=[]
+    async def ensure():
+        loops.append(asyncio.get_running_loop())
+    async def teardown():
+        order.append('teardown')
+        loops.append(asyncio.get_running_loop())
+    session.bridge=SimpleNamespace(_ensure_colocated_inference_asleep=ensure)
+    session.trainer=SimpleNamespace(inference_engine_client=SimpleNamespace(teardown=teardown))
+    session.barrier=SimpleNamespace(stamp=0,probe=0,begin=lambda *args: order.append('revoke'))
+    session._ensure_colocated_inference_asleep()
+    session._ensure_colocated_inference_asleep()
+    class Ray:
+        @staticmethod
+        def is_initialized():
+            return True
+        @staticmethod
+        def shutdown():
+            order.append('shutdown')
+    monkeypatch.setitem(__import__('sys').modules,'ray',Ray)
+    runner=session._async_runner
+    loop=runner.get_loop()
+    session.close()
+    assert loops[0] is loops[1] is loops[2] is loop
+    assert order==['revoke','teardown','shutdown']
+    assert session._async_runner is None
+    with pytest.raises(RuntimeError,match='closed'):
+        runner.get_loop()
+    bare=object.__new__(NativeSession)
+    bare.close()
 
 
 def test_activation_receipt_binds_checkpoint_and_requires_live_barrier(tmp_path,monkeypatch):

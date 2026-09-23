@@ -50,7 +50,7 @@ class _Session:
 
     def update(self, rows, *, algorithm):
         self.updates.append((algorithm, rows))
-        return {'grad_norm': 1.0}
+        return {'grad_norm': 1.0, 'changed_trainable_shards': 1}
 
     def save_reload(self):
         self.checkpoints += 1
@@ -110,7 +110,11 @@ def test_deepswe_train_command_exists(tmp_path, monkeypatch):
                                  '--task-id', 'abs-module-cache-flags', '--group-size', '4', '--max-updates', '1'])
     assert args.command == 'deepswe' and args.action == 'train'
     assert args.task_id == 'abs-module-cache-flags' and args.group_size == 4 and args.max_updates == 1
-    monkeypatch.setattr(adapter, 'train_task', lambda pipeline, task_id, group_size, max_updates: {
+    assert args.diagnostic_force_update is False
+    forced = parser().parse_args(['deepswe', '--state', '/tmp/state', 'train',
+                                   '--task-id', 'abs-module-cache-flags', '--diagnostic-force-update'])
+    assert forced.diagnostic_force_update is True
+    monkeypatch.setattr(adapter, 'train_task', lambda pipeline, task_id, group_size, max_updates, diagnostic_force_update=False: {
         'task_id': task_id, 'group_size': group_size, 'max_updates': max_updates})
     args.state = str(tmp_path/'state')
     assert dispatch_cli(args) == {'task_id': 'abs-module-cache-flags', 'group_size': 4, 'max_updates': 1}
@@ -141,3 +145,36 @@ def test_collected_grade_reward_enters_existing_grpo_update(tmp_path):
     assert '/workspace/source' not in system['content'] + user['content']
     assert 'fresh isolated worker' not in system['content'] + user['content']
     assert INSTRUCTIONS not in user['content']
+
+
+def test_identical_rewards_skip_the_optimizer(tmp_path):
+    from feature_rl.pipeline.deepswe_train import train_task
+    task_id = 'widget-cache'
+    pipeline, calls, _patch = _pipeline(tmp_path, task_id, [0, 0, 0, 0])
+    session = _Session()
+    result = train_task(pipeline, task_id, group_size=4, max_updates=1, session=session)
+    assert result['updates'] == 0 and result['checkpoints'] == []
+    assert result['rewards'] == [[0, 0, 0, 0]]
+    assert session.updates == [] and session.checkpoints == 0
+    assert 'diagnostic_force_update' not in result and 'real_reward_signal' not in result
+    assert [name for name, *_ in calls].count('grade') == 4
+
+
+def test_diagnostic_force_update_steps_on_identical_rewards_without_inventing_samples(tmp_path):
+    from feature_rl.pipeline.deepswe_train import train_task
+    task_id = 'widget-cache'
+    pipeline, _calls, _patch = _pipeline(tmp_path, task_id, [0, 0, 0, 0])
+    session = _Session()
+    result = train_task(pipeline, task_id, group_size=4, max_updates=1, session=session,
+                         diagnostic_force_update=True)
+    assert result['updates'] == 1 and result['checkpoints'] == [{'path': '/checkpoints/global_step_1'}]
+    assert result['diagnostic_force_update'] is True and result['real_reward_signal'] is False
+    assert session.checkpoints == 1
+    algorithm, rows = session.updates[0]
+    assert algorithm == 'grpo' and len(rows) == 4
+    assert [row.turn.advantage for row in rows] == [1.0, 1.0, 1.0, 1.0]
+    assert [row.reward for row in rows] == [0.0, 0.0, 0.0, 0.0]
+    assert [row.turn.context for row in rows] == [(1, 2)] * 4
+    assert [row.turn.targets for row in rows] == [(3,)] * 4
+    assert [row.turn.behavior for row in rows] == [(-0.5,)] * 4
+    assert [row.turn.mask for row in rows] == [(True,)] * 4

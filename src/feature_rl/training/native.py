@@ -197,6 +197,11 @@ class NativeSession:
         self.store,self.registry=store,registry
         if len(revision) not in (40,64) or any(x not in '0123456789abcdef' for x in revision):raise ValueError('Exact native adapter revision required')
         self.revision=revision
+        self._async_runner=None
+        self.experiment=None
+        self.trainer=None
+        self.bridge=None
+        self.barrier=None
         policy=configuration.initial_policy
         if (configuration.framework_version!=PINNED_SKYRL or configuration.backend_version!=PINNED_HARBOR
             or configuration.framework!='skyrl' or policy.identity.provider!='skyrl' or policy.identity.weights is None
@@ -231,13 +236,23 @@ class NativeSession:
         if not Path(skyrl.__file__).resolve().is_relative_to(checkout): raise ValueError('Imported SkyRL is outside pinned checkout')
         verify_installed_pins()
         from skyrl.train.config import SkyRLTrainConfig
-        from skyrl.train.utils import validate_cfg
         from skyrl.train.utils.utils import initialize_ray
         import ray
         if ray.is_initialized():raise ValueError('NativeSession requires its own controller process/Ray connection; reuse its existing session for other arms')
         cfg=SkyRLTrainConfig.from_cli_overrides([k+'='+json.dumps(v) for k,v in native_overrides(settings,configuration).items()])
         # Registration must precede validation/worker construction for custom losses.
-        initialize_ray(cfg);register_losses();validate_cfg(cfg)
+        initialize_ray(cfg)
+        self._async_runner=asyncio.Runner()
+        try:
+            self._start_trainer(cfg,policy,settings)
+        except BaseException:
+            self.close()
+            raise
+
+    def _start_trainer(self,cfg,policy,settings):
+        from skyrl.train.utils import validate_cfg
+        configuration=self.configuration
+        register_losses();validate_cfg(cfg)
         from transformers import AutoTokenizer
         tokenizer=AutoTokenizer.from_pretrained(settings.tokenizer_directory,local_files_only=True,trust_remote_code=False)
         from skyrl.train.entrypoints.main_base import BasePPOExp
@@ -280,6 +295,22 @@ class NativeSession:
             def get_generator(inner,*args):
                 return None  # Trainer.train/eval are unused; actual AgentRunner owns collection.
             def get_trainer(inner,**kwargs): return ExternalTrainer(**kwargs)
+            def _get_new_inference_client(inner):
+                # Pinned construction, but the startup sleep stays on this session's runner.
+                # The stock method calls asyncio.run(client.sleep()), which would bind aiohttp
+                # to a loop that the next asyncio.run() then abandons.
+                from skyrl.backends.skyrl_train.inference_servers.setup import build_new_inference_client
+                is_colocated=inner.cfg.trainer.placement.colocate_all
+                client,server_setup=build_new_inference_client(
+                    inner.cfg,inner.tokenizer,placement_group=inner.colocate_pg if is_colocated else None)
+                inner._inference_router=server_setup.router
+                inner._server_groups=server_setup.server_groups
+                inner._prefill_server_groups=server_setup.prefill_server_groups
+                inner._decode_server_groups=server_setup.decode_server_groups
+                inner._inference_client=client
+                if is_colocated:
+                    self._async_runner.run(client.sleep())
+                return client
 
         self.experiment=SourceExperiment();self.trainer=self.experiment._setup_trainer()
         self.bridge=SkyRLUpdateBridge(self.trainer)
@@ -294,7 +325,7 @@ class NativeSession:
             model_name=policy.identity.model,barrier=self.barrier,max_seq_len=settings.max_seq_len,
             adapter_name=SKYRL_LORA_ADAPTER_NAME if settings.lora.enabled else None)
         self.policy=policy
-        asyncio.run(self.bridge.initialize_sync())
+        self._async_runner.run(self.bridge.initialize_sync())
         self.last_probe=self.synchronize(policy)
 
     def activate_checkpoint(self,checkpoint,policy):
@@ -362,7 +393,7 @@ class NativeSession:
         bridge=getattr(self,'bridge',None)
         if bridge is None:
             raise RuntimeError('native bridge is required before colocated inference residency checks')
-        asyncio.run(bridge._ensure_colocated_inference_asleep())
+        self._async_runner.run(bridge._ensure_colocated_inference_asleep())
 
     def synchronize(self,policy):
         """Await native broadcast, then independently probe each actual worker endpoint."""
@@ -373,7 +404,7 @@ class NativeSession:
         stamp=PolicyStamp(policy.policy_version,policy.identity.weights.sha256,self.backend.tokenizer_digest,self.backend.template_digest)
         self.barrier.begin(stamp,(0,))  # Revokes all old acknowledgments before any call.
         self._ensure_colocated_inference_asleep()
-        asyncio.run(self.trainer.dispatch.save_weights_for_sampler())
+        self._async_runner.run(self.trainer.dispatch.save_weights_for_sampler())
         if self.settings.lora.enabled:
             self._validate_adapter(Path(self.settings.work_directory)/'lora-sync')
         results={}
@@ -409,7 +440,7 @@ class NativeSession:
             raise ValueError('Native output step already exists; recover retained work instead of overwriting immutable tensors')
         before=self.worker_snapshot()
         self.barrier.begin(self.barrier.stamp,self.barrier.probe)
-        status=asyncio.run(self.bridge.update(rows,algorithm=algorithm))
+        status=self._async_runner.run(self.bridge.update(rows,algorithm=algorithm))
         if status.get('optimizer_skipped'):
             self.last_probe=self.synchronize(self.policy);return status
         status={key:float(value) for key,value in status.items()}
@@ -518,11 +549,44 @@ class NativeSession:
         self._load(Path(path));self.last_probe=self.synchronize(policy)
         return self.last_probe
 
+    def _owned_inference_client(self):
+        trainer=getattr(self,'trainer',None)
+        client=getattr(trainer,'inference_engine_client',None) if trainer is not None else None
+        if client is not None:
+            return client
+        experiment=getattr(self,'experiment',None)
+        if experiment is None:
+            return None
+        client=getattr(experiment,'_inference_client',None)
+        if client is not None:
+            return client
+        trainer=getattr(experiment,'trainer',None)
+        return getattr(trainer,'inference_engine_client',None) if trainer is not None else None
+
     def close(self):
-        """Revoke inference, then close this controller's owned Ray connection."""
-        self.barrier.begin(self.barrier.stamp,self.barrier.probe)
-        import ray
-        ray.shutdown()
+        """Revoke inference, close the owned aiohttp session, then stop Ray."""
+        barrier=getattr(self,'barrier',None)
+        if barrier is not None:
+            barrier.begin(barrier.stamp,barrier.probe)
+        runner=getattr(self,'_async_runner',None)
+        client=self._owned_inference_client()
+        teardown_error=None
+        if runner is not None and client is not None:
+            try:
+                runner.run(client.teardown())
+            except Exception as exc:
+                teardown_error=exc
+        if runner is not None:
+            runner.close()
+            self._async_runner=None
+        try:
+            import ray
+        except ModuleNotFoundError:
+            ray=None
+        if ray is not None and ray.is_initialized():
+            ray.shutdown()
+        if teardown_error is not None:
+            raise teardown_error
 
 # Pinned FSDPStrategy.create_optimizer constructs torch.optim.AdamW directly.
 OPTIMIZER_FAMILY = 'adamw'

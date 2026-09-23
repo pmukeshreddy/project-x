@@ -3,6 +3,7 @@
 Collection uses DeepSWE start, execute, reset, collect, grade, and close.
 The optimizer step and checkpoint are NativeSession.update and save_reload.
 """
+import math
 from pathlib import Path
 
 from feature_rl.agents.protocol import Read, Submit, Write, parse_action
@@ -132,24 +133,60 @@ def _episode(pipeline, session, task_id, episode_id, index, timeout):
     return turns, reward, patch
 
 
-def _rows(task_id, episodes):
+def _row(task_id, index, turns, reward, advantage):
+    rows = []
+    for turn_index, turn in enumerate(turns):
+        last = turn_index == len(turns)-1
+        rows.append(UpdateRow(
+            CausalTurn(turn.context, turn.targets, turn.mask, turn.behavior, advantage),
+            task_id, index, last, float(reward) if last else 0.))
+    return rows
+
+
+def _diagnostic_rows(task_id, episodes):
+    """Reuse sampled trajectories and force advantage 1 so the optimizer can step.
+
+    Verifier rewards, tokens, masks, and behavior logprobs stay the collected values.
+    """
+    sampled = [(index, turns, reward) for index, (turns, reward, _) in enumerate(episodes)
+               if reward is not None and turns]
+    if len(sampled) < 2:
+        raise RuntimeError('diagnostic force update requires at least two sampled episodes')
+    rows = []
+    for index, turns, reward in sampled:
+        rows.extend(_row(task_id, index, turns, reward, 1.0))
+    if not rows:
+        raise RuntimeError('diagnostic force update requires sampled turns')
+    return rows
+
+
+def _rows(task_id, episodes, *, diagnostic_force_update=False):
     rewards = tuple(reward for _, reward, _ in episodes)
     advantages = group_advantages(rewards)
     if sum(reward is not None for reward in rewards) < 2 or not any(item not in (None, 0, 0.0) for item in advantages):
-        return []
+        if not diagnostic_force_update:
+            return [], False
+        return _diagnostic_rows(task_id, episodes), True
     rows = []
     for index, (turns, reward, _) in enumerate(episodes):
         if advantages[index] is None or not turns:
             continue
-        for turn_index, turn in enumerate(turns):
-            last = turn_index == len(turns)-1
-            rows.append(UpdateRow(
-                CausalTurn(turn.context, turn.targets, turn.mask, turn.behavior, advantages[index]),
-                task_id, index, last, float(reward) if last else 0.))
-    return rows
+        rows.extend(_row(task_id, index, turns, reward, advantages[index]))
+    return rows, False
 
 
-def train_task(pipeline, task_id, *, group_size, max_updates, session=None):
+def _require_diagnostic_mutation(status):
+    if status.get('optimizer_skipped'):
+        raise RuntimeError('diagnostic force update skipped the optimizer')
+    norm = status.get('grad_norm')
+    if type(norm) is bool or type(norm) not in (int, float) or not math.isfinite(norm) or norm == 0:
+        raise RuntimeError('diagnostic force update requires a nonzero finite gradient norm')
+    changed = status.get('changed_trainable_shards')
+    if type(changed) is not int or changed < 1:
+        raise RuntimeError('diagnostic force update did not change trainable worker state')
+
+
+def train_task(pipeline, task_id, *, group_size, max_updates, session=None, diagnostic_force_update=False):
     if type(group_size) is not int or group_size < 2:
         raise ValueError('GRPO group_size must be an integer of at least 2')
     if type(max_updates) is not int or max_updates < 1:
@@ -161,6 +198,7 @@ def train_task(pipeline, task_id, *, group_size, max_updates, session=None):
     rewards = []
     checkpoints = []
     updates = 0
+    used_diagnostic = False
     try:
         for _ in range(max_updates):
             opened = pipeline.start(task_id)
@@ -174,16 +212,25 @@ def train_task(pipeline, task_id, *, group_size, max_updates, session=None):
             finally:
                 pipeline.close(episode_id)
             rewards.append([reward for _, reward, _ in episodes])
-            rows = _rows(task_id, episodes)
+            rows, forced = _rows(task_id, episodes, diagnostic_force_update=diagnostic_force_update)
             if not rows:
                 continue
             status = session.update(rows, algorithm='grpo')
-            if status.get('optimizer_skipped'):
+            if forced:
+                _require_diagnostic_mutation(status)
+                used_diagnostic = True
+            elif status.get('optimizer_skipped'):
                 continue
             checkpoints.append(session.save_reload())
             updates += 1
+        if diagnostic_force_update and updates < 1:
+            raise RuntimeError('diagnostic force update did not apply an optimizer step')
     finally:
         if owns_session:
             session.close()
-    return {'task_id': task_id, 'group_size': group_size, 'max_updates': max_updates,
-            'updates': updates, 'rewards': rewards, 'checkpoints': checkpoints}
+    result = {'task_id': task_id, 'group_size': group_size, 'max_updates': max_updates,
+              'updates': updates, 'rewards': rewards, 'checkpoints': checkpoints}
+    if used_diagnostic:
+        result['diagnostic_force_update'] = True
+        result['real_reward_signal'] = False
+    return result
