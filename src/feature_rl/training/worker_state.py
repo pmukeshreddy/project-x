@@ -4,6 +4,37 @@ import math
 from feature_rl.artifacts import canonical_json
 
 
+def attach_lora_optimizer(model, optim_config, num_training_steps):
+    """AdamW and scheduler for fp32 LoRA parameters only.
+
+    Pinned FSDP training keeps an fp32 master of every base weight. On one
+    host that copy, the bf16 reference model, and vLLM's level-1 CPU backup
+    exceed node RAM. The frozen base stays bf16; only adapter weights are stepped.
+    """
+    import torch
+    from torch import optim
+    params=[param for param in model.parameters() if param.requires_grad]
+    if not params:
+        raise ValueError('LoRA training requires trainable parameters')
+    if any(param.dtype!=torch.float32 for param in params):
+        raise ValueError('LoRA trainable parameters must be fp32')
+    if optim_config.scheduler!='constant_with_warmup':
+        raise ValueError('LoRA training uses constant_with_warmup')
+    if type(num_training_steps) is not int or num_training_steps<1:
+        raise ValueError('LoRA optimizer requires the trainer step count')
+    warmup=optim_config.num_warmup_steps
+    if type(warmup) is not int or warmup<0:
+        raise ValueError('LoRA warmup steps must be a nonnegative integer')
+    optimizer=optim.AdamW(params,lr=optim_config.lr,betas=tuple(optim_config.adam_betas),
+                          weight_decay=optim_config.weight_decay)
+    def scale(step,warmup=warmup):
+        if warmup<=0 or step>=warmup:
+            return 1.0
+        return float(step)/float(warmup)
+    scheduler=torch.optim.lr_scheduler.LambdaLR(optimizer,scale)
+    return optimizer,scheduler
+
+
 def trainable_binding(model, optimizer, *, lora, trim_optimizer=False):
     """Bind PEFT's actual gradient mask and the optimizer's parameter ownership."""
     parameters=dict(model.named_parameters())

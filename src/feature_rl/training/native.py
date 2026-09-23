@@ -262,7 +262,24 @@ class NativeSession:
 
         class VerifiedPolicyWorker(FSDPPolicyWorkerBase):
             def init_model(inner, model_path, num_training_steps=None):
-                super().init_model(model_path,num_training_steps=num_training_steps)
+                # Pinned training init stores every base weight in fp32. LoRA does not
+                # update those weights; keeping them fp32 OOMs a single ~96GB host once
+                # the reference model and vLLM's CPU backup are also resident.
+                lora_train=inner.cfg.policy.model.lora.rank>0 and not inner.cfg.policy.inference_only_init
+                if lora_train:
+                    inner.cfg.policy.inference_only_init=True
+                try:
+                    super().init_model(model_path,num_training_steps=num_training_steps)
+                finally:
+                    if lora_train:
+                        inner.cfg.policy.inference_only_init=False
+                if lora_train:
+                    from feature_rl.training.worker_state import attach_lora_optimizer
+                    inner.optimizer,inner.scheduler=attach_lora_optimizer(
+                        inner.model,inner.cfg.policy.optimizer_config,inner.strategy.total_training_steps)
+                    inner.strategy.max_norm=inner.cfg.policy.optimizer_config.max_grad_norm
+                    inner.strategy.manual_offload_optimizer=(
+                        inner.cfg.policy.optimizer_config.offload_after_step and inner.strategy.manual_offload)
                 from feature_rl.training.worker_state import trainable_binding
                 trainable_binding(inner.model,inner.optimizer,lora=inner._is_lora,trim_optimizer=True)
 

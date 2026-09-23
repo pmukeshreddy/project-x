@@ -26,6 +26,34 @@ def model(torch):
     return TinyCausalModel()
 
 
+def test_lora_optimizer_steps_only_fp32_adapter_weights(torch):
+    from types import SimpleNamespace
+    from feature_rl.training.worker_state import attach_lora_optimizer,trainable_binding
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.base=torch.nn.Linear(4,4,dtype=torch.bfloat16)
+            self.base.weight.requires_grad_(False)
+            self.base.bias.requires_grad_(False)
+            self.lora_A=torch.nn.Parameter(torch.randn(4,2))
+            self.lora_B=torch.nn.Parameter(torch.randn(2,4))
+    model=Model()
+    frozen=model.base.weight.untyped_storage().data_ptr()
+    config=SimpleNamespace(lr=1e-4,adam_betas=(0.9,0.999),weight_decay=0.0,num_warmup_steps=0,
+                           scheduler='constant_with_warmup',max_grad_norm=1.0,offload_after_step=True)
+    optimizer,scheduler=attach_lora_optimizer(model,config,3)
+    owned=[id(param) for group in optimizer.param_groups for param in group['params']]
+    assert owned==[id(model.lora_A),id(model.lora_B)]
+    assert model.base.weight.dtype==torch.bfloat16 and model.base.weight.untyped_storage().data_ptr()==frozen
+    assert model.lora_A.dtype==torch.float32 and scheduler.get_last_lr()==[1e-4]
+    binding=trainable_binding(model,optimizer,lora=True,trim_optimizer=True)
+    assert set(binding)=={'lora_A','lora_B'}
+    broken=Model()
+    broken.lora_A.data=broken.lora_A.data.to(torch.bfloat16)
+    with pytest.raises(ValueError,match='fp32'):
+        attach_lora_optimizer(broken,config,3)
+
+
 def test_assistant_mask_removes_harness_tokens_from_policy_loss(torch):
     from feature_rl.training.torch_backend import clipped_surrogate
     logits = torch.tensor([-.5, -.7, -.9], requires_grad=True)
