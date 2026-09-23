@@ -284,11 +284,13 @@ class NativeSession:
                 trainable_binding(inner.model,inner.optimizer,lora=inner._is_lora,trim_optimizer=True)
 
             def feature_rl_trainable_binding(inner):
+                import torch
                 from feature_rl.training.worker_state import trainable_binding
                 return {'rank':torch.distributed.get_rank(),
                     'parameters':trainable_binding(inner.model,inner.optimizer,lora=inner._is_lora)}
 
             def feature_rl_snapshot(inner):
+                import torch
                 from feature_rl.training.worker_state import snapshot_state,trainable_binding
                 trainable_binding(inner.model,inner.optimizer,lora=inner._is_lora)
                 return snapshot_state(inner.model,inner.optimizer,rank=torch.distributed.get_rank())
